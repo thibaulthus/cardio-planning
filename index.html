@@ -389,32 +389,61 @@ function MedBtn(_a) {
 }
 /* ════ GRID H ════ */
 function GridH(_a) {
-    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4;
+    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _c = _a.showGarde, showGarde = _c === void 0 ? true : _c;
     var today = new Date();
+    var ghEffDays = useMemo(function () {
+        if (viewPeriod) {
+            var sm = month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6;
+            var sy = month <= 1 ? year - 1 : year;
+            var days = [];
+            for (var mi = 0; mi < 4; mi++) {
+                var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
+                var dim = new Date(y2, m2 + 1, 0).getDate();
+                for (var d = 1; d <= dim; d++)
+                    days.push({ y: y2, m: m2, d: d });
+            }
+            return days;
+        }
+        var base = allDays.map(function (d) { return ({ y: year, m: month, d: d }); });
+        if (!showFull) {
+            var tod_1 = new Date();
+            tod_1.setHours(0, 0, 0, 0);
+            return base.filter(function (_a) {
+                var ey = _a.y, em = _a.m, d = _a.d;
+                return new Date(ey, em, d) >= tod_1;
+            });
+        }
+        return base;
+    }, [year, month, viewPeriod, allDays, showFull]);
     return (React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)" } },
         React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
             React.createElement("thead", null,
                 React.createElement("tr", null,
                     React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 58 }), rowSpan: 2 }, "M\u00E9d."),
-                    allDays.map(function (d) {
-                        var we = isWE(year, month, d), isT = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-                        return React.createElement("th", { key: d, colSpan: we ? 1 : 3, style: __assign(__assign(__assign(__assign({}, S.th), (we ? S.thWE : {})), (isT ? S.thTD : {})), { minWidth: we ? 32 : 84, position: "sticky", top: 0, zIndex: 20 }) },
+                    ghEffDays.map(function (_a) {
+                        var ghY = _a.y, ghM = _a.m, d = _a.d;
+                        var we = isWE(ghY, ghM, d), isT = d === today.getDate() && ghM === today.getMonth() && ghY === today.getFullYear();
+                        var cols = showGarde ? 3 : 2;
+                        return React.createElement("th", { key: d + ghM + ghY, colSpan: we ? 1 : cols, style: __assign(__assign(__assign(__assign({}, S.th), (we ? S.thWE : {})), (isT ? S.thTD : {})), { minWidth: we ? 32 : cols * 28, position: "sticky", top: 0, zIndex: 20 }) },
                             React.createElement("div", { style: S.thN }, d),
-                            viewPeriod && React.createElement("div", { style: { fontSize: 7, color: "var(--txt3)", fontWeight: 600 } }, MOIS[month]),
-                            React.createElement("div", { style: S.thJ }, ["D", "L", "Ma", "Me", "J", "V", "S"][dow(year, month, d)]));
+                            viewPeriod && React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700 } }, MOIS[ghM]),
+                            React.createElement("div", { style: S.thJ }, ["D", "L", "Ma", "Me", "J", "V", "S"][dow(ghY, ghM, d)]));
                     })),
-                React.createElement("tr", null, allDays.map(function (d) {
-                    if (isWE(year, month, d))
+                React.createElement("tr", null, ghEffDays.map(function (_a) {
+                    var ghY = _a.y, ghM = _a.m, d = _a.d;
+                    if (isWE(ghY, ghM, d))
                         return null;
-                    return ["M", "AM", "N"].map(function (sl) { return React.createElement("th", { key: d + sl, style: __assign(__assign({}, S.th), { fontSize: 8, padding: "2px 1px", background: sl === "N" ? "var(--bg-n)" : "var(--th)", color: "var(--txt3)", position: "sticky", top: "24px", zIndex: 19 }) }, SLOTS[sl]); });
+                    var slots = showGarde ? ["M", "AM", "N"] : ["M", "AM"];
+                    return slots.map(function (sl) { return React.createElement("th", { key: d + sl + ghM + ghY, style: __assign(__assign({}, S.th), { fontSize: 8, padding: "2px 1px", background: sl === "N" ? "var(--bg-n)" : "var(--th)", color: "var(--txt3)", position: "sticky", top: "24px", zIndex: 19 }) }, SLOTS[sl]); });
                 }))),
             React.createElement("tbody", null, meds.map(function (med) { return (React.createElement("tr", { key: med.id, style: { borderBottom: "1px solid var(--border2)", height: 32 } },
                 React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10 }), title: "Dr. ".concat(med.prenom, " ").concat(med.nom) },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } },
                         React.createElement(Av, { med: med }),
                         React.createElement("span", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt)", fontFamily: "'JetBrains Mono',monospace" } }, med.init))),
-                allDays.map(function (d) {
-                    var we = isWE(year, month, d);
+                ghEffDays.map(function (_a) {
+                    var ghY = _a.y, ghM = _a.m, d = _a.d;
+                    var we = isWE(ghY, ghM, d);
                     if (we) {
                         var es = getEntries(med.id, year, month, d, "JOUR");
                         var noteT_1 = notes[nk(med.id, year, month, d, "JOUR")];
@@ -445,11 +474,11 @@ function GridV(_a) {
         if (!viewPeriod) {
             var base = allDays.map(function (d) { return ({ y: year, m: month, d: d, label: null }); });
             if (!showFull) {
-                var tod_1 = new Date();
-                tod_1.setHours(0, 0, 0, 0);
+                var tod_2 = new Date();
+                tod_2.setHours(0, 0, 0, 0);
                 return base.filter(function (_a) {
                     var ey = _a.y, em = _a.m, d = _a.d;
-                    return new Date(ey, em, d) >= tod_1;
+                    return new Date(ey, em, d) >= tod_2;
                 });
             }
             return base;
@@ -485,11 +514,7 @@ function GridV(_a) {
                 React.createElement("div", { style: S.mHd },
                     React.createElement("div", { style: S.mTit2 },
                         "\uD83C\uDF19 Garde \u2014 ",
-                        pickGardeDay,
-                        " ",
-                        MOIS[pickGardeDayFull ? pickGardeDayFull.m : month],
-                        " ",
-                        pickGardeDayFull ? pickGardeDayFull.y : year),
+                        (function () { var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var dw = dow(pgf.y, pgf.m, pgf.d); return ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw] + " " + pgf.d + " " + MOIS[pgf.m] + " " + pgf.y; })()),
                     React.createElement("button", { onClick: function () { return setPickGardeDay(null); }, style: S.xBtn }, "\u00D7")),
                 (function () {
                     var pgf2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
@@ -503,18 +528,29 @@ function GridV(_a) {
                             cgm.nom),
                         React.createElement("button", { onClick: function () { onCell(cgm.id, year, month, pickGardeDay, "N"); setPickGardeDay(null); }, style: __assign(__assign({ marginLeft: "auto" }, S.btnP), { fontSize: 11, padding: "3px 8px" }) }, "Modifier"))) : null;
                 })(),
-                React.createElement("input", { autoFocus: true, value: gardeSearch, onChange: function (e) { return setGardeSearch(e.target.value.toUpperCase()); }, placeholder: "Initiales ou nom...", style: { width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", fontSize: 14, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, letterSpacing: 2, marginBottom: 8, boxSizing: "border-box" } }),
-                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, maxHeight: 320, overflowY: "auto" } }, gardePickMeds.filter(function (m) { return !gardeSearch || m.init.toUpperCase().includes(gardeSearch) || m.nom.toUpperCase().includes(gardeSearch) || m.prenom.toUpperCase().includes(gardeSearch); }).map(function (m) {
-                    var gm = getGardeMed(pickGardeDay);
-                    var isOn = gm && gm.id === m.id;
-                    return React.createElement("button", { key: m.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid ".concat(isOn ? "#16a34a" : "var(--border)"), background: isOn ? "#f0fdf4" : "var(--bg2)", cursor: "pointer" }, onClick: function () { var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(m.id, pgf.y, pgf.m, pgf.d); setPickGardeDayFull(null); } },
-                        React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, m.init),
-                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
-                            m.prenom,
-                            " ",
-                            m.nom),
-                        isOn && React.createElement("span", { style: { marginLeft: "auto", color: "#16a34a", fontSize: 12 } }, "\u2713 De garde"));
-                })))),
+                (function () {
+                    var filteredGM = gardePickMeds.filter(function (m) { return !gardeSearch || m.init.toUpperCase().startsWith(gardeSearch); });
+                    var onEnter = function (e) { if (e.key === "Enter" && filteredGM.length === 1) {
+                        var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
+                        applyGarde(filteredGM[0].id, pgf.y, pgf.m, pgf.d);
+                        setPickGardeDayFull(null);
+                    } };
+                    return (React.createElement(React.Fragment, null,
+                        React.createElement("input", { autoFocus: true, value: gardeSearch, onChange: function (e) { return setGardeSearch(e.target.value.toUpperCase()); }, onKeyDown: onEnter, placeholder: "Initiales ou nom...", style: { width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", fontSize: 14, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, letterSpacing: 2, marginBottom: 8, boxSizing: "border-box" } }),
+                        filteredGM.length === 1 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 4, textAlign: "center" } }, "\u21B5 Entr\u00E9e pour confirmer"),
+                        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, maxHeight: 320, overflowY: "auto" } }, filteredGM.map(function (m) {
+                            var pgfCur = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
+                            var gm = getGardeMed2(pgfCur.y, pgfCur.m, pgfCur.d);
+                            var isOn = gm && gm.id === m.id;
+                            return React.createElement("button", { key: m.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid ".concat(isOn ? "#16a34a" : "var(--border)"), background: isOn ? "#f0fdf4" : "var(--bg2)", cursor: "pointer" }, onClick: function () { var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(m.id, pgf.y, pgf.m, pgf.d); setPickGardeDayFull(null); } },
+                                React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, m.init),
+                                React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
+                                    m.prenom,
+                                    " ",
+                                    m.nom),
+                                isOn && React.createElement("span", { style: { marginLeft: "auto", color: "#16a34a", fontSize: 12 } }, "\u2713 De garde"));
+                        }))));
+                })())),
         React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)" } },
             React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
                 React.createElement("thead", null,
@@ -536,7 +572,7 @@ function GridV(_a) {
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: C0, background: isVac && isVac(ey, em, d) ? "#e2e8f0" : "var(--td-fix)" }), rowSpan: slots.length },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
-                                viewPeriod && React.createElement("div", { style: { fontSize: 7, color: "var(--txt3)", fontWeight: 600, fontFamily: "sans-serif", lineHeight: 1 } }, MOIS[em])),
+                                viewPeriod && React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700, fontFamily: "sans-serif", lineHeight: 1.2 } }, MOIS[em])),
                             React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)", textTransform: "uppercase", textAlign: "center" } }, JOURSC[dow(ey, em, d)])),
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, SLOTS[sl]),
                         si === 0 && React.createElement("td", { rowSpan: slots.length, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0 + C1, zIndex: 9, borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "#f0fdf4" : "var(--td-fix)" }), onClick: function () { if (!isEdit)
@@ -571,11 +607,11 @@ function SiteView(_a) {
     var svEffDays = useMemo(function () {
         var base = allDays.map(function (d) { return ({ y: year, m: month, d: d }); });
         if (!showFull) {
-            var tod_2 = new Date();
-            tod_2.setHours(0, 0, 0, 0);
+            var tod_3 = new Date();
+            tod_3.setHours(0, 0, 0, 0);
             return base.filter(function (_a) {
                 var ey3 = _a.y, em3 = _a.m, d = _a.d;
-                return new Date(ey3, em3, d) >= tod_2;
+                return new Date(ey3, em3, d) >= tod_3;
             });
         }
         return base;
@@ -718,11 +754,11 @@ function ActTabView(_a) {
     var atvEffDays2 = useMemo(function () {
         var base = allDays.map(function (d) { return ({ y: year, m: month, d: d }); });
         if (!showFull) {
-            var tod_3 = new Date();
-            tod_3.setHours(0, 0, 0, 0);
+            var tod_4 = new Date();
+            tod_4.setHours(0, 0, 0, 0);
             return base.filter(function (_a) {
                 var ey3 = _a.y, em3 = _a.m, d = _a.d;
-                return new Date(ey3, em3, d) >= tod_3;
+                return new Date(ey3, em3, d) >= tod_4;
             });
         }
         return base;
@@ -849,11 +885,11 @@ function GardeView(_a) {
     var gvEffDays = useMemo(function () {
         var base = allDays.map(function (d) { return ({ y: year, m: month, d: d }); });
         if (!showFull) {
-            var tod_4 = new Date();
-            tod_4.setHours(0, 0, 0, 0);
+            var tod_5 = new Date();
+            tod_5.setHours(0, 0, 0, 0);
             return base.filter(function (_a) {
                 var ey3 = _a.y, em3 = _a.m, d = _a.d;
-                return new Date(ey3, em3, d) >= tod_4;
+                return new Date(ey3, em3, d) >= tod_5;
             });
         }
         return base;
@@ -963,7 +999,7 @@ function GardeView(_a) {
                     React.createElement("button", { style: { width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { removeGarde(typeof pickerDay === "object" ? pickerDay.d : pickerDay, pd && pd.y, pd && pd.m); setPickerDay(null); } }, "Retirer la garde + repos"))),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, gMed ? "Changer :" : "Assigner :"),
                 React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 360, overflowY: "auto" } }, medecins.filter(function (m) { return m.garde === true; }).map(function (m) {
-                    var avail = isMedAvailable(m, year, month, pickerDay, gardeSlot);
+                    var avail = isMedAvailable(m, pd.y, pd.m, pd.d, gardeSlot);
                     var isG = gMed && m.id === gMed.id;
                     return (React.createElement("button", { key: m.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 7,
                             border: "1px solid ".concat(isG ? "var(--today-c)" : "var(--border)"),
@@ -2111,7 +2147,7 @@ function CardioPlanning() {
     var _t = useState(false), viewPeriod = _t[0], setViewPeriod = _t[1];
     // Reset to 1M when leaving planning tab
     React.useEffect(function () {
-        if (tab !== "planning" && tab !== "attache" && viewPeriod) {
+        if (tab !== "planning" && tab !== "attache" && tab !== "garde" && viewPeriod) {
             setViewPeriod(false);
         }
     }, [tab]);
@@ -2924,10 +2960,11 @@ function CardioPlanning() {
                         React.createElement("div", { style: S.oriTog },
                             React.createElement("button", { onClick: function () { return setOrient("H"); }, style: __assign(__assign({}, S.oriB), (orient === "H" ? S.oriBa : {})) }, "\u27F7 H"),
                             React.createElement("button", { onClick: function () { return setOrient("V"); }, style: __assign(__assign({}, S.oriB), (orient === "V" ? S.oriBa : {})) }, "\u27F3 V")),
+                        React.createElement("button", { onClick: function () { return setViewPeriod(function (v) { return !v; }); }, title: viewPeriod ? "Vue mois" : "Vue 4 mois", style: __assign(__assign({}, S.arr), { fontSize: 11, padding: "3px 6px", fontWeight: 800, color: viewPeriod ? "#fff" : "var(--txt2)", background: viewPeriod ? "#1d4ed8" : "var(--bg2)", border: "1px solid ".concat(viewPeriod ? "#1d4ed8" : "var(--border)") }) }, viewPeriod ? "4M" : "1M"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 orient === "H"
-                    ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull })
+                    ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
