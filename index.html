@@ -455,7 +455,7 @@ function GridH(_a) {
                         var noteT = notes[nk(med.id, ghY, ghM, d, sl)];
                         var astIdH = getAstreinteForDay ? getAstreinteForDay(ghY, ghM, d) : null;
                         var isAstH = astIdH === med.id;
-                        return React.createElement("td", { key: d + sl + ghM + ghY, title: noteT || (isAstH ? "🔔 Astreinte" : undefined) || undefined, style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (sl === "N" ? S.tdN : {})), (isAstH && !we ? { background: "#fef9c3", outline: "1px solid #fbbf24" } : {})), (isTgh ? { background: "var(--bg-td)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ghY, ghM, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                        return React.createElement("td", { key: d + sl + ghM + ghY, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (sl === "N" ? S.tdN : {})), (isAstH ? { background: "#fef9c3", outline: "1px solid #fbbf24" } : {})), (isTgh ? { background: "var(--bg-td)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ghY, ghM, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                     });
                 }))); })))));
 }
@@ -587,7 +587,7 @@ function GridV(_a) {
                             var noteT = notes[nk(med.id, ey, em, d, sl)];
                             var astId = getAstreinteForDay ? getAstreinteForDay(ey, em, d) : null;
                             var isAst = astId === med.id;
-                            return React.createElement("td", { key: med.id, title: noteT || (isAst ? "🔔 Astreinte" : undefined) || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst && !we ? { background: "#fef9c3", outline: "1px solid #fbbf24" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                            return React.createElement("td", { key: med.id, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "#fef9c3", outline: "1px solid #fbbf24" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                         }))); });
                 }))))));
 }
@@ -2151,7 +2151,7 @@ function CardioPlanning() {
     var _t = useState(false), viewPeriod = _t[0], setViewPeriod = _t[1];
     // Reset to 1M when leaving planning tab
     React.useEffect(function () {
-        if (tab !== "planning" && tab !== "attache" && tab !== "garde" && viewPeriod) {
+        if (tab !== "planning" && tab !== "attache" && viewPeriod) {
             setViewPeriod(false);
         }
     }, [tab]);
@@ -2168,35 +2168,45 @@ function CardioPlanning() {
     var _z = useState({}), notes = _z[0], setNotes = _z[1];
     var _0 = useState({}), medPins = _0[0], setMedPins = _0[1]; // {medId: "pin"}
     var _1 = useState({}), astreinte = _1[0], setAstreinte = _1[1]; // {wKey: medId}
+    var _2 = useState(null), astDayModal = _2[0], setAstDayModal = _2[1]; // legacy
+    var _3 = useState(null), astPickModal = _3[0], setAstPickModal = _3[1]; // {dayKey,wKey,isWeek,label}
+    var _4 = useState(""), astSearch = _4[0], setAstSearch = _4[1];
+    var _5 = useState(false), ast4M = _5[0], setAst4M = _5[1];
     // Get astreinte medId for a given day
     var getAstreinteForDay = React.useCallback(function (y, m, d) {
+        // Check day-specific exception first
+        var dayKey = y + "-" + m + "-" + d;
+        if (astreinte[dayKey] !== undefined)
+            return astreinte[dayKey] || null;
+        // Fall back to week assignment (Monday key)
         var dt = new Date(y, m, d);
         var day = dt.getDay();
-        var diff = day === 0 ? -6 : 1 - day; // go to Monday
+        var diff = day === 0 ? -6 : 1 - day;
         var mon = new Date(dt);
         mon.setDate(dt.getDate() + diff);
-        var wk = "".concat(mon.getFullYear(), "-").concat(mon.getMonth(), "-").concat(mon.getDate());
+        var wk = mon.getFullYear() + "-" + mon.getMonth() + "-" + mon.getDate();
         return astreinte[wk] || null;
     }, [astreinte]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
-    var _2 = useState(function () { return new Date().getFullYear(); }), astYear = _2[0], setAstYear = _2[1];
-    var _3 = useState(function () { return new Date().getMonth(); }), astMonth = _3[0], setAstMonth = _3[1];
-    var _4 = useState(function () { return new Date().getFullYear(); }), tourYear = _4[0], setTourYear = _4[1];
-    var _5 = useState(function () { return new Date().getMonth(); }), tourMonth = _5[0], setTourMonth = _5[1];
-    var _6 = useState("connecting"), fbStatus = _6[0], setFbStatus = _6[1];
-    var _7 = useState(function () { try {
+    var _6 = useState(function () { return new Date().getFullYear(); }), astYear = _6[0], setAstYear = _6[1];
+    var _7 = useState(function () { return new Date().getMonth(); }), astMonth = _7[0], setAstMonth = _7[1];
+    var _8 = useState(function () { return new Date().getFullYear(); }), tourYear = _8[0], setTourYear = _8[1];
+    var _9 = useState(function () { return new Date().getMonth(); }), tourMonth = _9[0], setTourMonth = _9[1];
+    var _10 = useState("connecting"), fbStatus = _10[0], setFbStatus = _10[1];
+    var _11 = useState(function () { try {
         return localStorage.getItem("cp6_vaczone") || "B";
     }
     catch (_a) {
         return "B";
-    } }), vacZone = _7[0], setVacZone = _7[1];
-    var _8 = useState(new Set()), vacDates = _8[0], setVacDates = _8[1]; // Set of "YYYY-MM-DD" strings
+    } }), vacZone = _11[0], setVacZone = _11[1];
+    var _12 = useState(new Set()), vacDates = _12[0], setVacDates = _12[1]; // Set of "YYYY-MM-DD" strings
     // Fetch vacances scolaires from API gouv
     useEffect(function () {
         var zone = "Zone " + vacZone;
         var yr = new Date().getFullYear();
         var url = "https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?where=zones%20like%20%22Zone%20".concat(vacZone, "%22&limit=100&timezone=Europe%2FParis");
-        fetch(url)
+        var proxyUrl = "https://corsproxy.io/?".concat(encodeURIComponent(url));
+        fetch(url).catch(function () { return fetch(proxyUrl); })
             .then(function (r) { return r.json(); }).then(function (data) {
             var dates = new Set();
             (data.results || []).forEach(function (p) {
@@ -2385,7 +2395,7 @@ function CardioPlanning() {
         var ids = [];
         check.forEach(function (sl) { return getEntries(med.id, y2, m2, d2, sl).forEach(function (e) { if ((e && e.acteId) && !e._blocked)
             ids.push(e.acteId); }); });
-        if (ids.some(function (id) { return ["ABSENCE", "REPOS_GARDE"].includes(id); }))
+        if (ids.some(function (id) { return ["ABSENCE", "FORMATION"].includes(id); }))
             return "blocked";
         if (ids.some(function (id) { return !["TOUR_HC", "TOUR_USIC"].includes(id); }))
             return "warning";
@@ -2874,8 +2884,8 @@ function CardioPlanning() {
                             m.nom); }))),
                 userProfile > 0
                     ? orient === "H"
-                        ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: medecins.filter(function (m) { return m.id === userProfile; }), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull })
-                        : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: medecins.filter(function (m) { return m.id === userProfile; }), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull })
+                        ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: medecins.filter(function (m) { return m.id === userProfile; }), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
+                        : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: medecins.filter(function (m) { return m.id === userProfile; }), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement("p", { style: { color: "var(--txt3)", padding: 20, textAlign: "center" } }, "S\u00E9lectionnez votre profil."))),
             tab === "planning" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
@@ -2898,8 +2908,8 @@ function CardioPlanning() {
                     React.createElement("button", { onClick: function () { return setPlanFilter([]); }, style: { padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border)", background: planFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: planFilter.length === 0 ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: 600 } }, "Tous"),
                     medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); })),
                 orient === "H"
-                    ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull })
-                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull }))),
+                    ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
+                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && TourTab({ year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
@@ -3035,127 +3045,231 @@ function CardioPlanning() {
                             React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#f1f5f9", border: "1px solid #cbd5e1", fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign({}, m)); setModal("editMedActivites"); } }, "\uD83C\uDFAF"),
                             isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#f1f5f9", border: "1px solid #cbd5e1", fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign(__assign({}, m), { _pinMode: true })); setModal("editMedPin"); } }, "\uD83D\uDD11")))); })))); }))),
             tab === "astreinte" && (function () {
-                // Périodes de 4 mois: nov-fév (0), mars-juin (1), juil-oct (2)
-                // periodIdx state stored in month: we derive period from current month
-                var getPeriod = function (y, m) {
-                    // m: 0-11. nov(10)-fév(1) | mars(2)-juin(5) | juil(6)-oct(9)
-                    if (m >= 10)
-                        return { pi: 0, startY: y, startM: 10 };
-                    if (m <= 1)
-                        return { pi: 0, startY: y - 1, startM: 10 };
-                    if (m >= 2 && m <= 5)
-                        return { pi: 1, startY: y, startM: 2 };
-                    return { pi: 2, startY: y, startM: 6 };
-                };
-                var per = getPeriod(astYear, astMonth);
-                var periodLabels = ["Nov — Fév", "Mars — Juin", "Juil — Oct"];
-                // Build all weeks (mondays) in the 4-month period
-                var weeksList = [];
-                var startDate = new Date(per.startY, per.startM, 1);
-                // Find first monday
-                var fd = new Date(startDate);
-                while (fd.getDay() !== 1)
-                    fd.setDate(fd.getDate() + 1);
-                var endDate = new Date(per.startY, per.startM + 4, 0); // last day of 4th month
-                var cur = new Date(fd);
-                while (cur <= endDate) {
-                    var wk = "".concat(cur.getFullYear(), "-").concat(cur.getMonth(), "-").concat(cur.getDate());
-                    weeksList.push({ key: wk, date: new Date(cur) });
-                    cur.setDate(cur.getDate() + 7);
-                }
                 var astMeds = medecins.filter(function (m) { return m.astreinte === true; });
-                // Stats: count weeks per med in this period
+                var astToday = new Date();
+                var monKey2 = function (y, m, d) { var dt = new Date(y, m, d); var dw = dt.getDay(); var diff = dw === 0 ? -6 : 1 - dw; var mn = new Date(dt); mn.setDate(d + diff); return mn.getFullYear() + "-" + mn.getMonth() + "-" + mn.getDate(); };
+                var astForDay2 = function (y, m, d) { var dk = y + "-" + m + "-" + d; var v = astreinte[dk]; if (v !== undefined)
+                    return (typeof v === "string" ? v : null); var wk = monKey2(y, m, d); var wv = astreinte[wk]; return (typeof wv === "string" ? wv : null); };
+                var JOURS_C = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+                var prevAst = function () { if (astMonth === 0) {
+                    setAstYear(function (y) { return y - 1; });
+                    setAstMonth(11);
+                }
+                else
+                    setAstMonth(function (m) { return m - 1; }); };
+                var nextAst = function () { if (astMonth === 11) {
+                    setAstYear(function (y) { return y + 1; });
+                    setAstMonth(0);
+                }
+                else
+                    setAstMonth(function (m) { return m + 1; }); };
+                // 4M period
+                var sm = astMonth >= 10 ? astMonth : astMonth <= 1 ? 10 : astMonth >= 2 && astMonth <= 5 ? 2 : 6;
+                var sy = astMonth <= 1 ? astYear - 1 : astYear;
+                var allDays4M = [];
+                for (var mi = 0; mi < 4; mi++) {
+                    var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
+                    var dim = new Date(y2, m2 + 1, 0).getDate();
+                    for (var d = 1; d <= dim; d++)
+                        allDays4M.push({ y: y2, m: m2, d: d });
+                }
                 var stats = {};
                 astMeds.forEach(function (m) { stats[m.id] = 0; });
-                weeksList.forEach(function (w) { var mid = astreinte[w.key]; if (mid && stats[mid] !== undefined)
-                    stats[mid]++; });
-                var prevPeriod = function () {
-                    var nm = per.startM - 4;
-                    if (nm < 0) {
-                        setAstMonth(nm + 12 + 1);
-                        setAstYear(per.startY - 1);
-                    }
-                    else {
-                        setAstMonth(nm + 1);
-                        setAstYear(per.startY);
-                    }
+                allDays4M.forEach(function (_a) {
+                    var y = _a.y, m = _a.m, d = _a.d;
+                    var mid = astForDay2(y, m, d);
+                    if (mid && stats[mid] !== undefined)
+                        stats[mid]++;
+                });
+                var prevP = function () { if (sm === 6) {
+                    setAstYear(sy);
+                    setAstMonth(2);
+                }
+                else if (sm === 2) {
+                    setAstYear(sy - 1);
+                    setAstMonth(10);
+                }
+                else {
+                    setAstYear(sy - 1);
+                    setAstMonth(6);
+                } };
+                var nextP = function () { if (sm === 6) {
+                    setAstYear(sy);
+                    setAstMonth(10);
+                }
+                else if (sm === 10) {
+                    setAstYear(sy + 1);
+                    setAstMonth(2);
+                }
+                else {
+                    setAstYear(sy);
+                    setAstMonth(6);
+                } };
+                var pLabel = MOIS[sm] + " — " + MOIS[(sm + 3) % 12] + " " + sy;
+                var exportCSV = function () {
+                    var rows = [["Date", "Jour", "Médecin"]];
+                    allDays4M.forEach(function (_a) {
+                        var y = _a.y, m = _a.m, d = _a.d;
+                        var dt = new Date(y, m, d);
+                        var dw = JOURS_C[(dt.getDay() + 6) % 7];
+                        var mid = astForDay2(y, m, d);
+                        var med = mid ? medecins.find(function (x) { return x.id === mid; }) : null;
+                        rows.push([d + "/" + String(m + 1).padStart(2, "0") + "/" + y, dw, med ? med.prenom + " " + med.nom : "-"]);
+                    });
+                    var csv = rows.map(function (r) { return r.join(";"); }).join("\n");
+                    var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+                    var a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = "astreintes.csv";
+                    a.click();
                 };
-                var nextPeriod = function () {
-                    var nm = per.startM + 4;
-                    if (nm > 11) {
-                        setAstMonth(nm - 12 + 1);
-                        setAstYear(per.startY + 1);
-                    }
-                    else {
-                        setAstMonth(nm + 1);
-                        setAstYear(per.startY);
-                    }
-                };
-                var fmtW = function (dt) {
-                    var end = new Date(dt);
-                    end.setDate(end.getDate() + 6);
-                    return "".concat(dt.getDate(), " ").concat(MOIS[dt.getMonth()].slice(0, 4), " \u2192 ").concat(end.getDate(), " ").concat(MOIS[end.getMonth()].slice(0, 4));
-                };
-                var isAbsentWeek = function (med, wDate) {
-                    for (var i = 0; i < 7; i++) {
-                        var dt = new Date(wDate);
-                        dt.setDate(dt.getDate() + i);
-                        var e = getEntries(med.id, dt.getFullYear(), dt.getMonth(), dt.getDate(), "M")[0] || getEntries(med.id, dt.getFullYear(), dt.getMonth(), dt.getDate(), "AM")[0];
-                        if (e && e.acteId === "ABSENCE")
-                            return true;
-                    }
-                    return false;
-                };
-                return (React.createElement("div", null,
-                    React.createElement("div", { style: S.bar },
-                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-                            React.createElement("button", { onClick: prevPeriod, style: S.arr }, "\u2039"),
-                            React.createElement("h2", { style: S.mTit },
-                                React.createElement("span", { style: { color: "#a78bfa" } }, "\uD83D\uDCE1 Astreinte Rythmo"),
-                                " \u2014 ",
-                                periodLabels[per.pi],
-                                " ",
-                                per.startY,
-                                per.pi === 0 ? "/".concat(per.startY + 1) : ""),
-                            React.createElement("button", { onClick: nextPeriod, style: S.arr }, "\u203A"),
-                            React.createElement("div", { style: { display: "flex", gap: 4, marginLeft: "auto", alignItems: "center" } },
-                                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
-                        React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 4, alignItems: "center" } },
-                            React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
-                    React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" } },
-                        React.createElement("div", { style: { overflowX: "auto", borderRadius: 8, border: "1px solid var(--border)", flex: "2 1 480px" } },
-                            React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
-                                React.createElement("thead", null,
-                                    React.createElement("tr", null,
-                                        React.createElement("th", { style: __assign(__assign({}, S.th), { minWidth: 130, textAlign: "left", paddingLeft: 8 }) }, "Semaine"),
-                                        React.createElement("th", { style: __assign(__assign({}, S.th), { textAlign: "left", paddingLeft: 8 }) }, "Astreinte"))),
-                                React.createElement("tbody", null, weeksList.map(function (w) {
-                                    var astMedId = astreinte[w.key];
-                                    return (React.createElement("tr", { key: w.key, style: { borderBottom: "1px solid var(--border2)" } },
-                                        React.createElement("td", { style: { padding: "5px 8px", fontWeight: 700, fontSize: 11, color: "var(--txt)", whiteSpace: "nowrap" } }, fmtW(w.date)),
-                                        React.createElement("td", { style: { padding: "3px 6px" } },
-                                            React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, astMeds.map(function (m) {
-                                                var on = m.id === astMedId;
-                                                var absent = isAbsentWeek(m, w.date);
-                                                return (React.createElement("button", { key: m.id, disabled: absent || !isEdit, title: "".concat(m.prenom, " ").concat(m.nom).concat(absent ? " (absent)" : ""), onClick: function () { return setAstreinte(function (p) { var n = __assign({}, p); if (on)
-                                                        delete n[w.key];
-                                                    else
-                                                        n[w.key] = m.id; return n; }); }, style: { width: 30, height: 30, borderRadius: "50%", border: on ? "2px solid #7c3aed" : "1px solid var(--border)",
-                                                        background: m.color, color: "#fff", fontSize: 9, fontWeight: 800,
-                                                        cursor: absent || !isEdit ? "default" : "pointer",
-                                                        opacity: absent ? .25 : on ? 1 : .5,
-                                                        outline: on ? "2px solid #ede9fe" : "none" } }, m.init));
-                                            })))));
-                                })))),
-                        React.createElement("div", { style: { flex: "1 1 200px", borderRadius: 8, border: "1px solid var(--border)", padding: 14, background: "var(--bg2)" } },
-                            React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 } }, "Semaines par m\u00E9decin"),
-                            astMeds.sort(function (a, b) { return (stats[b.id] || 0) - (stats[a.id] || 0); }).map(function (m) { return (React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } },
-                                React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, m.init),
-                                React.createElement("span", { style: { flex: 1, fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
+                return (React.createElement("div", { style: { padding: 16 } },
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" } },
+                        React.createElement("button", { onClick: prevP, style: S.arr }, "\u2039"),
+                        React.createElement("h2", { style: __assign(__assign({}, S.mTit), { margin: 0 }) }, pLabel),
+                        React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A"),
+                        React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.arr), { fontSize: 11, padding: "3px 8px", display: "flex", alignItems: "center", gap: 3 }) }, "\uD83D\uDCE5 CSV")),
+                    React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
+                        React.createElement("div", { style: { flex: "3 1 320px", borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden", maxHeight: "calc(100vh - 180px)", overflowY: "auto" } }, allDays4M.map(function (_a) {
+                            var y = _a.y, m = _a.m, d = _a.d;
+                            var dt = new Date(y, m, d);
+                            var dw = (dt.getDay() + 6) % 7;
+                            var isWe = dw >= 5;
+                            var isT = d === astToday.getDate() && m === astToday.getMonth() && y === astToday.getFullYear();
+                            var dk = y + "-" + m + "-" + d;
+                            var wk = monKey2(y, m, d);
+                            var hasExc = typeof astreinte[dk] === "string";
+                            var mid = astForDay2(y, m, d);
+                            var med = mid ? medecins.find(function (x) { return x.id === mid; }) : null;
+                            var isNewM = d === 1;
+                            return (React.createElement("div", { key: dk },
+                                isNewM && React.createElement("div", { style: { background: "var(--bg2)", borderBottom: "1px solid var(--border)", padding: "3px 8px", fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase" } },
+                                    MOIS[m],
+                                    " ",
+                                    y),
+                                React.createElement("div", { onClick: isAnyEdit ? function () { var isMonday = dw === 0; setAstPickModal({ dayKey: dk, wKey: wk, isWeek: isMonday, label: (isMonday ? "Semaine du " : JOURS_C[dw] + " ") + d + " " + MOIS[m] + " " + y }); setAstSearch(""); } : undefined, style: { display: "flex", alignItems: "center", gap: 8, height: 28, borderBottom: "1px solid var(--border2)", padding: "0 8px",
+                                        background: isT ? "var(--bg-td)" : isWe ? "var(--bg-we)" : "var(--bg)",
+                                        cursor: isAnyEdit ? "pointer" : "default",
+                                        outline: hasExc ? "2px solid #7c3aed" : "none", outlineOffset: -2 } },
+                                    React.createElement("span", { style: { width: 80, fontSize: 11, fontWeight: isWe || isT ? 700 : 500, color: isT ? "var(--today-c)" : isWe ? "#92400e" : "var(--txt)", flexShrink: 0 } },
+                                        JOURS_C[dw],
+                                        " ",
+                                        d,
+                                        " ",
+                                        MOIS[m].slice(0, 4)),
+                                    med ? (React.createElement(React.Fragment, null,
+                                        React.createElement("div", { style: { width: 18, height: 18, borderRadius: "50%", background: med.color, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 7, fontWeight: 800 } }, med.init),
+                                        React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: "var(--txt)" } },
+                                            med.prenom,
+                                            " ",
+                                            med.nom),
+                                        hasExc && React.createElement("span", { style: { fontSize: 9, color: "#7c3aed", marginLeft: "auto" } }, "exc."))) : (React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "\u2014")))));
+                        })),
+                        React.createElement("div", { style: { flex: "1 1 160px", borderRadius: 8, border: "1px solid var(--border)", padding: 12, background: "var(--bg2)", alignSelf: "start" } },
+                            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Jours par m\u00E9decin"),
+                            astMeds.sort(function (a, b) { return (stats[b.id] || 0) - (stats[a.id] || 0); }).map(function (m) { return (React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 5, padding: "4px 6px", borderRadius: 5, background: "var(--bg)" } },
+                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 7, fontWeight: 800 } }, m.init),
+                                React.createElement("span", { style: { fontSize: 11, flex: 1 } },
                                     m.prenom,
                                     " ",
                                     m.nom),
-                                React.createElement("span", { style: { fontSize: 14, fontWeight: 800, color: "#7c3aed", fontFamily: "'JetBrains Mono',monospace" } }, stats[m.id] || 0))); })))));
+                                React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: stats[m.id] > 0 ? "var(--txt)" : "var(--txt3)" } }, stats[m.id] || 0))); }),
+                            React.createElement("div", { style: { marginTop: 10, fontSize: 10, color: "var(--txt3)" } },
+                                React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 2, border: "2px solid #7c3aed", marginRight: 4 } }),
+                                "exception jour"),
+                            React.createElement("div", { style: { marginTop: 4, fontSize: 10, color: "var(--txt3)" } }, "Clic sur un lundi (\uD83D\uDCC5) pour assigner la semaine"),
+                            Object.keys(astreinte).length > 0 && React.createElement("div", { style: { marginTop: 8, fontSize: 9, color: "var(--txt3)", wordBreak: "break-all", maxHeight: 80, overflowY: "auto" } },
+                                Object.keys(astreinte).slice(0, 5).map(function (k) { return React.createElement("div", { key: k },
+                                    k,
+                                    ": ",
+                                    astreinte[k]); }),
+                                Object.keys(astreinte).length > 5 && React.createElement("div", null,
+                                    "+",
+                                    Object.keys(astreinte).length - 5,
+                                    " autres..."))))));
+            })(),
+            astPickModal && (function () {
+                var astMeds2 = medecins.filter(function (m) { return m.astreinte === true; });
+                var monKey2b = function (y, m, d) { var dt = new Date(y, m, d); var dw = dt.getDay(); var diff = dw === 0 ? -6 : 1 - dw; var mn = new Date(dt); mn.setDate(d + diff); return mn.getFullYear() + "-" + mn.getMonth() + "-" + mn.getDate(); };
+                var dayKey = astPickModal.dayKey, wKey = astPickModal.wKey, isWeek = astPickModal.isWeek, label = astPickModal.label;
+                var curId = isWeek ? astreinte[wKey] : astPickModal && dayKey && astreinte[dayKey] !== undefined ? astreinte[dayKey] : astreinte[wKey];
+                // Check if med is absent for the relevant day(s)
+                var isAbsentForPick = function (medId) {
+                    if (isWeek) {
+                        // Check if absent ALL week - just check Monday
+                        var parts = wKey.split("-");
+                        var wy = parseInt(parts[0]), wm = parseInt(parts[1]), wd = parseInt(parts[2]);
+                        return getEntries(medId, wy, wm, wd, "M").some(function (e) { return ["ABSENCE", "FORMATION"].includes(e.acteId); }) ||
+                            getEntries(medId, wy, wm, wd, "JOUR").some(function (e) { return ["ABSENCE", "FORMATION"].includes(e.acteId); });
+                    }
+                    else if (dayKey) {
+                        var parts = dayKey.split("-");
+                        var dy = parseInt(parts[0]), dm = parseInt(parts[1]), dd = parseInt(parts[2]);
+                        return getEntries(medId, dy, dm, dd, "M").some(function (e) { return ["ABSENCE", "FORMATION"].includes(e.acteId); }) ||
+                            getEntries(medId, dy, dm, dd, "JOUR").some(function (e) { return ["ABSENCE", "FORMATION"].includes(e.acteId); });
+                    }
+                    return false;
+                };
+                var filtered = astMeds2.filter(function (m) { return !astSearch || m.init.toUpperCase().startsWith(astSearch.toUpperCase()); });
+                var onEnter = function (e) {
+                    if (e.key === "Enter" && filtered.length === 1) {
+                        var m_1 = filtered[0];
+                        setAstreinte(function (p) { var n = __assign({}, p); if (isWeek) {
+                            n[wKey] = m_1.id;
+                        }
+                        else {
+                            n[dayKey] = m_1.id;
+                        } return n; });
+                        setAstPickModal(null);
+                    }
+                };
+                return (React.createElement(Ov, { onClose: function () { return setAstPickModal(null); } },
+                    React.createElement("div", { style: { minWidth: 300 } },
+                        React.createElement("div", { style: S.mHd },
+                            React.createElement("div", { style: S.mTit2 },
+                                "\uD83D\uDCE1 Astreinte \u2014 ",
+                                label),
+                            React.createElement("button", { onClick: function () { return setAstPickModal(null); }, style: S.xBtn }, "\u00D7")),
+                        isWeek && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8, padding: "4px 0" } }, "Assigne toute la semaine (lun\u2192dim)"),
+                        !isWeek && React.createElement("div", { style: { fontSize: 11, color: "#7c3aed", marginBottom: 8, padding: "4px 0" } }, "Exception pour ce jour uniquement"),
+                        React.createElement("input", { autoFocus: true, value: astSearch, onChange: function (e) { return setAstSearch(e.target.value.toUpperCase()); }, onKeyDown: onEnter, placeholder: "Initiales...", style: { width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", fontSize: 13, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, letterSpacing: 2, marginBottom: 8, boxSizing: "border-box" } }),
+                        filtered.length === 1 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 4, textAlign: "center" } }, "\u21B5 Entr\u00E9e pour confirmer"),
+                        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 300, overflowY: "auto" } }, filtered.map(function (m) {
+                            var on = m.id === curId;
+                            var absent = isAbsentForPick(m.id);
+                            return (React.createElement("button", { key: m.id, disabled: absent, onClick: absent ? undefined : function () {
+                                    setAstreinte(function (p) {
+                                        var n = __assign({}, p);
+                                        if (on) {
+                                            if (isWeek)
+                                                delete n[wKey];
+                                            else
+                                                delete n[dayKey];
+                                        }
+                                        else {
+                                            if (isWeek) {
+                                                n[wKey] = m.id;
+                                            }
+                                            else {
+                                                n[dayKey] = m.id;
+                                            }
+                                        }
+                                        return n;
+                                    });
+                                    setAstPickModal(null);
+                                }, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8,
+                                    border: "1px solid " + (on ? "#7c3aed" : absent ? "#fca5a5" : "var(--border)"),
+                                    background: on ? "#f5f3ff" : absent ? "#fff1f2" : "var(--bg2)",
+                                    cursor: absent ? "not-allowed" : "pointer", opacity: absent ? 0.6 : 1 } },
+                                React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, m.init),
+                                React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
+                                    m.prenom,
+                                    " ",
+                                    m.nom),
+                                absent && React.createElement("span", { style: { marginLeft: "auto", color: "#ef4444", fontSize: 10 } }, "Absent"),
+                                on && !absent && React.createElement("span", { style: { marginLeft: "auto", color: "#7c3aed", fontSize: 11 } }, "\u2713 Assign\u00E9")));
+                        })),
+                        !isWeek && dayKey && astreinte[dayKey] !== undefined && (React.createElement("button", { onClick: function () { setAstreinte(function (p) { var n = __assign({}, p); delete n[dayKey]; return n; }); setAstPickModal(null); }, style: { marginTop: 8, width: "100%", padding: "6px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", cursor: "pointer", color: "var(--txt3)", fontSize: 11 } }, "\u21BA Supprimer exception \u2014 revenir \u00E0 la semaine")))));
             })(),
             tab === "stats" && isEdit && React.createElement(StatsTab, { medecins: medecins, actes: actes, plan: plan, year: year, month: month, darkMode: darkMode, setDarkMode: setDarkMode, tourMed: tourMed }),
             tab === "partage" && (React.createElement("div", { style: { maxWidth: 500 } },
