@@ -2261,8 +2261,17 @@ function CardioPlanning() {
                         setActes(JSON.parse(data.actes));
                     if (data.editPin)
                         setEditPin(data.editPin);
-                    if (data.astreinte)
-                        setAstreinte(JSON.parse(data.astreinte));
+                    if (data.astreinte) {
+                        var raw = JSON.parse(data.astreinte);
+                        // Migrate: drop invalid numeric entries, keep string IDs
+                        var cleaned_1 = {};
+                        Object.entries(raw).forEach(function (_a) {
+                            var k = _a[0], v = _a[1];
+                            if (typeof v === "string" && v.length > 0)
+                                cleaned_1[k] = v;
+                        });
+                        setAstreinte(cleaned_1);
+                    }
                     if (data.medPins)
                         setMedPins(JSON.parse(data.medPins));
                 }
