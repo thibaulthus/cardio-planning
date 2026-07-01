@@ -2174,19 +2174,27 @@ function CardioPlanning() {
     var _5 = useState(false), ast4M = _5[0], setAst4M = _5[1];
     // Get astreinte medId for a given day
     var getAstreinteForDay = React.useCallback(function (y, m, d) {
-        // Check day-specific exception first
+        var astMeds2 = medecins.filter(function (m) { return m.astreinte === true; });
+        var resolveId = function (v) {
+            if (v === undefined || v === null)
+                return null;
+            if (typeof v === "string")
+                return v;
+            if (typeof v === "number")
+                return astMeds2[v] ? astMeds2[v].id : null;
+            return null;
+        };
         var dayKey = y + "-" + m + "-" + d;
         if (astreinte[dayKey] !== undefined)
-            return astreinte[dayKey] || null;
-        // Fall back to week assignment (Monday key)
+            return resolveId(astreinte[dayKey]);
         var dt = new Date(y, m, d);
         var day = dt.getDay();
         var diff = day === 0 ? -6 : 1 - day;
         var mon = new Date(dt);
         mon.setDate(dt.getDate() + diff);
         var wk = mon.getFullYear() + "-" + mon.getMonth() + "-" + mon.getDate();
-        return astreinte[wk] || null;
-    }, [astreinte]);
+        return resolveId(astreinte[wk]);
+    }, [astreinte, medecins]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
     var _6 = useState(function () { return new Date().getFullYear(); }), astYear = _6[0], setAstYear = _6[1];
     var _7 = useState(function () { return new Date().getMonth(); }), astMonth = _7[0], setAstMonth = _7[1];
@@ -3051,8 +3059,18 @@ function CardioPlanning() {
                 console.log("ASTREINTE_DEBUG", JSON.stringify(astreinte));
                 console.log("ASTREINTE_KEYS", Object.keys(astreinte).length, "keys:", Object.keys(astreinte).slice(0, 5));
                 var monKey2 = function (y, m, d) { var dt = new Date(y, m, d); var dw = dt.getDay(); var diff = dw === 0 ? -6 : 1 - dw; var mn = new Date(dt); mn.setDate(d + diff); return mn.getFullYear() + "-" + mn.getMonth() + "-" + mn.getDate(); };
+                var astMedList = medecins.filter(function (m) { return m.astreinte === true; });
+                var resolveAstId = function (v) {
+                    if (v === undefined || v === null)
+                        return null;
+                    if (typeof v === "string")
+                        return v; // new format: medId string
+                    if (typeof v === "number")
+                        return astMedList[v] ? astMedList[v].id : null; // old format: index
+                    return null;
+                };
                 var astForDay2 = function (y, m, d) { var dk = y + "-" + m + "-" + d; var v = astreinte[dk]; if (v !== undefined)
-                    return (typeof v === "string" ? v : null); var wk = monKey2(y, m, d); var wv = astreinte[wk]; return (typeof wv === "string" ? wv : null); };
+                    return resolveAstId(v); var wk = monKey2(y, m, d); return resolveAstId(astreinte[wk]); };
                 var JOURS_C = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
                 var prevAst = function () { if (astMonth === 0) {
                     setAstYear(function (y) { return y - 1; });
