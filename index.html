@@ -389,7 +389,7 @@ function MedBtn(_a) {
 }
 /* ════ GRID H ════ */
 function GridH(_a) {
-    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _c = _a.showGarde, showGarde = _c === void 0 ? true : _c;
+    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _c = _a.showGarde, showGarde = _c === void 0 ? true : _c, getAstreinteForDay = _a.getAstreinteForDay;
     var today = new Date();
     var ghEffDays = useMemo(function () {
         if (viewPeriod) {
@@ -452,14 +452,16 @@ function GridH(_a) {
                     return ["M", "AM", "N"].map(function (sl) {
                         var es = getEntries(med.id, year, month, d, sl);
                         var bl = es[0] && es[0]._blocked;
-                        var noteT = notes[nk(med.id, year, month, d, sl)];
-                        return React.createElement("td", { key: d + sl, title: noteT || undefined, style: __assign(__assign(__assign(__assign({}, S.td), (sl === "N" ? S.tdN : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, year, month, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                        var noteT = notes[nk(med.id, ghY, ghM, d, sl)];
+                        var astIdH = getAstreinteForDay ? getAstreinteForDay(ghY, ghM, d) : null;
+                        var isAstH = astIdH === med.id;
+                        return React.createElement("td", { key: d + sl + ghM + ghY, title: noteT || (isAstH ? "🔔 Astreinte" : undefined) || undefined, style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (sl === "N" ? S.tdN : {})), (isAstH && !we ? { background: "#fef9c3", outline: "1px solid #fbbf24" } : {})), (isTgh ? { background: "var(--bg-td)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ghY, ghM, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                     });
                 }))); })))));
 }
 /* ════ GRID V ════ */
 function GridV(_a) {
-    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull;
+    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, getAstreinteForDay = _a.getAstreinteForDay;
     var today = new Date();
     var C0 = 42, C1 = 24, CG = 36;
     // Find garde med for a given day (slot N)
@@ -583,7 +585,9 @@ function GridV(_a) {
                             var es = getEntries(med.id, ey, em, d, sl);
                             var bl = es[0] && es[0]._blocked;
                             var noteT = notes[nk(med.id, ey, em, d, sl)];
-                            return React.createElement("td", { key: med.id, title: noteT || undefined, style: __assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                            var astId = getAstreinteForDay ? getAstreinteForDay(ey, em, d) : null;
+                            var isAst = astId === med.id;
+                            return React.createElement("td", { key: med.id, title: noteT || (isAst ? "🔔 Astreinte" : undefined) || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst && !we ? { background: "#fef9c3", outline: "1px solid #fbbf24" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                         }))); });
                 }))))));
 }
@@ -2164,6 +2168,16 @@ function CardioPlanning() {
     var _z = useState({}), notes = _z[0], setNotes = _z[1];
     var _0 = useState({}), medPins = _0[0], setMedPins = _0[1]; // {medId: "pin"}
     var _1 = useState({}), astreinte = _1[0], setAstreinte = _1[1]; // {wKey: medId}
+    // Get astreinte medId for a given day
+    var getAstreinteForDay = React.useCallback(function (y, m, d) {
+        var dt = new Date(y, m, d);
+        var day = dt.getDay();
+        var diff = day === 0 ? -6 : 1 - day; // go to Monday
+        var mon = new Date(dt);
+        mon.setDate(dt.getDate() + diff);
+        var wk = "".concat(mon.getFullYear(), "-").concat(mon.getMonth(), "-").concat(mon.getDate());
+        return astreinte[wk] || null;
+    }, [astreinte]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
     var _2 = useState(function () { return new Date().getFullYear(); }), astYear = _2[0], setAstYear = _2[1];
     var _3 = useState(function () { return new Date().getMonth(); }), astMonth = _3[0], setAstMonth = _3[1];
@@ -2964,8 +2978,8 @@ function CardioPlanning() {
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 orient === "H"
-                    ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false })
-                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull }))),
+                    ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, getAstreinteForDay: getAstreinteForDay })
+                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit }, "\u2699\uFE0F Activit\u00E9s"),
