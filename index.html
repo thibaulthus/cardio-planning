@@ -687,9 +687,6 @@ function SiteView(_a) {
                 (viewPeriod ? MOIS[month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6] + " — " + MOIS[((month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6) + 3) % 12] + " " + (month <= 1 ? year - 1 : year) : MOIS[month] + " " + year)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-            React.createElement("div", { style: S.oriTog },
-                React.createElement("button", { onClick: function () { return setOrient("H"); }, style: __assign(__assign({}, S.oriB), (orient === "H" ? S.oriBa : {})) }, "\u27F7 H"),
-                React.createElement("button", { onClick: function () { return setOrient("V"); }, style: __assign(__assign({}, S.oriB), (orient === "V" ? S.oriBa : {})) }, "\u27F3 V")),
             React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
     if (orient === "H")
@@ -820,9 +817,6 @@ function ActTabView(_a) {
                 (viewPeriod ? MOIS[month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6] + " — " + MOIS[((month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6) + 3) % 12] + " " + (month <= 1 ? year - 1 : year) : MOIS[month] + " " + year)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-            React.createElement("div", { style: S.oriTog },
-                React.createElement("button", { onClick: function () { return setOrient("H"); }, style: __assign(__assign({}, S.oriB), (orient === "H" ? S.oriBa : {})) }, "\u27F7 H"),
-                React.createElement("button", { onClick: function () { return setOrient("V"); }, style: __assign(__assign({}, S.oriB), (orient === "V" ? S.oriBa : {})) }, "\u27F3 V")),
             React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
     if (orient === "H")
@@ -891,18 +885,27 @@ function ActTabView(_a) {
 function GardeView(_a) {
     var year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod;
     var today = new Date();
+    // Always 4-month period for gardes
+    var gvSm = month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6;
+    var gvSy = month <= 1 ? year - 1 : year;
     var gvEffDays = useMemo(function () {
-        var base = allDays.map(function (d) { return ({ y: year, m: month, d: d }); });
+        var days = [];
+        for (var mi = 0; mi < 4; mi++) {
+            var m2 = (gvSm + mi) % 12, y2 = gvSm + mi > 11 ? gvSy + 1 : gvSy;
+            var dim = new Date(y2, m2 + 1, 0).getDate();
+            for (var d = 1; d <= dim; d++)
+                days.push({ y: y2, m: m2, d: d });
+        }
         if (!showFull) {
             var tod_5 = new Date();
             tod_5.setHours(0, 0, 0, 0);
-            return base.filter(function (_a) {
+            return days.filter(function (_a) {
                 var ey3 = _a.y, em3 = _a.m, d = _a.d;
                 return new Date(ey3, em3, d) >= tod_5;
             });
         }
-        return base;
-    }, [year, month, allDays, showFull]);
+        return days;
+    }, [gvSm, gvSy, showFull]);
     var _b = React.useState(null), pickerDay = _b[0], setPickerDay = _b[1];
     function getGardeMed2(gvY, gvM, d) {
         var gy2 = gvY || year, gm2 = (gvM !== undefined) ? gvM : month;
@@ -968,18 +971,70 @@ function GardeView(_a) {
     return (React.createElement("div", null,
         React.createElement("div", { style: S.bar },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-                React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
+                React.createElement("button", { onClick: function () { for (var i = 0; i < 4; i++)
+                        prevM(); }, style: S.arr }, "\u2039"),
                 React.createElement("h2", { style: S.mTit },
                     React.createElement("span", { style: { color: "#f85149" } }, "\uD83C\uDF19 Gardes"),
                     " \u2014 ",
-                    (viewPeriod ? MOIS[month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6] + " — " + MOIS[((month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6) + 3) % 12] + " " + (month <= 1 ? year - 1 : year) : MOIS[month] + " " + year)),
-                React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
+                    MOIS[gvSm] + " — " + MOIS[(gvSm + 3) % 12] + " " + gvSy),
+                React.createElement("button", { onClick: function () { for (var i = 0; i < 4; i++)
+                        nextM(); }, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                React.createElement("div", { style: S.oriTog },
-                    React.createElement("button", { onClick: function () { return setOrient("H"); }, style: __assign(__assign({}, S.oriB), (orient === "H" ? S.oriBa : {})) }, "\u27F7 H"),
-                    React.createElement("button", { onClick: function () { return setOrient("V"); }, style: __assign(__assign({}, S.oriB), (orient === "V" ? S.oriBa : {})) }, "\u27F3 V")),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                 React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
+        isEdit && (function () {
+            // Répartition idéale: count days by type in the 4M period
+            var gMeds = medecins.filter(function (m) { return m.garde === true; });
+            var nMeds = gMeds.length || 1;
+            var nSem = 0, nVen = 0, nSam = 0, nDim = 0;
+            gvEffDays.forEach(function (_a) {
+                var cy = _a.y, cm = _a.m, cd = _a.d;
+                var dw3 = dow(cy, cm, cd);
+                if (dw3 === 5)
+                    nVen++;
+                else if (dw3 === 6)
+                    nSam++;
+                else if (dw3 === 0)
+                    nDim++;
+                else
+                    nSem++;
+            });
+            var fmt2 = function (n) { var v = n / nMeds; return v % 1 === 0 ? String(v) : v.toFixed(1); };
+            return (React.createElement("div", { style: { marginTop: 14, maxWidth: 560, borderRadius: 8, border: "1px solid var(--border)", padding: 12, background: "var(--bg2)" } },
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } },
+                    "R\u00E9partition id\u00E9ale \u2014 ",
+                    gMeds.length,
+                    " m\u00E9decin",
+                    gMeds.length > 1 ? "s" : "",
+                    " de garde"),
+                React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
+                    React.createElement("thead", null,
+                        React.createElement("tr", { style: { borderBottom: "2px solid var(--border)" } },
+                            React.createElement("th", { style: { textAlign: "left", padding: "4px 8px", fontSize: 10, color: "var(--txt3)", fontWeight: 700 } }, "Type de jour"),
+                            React.createElement("th", { style: { textAlign: "center", padding: "4px 8px", fontSize: 10, color: "var(--txt3)", fontWeight: 700 } }, "Total p\u00E9riode"),
+                            React.createElement("th", { style: { textAlign: "center", padding: "4px 8px", fontSize: 10, color: "var(--txt3)", fontWeight: 700 } }, "Par m\u00E9decin"))),
+                    React.createElement("tbody", null,
+                        React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Semaine (lun\u2192jeu)"),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nSem),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nSem))),
+                        React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Vendredi"),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nVen),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nVen))),
+                        React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Samedi"),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nSam),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nSam))),
+                        React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Dimanche"),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nDim),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nDim))),
+                        React.createElement("tr", { style: { background: "var(--bg-we)" } },
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 800, color: "#92400e" } }, "Week-end (ven+sam+dim)"),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, fontWeight: 700, color: "#92400e" } }, nVen + nSam + nDim),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "#92400e" } }, fmt2(nVen + nSam + nDim)))))));
+        })(),
         orient === "V" ? viewV : viewH,
         pickerDay !== null && isEdit && (function () {
             var pd = pickerDay && typeof pickerDay === "object" ? pickerDay : { d: pickerDay, y: year, m: month };
@@ -2027,7 +2082,9 @@ function StatsTab(_a) {
     // Activities to track (exclude system ones)
     var trackActes = actes.filter(function (a) { return !a.isSystem && a.id !== "ABSENCE" && a.id !== "REPOS_GARDE"; }).sort(function (a, b) { return a.label.localeCompare(b.label); });
     var GARDE_ACTE = { id: "GARDE", label: "Garde", short: "G", color: "#93c47d" };
-    var allTrack = __spreadArray([GARDE_ACTE], trackActes, true);
+    var GARDE_SEM = { id: "GARDE_SEM", label: "Garde semaine", short: "G sem", color: "#93c47d" };
+    var GARDE_WE = { id: "GARDE_WE", label: "Garde week-end", short: "G WE", color: "#f59e0b" };
+    var allTrack = __spreadArray([GARDE_ACTE, GARDE_SEM, GARDE_WE], trackActes, true);
     // Count per med per acte
     var allStatMeds = medecins.filter(function (m) { return m.role === "medecin"; });
     var _e = React.useState([]), medFilter = _e[0], setMedFilter = _e[1];
@@ -2050,6 +2107,14 @@ function StatsTab(_a) {
                         return;
                     if (counts[medId][entry.acteId] !== undefined)
                         counts[medId][entry.acteId]++;
+                    // Garde: split by weekday (ven/sam/dim = weekend)
+                    if (entry.acteId === "GARDE") {
+                        var dw4 = new Date(y2, m2, d).getDay();
+                        var isWEg = dw4 === 5 || dw4 === 6 || dw4 === 0;
+                        var gk = isWEg ? "GARDE_WE" : "GARDE_SEM";
+                        if (counts[medId][gk] !== undefined)
+                            counts[medId][gk]++;
+                    }
                 });
             });
         });
@@ -2125,7 +2190,7 @@ function CardioPlanning() {
     var setYear = function (y) { return setYM(function (p) { return (__assign(__assign({}, p), { year: typeof y === "function" ? y(p.year) : y })); }); };
     var setMonth = function (m) { return setYM(function (p) { return (__assign(__assign({}, p), { month: typeof m === "function" ? m(p.month) : m })); }); };
     var setYearMonth = function (y, m) { return setYM({ year: y, month: m }); };
-    var _h = useState("V"), orient = _h[0], setOrient = _h[1];
+    var _h = useState("V"), orient = _h[0], setOrient = _h[1]; // H/V toggle removed - V only
     var _j = useState(false), darkMode = _j[0], setDarkMode = _j[1];
     var DEFAULT_TABS = [["monplanning", "👤"], ["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📡 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "🔗"], ["stats", "📊 Stats"]];
     var _k = useState(function () { try {
@@ -2908,9 +2973,6 @@ function CardioPlanning() {
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         isAnyEdit && React.createElement("button", { style: S.btnP, onClick: applyPlanningType }, "\u25B6 PT"),
-                        React.createElement("div", { style: S.oriTog },
-                            React.createElement("button", { onClick: function () { return setOrient("H"); }, style: __assign(__assign({}, S.oriB), (orient === "H" ? S.oriBa : {})) }, "\u27F7 H"),
-                            React.createElement("button", { onClick: function () { return setOrient("V"); }, style: __assign(__assign({}, S.oriB), (orient === "V" ? S.oriBa : {})) }, "\u27F3 V")),
                         React.createElement("button", { onClick: function () { setViewPeriod(function (v) { if (!v) {
                                 snapToPeriodStart(year, month);
                             } return !v; }); }, title: viewPeriod ? "Vue mois" : "Vue 4 mois", style: __assign(__assign({}, S.arr), { fontSize: 11, padding: "3px 6px", fontWeight: 800, color: viewPeriod ? "#fff" : "var(--txt2)", background: viewPeriod ? "#1d4ed8" : "var(--bg2)", border: "1px solid ".concat(viewPeriod ? "#1d4ed8" : "var(--border)") }) }, viewPeriod ? "4M" : "1M"),
@@ -2978,9 +3040,6 @@ function CardioPlanning() {
                         isEdit && React.createElement("button", { style: S.btnP, onClick: applyPlanningType },
                             "\u25B6 Appliquer ",
                             MOIS[month]),
-                        React.createElement("div", { style: S.oriTog },
-                            React.createElement("button", { onClick: function () { return setOrient("H"); }, style: __assign(__assign({}, S.oriB), (orient === "H" ? S.oriBa : {})) }, "\u27F7 H"),
-                            React.createElement("button", { onClick: function () { return setOrient("V"); }, style: __assign(__assign({}, S.oriB), (orient === "V" ? S.oriBa : {})) }, "\u27F3 V")),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
                 React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit, orient: orient, acteById: acteById, setMData: setMData, setModal: setModal }))),
@@ -2994,9 +3053,6 @@ function CardioPlanning() {
                         isEdit && React.createElement("button", { style: S.btnP, onClick: applyPlanningType },
                             "\u25B6 Appliquer ",
                             MOIS[month]),
-                        React.createElement("div", { style: S.oriTog },
-                            React.createElement("button", { onClick: function () { return setOrient("H"); }, style: __assign(__assign({}, S.oriB), (orient === "H" ? S.oriBa : {})) }, "\u27F7 H"),
-                            React.createElement("button", { onClick: function () { return setOrient("V"); }, style: __assign(__assign({}, S.oriB), (orient === "V" ? S.oriBa : {})) }, "\u27F3 V")),
                         React.createElement("button", { onClick: function () { return setViewPeriod(function (v) { return !v; }); }, title: viewPeriod ? "Vue mois" : "Vue 4 mois", style: __assign(__assign({}, S.arr), { fontSize: 11, padding: "3px 6px", fontWeight: 800, color: viewPeriod ? "#fff" : "var(--txt2)", background: viewPeriod ? "#1d4ed8" : "var(--bg2)", border: "1px solid ".concat(viewPeriod ? "#1d4ed8" : "var(--border)") }) }, viewPeriod ? "4M" : "1M"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
