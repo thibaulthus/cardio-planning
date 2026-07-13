@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.4 — 13/07/2026";
+var APP_VERSION = "v7.5 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1846,8 +1846,8 @@ function TourTab(_a) {
         var totEEP = seniors.filter(function (m) { return m.surSpec === "eep"; }).length;
         var totETT = seniors.filter(function (m) { return m.surSpec === "ett"; }).length;
         var issues = [];
-        if (totCoro < cfgMinCoro)
-            issues.push("Coro: " + totCoro + " sénior(s) dans l'équipe pour un minimum de " + cfgMinCoro);
+        if (totCoro < Math.min(cfgMinCoro, 2))
+            issues.push("Coro: " + totCoro + " sénior(s) dans l'équipe pour un minimum (même relâché) de " + Math.min(cfgMinCoro, 2));
         if (totPace < cfgMinPace)
             issues.push("Pace: " + totPace + " pour min " + cfgMinPace);
         if (totEEP < cfgMinEEP)
@@ -1867,7 +1867,9 @@ function TourTab(_a) {
         });
         // Semaines triées : les plus contraintes d'abord (moins de disponibles)
         var weeksByConstraint = __spreadArray([], weeksT, true).sort(function (a, b) { return availCount[a.key] - availCount[b.key]; });
-        var attempt = function () {
+        var attempt = function (opts) {
+            var useBlocks = opts.useBlocks;
+            var effMinCoro = opts.minCoro;
             var quota = {};
             tourMeds.forEach(function (m) { quota[m.id] = cfgExcl[m.id] ? 0 : (cfgWeeks[m.id] || 0); });
             var hcCount = {}, usicCount = {};
@@ -1883,7 +1885,7 @@ function TourTab(_a) {
                 var nPace = avail.filter(function (m) { return m.surSpec === "pace"; }).length;
                 var nETT = avail.filter(function (m) { return m.surSpec === "ett"; }).length;
                 var nCoro = avail.filter(function (m) { return m.surSpec === "coro"; }).length;
-                return nEEP >= cfgMinEEP && nPace >= cfgMinPace && nETT >= cfgMinETT && nCoro >= cfgMinCoro;
+                return nEEP >= cfgMinEEP && nPace >= cfgMinPace && nETT >= cfgMinETT && nCoro >= effMinCoro;
             };
             // Phase 1 : blocs de 2 semaines consécutives (préférences)
             var placeBlock = function (m, unit) {
@@ -1910,13 +1912,15 @@ function TourTab(_a) {
                 }
                 return false;
             };
-            var shuffled = __spreadArray([], tourMeds, true).sort(function () { return Math.random() - 0.5; });
-            shuffled.forEach(function (m) {
-                if (cfgPref2HC[m.id] && quota[m.id] >= 2)
-                    placeBlock(m, "HC");
-                if (cfgPref2USIC[m.id] && quota[m.id] >= 2)
-                    placeBlock(m, "USIC");
-            });
+            if (useBlocks) {
+                var shuffled = __spreadArray([], tourMeds, true).sort(function () { return Math.random() - 0.5; });
+                shuffled.forEach(function (m) {
+                    if (cfgPref2HC[m.id] && quota[m.id] >= 2)
+                        placeBlock(m, "HC");
+                    if (cfgPref2USIC[m.id] && quota[m.id] >= 2)
+                        placeBlock(m, "USIC");
+                });
+            }
             // Phase 2 : remplissage en commençant par les semaines les plus contraintes
             weeksByConstraint.forEach(function (w) {
                 var units = Math.random() < 0.5 ? ["HC", "USIC"] : ["USIC", "HC"];
@@ -1955,20 +1959,40 @@ function TourTab(_a) {
             var score = unfilled * 1000 + leftoverTotal * 10 + imbalance;
             return { assign: assign, quota: quota, unfilled: unfilled, score: score };
         };
-        var best = null;
-        for (var t = 0; t < N_TRIES; t++) {
-            var r = attempt();
-            if (!best || r.score < best.score)
-                best = r;
-            if (best.score === 0)
-                break;
+        // ═══ Paliers de relaxation progressive ═══
+        var relaxedCoro = Math.min(cfgMinCoro, 2);
+        var stages = [
+            { useBlocks: true, minCoro: cfgMinCoro, label: "standard" },
+            { useBlocks: false, minCoro: cfgMinCoro, label: "préférences 2 sem. ignorées" },
+        ];
+        if (relaxedCoro < cfgMinCoro) {
+            stages.push({ useBlocks: true, minCoro: relaxedCoro, label: "minimum Coro réduit à " + relaxedCoro });
+            stages.push({ useBlocks: false, minCoro: relaxedCoro, label: "préf. 2 sem. ignorées + Coro réduit à " + relaxedCoro });
+        }
+        var best = null, bestStage = stages[0];
+        for (var s = 0; s < stages.length; s++) {
+            var st = stages[s];
+            var stageBest = null;
+            for (var t = 0; t < N_TRIES; t++) {
+                var r = attempt(st);
+                if (!stageBest || r.score < stageBest.score)
+                    stageBest = r;
+                if (stageBest.unfilled === 0 && stageBest.score === 0)
+                    break;
+            }
+            if (!best || stageBest.score < best.score) {
+                best = stageBest;
+                bestStage = st;
+            }
+            if (best.unfilled === 0)
+                break; // palier suffisant : toutes les semaines pleines
         }
         persistCfg();
         setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { n[w.key] = best.assign[w.key]; }); return n; });
         var leftover = tourMeds.filter(function (m) { return best.quota[m.id] > 0; }).map(function (m) { return m.init + "(" + best.quota[m.id] + ")"; });
-        var msg = "Répartition effectuée (" + N_TRIES + " essais, meilleur résultat conservé).";
+        var msg = bestStage.label === "standard" ? "Répartition effectuée." : "Répartition effectuée — mode: " + bestStage.label + ".";
         if (best.unfilled > 0)
-            msg += " " + best.unfilled + " semaine(s) incomplète(s).";
+            msg += " " + best.unfilled + " semaine(s) incomplète(s) malgré toutes les relaxations.";
         if (leftover.length > 0)
             msg += " Quota restant: " + leftover.join(", ");
         toast(msg);
