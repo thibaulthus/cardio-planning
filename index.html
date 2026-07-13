@@ -122,7 +122,31 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v6.34 — 13/07/2026";
+var APP_VERSION = "v7.0 — 13/07/2026";
+/* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
+var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
+function perStart(y, m) {
+    var d = ((m - PCFG.startM) % 12 + 12) % 12;
+    var off = d % PCFG.len;
+    var sm = m - off, sy = y;
+    if (sm < 0) {
+        sm += 12;
+        sy--;
+    }
+    return { sy: sy, sm: sm };
+}
+function perNext(sy, sm) { var t = sm + PCFG.len; return { sy: t > 11 ? sy + 1 : sy, sm: t % 12 }; }
+function perPrev(sy, sm) { var t = sm - PCFG.len; return { sy: t < 0 ? sy - 1 : sy, sm: (t + 12) % 12 }; }
+function perDaysList(sy, sm) {
+    var days = [];
+    for (var i = 0; i < PCFG.len; i++) {
+        var mm = (sm + i) % 12, yy = sm + i > 11 ? sy + 1 : sy;
+        var dim = new Date(yy, mm + 1, 0).getDate();
+        for (var d = 1; d <= dim; d++)
+            days.push({ y: yy, m: mm, d: d });
+    }
+    return days;
+}
 var SYS = ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE"];
 var EDIT_PIN_DEFAULT = "1234";
 /* ════ HELPERS ════ */
@@ -365,10 +389,9 @@ function FF(_a) {
 }
 function MBar(_a) {
     var year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, extra = _a.extra, right = _a.right;
-    var _sm = month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6;
-    var _sy = month <= 1 ? year - 1 : year;
-    var _em = (_sm + 3) % 12;
-    var _pLabel = viewPeriod ? MOIS[_sm] + " — " + MOIS[_em] + " " + _sy : MOIS[month] + " " + year;
+    var _b = perStart(year, month), _sy = _b.sy, _sm = _b.sm;
+    var _em = (_sm + PCFG.len - 1) % 12;
+    var _pLabel = MOIS[_sm] + " — " + MOIS[_em] + " " + _sy;
     return (React.createElement("div", { style: S.bar },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
             React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
@@ -399,10 +422,9 @@ function GridH(_a) {
     var today = new Date();
     var ghEffDays = useMemo(function () {
         if (viewPeriod) {
-            var sm = month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6;
-            var sy = month <= 1 ? year - 1 : year;
+            var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
             var days = [];
-            for (var mi = 0; mi < 4; mi++) {
+            for (var mi = 0; mi < PCFG.len; mi++) {
                 var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
                 var dim = new Date(y2, m2 + 1, 0).getDate();
                 for (var d = 1; d <= dim; d++)
@@ -492,10 +514,9 @@ function GridV(_a) {
             return base;
         }
         // 4M mode: compute locally
-        var sm = month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6;
-        var sy = month <= 1 ? year - 1 : year;
+        var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
         var days = [];
-        for (var mi = 0; mi < 4; mi++) {
+        for (var mi = 0; mi < PCFG.len; mi++) {
             var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
             var dim = new Date(y2, m2 + 1, 0).getDate();
             for (var d = 1; d <= dim; d++)
@@ -685,7 +706,7 @@ function SiteView(_a) {
             React.createElement("h2", { style: S.mTit },
                 React.createElement("span", { style: { color: siteColor } }, site === "ANGIO" ? "🔬 PT Angio" : site),
                 " \u2014 ",
-                (viewPeriod ? MOIS[month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6] + " — " + MOIS[((month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6) + 3) % 12] + " " + (month <= 1 ? year - 1 : year) : MOIS[month] + " " + year)),
+                (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
             React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
@@ -815,7 +836,7 @@ function ActTabView(_a) {
             React.createElement("h2", { style: S.mTit },
                 React.createElement("span", { style: { color: titleColor } }, title),
                 " \u2014 ",
-                (viewPeriod ? MOIS[month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6] + " — " + MOIS[((month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6) + 3) % 12] + " " + (month <= 1 ? year - 1 : year) : MOIS[month] + " " + year)),
+                (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
             React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
@@ -886,17 +907,10 @@ function ActTabView(_a) {
 function GardeView(_a) {
     var year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod;
     var today = new Date();
-    // Always 4-month period for gardes
-    var gvSm = month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6;
-    var gvSy = month <= 1 ? year - 1 : year;
+    // Période globale pour les gardes
+    var _b = perStart(year, month), gvSy = _b.sy, gvSm = _b.sm;
     var gvEffDays = useMemo(function () {
-        var days = [];
-        for (var mi = 0; mi < 4; mi++) {
-            var m2 = (gvSm + mi) % 12, y2 = gvSm + mi > 11 ? gvSy + 1 : gvSy;
-            var dim = new Date(y2, m2 + 1, 0).getDate();
-            for (var d = 1; d <= dim; d++)
-                days.push({ y: y2, m: m2, d: d });
-        }
+        var days = perDaysList(gvSy, gvSm);
         if (!showFull) {
             var tod_5 = new Date();
             tod_5.setHours(0, 0, 0, 0);
@@ -906,8 +920,8 @@ function GardeView(_a) {
             });
         }
         return days;
-    }, [gvSm, gvSy, showFull]);
-    var _b = React.useState(null), pickerDay = _b[0], setPickerDay = _b[1];
+    }, [gvSm, gvSy, showFull, PCFG.len]);
+    var _c = React.useState(null), pickerDay = _c[0], setPickerDay = _c[1];
     function getGardeMed2(gvY, gvM, d) {
         var gy2 = gvY || year, gm2 = (gvM !== undefined) ? gvM : month;
         var dw2 = dow(gy2, gm2, d), gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
@@ -972,14 +986,12 @@ function GardeView(_a) {
     return (React.createElement("div", null,
         React.createElement("div", { style: S.bar },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-                React.createElement("button", { onClick: function () { for (var i = 0; i < 4; i++)
-                        prevM(); }, style: S.arr }, "\u2039"),
+                React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
                 React.createElement("h2", { style: S.mTit },
                     React.createElement("span", { style: { color: "#f85149" } }, "\uD83C\uDF19 Gardes"),
                     " \u2014 ",
-                    MOIS[gvSm] + " — " + MOIS[(gvSm + 3) % 12] + " " + gvSy),
-                React.createElement("button", { onClick: function () { for (var i = 0; i < 4; i++)
-                        nextM(); }, style: S.arr }, "\u203A")),
+                    MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy),
+                React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                 React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
@@ -1720,41 +1732,19 @@ function AbsModal(_a) {
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
     var tourMins = _a.tourMins, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
-    var getPeriodT = function (y, m) {
-        if (m >= 10)
-            return { pi: 0, startY: y, startM: 10 };
-        if (m <= 1)
-            return { pi: 0, startY: y - 1, startM: 10 };
-        if (m >= 2 && m <= 5)
-            return { pi: 1, startY: y, startM: 2 };
-        return { pi: 2, startY: y, startM: 6 };
-    };
-    var perT = getPeriodT(tourYear, tourMonth);
-    var perKeyT = perT.startY + "_" + perT.pi;
+    var _psT = perStart(tourYear, tourMonth);
+    var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
+    var perKeyT = perT.startY + "_" + perT.startM;
     var savedCfg = (tourCfg || {})[perKeyT] || null;
-    var periodLabelsT = ["Nov — Fév", "Mars — Juin", "Juil — Oct"];
-    var prevPeriodT = function () { var nm = perT.startM - 4; if (nm < 0) {
-        setTourMonth(nm + 12 + 1);
-        setTourYear(perT.startY - 1);
-    }
-    else {
-        setTourMonth(nm + 1);
-        setTourYear(perT.startY);
-    } };
-    var nextPeriodT = function () { var nm = perT.startM + 4; if (nm > 11) {
-        setTourMonth(nm - 12 + 1);
-        setTourYear(perT.startY + 1);
-    }
-    else {
-        setTourMonth(nm + 1);
-        setTourYear(perT.startY);
-    } };
+    var perLabelT = MOIS[perT.startM] + " — " + MOIS[(perT.startM + PCFG.len - 1) % 12];
+    var prevPeriodT = function () { var p = perPrev(perT.startY, perT.startM); setTourMonth(p.sm); setTourYear(p.sy); };
+    var nextPeriodT = function () { var p = perNext(perT.startY, perT.startM); setTourMonth(p.sm); setTourYear(p.sy); };
     var weeksT = [];
     var startDateT = new Date(perT.startY, perT.startM, 1);
     var fdT = new Date(startDateT);
     while (fdT.getDay() !== 1)
         fdT.setDate(fdT.getDate() + 1);
-    var endDateT = new Date(perT.startY, perT.startM + 4, 0);
+    var endDateT = new Date(perT.startY, perT.startM + PCFG.len, 0);
     var curT = new Date(fdT);
     while (curT <= endDateT) {
         weeksT.push({ key: curT.getFullYear() + "-" + curT.getMonth() + "-" + curT.getDate(), label: curT.getDate() + " " + MOIS[curT.getMonth()].slice(0, 4) });
@@ -1983,7 +1973,7 @@ function TourTab(_a) {
         React.createElement("div", { style: S.bar },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
                 React.createElement("button", { onClick: prevPeriodT, style: S.arr }, "\u2039"),
-                React.createElement("h2", { style: S.mTit }, "🔄 Tour médical — " + periodLabelsT[perT.pi] + " " + perT.startY + (perT.pi === 0 ? "/" + (perT.startY + 1) : "")),
+                React.createElement("h2", { style: S.mTit }, "🔄 Tour médical — " + perLabelT + " " + perT.startY),
                 React.createElement("button", { onClick: nextPeriodT, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                 [["■", "Coro", "#76a5af"], ["■", "Pace", "#e3b341"], ["■", "EEP", "#f97316"], ["■", "ETT", "#ea9999"]].map(function (_a) {
@@ -2107,7 +2097,7 @@ function TourTab(_a) {
                 React.createElement("div", { style: S.mHd },
                     React.createElement("div", { style: S.mTit2 },
                         "\u2699\uFE0F R\u00E9partition automatique \u2014 ",
-                        periodLabelsT[perT.pi],
+                        perLabelT,
                         " ",
                         perT.startY),
                     React.createElement("button", { onClick: closeAutoModal, style: S.xBtn }, "\u00D7")),
@@ -2183,46 +2173,16 @@ function TourTab(_a) {
 }
 function StatsTab(_a) {
     var medecins = _a.medecins, actes = _a.actes, plan = _a.plan, year = _a.year, month = _a.month, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, tourMed = _a.tourMed;
-    var getPeriod = function (y, m) {
-        if (m >= 10)
-            return { pi: 0, startY: y, startM: 10 };
-        if (m <= 1)
-            return { pi: 0, startY: y - 1, startM: 10 };
-        if (m >= 2 && m <= 5)
-            return { pi: 1, startY: y, startM: 2 };
-        return { pi: 2, startY: y, startM: 6 };
-    };
     var _b = React.useState(function () { return new Date().getFullYear(); }), statsYear = _b[0], setStatsYear = _b[1];
     var _c = React.useState(function () { return new Date().getMonth(); }), statsMonth = _c[0], setStatsMonth = _c[1];
     var _d = React.useState("tous"), statSite = _d[0], setStatSite = _d[1];
-    var per = getPeriod(statsYear, statsMonth);
-    var periodLabels = ["Nov — Fév", "Mars — Juin", "Juil — Oct"];
-    var prevP = function () { var nm = per.startM - 4; if (nm < 0) {
-        setStatsMonth(nm + 12 + 1);
-        setStatsYear(per.startY - 1);
-    }
-    else {
-        setStatsMonth(nm + 1);
-        setStatsYear(per.startY);
-    } };
-    var nextP = function () { var nm = per.startM + 4; if (nm > 11) {
-        setStatsMonth(nm - 12 + 1);
-        setStatsYear(per.startY + 1);
-    }
-    else {
-        setStatsMonth(nm + 1);
-        setStatsYear(per.startY);
-    } };
+    var _ps = perStart(statsYear, statsMonth);
+    var per = { startY: _ps.sy, startM: _ps.sm };
+    var perLabelS = MOIS[per.startM] + " — " + MOIS[(per.startM + PCFG.len - 1) % 12];
+    var prevP = function () { var p = perPrev(per.startY, per.startM); setStatsMonth(p.sm); setStatsYear(p.sy); };
+    var nextP = function () { var p = perNext(per.startY, per.startM); setStatsMonth(p.sm); setStatsYear(p.sy); };
     // Build all days in period
-    var days = [];
-    for (var mi = 0; mi < 4; mi++) {
-        var y2 = per.startY, m2 = (per.startM + mi) % 12;
-        if (per.startM + mi > 11)
-            y2 = per.startY + 1;
-        var dim = new Date(y2, m2 + 1, 0).getDate();
-        for (var d = 1; d <= dim; d++)
-            days.push({ y: y2, m: m2, d: d });
-    }
+    var days = perDaysList(per.startY, per.startM);
     // Activities to track (exclude system ones)
     var trackActes = actes.filter(function (a) { return !a.isSystem && a.id !== "ABSENCE" && a.id !== "REPOS_GARDE"; }).sort(function (a, b) { return a.label.localeCompare(b.label); });
     var GARDE_ACTE = { id: "GARDE", label: "Garde", short: "G", color: "#93c47d" };
@@ -2292,7 +2252,7 @@ function StatsTab(_a) {
         React.createElement("div", { style: S.bar },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
                 React.createElement("button", { onClick: prevP, style: S.arr }, "\u2039"),
-                React.createElement("h2", { style: S.mTit }, "📊 Stats — " + periodLabels[per.pi] + " " + per.startY + (per.pi === 0 ? "/" + (per.startY + 1) : "")),
+                React.createElement("h2", { style: S.mTit }, "📊 Stats — " + perLabelS + " " + per.startY),
                 React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                 React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11 }) }, "\uD83D\uDDA8\uFE0F Export"),
@@ -2353,7 +2313,7 @@ function CardioPlanning() {
     var setYearMonth = function (y, m) { return setYM({ year: y, month: m }); };
     var _h = useState("V"), orient = _h[0], setOrient = _h[1]; // H/V toggle removed - V only
     var _j = useState(false), darkMode = _j[0], setDarkMode = _j[1];
-    var DEFAULT_TABS = [["monplanning", "👤"], ["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📡 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "🔗"], ["stats", "📊 Stats"]];
+    var DEFAULT_TABS = [["monplanning", "👤"], ["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📡 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"]];
     var _k = useState(function () { try {
         var v = localStorage.getItem("cp6_taborder");
         if (v) {
@@ -2379,27 +2339,24 @@ function CardioPlanning() {
     var _q = useState([]), planFilter = _q[0], setPlanFilter = _q[1];
     var _r = useState(0), userProfile = _r[0], setUserProfile = _r[1];
     var _s = useState(false), showFull = _s[0], setShowFull = _s[1];
-    var _t = useState(false), viewPeriod = _t[0], setViewPeriod = _t[1];
-    // Reset to 1M when leaving planning tab
-    React.useEffect(function () {
-        if (tab !== "planning" && tab !== "attache" && viewPeriod) {
-            setViewPeriod(false);
-        }
-    }, [tab]);
+    var viewPeriod = true;
+    var setViewPeriod = function () { };
     var snapToPeriodStart = React.useCallback(function (y, m) {
-        var sm = m >= 10 ? 10 : m <= 1 ? 10 : m >= 2 && m <= 5 ? 2 : 6;
-        var sy = m <= 1 ? y - 1 : y;
-        setYearMonth(sy, sm);
+        var p = perStart(y, m);
+        setYearMonth(p.sy, p.sm);
     }, []);
-    var _u = useState(MEDECINS_INIT), medecins = _u[0], setMedecins = _u[1];
-    var _v = useState(DEFAULT_ACTES), actes = _v[0], setActes = _v[1];
-    var _w = useState({}), plan = _w[0], setPlan = _w[1];
-    var _x = useState({}), tourMed = _x[0], setTourMed = _x[1];
-    var _y = useState({}), planningType = _y[0], setPlanningType = _y[1];
-    var _z = useState({}), notes = _z[0], setNotes = _z[1];
-    var _0 = useState({}), medPins = _0[0], setMedPins = _0[1]; // {medId: "pin"}
-    var _1 = useState({ coro: 3, pace: 1, eep: 1, ett: 1 }), tourMins = _1[0], setTourMins = _1[1];
-    var _2 = useState({}), tourCfg = _2[0], setTourCfg = _2[1]; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
+    var _t = useState(MEDECINS_INIT), medecins = _t[0], setMedecins = _t[1];
+    var _u = useState(DEFAULT_ACTES), actes = _u[0], setActes = _u[1];
+    var _v = useState({}), plan = _v[0], setPlan = _v[1];
+    var _w = useState({}), tourMed = _w[0], setTourMed = _w[1];
+    var _x = useState({}), planningType = _x[0], setPlanningType = _x[1];
+    var _y = useState({}), notes = _y[0], setNotes = _y[1];
+    var _z = useState({}), medPins = _z[0], setMedPins = _z[1]; // {medId: "pin"}
+    var _0 = useState({ coro: 3, pace: 1, eep: 1, ett: 1 }), tourMins = _0[0], setTourMins = _0[1];
+    var _1 = useState({}), tourCfg = _1[0], setTourCfg = _1[1];
+    var _2 = useState({ len: 4, startM: 6 }), periodCfg = _2[0], setPeriodCfg = _2[1];
+    PCFG.len = periodCfg.len;
+    PCFG.startM = periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
     var _3 = useState({}), astreinte = _3[0], setAstreinte = _3[1]; // {wKey: medId}
     var _4 = useState(null), astDayModal = _4[0], setAstDayModal = _4[1]; // legacy
     var _5 = useState(null), astPickModal = _5[0], setAstPickModal = _5[1]; // {dayKey,wKey,isWeek,label}
@@ -2500,6 +2457,8 @@ function CardioPlanning() {
                         setTourMins(JSON.parse(data.tourMins));
                     if (data.tourCfg)
                         setTourCfg(JSON.parse(data.tourCfg));
+                    if (data.periodCfg)
+                        setPeriodCfg(JSON.parse(data.periodCfg));
                     if (data.medPins)
                         setMedPins(JSON.parse(data.medPins));
                 }
@@ -2545,6 +2504,8 @@ function CardioPlanning() {
         saveToFirebase({ tourMins: JSON.stringify(tourMins) }); }, [tourMins]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourCfg: JSON.stringify(tourCfg) }); }, [tourCfg]);
+    useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ planningType: JSON.stringify(planningType) }); }, [planningType]);
     useEffect(function () { if (!isFirstLoad.current)
@@ -2631,30 +2592,11 @@ function CardioPlanning() {
     }, [nDays, showFull, year, month, todayY, todayM, todayD]);
     /* ── getEntries ── */
     // 4-month period days
-    var getPeriodRange = function (y, m) {
-        var sm, sy;
-        if (m >= 10) {
-            sm = 10;
-            sy = y;
-        }
-        else if (m <= 1) {
-            sm = 10;
-            sy = y - 1;
-        }
-        else if (m >= 2 && m <= 5) {
-            sm = 2;
-            sy = y;
-        }
-        else {
-            sm = 6;
-            sy = y;
-        }
-        return { sy: sy, sm: sm };
-    };
+    var getPeriodRange = function (y, m) { return perStart(y, m); };
     var allDays4 = useMemo(function () {
         var _a = getPeriodRange(year, month), sy = _a.sy, sm = _a.sm;
         var days = [];
-        for (var mi = 0; mi < 4; mi++) {
+        for (var mi = 0; mi < PCFG.len; mi++) {
             var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
             var dim = new Date(y2, m2 + 1, 0).getDate();
             for (var d = 1; d <= dim; d++)
@@ -3007,50 +2949,16 @@ function CardioPlanning() {
         return [0, 1, 2, 3, 4].some(function (i) { var dt = new Date(wy, wm2, wd + i); return ["M", "AM", "JOUR"].some(function (sl) { var e = (plan[sk(dt.getFullYear(), dt.getMonth(), dt.getDate(), sl)] || {})[medId]; var ae = Array.isArray(e) ? e[0] : e; return ae && ae.acteId === "ABSENCE"; }); });
     }, [plan]);
     var tmCount = function (medId) { return Object.values(tourMed).reduce(function (n, w) { return ((w.HC || []).includes(medId) || (w.USIC || []).includes(medId)) ? n + 1 : n; }, 0); };
-    var getPeriodStart = function (y, m) {
-        var sm = m >= 10 ? 10 : m <= 1 ? 10 : m >= 2 && m <= 5 ? 2 : 6;
-        var sy = m <= 1 ? y - 1 : y;
-        return { sm: sm, sy: sy };
-    };
+    var getPeriodStart = function (y, m) { var p = perStart(y, m); return { sy: p.sy, sm: p.sm }; };
     var prevM = function () {
-        if (!viewPeriod) {
-            if (month === 0) {
-                setYearMonth(year - 1, 11);
-            }
-            else
-                setYearMonth(year, month - 1);
-            return;
-        }
         var _a = getPeriodStart(year, month), sm = _a.sm, sy = _a.sy;
-        if (sm === 6) {
-            setYearMonth(sy, 2);
-        }
-        else if (sm === 2) {
-            setYearMonth(sy - 1, 10);
-        }
-        else {
-            setYearMonth(sy - 1, 6);
-        }
+        var p = perPrev(sy, sm);
+        setYearMonth(p.sy, p.sm);
     };
     var nextM = function () {
-        if (!viewPeriod) {
-            if (month === 11) {
-                setYearMonth(year + 1, 0);
-            }
-            else
-                setYearMonth(year, month + 1);
-            return;
-        }
         var _a = getPeriodStart(year, month), sm = _a.sm, sy = _a.sy;
-        if (sm === 6) {
-            setYearMonth(sy, 10);
-        }
-        else if (sm === 10) {
-            setYearMonth(sy + 1, 2);
-        }
-        else {
-            setYearMonth(sy, 6);
-        }
+        var p = perNext(sy, sm);
+        setYearMonth(p.sy, p.sm);
     };
     var openCell = function (medId, y2, m2, d2, slot) {
         if (!canEdit(medId))
@@ -3133,8 +3041,8 @@ function CardioPlanning() {
                     } }, "\u270F\uFE0F \u00C9dition"),
                 React.createElement("div", { style: { marginTop: 14, fontSize: 10, color: "var(--txt3)", textAlign: "center" } }, APP_VERSION))));
     var _per = getPeriodRange(year, month);
-    var _pem = (_per.sm + 3) % 12, _pey = _per.sm + 3 > 11 ? _per.sy + 1 : _per.sy;
-    var _titlePeriod = viewPeriod ? MOIS[_per.sm] + " — " + MOIS[_pem] + " " + (_per.sy !== _pey ? _per.sy + "/" + _pey : _pey) : MOIS[month] + " " + year;
+    var _pem = (_per.sm + PCFG.len - 1) % 12, _pey = _per.sm + PCFG.len - 1 > 11 ? _per.sy + 1 : _per.sy;
+    var _titlePeriod = MOIS[_per.sm] + " — " + MOIS[_pem] + " " + (_per.sy !== _pey ? _per.sy + "/" + _pey : _pey);
     return (React.createElement("div", { style: S.app },
         React.createElement("style", null, "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav::-webkit-scrollbar { display: none; }\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
         notif && React.createElement("div", { style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", borderColor: "#4ade80" }) }, notif.msg),
@@ -3194,9 +3102,6 @@ function CardioPlanning() {
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         isAnyEdit && React.createElement("button", { style: S.btnP, onClick: applyPlanningType }, "\u25B6 PT"),
-                        React.createElement("button", { onClick: function () { setViewPeriod(function (v) { if (!v) {
-                                snapToPeriodStart(year, month);
-                            } return !v; }); }, title: viewPeriod ? "Vue mois" : "Vue 4 mois", style: __assign(__assign({}, S.arr), { fontSize: 11, padding: "3px 6px", fontWeight: 800, color: viewPeriod ? "#fff" : "var(--txt2)", background: viewPeriod ? "#1d4ed8" : "var(--bg2)", border: "1px solid ".concat(viewPeriod ? "#1d4ed8" : "var(--border)") }) }, viewPeriod ? "4M" : "1M"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8, alignItems: "center" } },
@@ -3268,13 +3173,12 @@ function CardioPlanning() {
                 React.createElement("div", { style: S.bar },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
-                        React.createElement("h2", { style: S.mTit }, "👔 Attachés — " + (viewPeriod ? MOIS[month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6] + " — " + MOIS[((month >= 10 ? month : month <= 1 ? 10 : month >= 2 && month <= 5 ? 2 : 6) + 3) % 12] + " " + (month <= 1 ? year - 1 : year) : MOIS[month] + " " + year)),
+                        React.createElement("h2", { style: S.mTit }, "👔 Attachés — " + (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         isEdit && React.createElement("button", { style: S.btnP, onClick: applyPlanningType },
                             "\u25B6 Appliquer ",
                             MOIS[month]),
-                        React.createElement("button", { onClick: function () { return setViewPeriod(function (v) { return !v; }); }, title: viewPeriod ? "Vue mois" : "Vue 4 mois", style: __assign(__assign({}, S.arr), { fontSize: 11, padding: "3px 6px", fontWeight: 800, color: viewPeriod ? "#fff" : "var(--txt2)", background: viewPeriod ? "#1d4ed8" : "var(--bg2)", border: "1px solid ".concat(viewPeriod ? "#1d4ed8" : "var(--border)") }) }, viewPeriod ? "4M" : "1M"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 orient === "H"
@@ -3287,19 +3191,7 @@ function CardioPlanning() {
                         React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
                     isEdit && React.createElement("button", { style: S.btnP, onClick: function () { setMData({ _new: true, id: "", label: "", short: "", color: "#3b82f6", bg: "#0c1a2e", hasSalle: false, salles: [], isSystem: false, site: "tous", medecinsAutorise: [] }); setModal("editActe"); } }, "+ Nouvelle"),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙")),
-                    isEdit && React.createElement("div", { style: { marginBottom: 14, padding: 12, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", maxWidth: 560 } },
-                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Tour m\u00E9dical \u2014 minimum de s\u00E9niors disponibles par sursp\u00E9cialit\u00E9 (par d\u00E9faut)"),
-                        React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
-                            var k = _a[0], lb = _a[1];
-                            return (React.createElement("label", { key: k, style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
-                                lb,
-                                React.createElement("input", { type: "number", min: 0, max: 9, value: tourMins[k], onChange: function (e) { return setTourMins(function (p) {
-                                        var _a;
-                                        return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
-                                    }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })));
-                        })),
-                        React.createElement("div", { style: { marginTop: 6, fontSize: 10, color: "var(--txt3)" } }, "Valeurs pr\u00E9-remplies dans la modale de r\u00E9partition automatique (modifiables au cas par cas)."))),
+                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
                 ["tous", "CHL", "CHB"].map(function (site) { return (React.createElement("div", { key: site, style: { marginBottom: 14 } },
                     React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 } }, site === "tous" ? "Toutes" : site),
                     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))", gap: 6 } }, actes.filter(function (a) { return (a.site || "tous") === site; }).map(function (a) { return (React.createElement("div", { key: a.id, style: __assign(__assign({}, S.card), { borderLeft: "3px solid ".concat(a.color), display: "flex", alignItems: "center", gap: 9 }) },
@@ -3359,45 +3251,10 @@ function CardioPlanning() {
                     return (v !== undefined && v !== null) ? String(v) : null;
                 };
                 var JOURS_C = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-                var sm = astMonth >= 10 ? astMonth : astMonth <= 1 ? 10 : astMonth >= 2 && astMonth <= 5 ? 2 : 6;
-                var sy = astMonth <= 1 ? astYear - 1 : astYear;
-                var prevAst = function () {
-                    // Jul->Mar(same yr), Nov->Jul(same yr), Mar->Nov(prev yr)
-                    if (sm === 6) {
-                        setAstYear(sy);
-                        setAstMonth(2);
-                    }
-                    else if (sm === 10) {
-                        setAstYear(sy);
-                        setAstMonth(6);
-                    }
-                    else {
-                        setAstYear(sy - 1);
-                        setAstMonth(10);
-                    }
-                };
-                var nextAst = function () {
-                    // Jul->Nov(same yr), Nov->Mar(same yr+1? no: sy+1), Mar->Jul(same yr)
-                    if (sm === 6) {
-                        setAstYear(sy);
-                        setAstMonth(10);
-                    }
-                    else if (sm === 10) {
-                        setAstYear(sy + 1);
-                        setAstMonth(2);
-                    }
-                    else {
-                        setAstYear(sy);
-                        setAstMonth(6);
-                    }
-                };
-                var allDays4M = [];
-                for (var mi = 0; mi < 4; mi++) {
-                    var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
-                    var dim = new Date(y2, m2 + 1, 0).getDate();
-                    for (var d = 1; d <= dim; d++)
-                        allDays4M.push({ y: y2, m: m2, d: d });
-                }
+                var _a = perStart(astYear, astMonth), sy = _a.sy, sm = _a.sm;
+                var prevAst = function () { var p = perPrev(sy, sm); setAstYear(p.sy); setAstMonth(p.sm); };
+                var nextAst = function () { var p = perNext(sy, sm); setAstYear(p.sy); setAstMonth(p.sm); };
+                var allDays4M = perDaysList(sy, sm);
                 var stats = {};
                 astMeds.forEach(function (m) { stats[String(m.id)] = 0; });
                 allDays4M.forEach(function (_a) {
@@ -3406,31 +3263,9 @@ function CardioPlanning() {
                     if (mid && stats[mid] !== undefined)
                         stats[mid]++;
                 });
-                var prevP = function () { if (sm === 6) {
-                    setAstYear(sy);
-                    setAstMonth(2);
-                }
-                else if (sm === 10) {
-                    setAstYear(sy);
-                    setAstMonth(6);
-                }
-                else {
-                    setAstYear(sy - 1);
-                    setAstMonth(10);
-                } };
-                var nextP = function () { if (sm === 6) {
-                    setAstYear(sy);
-                    setAstMonth(10);
-                }
-                else if (sm === 10) {
-                    setAstYear(sy + 1);
-                    setAstMonth(2);
-                }
-                else {
-                    setAstYear(sy);
-                    setAstMonth(6);
-                } };
-                var pLabel = MOIS[sm] + " — " + MOIS[(sm + 3) % 12] + " " + sy;
+                var prevP = function () { var p = perPrev(sy, sm); setAstYear(p.sy); setAstMonth(p.sm); };
+                var nextP = function () { var p = perNext(sy, sm); setAstYear(p.sy); setAstMonth(p.sm); };
+                var pLabel = MOIS[sm] + " — " + MOIS[(sm + PCFG.len - 1) % 12] + " " + sy;
                 var exportCSV = function () {
                     var rows = [["Date", "Jour", "Médecin"]];
                     allDays4M.forEach(function (_a) {
@@ -3615,7 +3450,9 @@ function CardioPlanning() {
             })(),
             tab === "stats" && isEdit && React.createElement(StatsTab, { medecins: medecins, actes: actes, plan: plan, year: year, month: month, darkMode: darkMode, setDarkMode: setDarkMode, tourMed: tourMed }),
             tab === "partage" && (React.createElement("div", { style: { maxWidth: 500 } },
-                React.createElement("h2", { style: __assign(__assign({}, S.mTit), { marginBottom: 16 }) }, "\uD83D\uDD17 Partage & acc\u00E8s"),
+                React.createElement("h2", { style: __assign(__assign({}, S.mTit), { marginBottom: 16 }) },
+                    "\u2699\uFE0F Param\u00E8tres ",
+                    React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#3fb950", fontSize: 13, marginBottom: 6 } },
                         "\uD83D\uDC41 Lecture seule",
@@ -3632,6 +3469,38 @@ function CardioPlanning() {
                             }
                             else
                                 toast("Min 4 car.", "warn"); } }, "OK"))),
+                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCC6 P\u00E9riode d'affichage"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Tous les onglets affichent le planning par blocs de cette dur\u00E9e, align\u00E9s sur le mois de d\u00E9part."),
+                    React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" } },
+                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
+                            "Dur\u00E9e (mois)",
+                            React.createElement("input", { type: "number", min: 1, max: 12, value: periodCfg.len, onChange: function (e) { var v = Math.min(12, Math.max(1, parseInt(e.target.value) || 4)); setPeriodCfg(function (p) { return (__assign(__assign({}, p), { len: v })); }); }, style: { width: 52, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })),
+                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
+                            "Mois de d\u00E9part",
+                            React.createElement("select", { value: periodCfg.startM, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { startM: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, MOIS.map(function (mn, mi) { return React.createElement("option", { key: mi, value: mi }, mn); })))),
+                    React.createElement("div", { style: { marginTop: 8, fontSize: 10, color: "var(--txt3)" } },
+                        "Actuellement : blocs de ",
+                        periodCfg.len,
+                        " mois \u00E0 partir de ",
+                        MOIS[periodCfg.startM],
+                        " (ex. ",
+                        MOIS[periodCfg.startM],
+                        " \u2014 ",
+                        MOIS[(periodCfg.startM + periodCfg.len - 1) % 12],
+                        ").")),
+                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#a371f7", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD04 Tour m\u00E9dical \u2014 minimums par sursp\u00E9cialit\u00E9"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Nombre minimum de s\u00E9niors devant rester disponibles chaque semaine (hors tour, hors absents). Pr\u00E9-rempli dans la modale de r\u00E9partition, modifiable au cas par cas."),
+                    React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
+                        var k = _a[0], lb = _a[1];
+                        return (React.createElement("label", { key: k, style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
+                            lb,
+                            React.createElement("input", { type: "number", min: 0, max: 9, value: tourMins[k], onChange: function (e) { return setTourMins(function (p) {
+                                    var _a;
+                                    return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
+                                }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })));
+                    }))),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { marginBottom: 20, padding: "14px 16px", background: "var(--bg)", borderRadius: 10, border: "1px solid var(--border)" } },
                         React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "var(--txt)", marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
