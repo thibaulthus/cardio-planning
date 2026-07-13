@@ -1771,166 +1771,121 @@ function TourTab(_a) {
         return false;
     };
     var tourMeds = medecins.filter(function (m) { return m.tourMed; });
-    return (React.createElement("div", null,
-        React.createElement("div", { style: S.bar },
-            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                React.createElement("button", { onClick: prevPeriodT, style: S.arr }, "\u2039"),
-                React.createElement("h2", { style: S.mTit }, "🔄 Tour médical — " + periodLabelsT[perT.pi] + " " + perT.startY + (perT.pi === 0 ? "/" + (perT.startY + 1) : "")),
-                React.createElement("button", { onClick: nextPeriodT, style: S.arr }, "\u203A")),
-            React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                [["■", "Coro", "#76a5af"], ["■", "Pace", "#e3b341"], ["■", "EEP", "#f97316"], ["■", "ETT", "#ea9999"]].map(function (_a) {
-                    var ic = _a[0], lb = _a[1], lc = _a[2];
-                    return (React.createElement("span", { key: lb, style: { fontSize: 10, color: lc, display: "flex", alignItems: "center", gap: 2, fontWeight: 700 } },
-                        ic,
-                        " ",
-                        lb));
-                }),
-                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
-        React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 4 } }, tourMeds.map(function (m) {
-            var hcCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.HC || []).includes(m.id) ? n + 1 : n; }, 0);
-            var usicCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.USIC || []).includes(m.id) ? n + 1 : n; }, 0);
-            var total = hcCount + usicCount;
-            return (React.createElement("div", { key: m.id, style: __assign(__assign({}, S.card), { textAlign: "center", minWidth: 64, flexShrink: 0, padding: "7px 9px" }) },
-                React.createElement(Av, { med: m }),
-                React.createElement("div", { style: { fontWeight: 800, fontSize: 14, color: m.color, fontFamily: "'JetBrains Mono',monospace", marginTop: 3 } }, total),
-                React.createElement("div", { style: { display: "flex", gap: 4, justifyContent: "center", marginTop: 2 } },
-                    React.createElement("span", { style: { fontSize: 9, color: "#388bfd", fontWeight: 700 } },
-                        hcCount,
-                        React.createElement("span", { style: { fontWeight: 400 } }, "HC")),
-                    React.createElement("span", { style: { fontSize: 9, color: "#a371f7", fontWeight: 700 } },
-                        usicCount,
-                        React.createElement("span", { style: { fontWeight: 400 } }, "US")))));
-        })),
-        weeksT.map(function (w) {
-            var wm = tourMed[w.key] || { HC: [], USIC: [] };
-            return (React.createElement("div", { key: w.key, style: S.tmRow },
-                React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt2)", minWidth: 110 } },
-                    "Sem. ",
-                    w.label),
-                ["HC", "USIC"].map(function (unit) { return (React.createElement("div", { key: unit, style: { flex: 1, minWidth: 170 } },
-                    React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: unit === "HC" ? "#388bfd" : "#a371f7", marginBottom: 4 } }, unit),
-                    React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, tourMeds.map(function (m) {
-                        var on = (wm[unit] || []).includes(m.id);
-                        var blocked = isBlockedInWeek(m.id, w.key);
-                        var inOther = (wm[unit === "HC" ? "USIC" : "HC"] || []).includes(m.id);
-                        var dis = blocked || inOther;
-                        return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "3px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 44,
-                                background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", opacity: dis ? .3 : 1,
-                                outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#a3e635", ett: "#46bdc6" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () { if (dis || !isEdit)
-                                return; setTourMed(function (p) {
-                                var _a;
-                                var cur = __assign({}, (p[w.key] || { HC: [], USIC: [] }));
-                                var l = cur[unit] || [];
-                                cur[unit] = on ? l.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], l, true), [m.id], false);
-                                return __assign(__assign({}, p), (_a = {}, _a[w.key] = cur, _a));
-                            }); } },
-                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10 } }, m.init),
-                            React.createElement("div", { style: { fontSize: 8, color: blocked ? "inherit" : m.surSpec && !on ? ({ coro: "#76a5af", pace: "#e3b341", eep: "#a3e635", ett: "#46bdc6" }[m.surSpec]) : "inherit" } }, blocked ? "indispo" : inOther ? "≠" : "")));
-                    })),
-                    React.createElement("div", { style: { marginTop: 4, display: "flex", alignItems: "center", gap: 8 } },
-                        React.createElement("span", { style: { fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: (wm[unit] || []).length === 2 ? "#3fb950" : (wm[unit] || []).length > 2 ? "#f85149" : "#e3b341" } },
-                            (wm[unit] || []).length,
-                            "/2"),
-                        isEdit && React.createElement("button", { style: { fontSize: 10, padding: "2px 7px", borderRadius: 5, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer", fontWeight: 600 }, onClick: function () {
-                                var allTmIds = __spreadArray(__spreadArray([], (wm.HC || []), true), (wm.USIC || []), true);
-                                var _a = w.key.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
-                                var weekDates = [0, 1, 2, 3, 4].map(function (i) { var dt = new Date(wy2, wm2, wd2 + i); return [dt.getFullYear(), dt.getMonth(), dt.getDate()]; });
-                                setPlan(function (p) {
-                                    var next = __assign({}, p);
-                                    weekDates.forEach(function (_a) {
-                                        var dy = _a[0], dm = _a[1], dd = _a[2];
-                                        if (isWE(dy, dm, dd))
-                                            return;
-                                        var dw2 = dow(dy, dm, dd);
-                                        medecins.forEach(function (med) {
-                                            var isTM = allTmIds.includes(med.id);
-                                            ["M", "AM"].forEach(function (sl) {
-                                                var _a, _b;
-                                                var k = sk(dy, dm, dd, sl), ex = (next[k] || {})[med.id];
-                                                var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                                                if (["ABSENCE", "GARDE", "REPOS_GARDE"].includes(exA))
-                                                    return;
-                                                if (isTM) {
-                                                    if ((next[k] || {})[med.id]) {
-                                                        var dm3 = __assign({}, next[k]);
-                                                        delete dm3[med.id];
-                                                        next = __assign(__assign({}, next), (_a = {}, _a[k] = dm3, _a));
-                                                    }
-                                                }
-                                                else {
-                                                    var pt = planningType[med.id];
-                                                    if (!pt || !pt[dw2])
-                                                        return;
-                                                    var _c = (pt[dw2][sl]) || [null, null], acteId = _c[0], salle = _c[1];
-                                                    if (!acteId)
-                                                        return;
-                                                    if (!next[k])
-                                                        next[k] = {};
-                                                    next[k] = __assign(__assign({}, next[k]), (_b = {}, _b[med.id] = { acteId: acteId, salle: salle || null }, _b));
-                                                }
-                                            });
-                                        });
-                                    });
-                                    return next;
-                                });
-                                toast("Semaine du " + w.label + " mise à jour", "info");
-                            } }, "\u21BA M\u00E0j sem.")))); })));
-        })));
-}
-function TourTab(_a) {
-    var tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
-    var getPeriodT = function (y, m) {
-        if (m >= 10)
-            return { pi: 0, startY: y, startM: 10 };
-        if (m <= 1)
-            return { pi: 0, startY: y - 1, startM: 10 };
-        if (m >= 2 && m <= 5)
-            return { pi: 1, startY: y, startM: 2 };
-        return { pi: 2, startY: y, startM: 6 };
+    // ─── Auto-répartition ───
+    var _b = React.useState(false), autoModal = _b[0], setAutoModal = _b[1];
+    var _c = React.useState(1), cfgMinEEP = _c[0], setCfgMinEEP = _c[1];
+    var _d = React.useState(1), cfgMinPace = _d[0], setCfgMinPace = _d[1];
+    var _e = React.useState(1), cfgMinETT = _e[0], setCfgMinETT = _e[1];
+    var _f = React.useState(3), cfgMinCoro = _f[0], setCfgMinCoro = _f[1];
+    var _g = React.useState({}), cfgWeeks = _g[0], setCfgWeeks = _g[1]; // {medId: nWeeks}
+    var _h = React.useState({}), cfgPref2HC = _h[0], setCfgPref2HC = _h[1]; // {medId: bool}
+    var _j = React.useState({}), cfgPref2USIC = _j[0], setCfgPref2USIC = _j[1]; // {medId: bool}
+    var totalSlots = weeksT.length * 4; // 2 HC + 2 USIC per week
+    var nominalW = tourMeds.length > 0 ? Math.round(totalSlots / tourMeds.length * 10) / 10 : 0;
+    var openAutoModal = function () {
+        var w = {}, ph = {}, pu = {};
+        tourMeds.forEach(function (m) { w[m.id] = Math.round(nominalW); ph[m.id] = !!m.pref2HC; pu[m.id] = !!m.pref2USIC; });
+        setCfgWeeks(w);
+        setCfgPref2HC(ph);
+        setCfgPref2USIC(pu);
+        setAutoModal(true);
     };
-    var perT = getPeriodT(tourYear, tourMonth);
-    var periodLabelsT = ["Nov — Fév", "Mars — Juin", "Juil — Oct"];
-    var prevPeriodT = function () { var nm = perT.startM - 4; if (nm < 0) {
-        setTourMonth(nm + 12 + 1);
-        setTourYear(perT.startY - 1);
-    }
-    else {
-        setTourMonth(nm + 1);
-        setTourYear(perT.startY);
-    } };
-    var nextPeriodT = function () { var nm = perT.startM + 4; if (nm > 11) {
-        setTourMonth(nm - 12 + 1);
-        setTourYear(perT.startY + 1);
-    }
-    else {
-        setTourMonth(nm + 1);
-        setTourYear(perT.startY);
-    } };
-    var weeksT = [];
-    var startDateT = new Date(perT.startY, perT.startM, 1);
-    var fdT = new Date(startDateT);
-    while (fdT.getDay() !== 1)
-        fdT.setDate(fdT.getDate() + 1);
-    var endDateT = new Date(perT.startY, perT.startM + 4, 0);
-    var curT = new Date(fdT);
-    while (curT <= endDateT) {
-        weeksT.push({ key: curT.getFullYear() + "-" + curT.getMonth() + "-" + curT.getDate(), label: curT.getDate() + " " + MOIS[curT.getMonth()].slice(0, 4) });
-        curT.setDate(curT.getDate() + 7);
-    }
-    var tmCountPeriod = function (medId) { return weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || { HC: [], USIC: [] }; return ((wm2.HC || []).includes(medId) || (wm2.USIC || []).includes(medId)) ? n + 1 : n; }, 0); };
-    var isBlockedInWeek = function (medId, wk2) {
-        var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
-        for (var i = 0; i < 5; i++) {
-            var dt = new Date(wy2, wm2, wd2 + i);
-            var dy = dt.getFullYear(), dm = dt.getMonth(), dd = dt.getDate();
-            var es1 = getEntries(medId, dy, dm, dd, "M");
-            var es2 = getEntries(medId, dy, dm, dd, "AM");
-            if (__spreadArray(__spreadArray([], es1, true), es2, true).some(function (e) { return ["ABSENCE", "FORM", "FORMATION"].includes(e.acteId); }))
+    var runAutoRepartition = function () {
+        // Greedy algorithm with constraints
+        var quota = {};
+        tourMeds.forEach(function (m) { quota[m.id] = cfgWeeks[m.id] || 0; });
+        var hcCount = {}, usicCount = {};
+        tourMeds.forEach(function (m) { hcCount[m.id] = 0; usicCount[m.id] = 0; });
+        var assign = {}; // {wKey: {HC:[id],USIC:[id]}}
+        weeksT.forEach(function (w) { assign[w.key] = { HC: [], USIC: [] }; });
+        var assignedThisWeek = {}; // {wKey: Set of medIds}
+        weeksT.forEach(function (w) { assignedThisWeek[w.key] = []; });
+        // Check specialty coverage: for a week, meds NOT on tour and NOT absent must cover specialties
+        var specOK = function (wKey, extraAssigned) {
+            var busy = __spreadArray(__spreadArray([], assignedThisWeek[wKey], true), extraAssigned, true);
+            var avail = medecins.filter(function (m) { return m.role === "medecin" && (m.statut || "senior") !== "junior" && !busy.includes(m.id) && !isBlockedInWeek(m.id, wKey); });
+            var nEEP = avail.filter(function (m) { return m.surSpec === "eep"; }).length;
+            var nPace = avail.filter(function (m) { return m.surSpec === "pace"; }).length;
+            var nETT = avail.filter(function (m) { return m.surSpec === "ett"; }).length;
+            var nCoro = avail.filter(function (m) { return m.surSpec === "coro"; }).length;
+            return nEEP >= cfgMinEEP && nPace >= cfgMinPace && nETT >= cfgMinETT && nCoro >= cfgMinCoro;
+        };
+        // Phase 1: place 2-week consecutive blocks per unit preference
+        var placeBlock = function (m, unit) {
+            for (var i = 0; i < weeksT.length - 1; i++) {
+                var w1 = weeksT[i], w2 = weeksT[i + 1];
+                if (assignedThisWeek[w1.key].includes(m.id) || assignedThisWeek[w2.key].includes(m.id))
+                    continue;
+                if (isBlockedInWeek(m.id, w1.key) || isBlockedInWeek(m.id, w2.key))
+                    continue;
+                if (assign[w1.key][unit].length >= 2 || assign[w2.key][unit].length >= 2)
+                    continue;
+                if (!specOK(w1.key, [m.id]) || !specOK(w2.key, [m.id]))
+                    continue;
+                assign[w1.key][unit].push(m.id);
+                assignedThisWeek[w1.key].push(m.id);
+                assign[w2.key][unit].push(m.id);
+                assignedThisWeek[w2.key].push(m.id);
+                if (unit === "HC")
+                    hcCount[m.id] += 2;
+                else
+                    usicCount[m.id] += 2;
+                quota[m.id] -= 2;
                 return true;
-        }
-        return false;
+            }
+            return false;
+        };
+        var shuffled = __spreadArray([], tourMeds, true).sort(function () { return Math.random() - 0.5; });
+        shuffled.forEach(function (m) {
+            // Place one HC block if pref, one USIC block if pref (as quota allows)
+            if (cfgPref2HC[m.id] && quota[m.id] >= 2)
+                placeBlock(m, "HC");
+            if (cfgPref2USIC[m.id] && quota[m.id] >= 2)
+                placeBlock(m, "USIC");
+        });
+        // Phase 2: fill remaining slots week by week with single assignments
+        weeksT.forEach(function (w) {
+            ["HC", "USIC"].forEach(function (unit) {
+                while (assign[w.key][unit].length < 2) {
+                    // Candidates: quota>0, not assigned this week, not blocked, spec OK
+                    var cands = tourMeds.filter(function (m) { return quota[m.id] > 0
+                        && !assignedThisWeek[w.key].includes(m.id)
+                        && !isBlockedInWeek(m.id, w.key)
+                        && specOK(w.key, [m.id]); });
+                    if (cands.length === 0)
+                        break;
+                    // Pick: most remaining quota, then better HC/USIC balance for this unit
+                    cands.sort(function (a, b) {
+                        if (quota[b.id] !== quota[a.id])
+                            return quota[b.id] - quota[a.id];
+                        var balA = unit === "HC" ? hcCount[a.id] - usicCount[a.id] : usicCount[a.id] - hcCount[a.id];
+                        var balB = unit === "HC" ? hcCount[b.id] - usicCount[b.id] : usicCount[b.id] - hcCount[b.id];
+                        return balA - balB;
+                    });
+                    var m = cands[0];
+                    assign[w.key][unit].push(m.id);
+                    assignedThisWeek[w.key].push(m.id);
+                    if (unit === "HC")
+                        hcCount[m.id]++;
+                    else
+                        usicCount[m.id]++;
+                    quota[m.id]--;
+                }
+            });
+        });
+        // Apply
+        setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { n[w.key] = assign[w.key]; }); return n; });
+        // Report unfilled
+        var unfilled = weeksT.filter(function (w) { return assign[w.key].HC.length < 2 || assign[w.key].USIC.length < 2; }).length;
+        var leftover = tourMeds.filter(function (m) { return quota[m.id] > 0; }).map(function (m) { return m.init + "(" + quota[m.id] + ")"; });
+        var msg = "Répartition effectuée.";
+        if (unfilled > 0)
+            msg += " " + unfilled + " semaine(s) incomplète(s).";
+        if (leftover.length > 0)
+            msg += " Quota restant: " + leftover.join(", ");
+        toast(msg);
+        setAutoModal(false);
     };
-    var tourMeds = medecins.filter(function (m) { return m.tourMed; });
     return (React.createElement("div", null,
         React.createElement("div", { style: S.bar },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
@@ -1945,6 +1900,7 @@ function TourTab(_a) {
                         " ",
                         lb));
                 }),
+                isEdit && React.createElement("button", { onClick: openAutoModal, title: "R\u00E9partition automatique", style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "4px 10px" }) }, "\u2699\uFE0F R\u00E9partition auto"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
         React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 4 } }, tourMeds.map(function (m) {
             var hcCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.HC || []).includes(m.id) ? n + 1 : n; }, 0);
@@ -1981,6 +1937,10 @@ function TourTab(_a) {
                                 var _a;
                                 var cur = __assign({}, (p[w.key] || { HC: [], USIC: [] }));
                                 var l = cur[unit] || [];
+                                if (!on && l.length >= 2) {
+                                    toast("Maximum 2 médecins par unité", "info");
+                                    return p;
+                                }
                                 cur[unit] = on ? l.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], l, true), [m.id], false);
                                 return __assign(__assign({}, p), (_a = {}, _a[w.key] = cur, _a));
                             }); } },
@@ -2035,7 +1995,77 @@ function TourTab(_a) {
                                 });
                                 toast("Semaine du " + w.label + " mise à jour", "info");
                             } }, "\u21BA M\u00E0j sem.")))); })));
-        })));
+        }),
+        autoModal && (React.createElement(Ov, { onClose: function () { return setAutoModal(false); } },
+            React.createElement("div", { style: { minWidth: 400, maxWidth: 520 } },
+                React.createElement("div", { style: S.mHd },
+                    React.createElement("div", { style: S.mTit2 },
+                        "\u2699\uFE0F R\u00E9partition automatique \u2014 ",
+                        periodLabelsT[perT.pi],
+                        " ",
+                        perT.startY),
+                    React.createElement("button", { onClick: function () { return setAutoModal(false); }, style: S.xBtn }, "\u00D7")),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } },
+                    weeksT.length,
+                    " semaines \u00D7 2 unit\u00E9s (HC + USIC) = ",
+                    totalSlots,
+                    " cr\u00E9neaux \u2014 nominal ",
+                    React.createElement("b", { style: { color: "var(--txt)" } },
+                        nominalW,
+                        " sem/m\u00E9decin")),
+                React.createElement("div", { style: { marginBottom: 12, padding: 10, borderRadius: 8, background: "var(--bg2)", border: "1px solid var(--border)" } },
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Minimum de s\u00E9niors disponibles / semaine (hors tour, hors absents)"),
+                    React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, [["Coro", cfgMinCoro, setCfgMinCoro], ["Pace", cfgMinPace, setCfgMinPace], ["EEP", cfgMinEEP, setCfgMinEEP], ["ETT", cfgMinETT, setCfgMinETT]].map(function (_a) {
+                        var lb = _a[0], v = _a[1], setV = _a[2];
+                        return (React.createElement("label", { key: lb, style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
+                            lb,
+                            React.createElement("input", { type: "number", min: 0, max: 9, value: v, onChange: function (e) { return setV(Math.max(0, parseInt(e.target.value) || 0)); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })));
+                    }))),
+                React.createElement("div", { style: { maxHeight: 280, overflowY: "auto", borderRadius: 8, border: "1px solid var(--border)" } },
+                    React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
+                        React.createElement("thead", null,
+                            React.createElement("tr", { style: { background: "var(--bg2)", borderBottom: "2px solid var(--border)" } },
+                                React.createElement("th", { style: { textAlign: "left", padding: "5px 8px", fontSize: 10, color: "var(--txt3)" } }, "M\u00E9decin"),
+                                React.createElement("th", { style: { textAlign: "center", padding: "5px 8px", fontSize: 10, color: "var(--txt3)" } }, "Semaines"),
+                                React.createElement("th", { style: { textAlign: "center", padding: "5px 8px", fontSize: 10, color: "var(--txt3)" } }, "2 sem. HC"),
+                                React.createElement("th", { style: { textAlign: "center", padding: "5px 8px", fontSize: 10, color: "var(--txt3)" } }, "2 sem. USIC"),
+                                React.createElement("th", { style: { textAlign: "center", padding: "5px 8px", fontSize: 10, color: "var(--txt3)" } }, "Sp\u00E9c."))),
+                        React.createElement("tbody", null, tourMeds.map(function (m) { return (React.createElement("tr", { key: m.id, style: { borderBottom: "1px solid var(--border2)" } },
+                            React.createElement("td", { style: { padding: "5px 8px" } },
+                                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+                                    React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, m.init),
+                                    React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: "var(--txt)" } },
+                                        m.prenom,
+                                        " ",
+                                        m.nom))),
+                            React.createElement("td", { style: { textAlign: "center", padding: "4px" } },
+                                React.createElement("input", { type: "number", min: 0, max: weeksT.length, value: cfgWeeks[m.id] || 0, onChange: function (e) { return setCfgWeeks(function (p) {
+                                        var _a;
+                                        return (__assign(__assign({}, p), (_a = {}, _a[m.id] = Math.max(0, parseInt(e.target.value) || 0), _a)));
+                                    }); }, style: { width: 48, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })),
+                            React.createElement("td", { style: { textAlign: "center", padding: "4px" } },
+                                React.createElement("input", { type: "checkbox", checked: !!cfgPref2HC[m.id], onChange: function (e) { return setCfgPref2HC(function (p) {
+                                        var _a;
+                                        return (__assign(__assign({}, p), (_a = {}, _a[m.id] = e.target.checked, _a)));
+                                    }); }, style: { width: 15, height: 15, cursor: "pointer" } })),
+                            React.createElement("td", { style: { textAlign: "center", padding: "4px" } },
+                                React.createElement("input", { type: "checkbox", checked: !!cfgPref2USIC[m.id], onChange: function (e) { return setCfgPref2USIC(function (p) {
+                                        var _a;
+                                        return (__assign(__assign({}, p), (_a = {}, _a[m.id] = e.target.checked, _a)));
+                                    }); }, style: { width: 15, height: 15, cursor: "pointer" } })),
+                            React.createElement("td", { style: { textAlign: "center", padding: "4px", fontSize: 9, color: "var(--txt3)" } },
+                                (m.statut === "junior") && React.createElement("span", { style: { color: "#f59e0b", fontWeight: 700 } }, "Jr "),
+                                ({ coro: "Coro", pace: "Pace", eep: "EEP", ett: "ETT" })[m.surSpec] || "—"))); })))),
+                React.createElement("div", { style: { marginTop: 6, fontSize: 11, color: "var(--txt3)" } },
+                    "Total configur\u00E9: ",
+                    React.createElement("b", { style: { color: "var(--txt)" } }, Object.values(cfgWeeks).reduce(function (a, b) { return a + b; }, 0)),
+                    " / ",
+                    totalSlots,
+                    " cr\u00E9neaux"),
+                React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 12 } },
+                    React.createElement("button", { onClick: runAutoRepartition, style: { flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#1d4ed8", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" } }, "\uD83D\uDE80 Lancer la r\u00E9partition"),
+                    React.createElement("button", { onClick: function () { return setAutoModal(false); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler")),
+                React.createElement("div", { style: { marginTop: 8, fontSize: 10, color: "#ef4444" } }, "\u26A0 La r\u00E9partition remplace toutes les assignations existantes de la p\u00E9riode."))))));
 }
 function StatsTab(_a) {
     var medecins = _a.medecins, actes = _a.actes, plan = _a.plan, year = _a.year, month = _a.month, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, tourMed = _a.tourMed;
@@ -2396,6 +2426,53 @@ function CardioPlanning() {
     };
     var acteById = useCallback(function (id) { return actes.find(function (a) { return a.id === id; }); }, [actes]);
     var isEdit = accessMode === "edit";
+    // ─── Undo/Redo history (edit mode) ───
+    var histRef = useRef({ stack: [], idx: -1, restoring: false });
+    var _13 = useState(0), histVer = _13[0], setHistVer = _13[1];
+    var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
+    useEffect(function () {
+        if (isFirstLoad.current)
+            return;
+        var h = histRef.current;
+        if (h.restoring) {
+            h.restoring = false;
+            return;
+        }
+        // Truncate redo branch, push snapshot
+        h.stack = h.stack.slice(0, h.idx + 1);
+        h.stack.push(JSON.stringify(histSnapshot()));
+        if (h.stack.length > 50)
+            h.stack.shift();
+        h.idx = h.stack.length - 1;
+        setHistVer(function (v) { return v + 1; });
+    }, [plan, tourMed, astreinte, notes, planningType]);
+    var applySnapshot = function (snap) {
+        var s = JSON.parse(snap);
+        histRef.current.restoring = true;
+        setPlan(s.plan);
+        setTourMed(s.tourMed);
+        setAstreinte(s.astreinte);
+        setNotes(s.notes);
+        setPlanningType(s.planningType);
+    };
+    var canUndo = histRef.current.idx > 0;
+    var canRedo = histRef.current.idx < histRef.current.stack.length - 1;
+    var doUndo = function () {
+        var h = histRef.current;
+        if (h.idx <= 0)
+            return;
+        h.idx--;
+        applySnapshot(h.stack[h.idx]);
+        setHistVer(function (v) { return v + 1; });
+    };
+    var doRedo = function () {
+        var h = histRef.current;
+        if (h.idx >= h.stack.length - 1)
+            return;
+        h.idx++;
+        applySnapshot(h.stack[h.idx]);
+        setHistVer(function (v) { return v + 1; });
+    };
     var isMedEdit = accessMode === "medecinEdit";
     // Returns true if current user can edit this specific medecin's data
     var canEdit = function (medId) { return isEdit || (isMedEdit && editMedId === medId); };
@@ -2542,7 +2619,7 @@ function CardioPlanning() {
                 var e = Array.isArray(gdm[mid]) ? gdm[mid][0] : gdm[mid];
                 if ((e && e.acteId) === "GARDE") {
                     var prevId_1 = parseInt(mid);
-                    var ndw_1 = dow(ny, nm, nd2), rSlots = (ndw_1 === 6 || ndw_1 === 0) ? ["JOUR"] : ["M", "AM"];
+                    var rSlots = isWE(ny, nm, nd2) ? ["JOUR"] : ["M", "AM"];
                     rSlots.forEach(function (sl) {
                         var _a;
                         var rk = sk(ny, nm, nd2, sl);
@@ -2557,8 +2634,7 @@ function CardioPlanning() {
             });
             next = __assign(__assign({}, next), (_a = {}, _a[gk] = gdm, _a));
             next[gk] = __assign(__assign({}, next[gk]), (_b = {}, _b[medId] = { acteId: "GARDE", salle: null }, _b));
-            var ndw = dow(ny, nm, nd2);
-            if (dw === 5 || dw === 6) {
+            if (isWE(ny, nm, nd2)) {
                 var k = sk(ny, nm, nd2, "JOUR"), dm = __assign({}, (next[k] || {}));
                 if (!dm[medId] || dm[medId].acteId !== "ABSENCE")
                     dm[medId] = { acteId: "REPOS_GARDE", salle: null };
@@ -2928,6 +3004,9 @@ function CardioPlanning() {
         React.createElement("header", { style: S.hdr },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexShrink: 0 } },
                 React.createElement("span", { style: { fontSize: 20, color: "#f85149" } }, "\u2665"),
+                isAnyEdit && React.createElement("div", { style: { display: "flex", gap: 3 } },
+                    React.createElement("button", { onClick: doUndo, disabled: !canUndo, title: "Annuler (retour arri\u00E8re)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canUndo ? "rgba(255,255,255,.1)" : "transparent", color: canUndo ? "#f0f6fc" : "#484f58", cursor: canUndo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B6"),
+                    React.createElement("button", { onClick: doRedo, disabled: !canRedo, title: "R\u00E9tablir (retour avant)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canRedo ? "rgba(255,255,255,.1)" : "transparent", color: canRedo ? "#f0f6fc" : "#484f58", cursor: canRedo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B7")),
                 React.createElement("div", null,
                     React.createElement("div", { style: { fontWeight: 800, fontSize: 14, color: "#f0f6fc" } }, "CardioPlanning"),
                     React.createElement("div", { style: { fontSize: 8, color: "#484f58", display: "flex", alignItems: "center", gap: 4 } },
@@ -2985,7 +3064,7 @@ function CardioPlanning() {
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && TourTab({ year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, { year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
@@ -3541,8 +3620,7 @@ function CardioPlanning() {
                                         removeEntry(medId, y2, m2, d2, slot, e.acteId);
                                         var dt = new Date(y2, m2, d2 + 1);
                                         var ny_1 = dt.getFullYear(), nm_1 = dt.getMonth(), nd3_1 = dt.getDate();
-                                        var ndw = dow(ny_1, nm_1, nd3_1), rSlots_1 = (ndw === 6 || ndw === 0) ? ["JOUR"] : ["M", "AM"];
-                                        setPlan(function (p) { var next = __assign({}, p); rSlots_1.forEach(function (sl) {
+                                        setPlan(function (p) { var next = __assign({}, p); ["JOUR", "M", "AM"].forEach(function (sl) {
                                             var _a;
                                             var k = sk(ny_1, nm_1, nd3_1, sl);
                                             var dm = __assign({}, (next[k] || {}));
@@ -3803,6 +3881,20 @@ function CardioPlanning() {
                     React.createElement("label", { style: { display: "flex", gap: 6, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
                         React.createElement("input", { type: "checkbox", checked: !!mData.astreinte, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { astreinte: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
                         "Astreinte rythmo")),
+                (mData.role || "medecin") === "medecin" && React.createElement("div", { style: { gridColumn: "1/-1" } },
+                    React.createElement("label", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 } }, "Statut"),
+                    React.createElement("div", { style: { display: "flex", gap: 4 } }, [["senior", "Sénior"], ["junior", "Junior"]].map(function (_a) {
+                        var v = _a[0], l = _a[1];
+                        return React.createElement("button", { key: v, onClick: function () { return setMData(function (p) { return (__assign(__assign({}, p), { statut: v })); }); }, style: { padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, background: (mData.statut || "senior") === v ? "#1d4ed8" : "var(--bg2)", color: (mData.statut || "senior") === v ? "#fff" : "var(--txt2)" } }, l);
+                    })),
+                    mData.tourMed && React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" } },
+                        React.createElement("span", { style: { fontSize: 13, color: "var(--txt2)" } }, "2 semaines de tour cons\u00E9cutives :"),
+                        React.createElement("label", { style: { display: "flex", gap: 5, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: !!mData.pref2HC, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { pref2HC: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
+                            "HC"),
+                        React.createElement("label", { style: { display: "flex", gap: 5, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: !!mData.pref2USIC, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { pref2USIC: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
+                            "USIC"))),
                 mData.role === "attache" && React.createElement("div", { style: { gridColumn: "1/-1", display: "flex", gap: 16, flexWrap: "wrap" } },
                     React.createElement("label", { style: { display: "flex", gap: 6, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
                         React.createElement("input", { type: "checkbox", checked: !!mData.astreinte, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { astreinte: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
