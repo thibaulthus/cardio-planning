@@ -122,6 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
+var APP_VERSION = "v6.30 — 13/07/2026";
 var SYS = ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE"];
 var EDIT_PIN_DEFAULT = "1234";
 /* ════ HELPERS ════ */
@@ -2118,6 +2119,7 @@ function StatsTab(_a) {
     // Count per med per acte
     var allStatMeds = medecins.filter(function (m) { return m.role === "medecin"; });
     var _e = React.useState([]), medFilter = _e[0], setMedFilter = _e[1];
+    var _f = React.useState(null), sortCol = _f[0], setSortCol = _f[1]; // {col,dir:'desc'|'asc'}
     var meds = medFilter.length > 0 ? allStatMeds.filter(function (m) { return medFilter.includes(m.id); }) : allStatMeds;
     var counts = {};
     meds.forEach(function (m) { counts[m.id] = {}; allTrack.forEach(function (a) { counts[m.id][a.id] = 0; }); });
@@ -2154,6 +2156,11 @@ function StatsTab(_a) {
     allTrack.forEach(function (a) { colTotals[a.id] = meds.reduce(function (n, m) { return n + (counts[m.id] ? counts[m.id][a.id] || 0 : 0); }, 0); });
     // Only show columns with at least 1 entry
     var usedActes = allTrack.filter(function (a) { return colTotals[a.id] > 0; });
+    var displayMeds = sortCol ? __spreadArray([], meds, true).sort(function (a, b) {
+        var va = (counts[a.id] && counts[a.id][sortCol.col]) || 0;
+        var vb = (counts[b.id] && counts[b.id][sortCol.col]) || 0;
+        return sortCol.dir === "desc" ? vb - va : va - vb;
+    }) : meds;
     var exportCSV = function () {
         var header = __spreadArray(__spreadArray(["Médecin"], usedActes.map(function (a) { return a.short; }), true), ["Total"], false).join(";");
         var rows = meds.map(function (m) {
@@ -2175,7 +2182,7 @@ function StatsTab(_a) {
                 React.createElement("h2", { style: S.mTit }, "📊 Stats — " + periodLabels[per.pi] + " " + per.startY + (per.pi === 0 ? "/" + (per.startY + 1) : "")),
                 React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11 }) }, "\u2B07 CSV"),
+                React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11 }) }, "\uD83D\uDDA8\uFE0F Export"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
         React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 } },
             React.createElement("button", { onClick: function () { return setMedFilter([]); }, style: { padding: "4px 10px", borderRadius: 20, border: "1px solid var(--border)", cursor: "pointer", fontSize: 11, fontWeight: 700,
@@ -2190,9 +2197,20 @@ function StatsTab(_a) {
                 React.createElement("thead", null,
                     React.createElement("tr", null,
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 120, textAlign: "left", padding: "6px 10px" }) }, "M\u00E9decin"),
-                        usedActes.map(function (a) { return (React.createElement("th", { key: a.id, style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: 44, textAlign: "center", padding: "4px 2px" }) },
-                            React.createElement("div", { style: { background: a.color, color: "#111", borderRadius: 4, padding: "2px 4px", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" } }, a.short))); }))),
-                React.createElement("tbody", null, meds.map(function (m, ri) {
+                        usedActes.map(function (a) {
+                            var isSorted = sortCol && sortCol.col === a.id;
+                            return (React.createElement("th", { key: a.id, onClick: function () { return setSortCol(function (s) {
+                                    if (!s || s.col !== a.id)
+                                        return { col: a.id, dir: "desc" };
+                                    if (s.dir === "desc")
+                                        return { col: a.id, dir: "asc" };
+                                    return null;
+                                }); }, title: !isSorted ? "Trier par " + a.label + " (décroissant)" : sortCol.dir === "desc" ? "Trier croissant" : "Revenir à l'ordre initial", style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: 44, textAlign: "center", padding: "4px 2px", cursor: "pointer" }) },
+                                React.createElement("div", { style: { background: a.color, color: "#111", borderRadius: 4, padding: "2px 4px", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", outline: isSorted ? "2px solid var(--txt)" : "none" } },
+                                    a.short,
+                                    isSorted ? (sortCol.dir === "desc" ? " ▼" : " ▲") : "")));
+                        }))),
+                React.createElement("tbody", null, displayMeds.map(function (m, ri) {
                     return (React.createElement("tr", { key: m.id, style: { background: ri % 2 === 0 ? "var(--bg2)" : "var(--bg)", borderBottom: "1px solid var(--border2)" } },
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, padding: "5px 10px", fontWeight: 700, color: m.color, minWidth: 120 }) },
                             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
@@ -2989,7 +3007,8 @@ function CardioPlanning() {
                         else {
                             setPinError(true);
                         }
-                    } }, "\u270F\uFE0F \u00C9dition"))));
+                    } }, "\u270F\uFE0F \u00C9dition"),
+                React.createElement("div", { style: { marginTop: 14, fontSize: 10, color: "var(--txt3)", textAlign: "center" } }, APP_VERSION))));
     var _per = getPeriodRange(year, month);
     var _pem = (_per.sm + 3) % 12, _pey = _per.sm + 3 > 11 ? _per.sy + 1 : _per.sy;
     var _titlePeriod = viewPeriod ? MOIS[_per.sm] + " — " + MOIS[_pem] + " " + (_per.sy !== _pey ? _per.sy + "/" + _pey : _pey) : MOIS[month] + " " + year;
@@ -3140,7 +3159,9 @@ function CardioPlanning() {
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
-                    React.createElement("h2", { style: S.mTit }, "\u2699\uFE0F Activit\u00E9s"),
+                    React.createElement("h2", { style: S.mTit },
+                        "\u2699\uFE0F Activit\u00E9s ",
+                        React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
                     isEdit && React.createElement("button", { style: S.btnP, onClick: function () { setMData({ _new: true, id: "", label: "", short: "", color: "#3b82f6", bg: "#0c1a2e", hasSalle: false, salles: [], isSystem: false, site: "tous", medecinsAutorise: [] }); setModal("editActe"); } }, "+ Nouvelle"),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
