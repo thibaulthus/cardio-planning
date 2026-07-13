@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.2 — 13/07/2026";
+var APP_VERSION = "v7.4 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -954,7 +954,10 @@ function GardeView(_a) {
                 var gMed = getGardeMed2(gvY, gvM, d);
                 return (React.createElement("tr", { key: d + gvM + gvY, style: __assign(__assign({ height: 36, borderBottom: "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})) },
                     React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, textAlign: "center", background: isT ? "var(--bg-td)" : we ? "var(--bg-we)" : "var(--td-fix)" }) },
-                        React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 13, fontFamily: "'JetBrains Mono',monospace" } }, d),
+                        React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 13, fontFamily: "'JetBrains Mono',monospace" } },
+                            d,
+                            " ",
+                            React.createElement("span", { style: { fontSize: 9, fontWeight: 600 } }, MOIS[gvM].slice(0, 4))),
                         React.createElement("div", { style: { fontSize: 9, color: we ? "#92400e" : isT ? "var(--today-c)" : "var(--txt3)", fontWeight: 600 } }, ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2])),
                     React.createElement("td", { style: __assign(__assign({}, S.td), { padding: 4, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return setPickerDay({ d: d, y: gvY, m: gvM }); } : undefined }, gMed ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 6, background: gMed.color + "22" } },
                         React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, gMed.init),
@@ -2315,7 +2318,7 @@ function CardioPlanning() {
     var setYearMonth = function (y, m) { return setYM({ year: y, month: m }); };
     var _h = useState("V"), orient = _h[0], setOrient = _h[1]; // H/V toggle removed - V only
     var _j = useState(false), darkMode = _j[0], setDarkMode = _j[1];
-    var DEFAULT_TABS = [["monplanning", "👤"], ["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📡 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"]];
+    var DEFAULT_TABS = [["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📡 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"]];
     var _k = useState(function () { try {
         var v = localStorage.getItem("cp6_taborder");
         if (v) {
@@ -3055,7 +3058,7 @@ function CardioPlanning() {
             React.createElement("button", { onClick: function () { return setAccessMode("view"); }, style: { background: "none", border: "1px solid rgba(255,255,255,.5)", borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 11, padding: "1px 7px", marginLeft: 8 } }, "Quitter")),
         React.createElement("header", { style: S.hdr },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexShrink: 0 } },
-                React.createElement("span", { style: { fontSize: 20, color: "#f85149" } }, "\u2665"),
+                React.createElement("span", { onClick: function () { return setAccessMode("ask"); }, title: "Retour \u00E0 l'accueil", style: { fontSize: 20, color: "#f85149", cursor: "pointer" } }, "\u2665"),
                 isAnyEdit && React.createElement("div", { style: { display: "flex", gap: 3 } },
                     React.createElement("button", { onClick: doUndo, disabled: !canUndo, title: "Annuler (retour arri\u00E8re)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canUndo ? "rgba(255,255,255,.1)" : "transparent", color: canUndo ? "#f0f6fc" : "#484f58", cursor: canUndo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B6"),
                     React.createElement("button", { onClick: doRedo, disabled: !canRedo, title: "R\u00E9tablir (retour avant)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canRedo ? "rgba(255,255,255,.1)" : "transparent", color: canRedo ? "#f0f6fc" : "#484f58", cursor: canRedo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B7")),
@@ -3073,29 +3076,6 @@ function CardioPlanning() {
                     } setDragTab(null); }, onClick: function () { return setTab(v); }, style: __assign(__assign(__assign({}, S.nb), (tab === v ? S.nba : {})), { cursor: "grab", userSelect: "none" }) }, l));
             }))),
         React.createElement("main", { style: S.main },
-            tab === "monplanning" && (React.createElement("div", null,
-                React.createElement("div", { style: S.bar },
-                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-                        React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
-                        React.createElement("h2", { style: S.mTit },
-                            userProfile > 0 ? "\uD83D\uDC64 Dr. ".concat((medecins.find(function (m) { return m.id === userProfile; }) || { nom: "?" }).nom) : "👤 Mon planning",
-                            " \u2014 ",
-                            MOIS[month],
-                            " ",
-                            year),
-                        React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
-                    React.createElement("select", { value: userProfile, onChange: function (e) { return setUserProfile(parseInt(e.target.value)); }, style: __assign(__assign({}, S.fi), { fontSize: 12, padding: "4px 8px" }) },
-                        React.createElement("option", { value: 0 }, "\u2014 Profil \u2014"),
-                        medPlan.map(function (m) { return React.createElement("option", { key: m.id, value: m.id },
-                            "Dr. ",
-                            m.prenom,
-                            " ",
-                            m.nom); }))),
-                userProfile > 0
-                    ? orient === "H"
-                        ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: medecins.filter(function (m) { return m.id === userProfile; }), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
-                        : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: medecins.filter(function (m) { return m.id === userProfile; }), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
-                    : React.createElement("p", { style: { color: "var(--txt3)", padding: 20, textAlign: "center" } }, "S\u00E9lectionnez votre profil."))),
             tab === "planning" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
