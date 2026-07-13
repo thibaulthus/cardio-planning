@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.5 — 13/07/2026";
+var APP_VERSION = "v7.7 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1771,14 +1771,15 @@ function TourTab(_a) {
     var tourMeds = medecins.filter(function (m) { return m.tourMed; });
     // ─── Auto-répartition ───
     var _b = React.useState(false), autoModal = _b[0], setAutoModal = _b[1];
-    var _c = React.useState(1), cfgMinEEP = _c[0], setCfgMinEEP = _c[1];
-    var _d = React.useState(1), cfgMinPace = _d[0], setCfgMinPace = _d[1];
-    var _e = React.useState(1), cfgMinETT = _e[0], setCfgMinETT = _e[1];
-    var _f = React.useState(3), cfgMinCoro = _f[0], setCfgMinCoro = _f[1];
-    var _g = React.useState({}), cfgExcl = _g[0], setCfgExcl = _g[1]; // {medId: true = ne participe pas}
-    var _h = React.useState({}), cfgWeeks = _h[0], setCfgWeeks = _h[1]; // {medId: nWeeks}
-    var _j = React.useState({}), cfgPref2HC = _j[0], setCfgPref2HC = _j[1]; // {medId: bool}
-    var _k = React.useState({}), cfgPref2USIC = _k[0], setCfgPref2USIC = _k[1]; // {medId: bool}
+    var _c = React.useState(null), lastReport = _c[0], setLastReport = _c[1];
+    var _d = React.useState(1), cfgMinEEP = _d[0], setCfgMinEEP = _d[1];
+    var _e = React.useState(1), cfgMinPace = _e[0], setCfgMinPace = _e[1];
+    var _f = React.useState(1), cfgMinETT = _f[0], setCfgMinETT = _f[1];
+    var _g = React.useState(3), cfgMinCoro = _g[0], setCfgMinCoro = _g[1];
+    var _h = React.useState({}), cfgExcl = _h[0], setCfgExcl = _h[1]; // {medId: true = ne participe pas}
+    var _j = React.useState({}), cfgWeeks = _j[0], setCfgWeeks = _j[1]; // {medId: nWeeks}
+    var _k = React.useState({}), cfgPref2HC = _k[0], setCfgPref2HC = _k[1]; // {medId: bool}
+    var _l = React.useState({}), cfgPref2USIC = _l[0], setCfgPref2USIC = _l[1]; // {medId: bool}
     var totalSlots = weeksT.length * 4; // 2 HC + 2 USIC per week
     var activeMeds = tourMeds.filter(function (m) { return !cfgExcl[m.id]; });
     var nominalW = activeMeds.length > 0 ? Math.ceil(totalSlots / activeMeds.length) : 0;
@@ -1796,26 +1797,22 @@ function TourTab(_a) {
             setCfgExcl(savedCfg.excl || {});
             setCfgPref2HC(savedCfg.p2hc || {});
             setCfgPref2USIC(savedCfg.p2usic || {});
-            var mns = savedCfg.mins || tourMins || {};
-            setCfgMinCoro(mns.coro !== undefined ? mns.coro : 3);
-            setCfgMinPace(mns.pace !== undefined ? mns.pace : 1);
-            setCfgMinEEP(mns.eep !== undefined ? mns.eep : 1);
-            setCfgMinETT(mns.ett !== undefined ? mns.ett : 1);
         }
         else {
             var ph_1 = {}, pu_1 = {};
             tourMeds.forEach(function (m) { ph_1[m.id] = !!m.pref2HC; pu_1[m.id] = !!m.pref2USIC; });
-            if (tourMins) {
-                setCfgMinCoro(tourMins.coro !== undefined ? tourMins.coro : 3);
-                setCfgMinPace(tourMins.pace !== undefined ? tourMins.pace : 1);
-                setCfgMinEEP(tourMins.eep !== undefined ? tourMins.eep : 1);
-                setCfgMinETT(tourMins.ett !== undefined ? tourMins.ett : 1);
-            }
             var excl = {};
             setCfgExcl(excl);
             setCfgWeeks(recalcWeeks(excl));
             setCfgPref2HC(ph_1);
             setCfgPref2USIC(pu_1);
+        }
+        // Minimums : TOUJOURS repris des réglages (modifiables ponctuellement ensuite)
+        if (tourMins) {
+            setCfgMinCoro(tourMins.coro !== undefined ? tourMins.coro : 3);
+            setCfgMinPace(tourMins.pace !== undefined ? tourMins.pace : 1);
+            setCfgMinEEP(tourMins.eep !== undefined ? tourMins.eep : 1);
+            setCfgMinETT(tourMins.ett !== undefined ? tourMins.ett : 0);
         }
         setAutoModal(true);
     };
@@ -1826,8 +1823,7 @@ function TourTab(_a) {
                 weeks: weeks !== undefined ? weeks : cfgWeeks,
                 excl: excl !== undefined ? excl : cfgExcl,
                 p2hc: p2h !== undefined ? p2h : cfgPref2HC,
-                p2usic: p2u !== undefined ? p2u : cfgPref2USIC,
-                mins: { coro: cfgMinCoro, pace: cfgMinPace, eep: cfgMinEEP, ett: cfgMinETT }
+                p2usic: p2u !== undefined ? p2u : cfgPref2USIC
             }, _a)));
         });
     };
@@ -1880,12 +1876,20 @@ function TourTab(_a) {
             weeksT.forEach(function (w) { assignedThisWeek[w.key] = []; });
             var specOK = function (wKey, extraAssigned) {
                 var busy = __spreadArray(__spreadArray([], assignedThisWeek[wKey], true), extraAssigned, true);
-                var avail = medecins.filter(function (m) { return m.role === "medecin" && (m.statut || "senior") !== "junior" && !busy.includes(m.id) && !isBlockedInWeek(m.id, wKey); });
-                var nEEP = avail.filter(function (m) { return m.surSpec === "eep"; }).length;
-                var nPace = avail.filter(function (m) { return m.surSpec === "pace"; }).length;
-                var nETT = avail.filter(function (m) { return m.surSpec === "ett"; }).length;
-                var nCoro = avail.filter(function (m) { return m.surSpec === "coro"; }).length;
-                return nEEP >= cfgMinEEP && nPace >= cfgMinPace && nETT >= cfgMinETT && nCoro >= effMinCoro;
+                // Séniors présents (hors absents), indépendamment du tour
+                var present = medecins.filter(function (m) { return m.role === "medecin" && (m.statut || "senior") !== "junior" && !isBlockedInWeek(m.id, wKey); });
+                // Séniors restant disponibles une fois le tour assigné
+                var avail = present.filter(function (m) { return !busy.includes(m.id); });
+                var cnt = function (list, pred) { return list.filter(pred).length; };
+                var check = function (spec, minV) {
+                    var nAvail = cnt(avail, function (m) { return m.surSpec === spec; });
+                    if (nAvail >= minV)
+                        return true;
+                    // Déficit : acceptable seulement si le tour n'y est pour rien
+                    // (autant de spécialistes dispo qu'il y en a de présents = aucun pris par le tour)
+                    return nAvail === cnt(present, function (m) { return m.surSpec === spec; });
+                };
+                return check("eep", cfgMinEEP) && check("pace", cfgMinPace) && check("ett", cfgMinETT) && check("coro", effMinCoro);
             };
             // Phase 1 : blocs de 2 semaines consécutives (préférences)
             var placeBlock = function (m, unit) {
@@ -1957,7 +1961,7 @@ function TourTab(_a) {
             var leftoverTotal = tourMeds.reduce(function (s, m) { return s + (quota[m.id] || 0); }, 0);
             var imbalance = tourMeds.reduce(function (s, m) { return s + Math.abs(hcCount[m.id] - usicCount[m.id]); }, 0);
             var score = unfilled * 1000 + leftoverTotal * 10 + imbalance;
-            return { assign: assign, quota: quota, unfilled: unfilled, score: score };
+            return { assign: assign, quota: quota, unfilled: unfilled, score: score, hcCount: hcCount, usicCount: usicCount, assignedThisWeek: assignedThisWeek, specOK: specOK };
         };
         // ═══ Paliers de relaxation progressive ═══
         var relaxedCoro = Math.min(cfgMinCoro, 2);
@@ -1969,6 +1973,99 @@ function TourTab(_a) {
             stages.push({ useBlocks: true, minCoro: relaxedCoro, label: "minimum Coro réduit à " + relaxedCoro });
             stages.push({ useBlocks: false, minCoro: relaxedCoro, label: "préf. 2 sem. ignorées + Coro réduit à " + relaxedCoro });
         }
+        // Réparation par échanges, appliquée au meilleur essai du palier
+        var repairResult = function (r) {
+            var assign = r.assign, quota = r.quota, hcCount = r.hcCount, usicCount = r.usicCount, assignedThisWeek = r.assignedThisWeek, specOK = r.specOK;
+            for (var pass = 0; pass < 2; pass++) {
+                weeksT.forEach(function (w) {
+                    ["HC", "USIC"].forEach(function (unit) {
+                        while (assign[w.key][unit].length < 2) {
+                            var stuck = tourMeds.filter(function (c) { return quota[c.id] > 0
+                                && !assignedThisWeek[w.key].includes(c.id)
+                                && !isBlockedInWeek(c.id, w.key); });
+                            var repaired = false;
+                            var _loop_1 = function (c) {
+                                if (repaired)
+                                    return "break";
+                                for (var _a = 0, weeksT_1 = weeksT; _a < weeksT_1.length; _a++) {
+                                    var w2 = weeksT_1[_a];
+                                    if (repaired)
+                                        break;
+                                    if (w2.key === w.key)
+                                        continue;
+                                    for (var _b = 0, _c = ["HC", "USIC"]; _b < _c.length; _b++) {
+                                        var unit2 = _c[_b];
+                                        if (repaired)
+                                            break;
+                                        var _loop_2 = function (m2id) {
+                                            if (assignedThisWeek[w.key].includes(m2id))
+                                                return "continue";
+                                            if (isBlockedInWeek(m2id, w.key))
+                                                return "continue";
+                                            if (assignedThisWeek[w2.key].includes(c.id))
+                                                return "continue";
+                                            if (isBlockedInWeek(c.id, w2.key))
+                                                return "continue";
+                                            assign[w2.key][unit2] = assign[w2.key][unit2].filter(function (x) { return x !== m2id; });
+                                            assignedThisWeek[w2.key] = assignedThisWeek[w2.key].filter(function (x) { return x !== m2id; });
+                                            assign[w2.key][unit2].push(c.id);
+                                            assignedThisWeek[w2.key].push(c.id);
+                                            assign[w.key][unit].push(m2id);
+                                            assignedThisWeek[w.key].push(m2id);
+                                            if (specOK(w.key, []) && specOK(w2.key, [])) {
+                                                quota[c.id]--;
+                                                if (unit2 === "HC") {
+                                                    hcCount[c.id]++;
+                                                    hcCount[m2id]--;
+                                                }
+                                                else {
+                                                    usicCount[c.id]++;
+                                                    usicCount[m2id]--;
+                                                }
+                                                if (unit === "HC")
+                                                    hcCount[m2id]++;
+                                                else
+                                                    usicCount[m2id]++;
+                                                repaired = true;
+                                            }
+                                            else {
+                                                assign[w.key][unit] = assign[w.key][unit].filter(function (x) { return x !== m2id; });
+                                                assignedThisWeek[w.key] = assignedThisWeek[w.key].filter(function (x) { return x !== m2id; });
+                                                assign[w2.key][unit2] = assign[w2.key][unit2].filter(function (x) { return x !== c.id; });
+                                                assignedThisWeek[w2.key] = assignedThisWeek[w2.key].filter(function (x) { return x !== c.id; });
+                                                assign[w2.key][unit2].push(m2id);
+                                                assignedThisWeek[w2.key].push(m2id);
+                                            }
+                                            if (repaired)
+                                                return "break";
+                                        };
+                                        for (var _d = 0, _e = __spreadArray([], assign[w2.key][unit2], true); _d < _e.length; _d++) {
+                                            var m2id = _e[_d];
+                                            var state_2 = _loop_2(m2id);
+                                            if (state_2 === "break")
+                                                break;
+                                        }
+                                    }
+                                }
+                            };
+                            for (var _i = 0, stuck_1 = stuck; _i < stuck_1.length; _i++) {
+                                var c = stuck_1[_i];
+                                var state_1 = _loop_1(c);
+                                if (state_1 === "break")
+                                    break;
+                            }
+                            if (!repaired)
+                                break;
+                        }
+                    });
+                });
+            }
+            r.unfilled = weeksT.filter(function (w) { return assign[w.key].HC.length < 2 || assign[w.key].USIC.length < 2; }).length;
+            var leftoverTotal = tourMeds.reduce(function (s, m) { return s + (quota[m.id] || 0); }, 0);
+            var imbalance = tourMeds.reduce(function (s, m) { return s + Math.abs(hcCount[m.id] - usicCount[m.id]); }, 0);
+            r.score = r.unfilled * 1000 + leftoverTotal * 10 + imbalance;
+            return r;
+        };
         var best = null, bestStage = stages[0];
         for (var s = 0; s < stages.length; s++) {
             var st = stages[s];
@@ -1980,6 +2077,8 @@ function TourTab(_a) {
                 if (stageBest.unfilled === 0 && stageBest.score === 0)
                     break;
             }
+            if (stageBest.unfilled > 0)
+                repairResult(stageBest);
             if (!best || stageBest.score < best.score) {
                 best = stageBest;
                 bestStage = st;
@@ -1989,12 +2088,21 @@ function TourTab(_a) {
         }
         persistCfg();
         setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { n[w.key] = best.assign[w.key]; }); return n; });
-        var leftover = tourMeds.filter(function (m) { return best.quota[m.id] > 0; }).map(function (m) { return m.init + "(" + best.quota[m.id] + ")"; });
-        var msg = bestStage.label === "standard" ? "Répartition effectuée." : "Répartition effectuée — mode: " + bestStage.label + ".";
+        var minBySpec = { coro: bestStage.minCoro, pace: cfgMinPace, eep: cfgMinEEP, ett: cfgMinETT };
+        var lockedInfo = function (m) {
+            if (!m.surSpec)
+                return "";
+            var nSpec = medecins.filter(function (x) { return x.role === "medecin" && (x.statut || "senior") !== "junior" && x.surSpec === m.surSpec; }).length;
+            return nSpec <= (minBySpec[m.surSpec] || 0) ? " [bloqué: seul(s) " + m.surSpec + "]" : "";
+        };
+        var leftover = tourMeds.filter(function (m) { return best.quota[m.id] > 0; }).map(function (m) { return m.init + "(" + best.quota[m.id] + ")" + lockedInfo(m); });
+        var minsTxt = " (min: Coro " + bestStage.minCoro + " · Pace " + cfgMinPace + " · EEP " + cfgMinEEP + " · ETT " + cfgMinETT + ")";
+        var msg = (bestStage.label === "standard" ? "Répartition effectuée." : "Répartition effectuée — mode: " + bestStage.label + ".") + minsTxt;
         if (best.unfilled > 0)
             msg += " " + best.unfilled + " semaine(s) incomplète(s) malgré toutes les relaxations.";
         if (leftover.length > 0)
             msg += " Quota restant: " + leftover.join(", ");
+        setLastReport(msg);
         toast(msg);
         setAutoModal(false);
     };
@@ -2022,6 +2130,10 @@ function TourTab(_a) {
                         toast("Attributions de la période supprimées", "info");
                     }, title: "Effacer toutes les attributions de la p\u00E9riode", style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "4px 10px", background: "#dc2626" }) }, "\uD83D\uDDD1 Tout effacer"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
+        isEdit && lastReport && React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", fontSize: 11, color: "var(--txt2)" } },
+            React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
+            React.createElement("span", { style: { flex: 1 } }, lastReport),
+            React.createElement("button", { onClick: function () { return setLastReport(null); }, style: { border: "none", background: "none", color: "var(--txt3)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 } }, "\u00D7")),
         React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 4, position: "sticky", top: 44, zIndex: 30, background: "var(--bg)", paddingTop: 4 } }, tourMeds.map(function (m) {
             var hcCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.HC || []).includes(m.id) ? n + 1 : n; }, 0);
             var usicCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.USIC || []).includes(m.id) ? n + 1 : n; }, 0);
@@ -2774,7 +2886,7 @@ function CardioPlanning() {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
             while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_1 = function (d) {
+                var _loop_3 = function (d) {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
@@ -2787,7 +2899,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_1(d);
+                    _loop_3(d);
                 }
                 if (cm === 11) {
                     cy++;
@@ -2808,7 +2920,7 @@ function CardioPlanning() {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
             while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_2 = function (d) {
+                var _loop_4 = function (d) {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
@@ -2827,7 +2939,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_2(d);
+                    _loop_4(d);
                 }
                 if (cm === 11) {
                     cy++;
@@ -3806,7 +3918,7 @@ function CardioPlanning() {
                     // Remove all non-system entries for medId over the period
                     var df = new Date(dateFrom), dt = new Date(dateTo);
                     var cur = new Date(df);
-                    var _loop_3 = function () {
+                    var _loop_5 = function () {
                         var y3 = cur.getFullYear(), m3 = cur.getMonth(), d3 = cur.getDate();
                         var slotsToClr = slots.includes("ALL") || slots.length === 2 ? ["M", "AM", "JOUR"] : slots;
                         slotsToClr.forEach(function (sl) {
@@ -3829,7 +3941,7 @@ function CardioPlanning() {
                         cur.setDate(cur.getDate() + 1);
                     };
                     while (cur <= dt) {
-                        _loop_3();
+                        _loop_5();
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
