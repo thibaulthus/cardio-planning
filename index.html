@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.0 — 13/07/2026";
+var APP_VERSION = "v7.1 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -636,7 +636,8 @@ function SiteView(_a) {
     // Effective days for 4M mode
     var sv_today = new Date();
     var svEffDays = useMemo(function () {
-        var base = allDays.map(function (d) { return ({ y: year, m: month, d: d }); });
+        var p = perStart(year, month);
+        var base = perDaysList(p.sy, p.sm);
         if (!showFull) {
             var tod_3 = new Date();
             tod_3.setHours(0, 0, 0, 0);
@@ -646,7 +647,7 @@ function SiteView(_a) {
             });
         }
         return base;
-    }, [year, month, allDays, showFull]);
+    }, [year, month, showFull, PCFG.len, PCFG.startM]);
     var _chlSalles = ["CHL-1", "CHL-2", "CHL-3", "CHL-4", "CHL-5", "CHL-6", "CHL-7", "Holter", "HC-Exam"];
     var _chbSalles = ["CHB-1", "CHB-2", "CHB-3", "CHB-VASC", "EE-CHB", "Rythmo-CHB", "CHB-BIP"];
     var _robustSalles = site === "CHL" ? _chlSalles : site === "CHB" ? _chbSalles : null;
@@ -780,7 +781,8 @@ function ActTabView(_a) {
     var title = _a.title, titleColor = _a.titleColor, rows = _a.rows, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, onPickAct = _a.onPickAct, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod;
     var today = new Date();
     var atvEffDays2 = useMemo(function () {
-        var base = allDays.map(function (d) { return ({ y: year, m: month, d: d }); });
+        var p = perStart(year, month);
+        var base = perDaysList(p.sy, p.sm);
         if (!showFull) {
             var tod_4 = new Date();
             tod_4.setHours(0, 0, 0, 0);
@@ -790,7 +792,7 @@ function ActTabView(_a) {
             });
         }
         return base;
-    }, [year, month, allDays, showFull]);
+    }, [year, month, showFull, PCFG.len, PCFG.startM]);
     var wdays = atvEffDays2; // keep full objects
     function getOcc(row, d, sl, ry, rm) {
         if (!ry)
