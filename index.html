@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.8 — 13/07/2026";
+var APP_VERSION = "v7.11 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1736,7 +1736,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var tourMins = _a.tourMins, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -1844,20 +1844,22 @@ function TourTab(_a) {
         var totEEP = seniors.filter(function (m) { return m.surSpec === "eep"; }).length;
         var totETT = seniors.filter(function (m) { return m.surSpec === "ett"; }).length;
         var issues = [];
-        if (totCoro < Math.min(cfgMinCoro, 2))
-            issues.push("Coro: " + totCoro + " sénior(s) dans l'équipe pour un minimum (même relâché) de " + Math.min(cfgMinCoro, 2));
-        if (totPace < cfgMinPace)
-            issues.push("Pace: " + totPace + " pour min " + cfgMinPace);
-        if (totEEP < cfgMinEEP)
-            issues.push("EEP: " + totEEP + " pour min " + cfgMinEEP);
-        if (totETT < cfgMinETT)
-            issues.push("ETT: " + totETT + " pour min " + cfgMinETT);
+        var hb = tourMinsHard || {};
+        var fl = { coro: Math.min(cfgMinCoro, hb.coro !== undefined ? hb.coro : 2), pace: Math.min(cfgMinPace, hb.pace !== undefined ? hb.pace : 1), eep: Math.min(cfgMinEEP, hb.eep !== undefined ? hb.eep : 1), ett: Math.min(cfgMinETT, hb.ett !== undefined ? hb.ett : 0) };
+        if (totCoro < fl.coro)
+            issues.push("Coro: " + totCoro + " sénior(s) pour un minimum (même relâché) de " + fl.coro);
+        if (totPace < fl.pace)
+            issues.push("Pace: " + totPace + " pour min " + fl.pace);
+        if (totEEP < fl.eep)
+            issues.push("EEP: " + totEEP + " pour min " + fl.eep);
+        if (totETT < fl.ett)
+            issues.push("ETT: " + totETT + " pour min " + fl.ett);
         if (issues.length > 0) {
             toast("Contraintes impossibles — " + issues.join(" · ") + ". Ajustez les minimums ou les surspécialités dans l'Équipe.", "info");
             return;
         }
         // ═══ Multi-essais : on lance N tentatives et on garde la meilleure ═══
-        var N_TRIES = 40;
+        var N_TRIES = 60;
         // Disponibilité statique par semaine (médecins participants non absents)
         var availCount = {};
         weeksT.forEach(function (w) {
@@ -1867,7 +1869,7 @@ function TourTab(_a) {
         var weeksByConstraint = __spreadArray([], weeksT, true).sort(function (a, b) { return availCount[a.key] - availCount[b.key]; });
         var attempt = function (opts) {
             var useBlocks = opts.useBlocks;
-            var effMinCoro = opts.minCoro;
+            var relaxedWeeks = [];
             var quota = {};
             tourMeds.forEach(function (m) { quota[m.id] = cfgExcl[m.id] ? 0 : (cfgWeeks[m.id] || 0); });
             var hcCount = {}, usicCount = {};
@@ -1876,7 +1878,7 @@ function TourTab(_a) {
             weeksT.forEach(function (w) { assign[w.key] = { HC: [], USIC: [] }; });
             var assignedThisWeek = {};
             weeksT.forEach(function (w) { assignedThisWeek[w.key] = []; });
-            var specOK = function (wKey, extraAssigned) {
+            var specOK = function (wKey, extraAssigned, mns) {
                 var busy = __spreadArray(__spreadArray([], assignedThisWeek[wKey], true), extraAssigned, true);
                 // Séniors présents (hors absents), indépendamment du tour
                 var present = medecins.filter(function (m) { return m.role === "medecin" && (m.statut || "senior") !== "junior" && !isBlockedInWeek(m.id, wKey); });
@@ -1891,7 +1893,7 @@ function TourTab(_a) {
                     // (autant de spécialistes dispo qu'il y en a de présents = aucun pris par le tour)
                     return nAvail === cnt(present, function (m) { return m.surSpec === spec; });
                 };
-                return check("eep", cfgMinEEP) && check("pace", cfgMinPace) && check("ett", cfgMinETT) && check("coro", effMinCoro);
+                return check("eep", mns.eep) && check("pace", mns.pace) && check("ett", mns.ett) && check("coro", mns.coro);
             };
             // Phase 1 : blocs de 2 semaines consécutives (préférences)
             var placeBlock = function (m, unit) {
@@ -1903,7 +1905,7 @@ function TourTab(_a) {
                         continue;
                     if (assign[w1.key][unit].length >= 2 || assign[w2.key][unit].length >= 2)
                         continue;
-                    if (!specOK(w1.key, [m.id]) || !specOK(w2.key, [m.id]))
+                    if (!specOK(w1.key, [m.id], idealMins) || !specOK(w2.key, [m.id], idealMins))
                         continue;
                     assign[w1.key][unit].push(m.id);
                     assignedThisWeek[w1.key].push(m.id);
@@ -1932,15 +1934,25 @@ function TourTab(_a) {
                 var units = Math.random() < 0.5 ? ["HC", "USIC"] : ["USIC", "HC"];
                 units.forEach(function (unit) {
                     while (assign[w.key][unit].length < 2) {
-                        var cands = tourMeds.filter(function (m) { return quota[m.id] > 0
+                        var baseC = tourMeds.filter(function (m) { return quota[m.id] > 0
                             && !assignedThisWeek[w.key].includes(m.id)
-                            && !isBlockedInWeek(m.id, w.key)
-                            && specOK(w.key, [m.id]); });
+                            && !isBlockedInWeek(m.id, w.key); });
+                        var cands = baseC.filter(function (m) { return specOK(w.key, [m.id], idealMins); });
+                        if (cands.length === 0) {
+                            cands = baseC.filter(function (m) { return specOK(w.key, [m.id], hardMins); });
+                            if (cands.length > 0 && !relaxedWeeks.includes(w.label))
+                                relaxedWeeks.push(w.label);
+                        }
                         if (cands.length === 0)
                             break;
                         cands.sort(function (a, b) {
                             if (quota[b.id] !== quota[a.id])
                                 return quota[b.id] - quota[a.id];
+                            // Surspécialistes d'abord : consommer leur quota tant que la semaine a de la marge
+                            var spA = a.surSpec && (idealMins[a.surSpec] || 0) > 0 ? 0 : 1;
+                            var spB = b.surSpec && (idealMins[b.surSpec] || 0) > 0 ? 0 : 1;
+                            if (spA !== spB)
+                                return spA - spB;
                             var balA = unit === "HC" ? hcCount[a.id] - usicCount[a.id] : usicCount[a.id] - hcCount[a.id];
                             var balB = unit === "HC" ? hcCount[b.id] - usicCount[b.id] : usicCount[b.id] - hcCount[b.id];
                             if (balA !== balB)
@@ -1962,22 +1974,27 @@ function TourTab(_a) {
             var unfilled = weeksT.filter(function (w) { return assign[w.key].HC.length < 2 || assign[w.key].USIC.length < 2; }).length;
             var leftoverTotal = tourMeds.reduce(function (s, m) { return s + (quota[m.id] || 0); }, 0);
             var imbalance = tourMeds.reduce(function (s, m) { return s + Math.abs(hcCount[m.id] - usicCount[m.id]); }, 0);
-            var score = unfilled * 1000 + leftoverTotal * 10 + imbalance;
-            return { assign: assign, quota: quota, unfilled: unfilled, score: score, hcCount: hcCount, usicCount: usicCount, assignedThisWeek: assignedThisWeek, specOK: specOK };
+            var score = unfilled * 1000 + relaxedWeeks.length * 100 + leftoverTotal * 10 + imbalance;
+            return { assign: assign, quota: quota, unfilled: unfilled, score: score, hcCount: hcCount, usicCount: usicCount, assignedThisWeek: assignedThisWeek, specOK: specOK, relaxedWeeks: relaxedWeeks };
         };
         // ═══ Paliers de relaxation progressive ═══
-        var relaxedCoro = Math.min(cfgMinCoro, 2);
+        var idealMins = { coro: cfgMinCoro, pace: cfgMinPace, eep: cfgMinEEP, ett: cfgMinETT };
+        var hardBase = tourMinsHard || { coro: 2, pace: 1, eep: 1, ett: 0 };
+        var hardMins = {
+            coro: Math.min(idealMins.coro, hardBase.coro !== undefined ? hardBase.coro : 2),
+            pace: Math.min(idealMins.pace, hardBase.pace !== undefined ? hardBase.pace : 1),
+            eep: Math.min(idealMins.eep, hardBase.eep !== undefined ? hardBase.eep : 1),
+            ett: Math.min(idealMins.ett, hardBase.ett !== undefined ? hardBase.ett : 0)
+        };
+        var minsLabel = function (mn) { return "Coro " + mn.coro + " · Pace " + mn.pace + " · EEP " + mn.eep + " · ETT " + mn.ett; };
+        var hardDiff = hardMins.coro < idealMins.coro || hardMins.pace < idealMins.pace || hardMins.eep < idealMins.eep || hardMins.ett < idealMins.ett;
         var stages = [
-            { useBlocks: true, minCoro: cfgMinCoro, label: "standard" },
-            { useBlocks: false, minCoro: cfgMinCoro, label: "préférences 2 sem. ignorées" },
+            { useBlocks: true, label: "standard" },
+            { useBlocks: false, label: "préférences 2 sem. ignorées" },
         ];
-        if (relaxedCoro < cfgMinCoro) {
-            stages.push({ useBlocks: true, minCoro: relaxedCoro, label: "minimum Coro réduit à " + relaxedCoro });
-            stages.push({ useBlocks: false, minCoro: relaxedCoro, label: "préf. 2 sem. ignorées + Coro réduit à " + relaxedCoro });
-        }
         // Réparation par échanges, appliquée au meilleur essai du palier
         var repairResult = function (r) {
-            var assign = r.assign, quota = r.quota, hcCount = r.hcCount, usicCount = r.usicCount, assignedThisWeek = r.assignedThisWeek, specOK = r.specOK;
+            var assign = r.assign, quota = r.quota, hcCount = r.hcCount, usicCount = r.usicCount, assignedThisWeek = r.assignedThisWeek, specOK = r.specOK, relaxedWeeks = r.relaxedWeeks;
             for (var pass = 0; pass < 2; pass++) {
                 weeksT.forEach(function (w) {
                     ["HC", "USIC"].forEach(function (unit) {
@@ -2014,7 +2031,15 @@ function TourTab(_a) {
                                             assignedThisWeek[w2.key].push(c.id);
                                             assign[w.key][unit].push(m2id);
                                             assignedThisWeek[w.key].push(m2id);
-                                            if (specOK(w.key, []) && specOK(w2.key, [])) {
+                                            var okIdeal = specOK(w.key, [], idealMins) && specOK(w2.key, [], idealMins);
+                                            var okHard = okIdeal || (specOK(w.key, [], hardMins) && specOK(w2.key, [], hardMins));
+                                            if (okHard) {
+                                                if (!okIdeal) {
+                                                    if (!relaxedWeeks.includes(w.label))
+                                                        relaxedWeeks.push(w.label);
+                                                    if (!relaxedWeeks.includes(w2.label))
+                                                        relaxedWeeks.push(w2.label);
+                                                }
                                                 quota[c.id]--;
                                                 if (unit2 === "HC") {
                                                     hcCount[c.id]++;
@@ -2065,7 +2090,7 @@ function TourTab(_a) {
             r.unfilled = weeksT.filter(function (w) { return assign[w.key].HC.length < 2 || assign[w.key].USIC.length < 2; }).length;
             var leftoverTotal = tourMeds.reduce(function (s, m) { return s + (quota[m.id] || 0); }, 0);
             var imbalance = tourMeds.reduce(function (s, m) { return s + Math.abs(hcCount[m.id] - usicCount[m.id]); }, 0);
-            r.score = r.unfilled * 1000 + leftoverTotal * 10 + imbalance;
+            r.score = r.unfilled * 1000 + relaxedWeeks.length * 100 + leftoverTotal * 10 + imbalance;
             return r;
         };
         var best = null, bestStage = stages[0];
@@ -2090,7 +2115,7 @@ function TourTab(_a) {
         }
         persistCfg();
         setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { n[w.key] = best.assign[w.key]; }); return n; });
-        var minBySpec = { coro: bestStage.minCoro, pace: cfgMinPace, eep: cfgMinEEP, ett: cfgMinETT };
+        var minBySpec = hardMins;
         var lockedInfo = function (m) {
             if (!m.surSpec)
                 return "";
@@ -2098,10 +2123,24 @@ function TourTab(_a) {
             return nSpec <= (minBySpec[m.surSpec] || 0) ? " [bloqué: seul(s) " + m.surSpec + "]" : "";
         };
         var leftover = tourMeds.filter(function (m) { return best.quota[m.id] > 0; }).map(function (m) { return m.init + "(" + best.quota[m.id] + ")" + lockedInfo(m); });
-        var minsTxt = " (min: Coro " + bestStage.minCoro + " · Pace " + cfgMinPace + " · EEP " + cfgMinEEP + " · ETT " + cfgMinETT + ")";
+        var minsTxt = " (idéal: " + minsLabel(idealMins) + " — min: " + minsLabel(hardMins) + ")";
         var msg = (bestStage.label === "standard" ? "Répartition effectuée." : "Répartition effectuée — mode: " + bestStage.label + ".") + minsTxt;
         if (best.unfilled > 0)
-            msg += " " + best.unfilled + " semaine(s) incomplète(s) malgré toutes les relaxations.";
+            msg += " ⚠ " + best.unfilled + " semaine(s) incomplète(s) malgré toutes les relaxations.";
+        else
+            msg += " ✓ Toutes les semaines sont complètes (2 HC + 2 USIC).";
+        // Semaines où il reste moins de coro dispo que le minimum standard
+        var lowCoroW = weeksT.filter(function (w2) {
+            var busyL = __spreadArray(__spreadArray([], best.assign[w2.key].HC, true), best.assign[w2.key].USIC, true).map(String);
+            var nC = medecins.filter(function (m) { return m.role === "medecin" && (m.statut || "senior") !== "junior" && m.surSpec === "coro" && !busyL.includes(String(m.id)) && !isBlockedInWeek(m.id, w2.key); }).length;
+            return nC < cfgMinCoro;
+        }).map(function (w2) { return w2.label; });
+        if (best.relaxedWeeks && best.relaxedWeeks.length > 0)
+            msg += " ⚠ Semaines passées au minimum: " + best.relaxedWeeks.join(", ") + ".";
+        else
+            msg += " Idéal de surspécialités respecté chaque semaine.";
+        if (lowCoroW.length > 0)
+            msg += " (Moins de " + cfgMinCoro + " coro dispo: " + lowCoroW.join(", ") + ")";
         if (leftover.length > 0)
             msg += " Quota restant: " + leftover.join(", ");
         setLastReport(msg);
@@ -2163,6 +2202,19 @@ function TourTab(_a) {
                     React.createElement("span", null,
                         "Sem. ",
                         w.label),
+                    React.createElement("span", { style: { display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", padding: "1px 7px", borderRadius: 5, background: "var(--bg2)", border: "1px solid var(--border2)" } }, [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
+                        var sk2 = _a[0], lb2 = _a[1];
+                        var wmS = tourMed[w.key] || { HC: [], USIC: [] };
+                        var busyS = __spreadArray(__spreadArray([], (wmS.HC || []), true), (wmS.USIC || []), true).map(String);
+                        var nDispo = medecins.filter(function (m) { return m.role === "medecin" && (m.statut || "senior") !== "junior" && m.surSpec === sk2 && !busyS.includes(String(m.id)) && !isBlockedInWeek(m.id, w.key); }).length;
+                        var minS = (tourMins || {})[sk2] || 0;
+                        var lowS = nDispo < minS;
+                        return React.createElement("span", { key: sk2, title: "Séniors " + lb2 + " disponibles (hors tour, hors absents) — minimum réglé: " + minS, style: { fontSize: 9, fontWeight: 800, color: lowS ? "#ef4444" : (SPEC_COLORS[sk2] || "var(--txt3)") } },
+                            lb2,
+                            " ",
+                            nDispo,
+                            lowS ? " ⚠" : "");
+                    })),
                     horsTourSpecMeds.length > 0 && React.createElement("span", { style: { display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" } },
                         React.createElement("span", { style: { fontSize: 8, color: "var(--txt3)", fontWeight: 600, textTransform: "uppercase" } }, "Hors tour:"),
                         horsTourSpecMeds.map(function (hm) {
@@ -2510,15 +2562,16 @@ function CardioPlanning() {
     var _y = useState({}), notes = _y[0], setNotes = _y[1];
     var _z = useState({}), medPins = _z[0], setMedPins = _z[1]; // {medId: "pin"}
     var _0 = useState({ coro: 3, pace: 1, eep: 1, ett: 1 }), tourMins = _0[0], setTourMins = _0[1];
-    var _1 = useState({}), tourCfg = _1[0], setTourCfg = _1[1];
-    var _2 = useState({ len: 4, startM: 6 }), periodCfg = _2[0], setPeriodCfg = _2[1];
+    var _1 = useState({ coro: 2, pace: 1, eep: 1, ett: 0 }), tourMinsHard = _1[0], setTourMinsHard = _1[1];
+    var _2 = useState({}), tourCfg = _2[0], setTourCfg = _2[1];
+    var _3 = useState({ len: 4, startM: 6 }), periodCfg = _3[0], setPeriodCfg = _3[1];
     PCFG.len = periodCfg.len;
     PCFG.startM = periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
-    var _3 = useState({}), astreinte = _3[0], setAstreinte = _3[1]; // {wKey: medId}
-    var _4 = useState(null), astDayModal = _4[0], setAstDayModal = _4[1]; // legacy
-    var _5 = useState(null), astPickModal = _5[0], setAstPickModal = _5[1]; // {dayKey,wKey,isWeek,label}
-    var _6 = useState(""), astSearch = _6[0], setAstSearch = _6[1];
-    var _7 = useState(false), ast4M = _7[0], setAst4M = _7[1];
+    var _4 = useState({}), astreinte = _4[0], setAstreinte = _4[1]; // {wKey: medId}
+    var _5 = useState(null), astDayModal = _5[0], setAstDayModal = _5[1]; // legacy
+    var _6 = useState(null), astPickModal = _6[0], setAstPickModal = _6[1]; // {dayKey,wKey,isWeek,label}
+    var _7 = useState(""), astSearch = _7[0], setAstSearch = _7[1];
+    var _8 = useState(false), ast4M = _8[0], setAst4M = _8[1];
     // Get astreinte medId for a given day
     var getAstreinteForDay = React.useCallback(function (y, m, d) {
         var dayKey = y + "-" + m + "-" + d;
@@ -2534,18 +2587,18 @@ function CardioPlanning() {
         return (v !== undefined && v !== null) ? String(v) : null;
     }, [astreinte]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
-    var _8 = useState(function () { return new Date().getFullYear(); }), astYear = _8[0], setAstYear = _8[1];
-    var _9 = useState(function () { return new Date().getMonth(); }), astMonth = _9[0], setAstMonth = _9[1];
-    var _10 = useState(function () { return new Date().getFullYear(); }), tourYear = _10[0], setTourYear = _10[1];
-    var _11 = useState(function () { return new Date().getMonth(); }), tourMonth = _11[0], setTourMonth = _11[1];
-    var _12 = useState("connecting"), fbStatus = _12[0], setFbStatus = _12[1];
-    var _13 = useState(function () { try {
+    var _9 = useState(function () { return new Date().getFullYear(); }), astYear = _9[0], setAstYear = _9[1];
+    var _10 = useState(function () { return new Date().getMonth(); }), astMonth = _10[0], setAstMonth = _10[1];
+    var _11 = useState(function () { return new Date().getFullYear(); }), tourYear = _11[0], setTourYear = _11[1];
+    var _12 = useState(function () { return new Date().getMonth(); }), tourMonth = _12[0], setTourMonth = _12[1];
+    var _13 = useState("connecting"), fbStatus = _13[0], setFbStatus = _13[1];
+    var _14 = useState(function () { try {
         return localStorage.getItem("cp6_vaczone") || "B";
     }
     catch (_a) {
         return "B";
-    } }), vacZone = _13[0], setVacZone = _13[1];
-    var _14 = useState(new Set()), vacDates = _14[0], setVacDates = _14[1]; // Set of "YYYY-MM-DD" strings
+    } }), vacZone = _14[0], setVacZone = _14[1];
+    var _15 = useState(new Set()), vacDates = _15[0], setVacDates = _15[1]; // Set of "YYYY-MM-DD" strings
     // Fetch vacances scolaires from API gouv
     useEffect(function () {
         var zone = "Zone " + vacZone;
@@ -2612,6 +2665,8 @@ function CardioPlanning() {
                     }
                     if (data.tourMins)
                         setTourMins(JSON.parse(data.tourMins));
+                    if (data.tourMinsHard)
+                        setTourMinsHard(JSON.parse(data.tourMinsHard));
                     if (data.tourCfg)
                         setTourCfg(JSON.parse(data.tourCfg));
                     if (data.periodCfg)
@@ -2660,6 +2715,8 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourMins: JSON.stringify(tourMins) }); }, [tourMins]);
     useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ tourMinsHard: JSON.stringify(tourMinsHard) }); }, [tourMinsHard]);
+    useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourCfg: JSON.stringify(tourCfg) }); }, [tourCfg]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
@@ -2687,7 +2744,7 @@ function CardioPlanning() {
     var isEdit = accessMode === "edit";
     // ─── Undo/Redo history (edit mode) ───
     var histRef = useRef({ stack: [], idx: -1, restoring: false });
-    var _15 = useState(0), histVer = _15[0], setHistVer = _15[1];
+    var _16 = useState(0), histVer = _16[0], setHistVer = _16[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
     useEffect(function () {
         if (isFirstLoad.current)
@@ -3245,7 +3302,7 @@ function CardioPlanning() {
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
@@ -3627,16 +3684,35 @@ function CardioPlanning() {
                         ").")),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#a371f7", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD04 Tour m\u00E9dical \u2014 minimums par sursp\u00E9cialit\u00E9"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Nombre minimum de s\u00E9niors devant rester disponibles chaque semaine (hors tour, hors absents). Pr\u00E9-rempli dans la modale de r\u00E9partition, modifiable au cas par cas."),
-                    React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
-                        var k = _a[0], lb = _a[1];
-                        return (React.createElement("label", { key: k, style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
-                            lb,
-                            React.createElement("input", { type: "number", min: 0, max: 9, value: tourMins[k], onChange: function (e) { return setTourMins(function (p) {
-                                    var _a;
-                                    return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
-                                }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })));
-                    }))),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } },
+                        "S\u00E9niors devant rester disponibles chaque semaine (hors tour, hors absents). L'algorithme vise l'",
+                        React.createElement("b", null, "id\u00E9al"),
+                        " et ne descend au ",
+                        React.createElement("b", null, "minimum"),
+                        " que si aucune solution n'existe."),
+                    React.createElement("table", { style: { borderCollapse: "collapse" } },
+                        React.createElement("thead", null,
+                            React.createElement("tr", null,
+                                React.createElement("th", { style: { textAlign: "left", padding: "3px 10px 3px 0", fontSize: 10, color: "var(--txt3)" } }),
+                                [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
+                                    var k = _a[0], lb = _a[1];
+                                    return React.createElement("th", { key: k, style: { padding: "3px 8px", fontSize: 11, color: "var(--txt2)", fontWeight: 700 } }, lb);
+                                }))),
+                        React.createElement("tbody", null,
+                            React.createElement("tr", null,
+                                React.createElement("td", { style: { padding: "3px 10px 3px 0", fontSize: 11, color: "var(--txt2)", fontWeight: 600 } }, "Id\u00E9al"),
+                                ["coro", "pace", "eep", "ett"].map(function (k) { return React.createElement("td", { key: k, style: { padding: "3px 8px", textAlign: "center" } },
+                                    React.createElement("input", { type: "number", min: 0, max: 9, value: tourMins[k], onChange: function (e) { return setTourMins(function (p) {
+                                            var _a;
+                                            return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
+                                        }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); })),
+                            React.createElement("tr", null,
+                                React.createElement("td", { style: { padding: "3px 10px 3px 0", fontSize: 11, color: "var(--txt2)", fontWeight: 600 } }, "Minimum"),
+                                ["coro", "pace", "eep", "ett"].map(function (k) { return React.createElement("td", { key: k, style: { padding: "3px 8px", textAlign: "center" } },
+                                    React.createElement("input", { type: "number", min: 0, max: 9, value: tourMinsHard[k], onChange: function (e) { return setTourMinsHard(function (p) {
+                                            var _a;
+                                            return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
+                                        }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); }))))),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { marginBottom: 20, padding: "14px 16px", background: "var(--bg)", borderRadius: 10, border: "1px solid var(--border)" } },
                         React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "var(--txt)", marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
