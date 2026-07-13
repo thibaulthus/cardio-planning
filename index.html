@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.1 — 13/07/2026";
+var APP_VERSION = "v7.2 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3476,8 +3476,10 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Tous les onglets affichent le planning par blocs de cette dur\u00E9e, align\u00E9s sur le mois de d\u00E9part."),
                     React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" } },
                         React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
-                            "Dur\u00E9e (mois)",
-                            React.createElement("input", { type: "number", min: 1, max: 12, value: periodCfg.len, onChange: function (e) { var v = Math.min(12, Math.max(1, parseInt(e.target.value) || 4)); setPeriodCfg(function (p) { return (__assign(__assign({}, p), { len: v })); }); }, style: { width: 52, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })),
+                            "Dur\u00E9e",
+                            React.createElement("select", { value: periodCfg.len, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { len: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, [1, 2, 3, 4, 6, 12].map(function (v) { return React.createElement("option", { key: v, value: v },
+                                v,
+                                " mois"); }))),
                         React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
                             "Mois de d\u00E9part",
                             React.createElement("select", { value: periodCfg.startM, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { startM: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, MOIS.map(function (mn, mi) { return React.createElement("option", { key: mi, value: mi }, mn); })))),
