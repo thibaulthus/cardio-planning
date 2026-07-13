@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.7 — 13/07/2026";
+var APP_VERSION = "v7.8 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1769,6 +1769,8 @@ function TourTab(_a) {
         return false;
     };
     var tourMeds = medecins.filter(function (m) { return m.tourMed; });
+    var horsTourSpecMeds = medecins.filter(function (m) { return m.role === "medecin" && !m.tourMed && m.surSpec; });
+    var SPEC_COLORS = { coro: "#76a5af", pace: "#e3b341", eep: "#f97316", ett: "#ea9999" };
     // ─── Auto-répartition ───
     var _b = React.useState(false), autoModal = _b[0], setAutoModal = _b[1];
     var _c = React.useState(null), lastReport = _c[0], setLastReport = _c[1];
@@ -2157,9 +2159,23 @@ function TourTab(_a) {
             var wm = tourMed[w.key] || { HC: [], USIC: [] };
             var incomplete = (wm.HC || []).length < 2 || (wm.USIC || []).length < 2;
             return (React.createElement("div", { key: w.key, style: __assign(__assign({}, S.tmRow), (incomplete ? { background: "rgba(128,134,148,.10)", borderColor: "rgba(128,134,148,.35)" } : {})) },
-                React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt2)", width: "100%", marginBottom: 2 } },
-                    "Sem. ",
-                    w.label),
+                React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt2)", width: "100%", marginBottom: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+                    React.createElement("span", null,
+                        "Sem. ",
+                        w.label),
+                    horsTourSpecMeds.length > 0 && React.createElement("span", { style: { display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" } },
+                        React.createElement("span", { style: { fontSize: 8, color: "var(--txt3)", fontWeight: 600, textTransform: "uppercase" } }, "Hors tour:"),
+                        horsTourSpecMeds.map(function (hm) {
+                            var hBlocked = isBlockedInWeek(hm.id, w.key);
+                            return (React.createElement("span", { key: hm.id, title: hm.prenom + " " + hm.nom + " (" + hm.surSpec + ") — " + (hBlocked ? "absent/formation" : "présent"), style: { fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 5, cursor: "default",
+                                    border: "1.5px solid " + (SPEC_COLORS[hm.surSpec] || "var(--border)"),
+                                    color: hBlocked ? "var(--txt3)" : (SPEC_COLORS[hm.surSpec] || "var(--txt2)"),
+                                    background: "transparent",
+                                    opacity: hBlocked ? .4 : 1,
+                                    textDecoration: hBlocked ? "line-through" : "none" } },
+                                hm.init,
+                                hBlocked ? " ✕" : ""));
+                        }))),
                 ["HC", "USIC"].map(function (unit) { return (React.createElement("div", { key: unit, style: { flex: 1, minWidth: 170 } },
                     React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: unit === "HC" ? "#388bfd" : "#a371f7", marginBottom: 4 } }, unit),
                     React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, tourMeds.map(function (m) {
