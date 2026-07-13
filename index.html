@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.11 — 13/07/2026";
+var APP_VERSION = "v7.13 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -430,15 +430,23 @@ function GridH(_a) {
                 for (var d = 1; d <= dim; d++)
                     days.push({ y: y2, m: m2, d: d });
             }
+            if (!showFull) {
+                var tod_1 = new Date();
+                tod_1.setHours(0, 0, 0, 0);
+                return days.filter(function (_a) {
+                    var ey = _a.y, em = _a.m, d = _a.d;
+                    return new Date(ey, em, d) >= tod_1;
+                });
+            }
             return days;
         }
         var base = allDays.map(function (d) { return ({ y: year, m: month, d: d }); });
         if (!showFull) {
-            var tod_1 = new Date();
-            tod_1.setHours(0, 0, 0, 0);
+            var tod_2 = new Date();
+            tod_2.setHours(0, 0, 0, 0);
             return base.filter(function (_a) {
                 var ey = _a.y, em = _a.m, d = _a.d;
-                return new Date(ey, em, d) >= tod_1;
+                return new Date(ey, em, d) >= tod_2;
             });
         }
         return base;
@@ -504,16 +512,16 @@ function GridV(_a) {
         if (!viewPeriod) {
             var base = allDays.map(function (d) { return ({ y: year, m: month, d: d, label: null }); });
             if (!showFull) {
-                var tod_2 = new Date();
-                tod_2.setHours(0, 0, 0, 0);
+                var tod_3 = new Date();
+                tod_3.setHours(0, 0, 0, 0);
                 return base.filter(function (_a) {
                     var ey = _a.y, em = _a.m, d = _a.d;
-                    return new Date(ey, em, d) >= tod_2;
+                    return new Date(ey, em, d) >= tod_3;
                 });
             }
             return base;
         }
-        // 4M mode: compute locally
+        // Mode période
         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
         var days = [];
         for (var mi = 0; mi < PCFG.len; mi++) {
@@ -522,8 +530,16 @@ function GridV(_a) {
             for (var d = 1; d <= dim; d++)
                 days.push({ y: y2, m: m2, d: d, label: null });
         }
+        if (!showFull) {
+            var tod_4 = new Date();
+            tod_4.setHours(0, 0, 0, 0);
+            return days.filter(function (_a) {
+                var ey = _a.y, em = _a.m, d = _a.d;
+                return new Date(ey, em, d) >= tod_4;
+            });
+        }
         return days;
-    }, [viewPeriod, allDays, year, month, showFull]);
+    }, [viewPeriod, allDays, year, month, showFull, PCFG.len, PCFG.startM]);
     var getGardeMed = function (d) { return getGardeMed2(year, month, d); };
     var getGardeMed2 = function (y2, m2, d2) {
         var dw2 = dow(y2, m2, d2);
@@ -597,7 +613,7 @@ function GridV(_a) {
                     var slots = we ? ["JOUR"] : ["M", "AM"];
                     var isMonGV = !we && dow(ey, em, d) === 1;
                     var gardeMed = getGardeMed2(ey, em, d);
-                    return slots.map(function (sl, si) { return (React.createElement("tr", { key: d + sl, style: __assign(__assign(__assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMonGV ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
+                    return slots.map(function (sl, si) { return (React.createElement("tr", { key: ey + "-" + em + "-" + d + sl, style: __assign(__assign(__assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMonGV ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: C0, background: isVac && isVac(ey, em, d) ? "#e2e8f0" : "var(--td-fix)" }), rowSpan: slots.length },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
@@ -639,11 +655,11 @@ function SiteView(_a) {
         var p = perStart(year, month);
         var base = perDaysList(p.sy, p.sm);
         if (!showFull) {
-            var tod_3 = new Date();
-            tod_3.setHours(0, 0, 0, 0);
+            var tod_5 = new Date();
+            tod_5.setHours(0, 0, 0, 0);
             return base.filter(function (_a) {
                 var ey3 = _a.y, em3 = _a.m, d = _a.d;
-                return new Date(ey3, em3, d) >= tod_3;
+                return new Date(ey3, em3, d) >= tod_5;
             });
         }
         return base;
@@ -733,7 +749,7 @@ function SiteView(_a) {
                             React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: "24px", left: 0, zIndex: 39 }) }),
                             wdays.map(function (_a) {
                                 var wY = _a.y, wM = _a.m, d = _a.d;
-                                return isWE(wY, wM, d) ? React.createElement("th", { key: d + wM + wY, style: __assign(__assign(__assign({}, S.th), S.thWE), { fontSize: 8, padding: "2px 1px", position: "sticky", top: "24px", zIndex: 19 }) }) : ["M", "AM"].map(function (sl) { return React.createElement("th", { key: d + sl, style: __assign(__assign({}, S.th), { fontSize: 8, color: "var(--txt3)", padding: "2px 1px", position: "sticky", top: "24px", zIndex: 19 }) }, SLOTS[sl]); });
+                                return isWE(wY, wM, d) ? React.createElement("th", { key: d + wM + wY, style: __assign(__assign(__assign({}, S.th), S.thWE), { fontSize: 8, padding: "2px 1px", position: "sticky", top: "24px", zIndex: 19 }) }) : ["M", "AM"].map(function (sl) { return React.createElement("th", { key: wY + "-" + wM + "-" + d + sl, style: __assign(__assign({}, S.th), { fontSize: 8, color: "var(--txt3)", padding: "2px 1px", position: "sticky", top: "24px", zIndex: 19 }) }, SLOTS[sl]); });
                             }))),
                     React.createElement("tbody", null, allSalles.map(function (salle) { return (React.createElement("tr", { key: salle, style: { borderBottom: "1px solid var(--border2)" } },
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5 }) },
@@ -758,7 +774,7 @@ function SiteView(_a) {
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
                     var dSV = dow(wY, wM, d), weSV = isWE(wY, wM, d), isMonSV = dSV === 1 && !weSV;
                     if (weSV)
-                        return (React.createElement("tr", { key: d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
+                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
                             React.createElement("td", { colSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, background: "var(--bg-we)" }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: "#92400e", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     d,
@@ -766,7 +782,7 @@ function SiteView(_a) {
                                     " ",
                                     JOURSC[dSV])),
                             allSalles.map(function (s) { return React.createElement("td", { key: s, style: __assign(__assign({}, S.td), S.tdWE) }); })));
-                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonSV && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
+                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonSV && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: 42 }), rowSpan: 2 },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
@@ -784,11 +800,11 @@ function ActTabView(_a) {
         var p = perStart(year, month);
         var base = perDaysList(p.sy, p.sm);
         if (!showFull) {
-            var tod_4 = new Date();
-            tod_4.setHours(0, 0, 0, 0);
+            var tod_6 = new Date();
+            tod_6.setHours(0, 0, 0, 0);
             return base.filter(function (_a) {
                 var ey3 = _a.y, em3 = _a.m, d = _a.d;
-                return new Date(ey3, em3, d) >= tod_4;
+                return new Date(ey3, em3, d) >= tod_6;
             });
         }
         return base;
@@ -864,7 +880,7 @@ function ActTabView(_a) {
                             React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: "24px", left: 0, zIndex: 39 }) }),
                             wdays.map(function (_a) {
                                 var wY = _a.y, wM = _a.m, d = _a.d;
-                                return isWE(wY, wM, d) ? React.createElement("th", { key: d + wM + wY, style: __assign(__assign(__assign({}, S.th), S.thWE), { padding: "2px 1px", position: "sticky", top: "24px", zIndex: 19 }) }) : ["M", "AM"].map(function (sl) { return React.createElement("th", { key: d + sl, style: __assign(__assign({}, S.th), { fontSize: 8, color: "var(--txt3)", padding: "2px 1px", position: "sticky", top: "24px", zIndex: 19 }) }, SLOTS[sl]); });
+                                return isWE(wY, wM, d) ? React.createElement("th", { key: d + wM + wY, style: __assign(__assign(__assign({}, S.th), S.thWE), { padding: "2px 1px", position: "sticky", top: "24px", zIndex: 19 }) }) : ["M", "AM"].map(function (sl) { return React.createElement("th", { key: wY + "-" + wM + "-" + d + sl, style: __assign(__assign({}, S.th), { fontSize: 8, color: "var(--txt3)", padding: "2px 1px", position: "sticky", top: "24px", zIndex: 19 }) }, SLOTS[sl]); });
                             }))),
                     React.createElement("tbody", null, rows.map(function (row) { return (React.createElement("tr", { key: row.label, style: { borderBottom: "1px solid var(--border2)" } },
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5 }) },
@@ -888,14 +904,14 @@ function ActTabView(_a) {
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
                     var dAT = dow(wY, wM, d), weAT = isWE(wY, wM, d), isMonAT = dAT === 1 && !weAT;
                     if (weAT)
-                        return (React.createElement("tr", { key: d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
+                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
                             React.createElement("td", { colSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, background: "var(--bg-we)" }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: "#92400e", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     d,
                                     " ",
                                     JOURSC[dAT])),
                             rows.map(function (r) { return React.createElement("td", { key: r.label, style: __assign(__assign({}, S.td), S.tdWE) }); })));
-                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonAT && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
+                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonAT && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: 42 }), rowSpan: 2 },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
@@ -914,11 +930,11 @@ function GardeView(_a) {
     var gvEffDays = useMemo(function () {
         var days = perDaysList(gvSy, gvSm);
         if (!showFull) {
-            var tod_5 = new Date();
-            tod_5.setHours(0, 0, 0, 0);
+            var tod_7 = new Date();
+            tod_7.setHours(0, 0, 0, 0);
             return days.filter(function (_a) {
                 var ey3 = _a.y, em3 = _a.m, d = _a.d;
-                return new Date(ey3, em3, d) >= tod_5;
+                return new Date(ey3, em3, d) >= tod_7;
             });
         }
         return days;
@@ -942,7 +958,7 @@ function GardeView(_a) {
     }
     var wdays = gvEffDays; // keep full objects
     var viewV = (React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)" } },
-        React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
+        React.createElement("table", { key: showFull ? "gvfull" : "gvpart", style: { borderCollapse: "collapse", tableLayout: "fixed" } },
             React.createElement("thead", null,
                 React.createElement("tr", null,
                     React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 80 }) }, "Date"),
@@ -1166,14 +1182,14 @@ function BipTab(_a) {
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
                     var dBip = dow(wY, wM, d), weBip = isWE(wY, wM, d), isMonBip = dBip === 1 && !weBip;
                     if (weBip)
-                        return (React.createElement("tr", { key: d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
+                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
                             React.createElement("td", { colSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, background: "var(--bg-we)" }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: "#92400e", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     d,
                                     " ",
                                     JOURSC[dBip])),
                             React.createElement("td", { style: __assign(__assign({}, S.td), S.tdWE) })));
-                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonBip && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
+                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonBip && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, verticalAlign: "middle", minWidth: 42 }), rowSpan: 2 },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
@@ -2599,31 +2615,43 @@ function CardioPlanning() {
         return "B";
     } }), vacZone = _14[0], setVacZone = _14[1];
     var _15 = useState(new Set()), vacDates = _15[0], setVacDates = _15[1]; // Set of "YYYY-MM-DD" strings
-    // Fetch vacances scolaires from API gouv
+    // Vacances scolaires : fichier iCal officiel du ministère (l'ancienne API records a été retirée)
     useEffect(function () {
-        var zone = "Zone " + vacZone;
         var yr = new Date().getFullYear();
-        var url = "https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?where=zones%20like%20%22Zone%20".concat(vacZone, "%22&limit=100&timezone=Europe%2FParis");
-        var proxyUrl = "https://corsproxy.io/?".concat(encodeURIComponent(url));
-        fetch(url).catch(function () { return fetch(proxyUrl); })
-            .then(function (r) { return r.json(); }).then(function (data) {
+        var icsUrl = "https://fr.ftp.opendatasoft.com/openscol/fr-en-calendrier-scolaire/Zone-" + vacZone + ".ics";
+        var proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(icsUrl);
+        var parseIcs = function (txt) {
             var dates = new Set();
-            (data.results || []).forEach(function (p) {
-                if (!p.start_date || !p.end_date)
+            var fmt = function (y, m, d) { return y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0"); };
+            var events = txt.split("BEGIN:VEVENT").slice(1);
+            events.forEach(function (ev) {
+                var ms = ev.match(/DTSTART[^:]*:(\d{4})(\d{2})(\d{2})/);
+                var me = ev.match(/DTEND[^:]*:(\d{4})(\d{2})(\d{2})/);
+                if (!ms || !me)
                     return;
-                // Only current and next school year
-                var startY = new Date(p.start_date).getFullYear();
-                if (startY < yr - 1 || startY > yr + 1)
+                var sy2 = +ms[1];
+                if (sy2 < yr - 1 || sy2 > yr + 1)
                     return;
-                var start = new Date(p.start_date), end = new Date(p.end_date);
-                var cur = new Date(start);
-                while (cur <= end) {
-                    dates.add(cur.toISOString().slice(0, 10));
+                var cur = new Date(+ms[1], +ms[2] - 1, +ms[3]);
+                var end = new Date(+me[1], +me[2] - 1, +me[3]); // DTEND exclusif (norme iCal)
+                while (cur < end) {
+                    dates.add(fmt(cur.getFullYear(), cur.getMonth() + 1, cur.getDate()));
                     cur.setDate(cur.getDate() + 1);
                 }
             });
-            setVacDates(dates);
-        }).catch(function (e) { return console.log("vac error:", e); });
+            return dates;
+        };
+        fetch(icsUrl).then(function (r) { if (!r.ok)
+            throw new Error("http " + r.status); return r.text(); })
+            .catch(function () { return fetch(proxyUrl).then(function (r) { return r.text(); }); })
+            .then(function (txt) {
+            var dates = parseIcs(txt || "");
+            if (dates.size > 0)
+                setVacDates(dates);
+            else
+                console.log("vac: aucun évènement parsé");
+        })
+            .catch(function (e) { return console.log("vac error:", e); });
     }, [vacZone]);
     var isVac = function (y, m, d) { return vacDates.has("".concat(y, "-").concat(String(m + 1).padStart(2, "0"), "-").concat(String(d).padStart(2, "0"))); };
     var isFirstLoad = useRef(true);
@@ -3308,7 +3336,7 @@ function CardioPlanning() {
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
-            tab === "chb" && React.createElement(SiteView, { site: "CHB", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "chb" && React.createElement(SiteView, { site: "CHB", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
                     var full = bip && ["CHB-1", "CHB-2", "CHB-3"].includes(salle) ? __spreadArray(__spreadArray([], siteActes.filter(function (a) { return a.id !== "BIP"; }), true), [bip], false) : siteActes;
@@ -3322,7 +3350,7 @@ function CardioPlanning() {
                     { label: "ETO", ids: ["ETO_CHL"], color: "#2dd4bf", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "Reveal", ids: ["REVEAL"], color: "#818cf8", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "EE CHL", ids: ["EE_CHL"], color: "#4ade80", salle: S_EE_CHL },
-                ], year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
+                ], year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
