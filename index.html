@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.14 — 13/07/2026";
+var APP_VERSION = "v7.15 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2615,6 +2615,7 @@ function CardioPlanning() {
         return "B";
     } }), vacZone = _14[0], setVacZone = _14[1];
     var _15 = useState(new Set()), vacDates = _15[0], setVacDates = _15[1]; // Set of "YYYY-MM-DD" strings
+    var _16 = useState(null), vacSource = _16[0], setVacSource = _16[1]; // provenance des données vacances
     // Vacances scolaires : fichier iCal officiel du ministère (l'ancienne API records a été retirée)
     // + calendrier officiel 2025-2027 embarqué en secours (arrêté du 22/10/2025, JO 23/10/2025)
     var VAC_FALLBACK = {
@@ -2666,10 +2667,12 @@ function CardioPlanning() {
             });
             return dates;
         };
+        var srcLabels = ["iCal officiel (direct)", "iCal officiel (via proxy AllOrigins)", "iCal officiel (via proxy CorsProxy)"];
         var tryFetch = function (i) {
             if (i >= proxies.length) {
                 // Toutes les sources réseau ont échoué : calendrier officiel embarqué
                 setVacDates(vacFromFallback(vacZone));
+                setVacSource("calendrier intégré à l'application (hors ligne)");
                 return;
             }
             fetch(proxies[i])
@@ -2677,8 +2680,10 @@ function CardioPlanning() {
                 throw new Error("http " + r.status); return r.text(); })
                 .then(function (txt) {
                 var dates = parseIcs(txt || "");
-                if (dates.size > 0)
+                if (dates.size > 0) {
                     setVacDates(dates);
+                    setVacSource(srcLabels[i]);
+                }
                 else
                     tryFetch(i + 1);
             })
@@ -2805,7 +2810,7 @@ function CardioPlanning() {
     var isEdit = accessMode === "edit";
     // ─── Undo/Redo history (edit mode) ───
     var histRef = useRef({ stack: [], idx: -1, restoring: false });
-    var _16 = useState(0), histVer = _16[0], setHistVer = _16[1];
+    var _17 = useState(0), histVer = _17[0], setHistVer = _17[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
     useEffect(function () {
         if (isFirstLoad.current)
@@ -3788,7 +3793,10 @@ function CardioPlanning() {
                                     fontWeight: 700, fontSize: 13, cursor: "pointer" } },
                                 "Zone ",
                                 z)); })),
-                            React.createElement("span", { style: { fontSize: 11, color: vacDates.size > 0 ? "#16a34a" : "#f59e0b", fontWeight: 600 } }, vacDates.size > 0 ? "\u2713 ".concat(vacDates.size, " jours charg\u00E9s") : "⏳ Chargement..."))),
+                            React.createElement("span", { style: { fontSize: 11, color: vacDates.size > 0 ? "#16a34a" : "#f59e0b", fontWeight: 600 } }, vacDates.size > 0 ? "\u2713 ".concat(vacDates.size, " jours charg\u00E9s") : "⏳ Chargement..."),
+                            vacSource && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 3 } },
+                                "Source : ",
+                                vacSource))),
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde des donn\u00E9es"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "T\u00E9l\u00E9chargez une copie de toutes vos donn\u00E9es. En cas de probl\u00E8me, importez ce fichier pour tout restaurer."),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
