@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.21 — 14/07/2026";
+var APP_VERSION = "v7.26 — 14/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -947,7 +947,8 @@ function GardeView(_a) {
     var FACT = { less: 0.75, normal: 1, more: 1.25 };
     // Tous les jours de la période (complets, indépendants de showFull)
     var gvAllDays = React.useMemo(function () { return perDaysList(gvSy, gvSm); }, [gvSy, gvSm, PCFG.len]);
-    var catOf = function (y2, m2, d2) { var dw = dow(y2, m2, d2); return dw === 6 ? "sam" : dw === 0 ? "dim" : dw === 5 ? "ven" : "sem"; };
+    var catOf = function (y2, m2, d2) { var dw = dow(y2, m2, d2); return dw === 6 ? "sam" : dw === 0 ? "dim" : dw === 5 ? "ven" : dw === 4 ? "jeu" : "sem"; };
+    var GCATS = ["sem", "jeu", "ven", "sam", "dim"];
     var hasGardeAlready = function (y2, m2, d2) {
         var dw = dow(y2, m2, d2);
         var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
@@ -980,14 +981,38 @@ function GardeView(_a) {
         var weights = {};
         var wSum = 0;
         gardeMeds.forEach(function (m) { weights[m.id] = FACT[m.gardeFactor || "normal"] || 1; wSum += weights[m.id]; });
-        var catCount = { sem: 0, ven: 0, sam: 0, dim: 0 };
+        var catCount = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 };
         days.forEach(function (_a) {
             var y2 = _a.y, m2 = _a.m, d2 = _a.d;
             catCount[catOf(y2, m2, d2)]++;
         });
-        var target = {};
-        gardeMeds.forEach(function (m) { target[m.id] = {}; ["sem", "ven", "sam", "dim"].forEach(function (c) { target[m.id][c] = catCount[c] * weights[m.id] / wSum; }); });
         var maxOf = function (mid) { var v = parseInt(gMax[mid]); return isNaN(v) ? Infinity : v; };
+        var target = {};
+        gardeMeds.forEach(function (m) { target[m.id] = {}; GCATS.forEach(function (c) { target[m.id][c] = catCount[c] * weights[m.id] / wSum; }); });
+        // Si un maximum est fixé sous la cible : réduire les cibles par catégorie au prorata,
+        // et redistribuer le surplus sur les autres (proportionnellement à leur poids)
+        var surplus = 0, openW = 0;
+        gardeMeds.forEach(function (m) {
+            var tot = GCATS.reduce(function (s, c) { return s + target[m.id][c]; }, 0);
+            var mx = maxOf(m.id);
+            if (mx < tot) {
+                var f2_1 = tot > 0 ? mx / tot : 0;
+                GCATS.forEach(function (c) { target[m.id][c] *= f2_1; });
+                surplus += tot - mx;
+            }
+            else
+                openW += weights[m.id];
+        });
+        if (surplus > 0 && openW > 0) {
+            gardeMeds.forEach(function (m) {
+                var tot = GCATS.reduce(function (s, c) { return s + target[m.id][c]; }, 0);
+                if (maxOf(m.id) >= tot + 0.001) {
+                    var share = surplus * weights[m.id] / openW;
+                    var f3_1 = tot > 0 ? (tot + share) / tot : 1;
+                    GCATS.forEach(function (c) { target[m.id][c] *= f3_1; });
+                }
+            });
+        }
         var canTake = function (m, y2, m2, d2) {
             var dw = dow(y2, m2, d2);
             if ((m.gardeDays || {})[String(dw)] === false)
@@ -1003,24 +1028,96 @@ function GardeView(_a) {
                 return false;
             return true;
         };
+        // Toutes les gardes existantes par médecin (pour l'écart minimal de 3 jours)
+        var exG = {}; // {medId:Set("y-m-d")}
+        gvAllDays.forEach(function (_a) {
+            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+            var dw = dow(y2, m2, d2);
+            var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+            var dm = plan[sk(y2, m2, d2, slot)] || {};
+            Object.keys(dm).forEach(function (mid) {
+                var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
+                if (!e || e.acteId !== "GARDE")
+                    return;
+                if (!exG[mid])
+                    exG[mid] = new Set();
+                exG[mid].add(y2 + "-" + m2 + "-" + d2);
+            });
+        });
+        // Gardes existantes (posées manuellement) par médecin/semaine : jeudi et week-end
+        var exJeu = {}, exWE = {};
+        gvAllDays.forEach(function (_a) {
+            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+            var dw = dow(y2, m2, d2);
+            if (dw !== 4 && dw !== 6 && dw !== 0)
+                return;
+            var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+            var dm = plan[sk(y2, m2, d2, slot)] || {};
+            Object.keys(dm).forEach(function (mid) {
+                var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
+                if (!e || e.acteId !== "GARDE")
+                    return;
+                var wk = wKey(y2, m2, d2);
+                if (dw === 4) {
+                    if (!exJeu[mid])
+                        exJeu[mid] = {};
+                    exJeu[mid][wk] = true;
+                }
+                else {
+                    if (!exWE[mid])
+                        exWE[mid] = {};
+                    exWE[mid][wk] = true;
+                }
+            });
+        });
         var N_TRIES_G = 40;
         var best = null;
         var _loop_1 = function (t) {
             var cnt = {}, catCnt = {}, lastG = {};
-            gardeMeds.forEach(function (m) { cnt[m.id] = 0; catCnt[m.id] = { sem: 0, ven: 0, sam: 0, dim: 0 }; });
+            var asJeu = {}, asWE = {};
+            var jeuOf = function (mid, wk) { return ((exJeu[mid] || {})[wk]) || ((asJeu[mid] || {})[wk]); };
+            var weOf = function (mid, wk) { return ((exWE[mid] || {})[wk]) || ((asWE[mid] || {})[wk]); };
+            var asG = {}; // {medId:Set("y-m-d")} gardes assignées cet essai
+            var gapOK = function (mid, y3, m3, d3) {
+                for (var k = -1; k <= 1; k += 2) {
+                    var dd = new Date(y3, m3, d3 + k);
+                    var key = dd.getFullYear() + "-" + dd.getMonth() + "-" + dd.getDate();
+                    if ((exG[mid] && exG[mid].has(key)) || (asG[mid] && asG[mid].has(key)))
+                        return false;
+                }
+                return true;
+            };
+            var markG = function (mid, y3, m3, d3) { if (!asG[mid])
+                asG[mid] = new Set(); asG[mid].add(y3 + "-" + m3 + "-" + d3); };
+            gardeMeds.forEach(function (m) { cnt[m.id] = 0; catCnt[m.id] = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 }; });
             var assign = {}; // dateKey -> medId
             var wishMiss = 0;
             // 1. Vœux d'abord
             days.forEach(function (_a) {
                 var y2 = _a.y, m2 = _a.m, d2 = _a.d;
                 var dk4 = dKey(y2, m2, d2);
-                var wishers = gardeMeds.filter(function (m) { return ((gardeWish || {})[dk4] || {})[m.id] && canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id); });
+                var dwW = dow(y2, m2, d2), wkW = wKey(y2, m2, d2);
+                var jweOK = function (mid) { if (dwW === 6 || dwW === 0)
+                    return !jeuOf(mid, wkW); if (dwW === 4)
+                    return !weOf(mid, wkW); return true; };
+                var wishers = gardeMeds.filter(function (m) { return ((gardeWish || {})[dk4] || {})[m.id] && canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && jweOK(m.id) && gapOK(m.id, y2, m2, d2); });
                 if (wishers.length > 0) {
                     var m = wishers[Math.floor(Math.random() * wishers.length)];
                     assign[dk4] = m.id;
                     cnt[m.id]++;
                     catCnt[m.id][catOf(y2, m2, d2)]++;
                     lastG[m.id] = new Date(y2, m2, d2).getTime();
+                    if (dwW === 4) {
+                        if (!asJeu[m.id])
+                            asJeu[m.id] = {};
+                        asJeu[m.id][wkW] = true;
+                    }
+                    if (dwW === 6 || dwW === 0) {
+                        if (!asWE[m.id])
+                            asWE[m.id] = {};
+                        asWE[m.id][wkW] = true;
+                    }
+                    markG(m.id, y2, m2, d2);
                 }
                 else if (Object.keys((gardeWish || {})[dk4] || {}).length > 0)
                     wishMiss++;
@@ -1030,14 +1127,19 @@ function GardeView(_a) {
                 var y2 = _a.y, m2 = _a.m, d2 = _a.d;
                 return !assign[dKey(y2, m2, d2)];
             });
-            var nCand = function (dd) { return gardeMeds.filter(function (m) { return canTake(m, dd.y, dd.m, dd.d) && cnt[m.id] < maxOf(m.id); }).length; };
+            var jweOK2 = function (mid, y3, m3, d3) { var dw3 = dow(y3, m3, d3), wk3 = wKey(y3, m3, d3); if (dw3 === 6 || dw3 === 0)
+                return !jeuOf(mid, wk3); if (dw3 === 4)
+                return !weOf(mid, wk3); return true; };
+            var nCand = function (dd) { return gardeMeds.filter(function (m) { return canTake(m, dd.y, dd.m, dd.d) && cnt[m.id] < maxOf(m.id) && jweOK2(m.id, dd.y, dd.m, dd.d) && gapOK(m.id, dd.y, dd.m, dd.d); }).length; };
             var sorted = __spreadArray([], rest, true).sort(function (a, b) { return nCand(a) - nCand(b); });
             var unfilled = 0;
             sorted.forEach(function (_a) {
                 var y2 = _a.y, m2 = _a.m, d2 = _a.d;
                 var dk4 = dKey(y2, m2, d2);
                 var c = catOf(y2, m2, d2);
-                var cands = gardeMeds.filter(function (m) { return canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id); });
+                var cands = gardeMeds.filter(function (m) { return canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && jweOK2(m.id, y2, m2, d2) && gapOK(m.id, y2, m2, d2); });
+                if (cands.length === 0)
+                    cands = gardeMeds.filter(function (m) { return canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && gapOK(m.id, y2, m2, d2); }); // dernier recours : accepter jeudi+WE, mais JAMAIS deux jours consécutifs
                 if (cands.length === 0) {
                     unfilled++;
                     return;
@@ -1057,10 +1159,22 @@ function GardeView(_a) {
                 cnt[m.id]++;
                 catCnt[m.id][c]++;
                 lastG[m.id] = ts2;
+                var dwA = dow(y2, m2, d2), wkA = wKey(y2, m2, d2);
+                if (dwA === 4) {
+                    if (!asJeu[m.id])
+                        asJeu[m.id] = {};
+                    asJeu[m.id][wkA] = true;
+                }
+                if (dwA === 6 || dwA === 0) {
+                    if (!asWE[m.id])
+                        asWE[m.id] = {};
+                    asWE[m.id][wkA] = true;
+                }
+                markG(m.id, y2, m2, d2);
             });
             // Score : jours non attribués, écart aux cibles, vœux manqués, gardes rapprochées (<3j)
             var dev = 0;
-            gardeMeds.forEach(function (m) { ["sem", "ven", "sam", "dim"].forEach(function (c) { dev += Math.abs(catCnt[m.id][c] - target[m.id][c]); }); });
+            gardeMeds.forEach(function (m) { GCATS.forEach(function (c) { dev += Math.abs(catCnt[m.id][c] - target[m.id][c]); }); });
             var score = unfilled * 1000 + wishMiss * 50 + dev * 10;
             if (!best || score < best.score)
                 best = { assign: assign, score: score, unfilled: unfilled, cnt: cnt };
@@ -1250,11 +1364,13 @@ function GardeView(_a) {
             // Répartition idéale: count days by type in the 4M period
             var gMeds = medecins.filter(function (m) { return m.garde === true; });
             var nMeds = gMeds.length || 1;
-            var nSem = 0, nVen = 0, nSam = 0, nDim = 0;
+            var nSem = 0, nJeu = 0, nVen = 0, nSam = 0, nDim = 0;
             gvEffDays.forEach(function (_a) {
                 var cy = _a.y, cm = _a.m, cd = _a.d;
                 var dw3 = dow(cy, cm, cd);
-                if (dw3 === 5)
+                if (dw3 === 4)
+                    nJeu++;
+                else if (dw3 === 5)
                     nVen++;
                 else if (dw3 === 6)
                     nSam++;
@@ -1278,10 +1394,20 @@ function GardeView(_a) {
                             React.createElement("th", { style: { textAlign: "center", padding: "4px 8px", fontSize: 10, color: "var(--txt3)", fontWeight: 700 } }, "Total p\u00E9riode"),
                             React.createElement("th", { style: { textAlign: "center", padding: "4px 8px", fontSize: 10, color: "var(--txt3)", fontWeight: 700 } }, "Par m\u00E9decin"))),
                     React.createElement("tbody", null,
+                        React.createElement("tr", { style: { borderBottom: "2px solid var(--border)", background: "var(--bg3)" } },
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 800, color: "var(--txt)" } }, "\uD83C\uDF19 Toutes gardes"),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, nSem + nJeu + nVen + nSam + nDim),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "#f85149" } }, fmt2(nSem + nJeu + nVen + nSam + nDim))),
                         React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
-                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Semaine (lun\u2192jeu)"),
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Semaine (lun\u2192mer)"),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nSem),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nSem))),
+                        React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
+                                "Jeudi ",
+                                React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "(WE prolong\u00E9)")),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nJeu),
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nJeu))),
                         React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
                             React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Vendredi"),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nVen),
@@ -3572,10 +3698,51 @@ function CardioPlanning() {
         }
         return arr;
     }, [year, month, PCFG.len, PCFG.startM]);
-    var openPtModal = function (medId) {
+    var removePTFlex = useCallback(function (medId, monthsList, fromToday) {
+        var tod = new Date();
+        tod.setHours(0, 0, 0, 0);
+        var KEEP = ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE", "FORM", "FORMATION"];
+        var targetIds = medId ? [medId] : medecins.map(function (m) { return m.id; });
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            monthsList.forEach(function (_a) {
+                var ay = _a.y, am = _a.m;
+                var dim = new Date(ay, am + 1, 0).getDate();
+                var _loop_7 = function (d) {
+                    if (fromToday && new Date(ay, am, d) < tod)
+                        return "continue";
+                    ["M", "AM", "JOUR", "N"].forEach(function (sl) {
+                        var k = sk(ay, am, d, sl);
+                        if (!next[k])
+                            return;
+                        var dm = __assign({}, next[k]);
+                        var changed = false;
+                        targetIds.forEach(function (mid) {
+                            var e = dm[mid];
+                            if (!e)
+                                return;
+                            var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
+                            if (!KEEP.includes(a)) {
+                                delete dm[mid];
+                                changed = true;
+                            }
+                        });
+                        if (changed)
+                            next[k] = dm;
+                    });
+                };
+                for (var d = 1; d <= dim; d++) {
+                    _loop_7(d);
+                }
+            });
+            return next;
+        });
+        toast("Affectations retirées (" + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + "). Gardes, absences, formations et tour conservés.", "info");
+    }, [medecins]);
+    var openPtModal = function (medId, mode) {
         setPtMonths(ptPeriodMonths.map(function (_, i) { return i; })); // tous cochés par défaut
         setPtFromToday(true);
-        setPtModal({ medId: medId || null });
+        setPtModal({ medId: medId || null, mode: mode || "apply" });
     };
     var runPtModal = function () {
         var list = ptPeriodMonths.filter(function (_, i) { return ptMonths.includes(i); });
@@ -3583,7 +3750,14 @@ function CardioPlanning() {
             toast("Sélectionnez au moins un mois", "warn");
             return;
         }
-        applyPTFlex(ptModal.medId, list, ptFromToday);
+        if (ptModal.mode === "remove") {
+            if (!window.confirm("Retirer toutes les affectations d'activités sur les mois sélectionnés ?"))
+                return;
+            removePTFlex(ptModal.medId, list, ptFromToday);
+        }
+        else {
+            applyPTFlex(ptModal.medId, list, ptFromToday);
+        }
         setPtModal(null);
     };
     var applyPlanningType = useCallback(function () {
@@ -3911,6 +4085,7 @@ function CardioPlanning() {
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         isEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
+                        isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "var(--bg2)", color: "#dc2626" }), onClick: function () { return openPtModal(null, "remove"); } }, "\uD83E\uDDF9 Retirer"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Semaine type par m\u00E9decin. Le bouton \u25B6 PT l'applique aux mois de la p\u00E9riode affich\u00E9e (choix des mois et du point de d\u00E9part dans la fen\u00EAtre). TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
                 React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit, orient: orient, acteById: acteById, setMData: setMData, setModal: setModal }))),
@@ -4409,7 +4584,7 @@ function CardioPlanning() {
         ptModal && (React.createElement(Ov, { onClose: function () { return setPtModal(null); } },
             React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 430 }), onClick: function (e) { return e.stopPropagation(); } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
-                    React.createElement("div", { style: S.mTit2 }, "\u25B6 Appliquer le planning type"),
+                    React.createElement("div", { style: S.mTit2 }, ptModal.mode === "remove" ? "🧹 Retirer les affectations" : "▶ Appliquer le planning type"),
                     React.createElement("button", { onClick: function () { return setPtModal(null); }, style: S.xBtn }, "\u00D7")),
                 React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 12, fontWeight: 600 } }, ptModal.medId
                     ? ("Pour : " + ((medecins.find(function (m2) { return m2.id === ptModal.medId; }) || {}).prenom || "") + " " + ((medecins.find(function (m2) { return m2.id === ptModal.medId; }) || {}).nom || ""))
@@ -4428,10 +4603,10 @@ function CardioPlanning() {
                     React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", cursor: "pointer" } },
                         React.createElement("input", { type: "radio", name: "ptstart", checked: !ptFromToday, onChange: function () { return setPtFromToday(false); } }),
                         "Depuis le d\u00E9but de la p\u00E9riode")),
-                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 14 } }, "Les absences, gardes et repos de garde existants sont pr\u00E9serv\u00E9s. Les semaines de tour m\u00E9dical sont exclues."),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 14 } }, ptModal.mode === "remove" ? "Retire toutes les activités posées. Gardes, repos de garde, absences, formations et tour médical sont conservés." : "Les absences, gardes et repos de garde existants sont préservés. Les semaines de tour médical sont exclues."),
                 React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
                     React.createElement("button", { onClick: function () { return setPtModal(null); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
-                    React.createElement("button", { onClick: runPtModal, style: __assign(__assign({}, S.btnP), { padding: "9px 18px" }) }, "\u25B6 Appliquer"))))),
+                    React.createElement("button", { onClick: runPtModal, style: __assign(__assign(__assign({}, S.btnP), { padding: "9px 18px" }), (ptModal.mode === "remove" ? { background: "#dc2626" } : {})) }, ptModal.mode === "remove" ? "🧹 Retirer" : "▶ Appliquer"))))),
         modal === "cell" && mData && (function () {
             var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d, slot = mData.slot;
             var med = medecins.find(function (x) { return x.id === medId; });
@@ -4653,7 +4828,7 @@ function CardioPlanning() {
                     // Remove all non-system entries for medId over the period
                     var df = new Date(dateFrom), dt = new Date(dateTo);
                     var cur = new Date(df);
-                    var _loop_7 = function () {
+                    var _loop_8 = function () {
                         var y3 = cur.getFullYear(), m3 = cur.getMonth(), d3 = cur.getDate();
                         var slotsToClr = slots.includes("ALL") || slots.length === 2 ? ["M", "AM", "JOUR"] : slots;
                         slotsToClr.forEach(function (sl) {
@@ -4676,7 +4851,7 @@ function CardioPlanning() {
                         cur.setDate(cur.getDate() + 1);
                     };
                     while (cur <= dt) {
-                        _loop_7();
+                        _loop_8();
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
