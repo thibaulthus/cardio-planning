@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.16 — 13/07/2026";
+var APP_VERSION = "v7.20 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -923,7 +923,7 @@ function ActTabView(_a) {
 }
 /* ════ GARDE VIEW ════ */
 function GardeView(_a) {
-    var year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod;
+    var year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
     var today = new Date();
     // Période globale pour les gardes
     var _b = perStart(year, month), gvSy = _b.sy, gvSm = _b.sm;
@@ -940,6 +940,173 @@ function GardeView(_a) {
         return days;
     }, [gvSm, gvSy, showFull, PCFG.len]);
     var _c = React.useState(null), pickerDay = _c[0], setPickerDay = _c[1];
+    /* ═══ Répartition automatique des gardes ═══ */
+    var _d = React.useState(false), gardeModal = _d[0], setGardeModal = _d[1];
+    var _e = React.useState({}), gMax = _e[0], setGMax = _e[1]; // {medId: maxGardes} optionnel
+    var gardeMeds = medecins.filter(function (m) { return m.garde; });
+    var FACT = { less: 0.75, normal: 1, more: 1.25 };
+    // Tous les jours de la période (complets, indépendants de showFull)
+    var gvAllDays = React.useMemo(function () { return perDaysList(gvSy, gvSm); }, [gvSy, gvSm, PCFG.len]);
+    var catOf = function (y2, m2, d2) { var dw = dow(y2, m2, d2); return dw === 6 ? "sam" : dw === 0 ? "dim" : dw === 5 ? "ven" : "sem"; };
+    var hasGardeAlready = function (y2, m2, d2) {
+        var dw = dow(y2, m2, d2);
+        var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+        var dm = plan[sk(y2, m2, d2, slot)] || {};
+        return Object.keys(dm).some(function (mid) { var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid]; return e && e.acteId === "GARDE"; });
+    };
+    var isAbsFor = function (medId, y2, m2, d2) {
+        var es = __spreadArray([], (getEntry ? [] : []), true);
+        var check = function (sl) { var dm = plan[sk(y2, m2, d2, sl)] || {}; var e = dm[medId]; var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId); return ["ABSENCE", "FORM", "FORMATION"].includes(a); };
+        return check("M") || check("AM") || check("JOUR");
+    };
+    var inTourWeek = function (medId, y2, m2, d2) {
+        var wk = wKey(y2, m2, d2);
+        var wm = (tourMed || {})[wk] || { HC: [], USIC: [] };
+        return __spreadArray(__spreadArray([], (wm.HC || []), true), (wm.USIC || []), true).map(String).includes(String(medId));
+    };
+    var runGardeAuto = function () {
+        var tod = new Date();
+        tod.setHours(0, 0, 0, 0);
+        // Jours à attribuer : période complète, futurs (>= aujourd'hui), sans garde existante
+        var days = gvAllDays.filter(function (_a) {
+            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+            return new Date(y2, m2, d2) >= tod && !hasGardeAlready(y2, m2, d2);
+        });
+        if (days.length === 0) {
+            toast("Aucun jour à attribuer (gardes déjà posées ou période passée)", "info");
+            return;
+        }
+        // Cibles pondérées par catégorie
+        var weights = {};
+        var wSum = 0;
+        gardeMeds.forEach(function (m) { weights[m.id] = FACT[m.gardeFactor || "normal"] || 1; wSum += weights[m.id]; });
+        var catCount = { sem: 0, ven: 0, sam: 0, dim: 0 };
+        days.forEach(function (_a) {
+            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+            catCount[catOf(y2, m2, d2)]++;
+        });
+        var target = {};
+        gardeMeds.forEach(function (m) { target[m.id] = {}; ["sem", "ven", "sam", "dim"].forEach(function (c) { target[m.id][c] = catCount[c] * weights[m.id] / wSum; }); });
+        var maxOf = function (mid) { var v = parseInt(gMax[mid]); return isNaN(v) ? Infinity : v; };
+        var canTake = function (m, y2, m2, d2) {
+            var dw = dow(y2, m2, d2);
+            if ((m.gardeDays || {})[String(dw)] === false)
+                return false;
+            if (isAbsFor(m.id, y2, m2, d2))
+                return false;
+            if (inTourWeek(m.id, y2, m2, d2))
+                return false;
+            var nx = new Date(y2, m2, d2 + 1);
+            if (isAbsFor(m.id, nx.getFullYear(), nx.getMonth(), nx.getDate()))
+                return false; // repos de garde impossible
+            if (((gardeAvoid || {})[dKey(y2, m2, d2)] || {})[m.id])
+                return false;
+            return true;
+        };
+        var N_TRIES_G = 40;
+        var best = null;
+        var _loop_1 = function (t) {
+            var cnt = {}, catCnt = {}, lastG = {};
+            gardeMeds.forEach(function (m) { cnt[m.id] = 0; catCnt[m.id] = { sem: 0, ven: 0, sam: 0, dim: 0 }; });
+            var assign = {}; // dateKey -> medId
+            var wishMiss = 0;
+            // 1. Vœux d'abord
+            days.forEach(function (_a) {
+                var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+                var dk4 = dKey(y2, m2, d2);
+                var wishers = gardeMeds.filter(function (m) { return ((gardeWish || {})[dk4] || {})[m.id] && canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id); });
+                if (wishers.length > 0) {
+                    var m = wishers[Math.floor(Math.random() * wishers.length)];
+                    assign[dk4] = m.id;
+                    cnt[m.id]++;
+                    catCnt[m.id][catOf(y2, m2, d2)]++;
+                    lastG[m.id] = new Date(y2, m2, d2).getTime();
+                }
+                else if (Object.keys((gardeWish || {})[dk4] || {}).length > 0)
+                    wishMiss++;
+            });
+            // 2. Jours les plus contraints d'abord
+            var rest = days.filter(function (_a) {
+                var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+                return !assign[dKey(y2, m2, d2)];
+            });
+            var nCand = function (dd) { return gardeMeds.filter(function (m) { return canTake(m, dd.y, dd.m, dd.d) && cnt[m.id] < maxOf(m.id); }).length; };
+            var sorted = __spreadArray([], rest, true).sort(function (a, b) { return nCand(a) - nCand(b); });
+            var unfilled = 0;
+            sorted.forEach(function (_a) {
+                var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+                var dk4 = dKey(y2, m2, d2);
+                var c = catOf(y2, m2, d2);
+                var cands = gardeMeds.filter(function (m) { return canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id); });
+                if (cands.length === 0) {
+                    unfilled++;
+                    return;
+                }
+                var ts2 = new Date(y2, m2, d2).getTime();
+                cands.sort(function (a, b) {
+                    var defA = (target[a.id][c] - catCnt[a.id][c]), defB = (target[b.id][c] - catCnt[b.id][c]);
+                    if (Math.abs(defB - defA) > 0.01)
+                        return defB - defA;
+                    var gapA = lastG[a.id] ? ts2 - lastG[a.id] : 1e12, gapB = lastG[b.id] ? ts2 - lastG[b.id] : 1e12;
+                    if (gapA !== gapB)
+                        return gapB - gapA;
+                    return Math.random() - 0.5;
+                });
+                var m = cands[0];
+                assign[dk4] = m.id;
+                cnt[m.id]++;
+                catCnt[m.id][c]++;
+                lastG[m.id] = ts2;
+            });
+            // Score : jours non attribués, écart aux cibles, vœux manqués, gardes rapprochées (<3j)
+            var dev = 0;
+            gardeMeds.forEach(function (m) { ["sem", "ven", "sam", "dim"].forEach(function (c) { dev += Math.abs(catCnt[m.id][c] - target[m.id][c]); }); });
+            var score = unfilled * 1000 + wishMiss * 50 + dev * 10;
+            if (!best || score < best.score)
+                best = { assign: assign, score: score, unfilled: unfilled, cnt: cnt };
+            if (best.score === 0)
+                return "break";
+        };
+        for (var t = 0; t < N_TRIES_G; t++) {
+            var state_1 = _loop_1(t);
+            if (state_1 === "break")
+                break;
+        }
+        // Application en un seul setPlan (garde + repos de garde le lendemain)
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            Object.keys(best.assign).forEach(function (dk4) {
+                var _a;
+                var _b = dk4.split("-").map(Number), y2 = _b[0], m2 = _b[1], d2 = _b[2];
+                var my = m2 - 1;
+                var dw = dow(y2, my, d2);
+                var gslot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+                var gk = sk(y2, my, d2, gslot);
+                next[gk] = __assign(__assign({}, (next[gk] || {})), (_a = {}, _a[best.assign[dk4]] = { acteId: "GARDE", salle: null }, _a));
+                var nx = new Date(y2, my, d2 + 1);
+                var ny = nx.getFullYear(), nm = nx.getMonth(), nd = nx.getDate();
+                var rSlots = isWE(ny, nm, nd) ? ["JOUR"] : ["M", "AM"];
+                rSlots.forEach(function (sl) {
+                    var rk = sk(ny, nm, nd, sl);
+                    var dm = __assign({}, (next[rk] || {}));
+                    var ex = dm[best.assign[dk4]];
+                    var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
+                    if (!["ABSENCE", "GARDE"].includes(exA))
+                        dm[best.assign[dk4]] = { acteId: "REPOS_GARDE", salle: null };
+                    next[rk] = dm;
+                });
+            });
+            return next;
+        });
+        var nA = Object.keys(best.assign).length;
+        var msg = "Gardes attribuées: " + nA + "/" + days.length + ".";
+        if (best.unfilled > 0)
+            msg += " ⚠ " + best.unfilled + " jour(s) sans candidat possible.";
+        var tots = gardeMeds.map(function (m) { return m.init + " " + (best.cnt[m.id] || 0); }).join(" · ");
+        msg += " Totaux: " + tots;
+        toast(msg, "info");
+        setGardeModal(false);
+    };
     function getGardeMed2(gvY, gvM, d) {
         var gy2 = gvY || year, gm2 = (gvM !== undefined) ? gvM : month;
         var dw2 = dow(gy2, gm2, d), gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
@@ -1014,8 +1181,39 @@ function GardeView(_a) {
                     MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy),
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
+                isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#f85149" }), onClick: function () { setGMax({}); setGardeModal(true); } }, "\u2699\uFE0F R\u00E9partition auto"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                 React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
+        gardeModal && (React.createElement(Ov, { onClose: function () { return setGardeModal(false); } },
+            React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 460, maxHeight: "85vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } },
+                    React.createElement("div", { style: S.mTit2 }, "\u2699\uFE0F R\u00E9partition automatique des gardes"),
+                    React.createElement("button", { onClick: function () { return setGardeModal(false); }, style: S.xBtn }, "\u00D7")),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } },
+                    "Attribue les jours ",
+                    React.createElement("b", null, "sans garde existante"),
+                    ", \u00E0 partir d'aujourd'hui, sur la p\u00E9riode affich\u00E9e. Respecte : absences/formations, semaines de tour, absence le lendemain (repos de garde), jours autoris\u00E9s et volume de gardes (r\u00E9gl\u00E9s dans l'\u00C9quipe), et les pr\u00E9f\u00E9rences \u2B50/\uD83D\uDEAB pos\u00E9es jour par jour."),
+                React.createElement("table", { style: { borderCollapse: "collapse", width: "100%", marginBottom: 12 } },
+                    React.createElement("thead", null,
+                        React.createElement("tr", null,
+                            React.createElement("th", { style: { textAlign: "left", padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "M\u00E9decin"),
+                            React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Volume"),
+                            React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Max (opt.)"))),
+                    React.createElement("tbody", null, gardeMeds.map(function (m) { return (React.createElement("tr", { key: m.id, style: { borderBottom: "1px solid var(--border2)" } },
+                        React.createElement("td", { style: { padding: "4px 6px", fontSize: 12, color: "var(--txt)", fontWeight: 600 } },
+                            m.init,
+                            " ",
+                            React.createElement("span", { style: { color: "var(--txt3)", fontWeight: 400 } }, m.nom)),
+                        React.createElement("td", { style: { padding: "4px 6px", fontSize: 11, textAlign: "center", color: { less: "#f59e0b", normal: "var(--txt2)", more: "#16a34a" }[m.gardeFactor || "normal"] } }, { less: "Moins", normal: "Moyen", more: "Plus" }[m.gardeFactor || "normal"]),
+                        React.createElement("td", { style: { padding: "4px 6px", textAlign: "center" } },
+                            React.createElement("input", { type: "number", min: 0, placeholder: "\u2014", value: gMax[m.id] !== undefined ? gMax[m.id] : "", onChange: function (e) { return setGMax(function (p) {
+                                    var _a;
+                                    return (__assign(__assign({}, p), (_a = {}, _a[m.id] = e.target.value, _a)));
+                                }); }, style: { width: 52, padding: "3px 5px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, textAlign: "center" } })))); }))),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 12 } }, "Le tableau \"R\u00E9partition id\u00E9ale\" au-dessus de la liste des gardes reste votre r\u00E9f\u00E9rence : laissez Max vide pour une r\u00E9partition purement pond\u00E9r\u00E9e."),
+                React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
+                    React.createElement("button", { onClick: function () { return setGardeModal(false); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
+                    React.createElement("button", { onClick: runGardeAuto, style: __assign(__assign({}, S.btnP), { background: "#f85149", padding: "9px 18px" }) }, "\uD83C\uDF19 Lancer la r\u00E9partition"))))),
         isEdit && (function () {
             // Répartition idéale: count days by type in the 4M period
             var gMeds = medecins.filter(function (m) { return m.garde === true; });
@@ -1655,9 +1853,10 @@ function EditPTModal(_a) {
 function ClearPeriodModal(_a) {
     var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, onApply = _a.onApply, onClose = _a.onClose;
     var _b = useState(initMedId || null), medId = _b[0], setMedId = _b[1];
-    var _c = useState(initDate || ""), dateFrom = _c[0], setDateFrom = _c[1];
-    var _d = useState(initDate || ""), dateTo = _d[0], setDateTo = _d[1];
-    var _e = useState(["M", "AM"]), slots = _e[0], setSlots = _e[1];
+    var _c = useState(true), keepAbs = _c[0], setKeepAbs = _c[1];
+    var _d = useState(initDate || ""), dateFrom = _d[0], setDateFrom = _d[1];
+    var _e = useState(initDate || ""), dateTo = _e[0], setDateTo = _e[1];
+    var _f = useState(["M", "AM"]), slots = _f[0], setSlots = _f[1];
     var med = medecins.find(function (m) { return m.id === medId; });
     return (React.createElement("div", { style: { minWidth: 320 } },
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
@@ -1680,6 +1879,9 @@ function ClearPeriodModal(_a) {
                 React.createElement("input", { type: "date", value: dateTo, onChange: function (e) { return setDateTo(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }))),
         React.createElement("div", { style: { marginBottom: 14 } },
             React.createElement("label", { style: S.fl }, "Demi-journ\u00E9es"),
+            React.createElement("label", { style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--txt)", marginBottom: 10, cursor: "pointer" } },
+                React.createElement("input", { type: "checkbox", checked: keepAbs, onChange: function (e) { return setKeepAbs(e.target.checked); }, style: { width: 14, height: 14 } }),
+                "Conserver les absences et formations (ne retirer que les activit\u00E9s)"),
             React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 4 } }, [["M", "Matin"], ["AM", "Après-midi"], ["ALL", "Journée"]].map(function (_a) {
                 var v = _a[0], l = _a[1];
                 var on = v === "ALL" ? (slots.includes("M") && slots.includes("AM")) : slots.length === 1 && slots[0] === v;
@@ -1688,7 +1890,7 @@ function ClearPeriodModal(_a) {
             }))),
         React.createElement("div", { style: { padding: "8px 10px", background: "#1a0000", borderRadius: 7, marginBottom: 12, fontSize: 11, color: "#ef4444" } }, "\u26A0 Toutes les activit\u00E9s (hors gardes et repos) seront supprim\u00E9es pour ce m\u00E9decin sur la p\u00E9riode."),
         React.createElement("button", { style: __assign(__assign({}, S.btnP), { width: "100%", background: "#ef4444" }), onClick: function () { if (!medId || !dateFrom || !dateTo)
-                return; onApply({ medId: medId, dateFrom: dateFrom, dateTo: dateTo, slots: slots }); } }, "\uD83D\uDDD1 Effacer les activit\u00E9s")));
+                return; onApply({ keepAbs: keepAbs, medId: medId, dateFrom: dateFrom, dateTo: dateTo, slots: slots }); } }, "\uD83D\uDDD1 Effacer les activit\u00E9s")));
 }
 function AbsModal(_a) {
     var medecins = _a.medecins, onApply = _a.onApply, onRemove = _a.onRemove, onClose = _a.onClose, _b = _a.initMedId, initMedId = _b === void 0 ? null : _b, _c = _a.initDate, initDate = _c === void 0 ? null : _c;
@@ -1752,7 +1954,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -1883,9 +2085,11 @@ function TourTab(_a) {
         });
         // Semaines triées : les plus contraintes d'abord (moins de disponibles)
         var weeksByConstraint = __spreadArray([], weeksT, true).sort(function (a, b) { return availCount[a.key] - availCount[b.key]; });
+        var isAvoid = function (medId, wk4) { return !!((tourAvoid || {})[wk4] || {})[medId]; };
         var attempt = function (opts) {
             var useBlocks = opts.useBlocks;
             var relaxedWeeks = [];
+            var avoidViol = [];
             var quota = {};
             tourMeds.forEach(function (m) { quota[m.id] = cfgExcl[m.id] ? 0 : (cfgWeeks[m.id] || 0); });
             var hcCount = {}, usicCount = {};
@@ -1918,6 +2122,8 @@ function TourTab(_a) {
                     if (assignedThisWeek[w1.key].includes(m.id) || assignedThisWeek[w2.key].includes(m.id))
                         continue;
                     if (isBlockedInWeek(m.id, w1.key) || isBlockedInWeek(m.id, w2.key))
+                        continue;
+                    if (isAvoid(m.id, w1.key) || isAvoid(m.id, w2.key))
                         continue;
                     if (assign[w1.key][unit].length >= 2 || assign[w2.key][unit].length >= 2)
                         continue;
@@ -1953,15 +2159,33 @@ function TourTab(_a) {
                         var baseC = tourMeds.filter(function (m) { return quota[m.id] > 0
                             && !assignedThisWeek[w.key].includes(m.id)
                             && !isBlockedInWeek(m.id, w.key); });
-                        var cands = baseC.filter(function (m) { return specOK(w.key, [m.id], idealMins); });
+                        var noAv = baseC.filter(function (m) { return !isAvoid(m.id, w.key); });
+                        var usedAvoid = false;
+                        var cands = noAv.filter(function (m) { return specOK(w.key, [m.id], idealMins); });
                         if (cands.length === 0) {
-                            cands = baseC.filter(function (m) { return specOK(w.key, [m.id], hardMins); });
+                            cands = baseC.filter(function (m) { return specOK(w.key, [m.id], idealMins); });
+                            if (cands.length > 0)
+                                usedAvoid = true;
+                        }
+                        if (cands.length === 0) {
+                            cands = noAv.filter(function (m) { return specOK(w.key, [m.id], hardMins); });
                             if (cands.length > 0 && !relaxedWeeks.includes(w.label))
                                 relaxedWeeks.push(w.label);
+                        }
+                        if (cands.length === 0) {
+                            cands = baseC.filter(function (m) { return specOK(w.key, [m.id], hardMins); });
+                            if (cands.length > 0) {
+                                usedAvoid = true;
+                                if (!relaxedWeeks.includes(w.label))
+                                    relaxedWeeks.push(w.label);
+                            }
                         }
                         if (cands.length === 0)
                             break;
                         cands.sort(function (a, b) {
+                            var wA = ((tourWish || {})[w.key] || {})[a.id] ? 0 : 1, wB = ((tourWish || {})[w.key] || {})[b.id] ? 0 : 1;
+                            if (wA !== wB)
+                                return wA - wB;
                             if (quota[b.id] !== quota[a.id])
                                 return quota[b.id] - quota[a.id];
                             // Surspécialistes d'abord : consommer leur quota tant que la semaine a de la marge
@@ -1976,6 +2200,8 @@ function TourTab(_a) {
                             return Math.random() - 0.5;
                         });
                         var m = cands[0];
+                        if (usedAvoid && isAvoid(m.id, w.key))
+                            avoidViol.push(m.init + " (" + w.label + ")");
                         assign[w.key][unit].push(m.id);
                         assignedThisWeek[w.key].push(m.id);
                         if (unit === "HC")
@@ -1990,8 +2216,8 @@ function TourTab(_a) {
             var unfilled = weeksT.filter(function (w) { return assign[w.key].HC.length < 2 || assign[w.key].USIC.length < 2; }).length;
             var leftoverTotal = tourMeds.reduce(function (s, m) { return s + (quota[m.id] || 0); }, 0);
             var imbalance = tourMeds.reduce(function (s, m) { return s + Math.abs(hcCount[m.id] - usicCount[m.id]); }, 0);
-            var score = unfilled * 1000 + relaxedWeeks.length * 100 + leftoverTotal * 10 + imbalance;
-            return { assign: assign, quota: quota, unfilled: unfilled, score: score, hcCount: hcCount, usicCount: usicCount, assignedThisWeek: assignedThisWeek, specOK: specOK, relaxedWeeks: relaxedWeeks };
+            var score = unfilled * 1000 + relaxedWeeks.length * 100 + avoidViol.length * 40 + leftoverTotal * 10 + imbalance;
+            return { assign: assign, quota: quota, unfilled: unfilled, score: score, hcCount: hcCount, usicCount: usicCount, assignedThisWeek: assignedThisWeek, specOK: specOK, relaxedWeeks: relaxedWeeks, avoidViol: avoidViol };
         };
         // ═══ Paliers de relaxation progressive ═══
         var idealMins = { coro: cfgMinCoro, pace: cfgMinPace, eep: cfgMinEEP, ett: cfgMinETT };
@@ -2019,7 +2245,7 @@ function TourTab(_a) {
                                 && !assignedThisWeek[w.key].includes(c.id)
                                 && !isBlockedInWeek(c.id, w.key); });
                             var repaired = false;
-                            var _loop_1 = function (c) {
+                            var _loop_2 = function (c) {
                                 if (repaired)
                                     return "break";
                                 for (var _a = 0, weeksT_1 = weeksT; _a < weeksT_1.length; _a++) {
@@ -2032,7 +2258,7 @@ function TourTab(_a) {
                                         var unit2 = _c[_b];
                                         if (repaired)
                                             break;
-                                        var _loop_2 = function (m2id) {
+                                        var _loop_3 = function (m2id) {
                                             if (assignedThisWeek[w.key].includes(m2id))
                                                 return "continue";
                                             if (isBlockedInWeek(m2id, w.key))
@@ -2084,8 +2310,8 @@ function TourTab(_a) {
                                         };
                                         for (var _d = 0, _e = __spreadArray([], assign[w2.key][unit2], true); _d < _e.length; _d++) {
                                             var m2id = _e[_d];
-                                            var state_2 = _loop_2(m2id);
-                                            if (state_2 === "break")
+                                            var state_3 = _loop_3(m2id);
+                                            if (state_3 === "break")
                                                 break;
                                         }
                                     }
@@ -2093,8 +2319,8 @@ function TourTab(_a) {
                             };
                             for (var _i = 0, stuck_1 = stuck; _i < stuck_1.length; _i++) {
                                 var c = stuck_1[_i];
-                                var state_1 = _loop_1(c);
-                                if (state_1 === "break")
+                                var state_2 = _loop_2(c);
+                                if (state_2 === "break")
                                     break;
                             }
                             if (!repaired)
@@ -2155,6 +2381,8 @@ function TourTab(_a) {
             msg += " ⚠ Semaines passées au minimum: " + best.relaxedWeeks.join(", ") + ".";
         else
             msg += " Idéal de surspécialités respecté chaque semaine.";
+        if (best.avoidViol && best.avoidViol.length > 0)
+            msg += " ⚠ Préférences \"pas de tour\" non respectées: " + best.avoidViol.join(", ") + ".";
         if (lowCoroW.length > 0)
             msg += " (Moins de " + cfgMinCoro + " coro dispo: " + lowCoroW.join(", ") + ")";
         if (leftover.length > 0)
@@ -2251,6 +2479,8 @@ function TourTab(_a) {
                         var blocked = isBlockedInWeek(m.id, w.key);
                         var inOther = (wm[unit === "HC" ? "USIC" : "HC"] || []).includes(m.id);
                         var dis = blocked || inOther;
+                        var avoidW = !!((tourAvoid || {})[w.key] || {})[m.id];
+                        var wishW = !!((tourWish || {})[w.key] || {})[m.id];
                         return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "3px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 44,
                                 background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", opacity: dis ? .3 : 1,
                                 outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#a3e635", ett: "#46bdc6" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () { if (dis || !isEdit)
@@ -2265,7 +2495,9 @@ function TourTab(_a) {
                                 cur[unit] = on ? l.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], l, true), [m.id], false);
                                 return __assign(__assign({}, p), (_a = {}, _a[w.key] = cur, _a));
                             }); } },
-                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10 } }, m.init),
+                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10 }, title: avoidW ? "Préfère ne pas tourner cette semaine" : wishW ? "Souhaite tourner cette semaine" : "" },
+                                m.init,
+                                avoidW ? " 🚫" : wishW ? " ⭐" : ""),
                             React.createElement("div", { style: { fontSize: 8, color: blocked ? "inherit" : m.surSpec && !on ? ({ coro: "#76a5af", pace: "#e3b341", eep: "#a3e635", ett: "#46bdc6" }[m.surSpec]) : "inherit" } }, blocked ? "indispo" : inOther ? "≠" : "")));
                     })),
                     React.createElement("div", { style: { marginTop: 4, display: "flex", alignItems: "center", gap: 8 } },
@@ -2580,14 +2812,18 @@ function CardioPlanning() {
     var _0 = useState({ coro: 3, pace: 1, eep: 1, ett: 1 }), tourMins = _0[0], setTourMins = _0[1];
     var _1 = useState({ coro: 2, pace: 1, eep: 1, ett: 0 }), tourMinsHard = _1[0], setTourMinsHard = _1[1];
     var _2 = useState({}), tourCfg = _2[0], setTourCfg = _2[1];
-    var _3 = useState({ len: 4, startM: 6 }), periodCfg = _3[0], setPeriodCfg = _3[1];
+    var _3 = useState({}), tourAvoid = _3[0], setTourAvoid = _3[1]; // {weekKey:{medId:true}} préférences "ne pas tourner"
+    var _4 = useState({}), tourWish = _4[0], setTourWish = _4[1]; // {weekKey:{medId:true}} souhaite tourner
+    var _5 = useState({}), gardeAvoid = _5[0], setGardeAvoid = _5[1]; // {dateKey:{medId:true}} préfère pas de garde ce jour
+    var _6 = useState({}), gardeWish = _6[0], setGardeWish = _6[1]; // {dateKey:{medId:true}} souhaite la garde ce jour
+    var _7 = useState({ len: 4, startM: 6 }), periodCfg = _7[0], setPeriodCfg = _7[1];
     PCFG.len = periodCfg.len;
     PCFG.startM = periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
-    var _4 = useState({}), astreinte = _4[0], setAstreinte = _4[1]; // {wKey: medId}
-    var _5 = useState(null), astDayModal = _5[0], setAstDayModal = _5[1]; // legacy
-    var _6 = useState(null), astPickModal = _6[0], setAstPickModal = _6[1]; // {dayKey,wKey,isWeek,label}
-    var _7 = useState(""), astSearch = _7[0], setAstSearch = _7[1];
-    var _8 = useState(false), ast4M = _8[0], setAst4M = _8[1];
+    var _8 = useState({}), astreinte = _8[0], setAstreinte = _8[1]; // {wKey: medId}
+    var _9 = useState(null), astDayModal = _9[0], setAstDayModal = _9[1]; // legacy
+    var _10 = useState(null), astPickModal = _10[0], setAstPickModal = _10[1]; // {dayKey,wKey,isWeek,label}
+    var _11 = useState(""), astSearch = _11[0], setAstSearch = _11[1];
+    var _12 = useState(false), ast4M = _12[0], setAst4M = _12[1];
     // Get astreinte medId for a given day
     var getAstreinteForDay = React.useCallback(function (y, m, d) {
         var dayKey = y + "-" + m + "-" + d;
@@ -2603,19 +2839,19 @@ function CardioPlanning() {
         return (v !== undefined && v !== null) ? String(v) : null;
     }, [astreinte]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
-    var _9 = useState(function () { return new Date().getFullYear(); }), astYear = _9[0], setAstYear = _9[1];
-    var _10 = useState(function () { return new Date().getMonth(); }), astMonth = _10[0], setAstMonth = _10[1];
-    var _11 = useState(function () { return new Date().getFullYear(); }), tourYear = _11[0], setTourYear = _11[1];
-    var _12 = useState(function () { return new Date().getMonth(); }), tourMonth = _12[0], setTourMonth = _12[1];
-    var _13 = useState("connecting"), fbStatus = _13[0], setFbStatus = _13[1];
-    var _14 = useState(function () { try {
+    var _13 = useState(function () { return new Date().getFullYear(); }), astYear = _13[0], setAstYear = _13[1];
+    var _14 = useState(function () { return new Date().getMonth(); }), astMonth = _14[0], setAstMonth = _14[1];
+    var _15 = useState(function () { return new Date().getFullYear(); }), tourYear = _15[0], setTourYear = _15[1];
+    var _16 = useState(function () { return new Date().getMonth(); }), tourMonth = _16[0], setTourMonth = _16[1];
+    var _17 = useState("connecting"), fbStatus = _17[0], setFbStatus = _17[1];
+    var _18 = useState(function () { try {
         return localStorage.getItem("cp6_vaczone") || "B";
     }
     catch (_a) {
         return "B";
-    } }), vacZone = _14[0], setVacZone = _14[1];
-    var _15 = useState(new Set()), vacDates = _15[0], setVacDates = _15[1]; // Set of "YYYY-MM-DD" strings
-    var _16 = useState(null), vacSource = _16[0], setVacSource = _16[1]; // provenance des données vacances
+    } }), vacZone = _18[0], setVacZone = _18[1];
+    var _19 = useState(new Set()), vacDates = _19[0], setVacDates = _19[1]; // Set of "YYYY-MM-DD" strings
+    var _20 = useState(null), vacSource = _20[0], setVacSource = _20[1]; // provenance des données vacances
     // Vacances scolaires : fichier iCal officiel du ministère (l'ancienne API records a été retirée)
     // + calendrier officiel 2025-2027 embarqué en secours (arrêté du 22/10/2025, JO 23/10/2025)
     var VAC_FALLBACK = {
@@ -2735,6 +2971,14 @@ function CardioPlanning() {
                         setTourMinsHard(JSON.parse(data.tourMinsHard));
                     if (data.tourCfg)
                         setTourCfg(JSON.parse(data.tourCfg));
+                    if (data.tourAvoid)
+                        setTourAvoid(JSON.parse(data.tourAvoid));
+                    if (data.tourWish)
+                        setTourWish(JSON.parse(data.tourWish));
+                    if (data.gardeAvoid)
+                        setGardeAvoid(JSON.parse(data.gardeAvoid));
+                    if (data.gardeWish)
+                        setGardeWish(JSON.parse(data.gardeWish));
                     if (data.periodCfg)
                         setPeriodCfg(JSON.parse(data.periodCfg));
                     if (data.medPins)
@@ -2749,6 +2993,138 @@ function CardioPlanning() {
             setFbStatus("ok");
         }, function (err) { console.error("Firebase:", err); setFbStatus("error"); });
         return function () { return unsub(); };
+    }, []);
+    /* ── Sauvegardes automatiques (72h, 10 conservées) ── */
+    var _21 = useState([]), backupList = _21[0], setBackupList = _21[1]; // [{id,ts}]
+    var refreshBackupList = useCallback(function () { return __awaiter(_this, void 0, void 0, function () {
+        var snap, items_1, e_1;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    _a.trys.push([0, 2, , 3]);
+                    return [4 /*yield*/, window.firebaseDB.collection("backups").get()];
+                case 1:
+                    snap = _a.sent();
+                    items_1 = [];
+                    snap.forEach(function (d) { return items_1.push({ id: d.id, ts: (d.data() || {})._ts || 0 }); });
+                    items_1.sort(function (a, b) { return b.ts - a.ts; });
+                    setBackupList(items_1);
+                    return [2 /*return*/, items_1];
+                case 2:
+                    e_1 = _a.sent();
+                    console.log("backup list:", e_1);
+                    return [2 /*return*/, []];
+                case 3: return [2 /*return*/];
+            }
+        });
+    }); }, []);
+    var makeBackup = useCallback(function (manual) { return __awaiter(_this, void 0, void 0, function () {
+        var cur, ts, payload, items, _i, _a, it, e_2;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    _b.trys.push([0, 10, , 11]);
+                    return [4 /*yield*/, window.firebaseDB.collection("planning").doc("main").get()];
+                case 1:
+                    cur = (_b.sent()).data() || {};
+                    ts = Date.now();
+                    payload = __assign(__assign({}, cur), { _ts: ts });
+                    return [4 /*yield*/, window.firebaseDB.collection("backups").doc("b" + ts).set(payload)];
+                case 2:
+                    _b.sent();
+                    return [4 /*yield*/, window.firebaseDB.collection("planning").doc("main").set({ _lastBackupAt: ts }, { merge: true })];
+                case 3:
+                    _b.sent();
+                    return [4 /*yield*/, refreshBackupList()];
+                case 4:
+                    items = _b.sent();
+                    _i = 0, _a = items.slice(10);
+                    _b.label = 5;
+                case 5:
+                    if (!(_i < _a.length)) return [3 /*break*/, 8];
+                    it = _a[_i];
+                    return [4 /*yield*/, window.firebaseDB.collection("backups").doc(it.id).delete()];
+                case 6:
+                    _b.sent();
+                    _b.label = 7;
+                case 7:
+                    _i++;
+                    return [3 /*break*/, 5];
+                case 8: return [4 /*yield*/, refreshBackupList()];
+                case 9:
+                    _b.sent();
+                    if (manual)
+                        toast("Sauvegarde créée", "info");
+                    return [2 /*return*/, true];
+                case 10:
+                    e_2 = _b.sent();
+                    console.log("backup:", e_2);
+                    if (manual)
+                        toast("Échec de la sauvegarde", "warn");
+                    return [2 /*return*/, false];
+                case 11: return [2 /*return*/];
+            }
+        });
+    }); }, [refreshBackupList]);
+    var restoreBackup = useCallback(function (id) { return __awaiter(_this, void 0, void 0, function () {
+        var d, data, _ts, rest, e_3;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    _a.trys.push([0, 3, , 4]);
+                    return [4 /*yield*/, window.firebaseDB.collection("backups").doc(id).get()];
+                case 1:
+                    d = _a.sent();
+                    data = d.data();
+                    if (!data) {
+                        toast("Sauvegarde introuvable", "warn");
+                        return [2 /*return*/];
+                    }
+                    _ts = data._ts, rest = __rest(data, ["_ts"]);
+                    return [4 /*yield*/, window.firebaseDB.collection("planning").doc("main").set(rest, { merge: true })];
+                case 2:
+                    _a.sent();
+                    toast("Sauvegarde restaurée — rechargez la page si besoin", "info");
+                    return [3 /*break*/, 4];
+                case 3:
+                    e_3 = _a.sent();
+                    console.log("restore:", e_3);
+                    toast("Échec de la restauration", "warn");
+                    return [3 /*break*/, 4];
+                case 4: return [2 /*return*/];
+            }
+        });
+    }); }, []);
+    useEffect(function () {
+        // Au chargement : backup auto si la dernière date de plus de 72 h
+        var t = setTimeout(function () { return __awaiter(_this, void 0, void 0, function () {
+            var d, last, e_4;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        _a.trys.push([0, 5, , 6]);
+                        return [4 /*yield*/, window.firebaseDB.collection("planning").doc("main").get()];
+                    case 1:
+                        d = _a.sent();
+                        last = (d.data() || {})._lastBackupAt || 0;
+                        if (!(Date.now() - last > 72 * 3600 * 1000)) return [3 /*break*/, 3];
+                        return [4 /*yield*/, makeBackup(false)];
+                    case 2:
+                        _a.sent();
+                        return [3 /*break*/, 4];
+                    case 3:
+                        refreshBackupList();
+                        _a.label = 4;
+                    case 4: return [3 /*break*/, 6];
+                    case 5:
+                        e_4 = _a.sent();
+                        console.log("backup check:", e_4);
+                        return [3 /*break*/, 6];
+                    case 6: return [2 /*return*/];
+                }
+            });
+        }); }, 6000);
+        return function () { return clearTimeout(t); };
     }, []);
     var saveToFirebase = useCallback(function (data) { return __awaiter(_this, void 0, void 0, function () {
         var err_1;
@@ -2785,6 +3161,14 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourCfg: JSON.stringify(tourCfg) }); }, [tourCfg]);
     useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ tourAvoid: JSON.stringify(tourAvoid) }); }, [tourAvoid]);
+    useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ tourWish: JSON.stringify(tourWish) }); }, [tourWish]);
+    useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ gardeAvoid: JSON.stringify(gardeAvoid) }); }, [gardeAvoid]);
+    useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ gardeWish: JSON.stringify(gardeWish) }); }, [gardeWish]);
+    useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ planningType: JSON.stringify(planningType) }); }, [planningType]);
@@ -2810,7 +3194,7 @@ function CardioPlanning() {
     var isEdit = accessMode === "edit";
     // ─── Undo/Redo history (edit mode) ───
     var histRef = useRef({ stack: [], idx: -1, restoring: false });
-    var _17 = useState(0), histVer = _17[0], setHistVer = _17[1];
+    var _22 = useState(0), histVer = _22[0], setHistVer = _22[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
     useEffect(function () {
         if (isFirstLoad.current)
@@ -3025,7 +3409,7 @@ function CardioPlanning() {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
             while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_3 = function (d) {
+                var _loop_4 = function (d) {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
@@ -3038,7 +3422,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_3(d);
+                    _loop_4(d);
                 }
                 if (cm === 11) {
                     cy++;
@@ -3059,7 +3443,7 @@ function CardioPlanning() {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
             while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_4 = function (d) {
+                var _loop_5 = function (d) {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
@@ -3078,7 +3462,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_4(d);
+                    _loop_5(d);
                 }
                 if (cm === 11) {
                     cy++;
@@ -3103,7 +3487,7 @@ function CardioPlanning() {
             monthsList.forEach(function (_a) {
                 var ay = _a.y, am = _a.m;
                 var dim = new Date(ay, am + 1, 0).getDate();
-                var _loop_5 = function (d) {
+                var _loop_6 = function (d) {
                     if (isWE(ay, am, d))
                         return "continue";
                     if (fromToday && new Date(ay, am, d) < tod)
@@ -3134,7 +3518,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dim; d++) {
-                    _loop_5(d);
+                    _loop_6(d);
                 }
             });
             return next;
@@ -3143,9 +3527,9 @@ function CardioPlanning() {
         toast("Planning type appliqué (" + medLbl + ", " + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")", "info");
     }, [medecins, planningType, tourMed]);
     /* ── Modale d'application du PT ── */
-    var _18 = React.useState(null), ptModal = _18[0], setPtModal = _18[1]; // null | {medId:null|number}
-    var _19 = React.useState([]), ptMonths = _19[0], setPtMonths = _19[1]; // indices cochés
-    var _20 = React.useState(true), ptFromToday = _20[0], setPtFromToday = _20[1];
+    var _23 = React.useState(null), ptModal = _23[0], setPtModal = _23[1]; // null | {medId:null|number}
+    var _24 = React.useState([]), ptMonths = _24[0], setPtMonths = _24[1]; // indices cochés
+    var _25 = React.useState(true), ptFromToday = _25[0], setPtFromToday = _25[1];
     var ptPeriodMonths = React.useMemo(function () {
         var p = perStart(year, month);
         var arr = [];
@@ -3445,7 +3829,7 @@ function CardioPlanning() {
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
@@ -3484,7 +3868,7 @@ function CardioPlanning() {
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "garde" && React.createElement(GardeView, { year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, getEntry: getEntry, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
+            tab === "garde" && React.createElement(GardeView, { year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, getEntry: getEntry, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast }),
             tab === "bip" && React.createElement(BipTab, { year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, allDays: allDays, isEdit: isEdit, actes: actes, getEntries: getEntries, salleOcc: salleOcc, addEntry: addEntry, removeEntry: removeEntry, isMedAvailable: isMedAvailable, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull }),
             tab === "plantype" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
@@ -3868,6 +4252,16 @@ function CardioPlanning() {
                                 vacSource))),
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde des donn\u00E9es"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "T\u00E9l\u00E9chargez une copie de toutes vos donn\u00E9es. En cas de probl\u00E8me, importez ce fichier pour tout restaurer."),
+                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } }, "\uD83D\uDD50 Sauvegardes automatiques (toutes les 72 h, 10 conserv\u00E9es)"),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "Restaurer \u00E9crase les donn\u00E9es actuelles par celles de la sauvegarde choisie."),
+                        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 } },
+                            backupList.length === 0 && React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune sauvegarde pour l'instant."),
+                            backupList.map(function (b) { return (React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--txt)" } },
+                                React.createElement("span", { style: { flex: 1 } }, new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })),
+                                React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(b.ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?"))
+                                        restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
+                        React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
                         React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#e3b341", color: "#111" }), onClick: function () {
                                 var data = { plan: plan, tourMed: tourMed, planningType: planningType, notes: notes, medecins: medecins, actes: actes, editPin: editPin, exportDate: new Date().toISOString(), version: "v6" };
@@ -3929,6 +4323,56 @@ function CardioPlanning() {
                             fbStatus === "error" ? "Erreur de connexion — vérifiez votre réseau" :
                                 fbStatus === "offline" ? "Mode local — sans sauvegarde automatique" :
                                     "Connexion en cours...")))))),
+        modal === "prefs" && mData && (function () {
+            var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d;
+            var med = medecins.find(function (mm) { return mm.id === medId; });
+            var wk3 = wKey(y2, m2, d2);
+            var dk3 = dKey(y2, m2, d2);
+            var tgl = function (setter, key) { return setter(function (p) { var n = __assign({}, p); var o = __assign({}, (n[key] || {})); if (o[medId])
+                delete o[medId];
+            else
+                o[medId] = true; if (Object.keys(o).length === 0)
+                delete n[key];
+            else
+                n[key] = o; return n; }); };
+            var rowStyle = function (active, color) { return ({ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 10px", borderRadius: 8, marginBottom: 6, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                border: "1px solid " + (active ? color : "var(--border)"), background: active ? color + "22" : "var(--bg2)", color: active ? color : "var(--txt)" }); };
+            return (React.createElement(Ov, { onClose: function () { return setModal("cell"); } },
+                React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 420 }), onClick: function (e) { return e.stopPropagation(); } },
+                    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
+                        React.createElement("div", { style: S.mTit2 },
+                            "\u2699\uFE0F Pr\u00E9f\u00E9rences \u2014 ",
+                            med ? med.prenom + " " + med.nom : ""),
+                        React.createElement("button", { onClick: function () { return setModal("cell"); }, style: S.xBtn }, "\u00D7")),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } },
+                        "Semaine du ",
+                        wk3.split("-")[2],
+                        " / jour du ",
+                        d2,
+                        " ",
+                        MOIS[m2],
+                        ". Ce sont des pr\u00E9f\u00E9rences : l'algorithme les respecte quand c'est possible, elles ne bloquent jamais une pose manuelle."),
+                    med && med.tourMed && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 4 } }, "Tour m\u00E9dical (semaine enti\u00E8re)"),
+                    med && med.tourMed && React.createElement("div", { style: rowStyle(!!((tourAvoid[wk3] || {})[medId]), "#7c3aed"), onClick: function () { tgl(setTourAvoid, wk3); if ((tourWish[wk3] || {})[medId])
+                            tgl(setTourWish, wk3); } },
+                        React.createElement("span", null, "\uD83D\uDEAB Pr\u00E9f\u00E8re ne pas tourner cette semaine"),
+                        React.createElement("span", null, (tourAvoid[wk3] || {})[medId] ? "✓" : "")),
+                    med && med.tourMed && React.createElement("div", { style: rowStyle(!!((tourWish[wk3] || {})[medId]), "#16a34a"), onClick: function () { tgl(setTourWish, wk3); if ((tourAvoid[wk3] || {})[medId])
+                            tgl(setTourAvoid, wk3); } },
+                        React.createElement("span", null, "\u2B50 Souhaite tourner cette semaine"),
+                        React.createElement("span", null, (tourWish[wk3] || {})[medId] ? "✓" : "")),
+                    med && med.garde && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", margin: "10px 0 4px" } }, "Garde (ce jour pr\u00E9cis)"),
+                    med && med.garde && React.createElement("div", { style: rowStyle(!!((gardeAvoid[dk3] || {})[medId]), "#dc2626"), onClick: function () { tgl(setGardeAvoid, dk3); if ((gardeWish[dk3] || {})[medId])
+                            tgl(setGardeWish, dk3); } },
+                        React.createElement("span", null, "\uD83D\uDEAB Pr\u00E9f\u00E8re ne pas \u00EAtre de garde ce jour"),
+                        React.createElement("span", null, (gardeAvoid[dk3] || {})[medId] ? "✓" : "")),
+                    med && med.garde && React.createElement("div", { style: rowStyle(!!((gardeWish[dk3] || {})[medId]), "#16a34a"), onClick: function () { tgl(setGardeWish, dk3); if ((gardeAvoid[dk3] || {})[medId])
+                            tgl(setGardeAvoid, dk3); } },
+                        React.createElement("span", null, "\u2B50 Souhaite \u00EAtre de garde ce jour"),
+                        React.createElement("span", null, (gardeWish[dk3] || {})[medId] ? "✓" : "")),
+                    React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 10 } },
+                        React.createElement("button", { onClick: function () { return setModal("cell"); }, style: __assign(__assign({}, S.btnP), { padding: "8px 16px" }) }, "OK")))));
+        })(),
         ptModal && (React.createElement(Ov, { onClose: function () { return setPtModal(null); } },
             React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 430 }), onClick: function (e) { return e.stopPropagation(); } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
@@ -3950,7 +4394,7 @@ function CardioPlanning() {
                         "\u00C0 partir d'aujourd'hui"),
                     React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", cursor: "pointer" } },
                         React.createElement("input", { type: "radio", name: "ptstart", checked: !ptFromToday, onChange: function () { return setPtFromToday(false); } }),
-                        "Depuis le d\u00E9but des mois coch\u00E9s")),
+                        "Depuis le d\u00E9but de la p\u00E9riode")),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 14 } }, "Les absences, gardes et repos de garde existants sont pr\u00E9serv\u00E9s. Les semaines de tour m\u00E9dical sont exclues."),
                 React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
                     React.createElement("button", { onClick: function () { return setPtModal(null); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
@@ -4044,6 +4488,7 @@ function CardioPlanning() {
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setModal(null); openPtModal(medId); } },
                         "\u25B6 PT ",
                         med && med.init),
+                    canEditThisMed && med && (med.tourMed || med.garde) && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#7c3aed", background: "#f3e8ff", color: "#6d28d9" }), onClick: function () { setModal("prefs"); } }, "\u2699\uFE0F Pr\u00E9f\u00E9rences tour & garde\u2026"),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { return clearPlanningType(medId); } },
                         "\uD83D\uDDD1 Effacer mois ",
                         med && med.nom),
@@ -4170,11 +4615,12 @@ function CardioPlanning() {
             React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", padding: "8px 10px", background: "var(--bg)", borderRadius: 7 } }, "\uD83D\uDCA1 Le m\u00E9decin entre son PIN sur l'\u00E9cran de connexion \u2192 acc\u00E8s en \u00E9dition restreinte \u00E0 sa colonne uniquement."))),
         modal === "clearPeriod" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(ClearPeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), onApply: function (_a) {
-                    var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, slots = _a.slots, _b = _a.absType, absType = _b === void 0 ? "ABSENCE" : _b;
+                    var keepAbs = _a.keepAbs, medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, slots = _a.slots, _b = _a.absType, absType = _b === void 0 ? "ABSENCE" : _b;
+                    var KEEP = keepAbs ? ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE", "FORM", "FORMATION"] : SYS.filter(function (x) { return x !== "ABSENCE"; });
                     // Remove all non-system entries for medId over the period
                     var df = new Date(dateFrom), dt = new Date(dateTo);
                     var cur = new Date(df);
-                    var _loop_6 = function () {
+                    var _loop_7 = function () {
                         var y3 = cur.getFullYear(), m3 = cur.getMonth(), d3 = cur.getDate();
                         var slotsToClr = slots.includes("ALL") || slots.length === 2 ? ["M", "AM", "JOUR"] : slots;
                         slotsToClr.forEach(function (sl) {
@@ -4185,7 +4631,7 @@ function CardioPlanning() {
                                 if (dm[medId]) {
                                     var ex = dm[medId];
                                     var entries = Array.isArray(ex) ? ex : [ex];
-                                    var kept = entries.filter(function (e) { return SYS.includes(e.acteId) && e.acteId !== "ABSENCE"; });
+                                    var kept = entries.filter(function (e) { return KEEP.includes(e.acteId); });
                                     if (kept.length === 0)
                                         delete dm[medId];
                                     else
@@ -4197,7 +4643,7 @@ function CardioPlanning() {
                         cur.setDate(cur.getDate() + 1);
                     };
                     while (cur <= dt) {
-                        _loop_6();
+                        _loop_7();
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
@@ -4295,7 +4741,25 @@ function CardioPlanning() {
                             "HC"),
                         React.createElement("label", { style: { display: "flex", gap: 5, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
                             React.createElement("input", { type: "checkbox", checked: !!mData.pref2USIC, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { pref2USIC: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
-                            "USIC"))),
+                            "USIC")),
+                    mData.garde && React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" } },
+                        React.createElement("span", { style: { fontSize: 13, color: "var(--txt2)" } }, "Volume de gardes :"),
+                        React.createElement("select", { value: mData.gardeFactor || "normal", onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { gardeFactor: e.target.value })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } },
+                            React.createElement("option", { value: "less" }, "Moins de gardes"),
+                            React.createElement("option", { value: "normal" }, "Gardes moyennes"),
+                            React.createElement("option", { value: "more" }, "Plus de gardes"))),
+                    mData.garde && React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" } },
+                        React.createElement("span", { style: { fontSize: 13, color: "var(--txt2)" } }, "Jours de garde possibles :"),
+                        [["1", "Lun"], ["2", "Mar"], ["3", "Mer"], ["4", "Jeu"], ["5", "Ven"], ["6", "Sam"], ["0", "Dim"]].map(function (_a) {
+                            var dk = _a[0], lb = _a[1];
+                            return (React.createElement("label", { key: dk, style: { display: "flex", gap: 3, alignItems: "center", color: "var(--txt2)", fontSize: 12, cursor: "pointer" } },
+                                React.createElement("input", { type: "checkbox", checked: (mData.gardeDays || {})[dk] !== false, onChange: function (e) { return setMData(function (p) {
+                                        var _a;
+                                        return (__assign(__assign({}, p), { gardeDays: __assign(__assign({}, (p.gardeDays || {})), (_a = {}, _a[dk] = e.target.checked, _a)) }));
+                                    }); }, style: { width: 13, height: 13 } }),
+                                lb));
+                        })),
+                    "}"),
                 mData.role === "attache" && React.createElement("div", { style: { gridColumn: "1/-1", display: "flex", gap: 16, flexWrap: "wrap" } },
                     React.createElement("label", { style: { display: "flex", gap: 6, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
                         React.createElement("input", { type: "checkbox", checked: !!mData.astreinte, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { astreinte: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
