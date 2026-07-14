@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.26 — 14/07/2026";
+var APP_VERSION = "v8.0 — 14/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2801,9 +2801,10 @@ function StatsTab(_a) {
     // Activities to track (exclude system ones)
     var trackActes = actes.filter(function (a) { return !a.isSystem && a.id !== "ABSENCE" && a.id !== "REPOS_GARDE"; }).sort(function (a, b) { return a.label.localeCompare(b.label); });
     var GARDE_ACTE = { id: "GARDE", label: "Garde", short: "G", color: "#93c47d" };
-    var GARDE_SEM = { id: "GARDE_SEM", label: "Garde semaine", short: "G sem", color: "#93c47d" };
+    var GARDE_SEM = { id: "GARDE_SEM", label: "Garde semaine (lun→mer)", short: "G sem", color: "#93c47d" };
+    var GARDE_JEU = { id: "GARDE_JEU", label: "Garde jeudi", short: "G jeu", color: "#6aa84f" };
     var GARDE_WE = { id: "GARDE_WE", label: "Garde week-end", short: "G WE", color: "#f59e0b" };
-    var allTrack = __spreadArray([GARDE_ACTE, GARDE_SEM, GARDE_WE], trackActes, true);
+    var allTrack = __spreadArray([GARDE_ACTE, GARDE_SEM, GARDE_JEU, GARDE_WE], trackActes, true);
     // Count per med per acte
     var allStatMeds = medecins.filter(function (m) { return m.role === "medecin"; });
     var _e = React.useState([]), medFilter = _e[0], setMedFilter = _e[1];
@@ -2831,7 +2832,7 @@ function StatsTab(_a) {
                     if (entry.acteId === "GARDE") {
                         var dw4 = new Date(y2, m2, d).getDay();
                         var isWEg = dw4 === 5 || dw4 === 6 || dw4 === 0;
-                        var gk = isWEg ? "GARDE_WE" : "GARDE_SEM";
+                        var gk = dw4 === 4 ? "GARDE_JEU" : isWEg ? "GARDE_WE" : "GARDE_SEM";
                         if (counts[medId][gk] !== undefined)
                             counts[medId][gk]++;
                     }
