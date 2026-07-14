@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.20 — 13/07/2026";
+var APP_VERSION = "v7.21 — 14/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1182,6 +1182,38 @@ function GardeView(_a) {
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                 isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#f85149" }), onClick: function () { setGMax({}); setGardeModal(true); } }, "\u2699\uFE0F R\u00E9partition auto"),
+                isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "var(--bg2)", color: "#dc2626" }), onClick: function () {
+                        var lbl = MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy;
+                        if (!window.confirm("Retirer TOUTES les gardes et repos de garde de la période " + lbl + " ?"))
+                            return;
+                        if (!window.confirm("Confirmer définitivement ? Cette action retire les gardes posées manuellement comme automatiquement."))
+                            return;
+                        setPlan(function (p) {
+                            var next = __assign({}, p);
+                            gvAllDays.forEach(function (_a) {
+                                var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+                                ["M", "AM", "JOUR", "N"].forEach(function (sl) {
+                                    var k = sk(y2, m2, d2, sl);
+                                    if (!next[k])
+                                        return;
+                                    var dm = __assign({}, next[k]);
+                                    var changed = false;
+                                    Object.keys(dm).forEach(function (mid) {
+                                        var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
+                                        var a = e && e.acteId;
+                                        if (a === "GARDE" || a === "REPOS_GARDE") {
+                                            delete dm[mid];
+                                            changed = true;
+                                        }
+                                    });
+                                    if (changed)
+                                        next[k] = dm;
+                                });
+                            });
+                            return next;
+                        });
+                        toast("Gardes et repos retirés sur la période", "info");
+                    } }, "\uD83D\uDDD1 Retirer les gardes"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                 React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
         gardeModal && (React.createElement(Ov, { onClose: function () { return setGardeModal(false); } },
@@ -2880,7 +2912,8 @@ function CardioPlanning() {
         var proxies = [
             icsUrl,
             "https://api.allorigins.win/raw?url=" + encodeURIComponent(icsUrl),
-            "https://corsproxy.io/?" + encodeURIComponent(icsUrl)
+            "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(icsUrl),
+            "https://corsproxy.io/?url=" + encodeURIComponent(icsUrl)
         ];
         var parseIcs = function (txt) {
             var dates = new Set();
@@ -2903,7 +2936,7 @@ function CardioPlanning() {
             });
             return dates;
         };
-        var srcLabels = ["iCal officiel (direct)", "iCal officiel (via proxy AllOrigins)", "iCal officiel (via proxy CorsProxy)"];
+        var srcLabels = ["iCal officiel (direct)", "iCal officiel (via proxy AllOrigins)", "iCal officiel (via proxy CodeTabs)", "iCal officiel (via proxy CorsProxy)"];
         var tryFetch = function (i) {
             if (i >= proxies.length) {
                 // Toutes les sources réseau ont échoué : calendrier officiel embarqué
@@ -4758,8 +4791,7 @@ function CardioPlanning() {
                                         return (__assign(__assign({}, p), { gardeDays: __assign(__assign({}, (p.gardeDays || {})), (_a = {}, _a[dk] = e.target.checked, _a)) }));
                                     }); }, style: { width: 13, height: 13 } }),
                                 lb));
-                        })),
-                    "}"),
+                        }))),
                 mData.role === "attache" && React.createElement("div", { style: { gridColumn: "1/-1", display: "flex", gap: 16, flexWrap: "wrap" } },
                     React.createElement("label", { style: { display: "flex", gap: 6, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
                         React.createElement("input", { type: "checkbox", checked: !!mData.astreinte, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { astreinte: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
