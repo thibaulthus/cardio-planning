@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v7.15 — 13/07/2026";
+var APP_VERSION = "v7.16 — 13/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3092,6 +3092,83 @@ function CardioPlanning() {
         toast("Absence retirée");
     }, []);
     /* ── applyPlanningType ── */
+    /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
+    var applyPTFlex = useCallback(function (medId, monthsList, fromToday) {
+        var tod = new Date();
+        tod.setHours(0, 0, 0, 0);
+        var targets = medId ? medecins.filter(function (m) { return m.id === medId; }) : medecins;
+        var nApplied = 0;
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            monthsList.forEach(function (_a) {
+                var ay = _a.y, am = _a.m;
+                var dim = new Date(ay, am + 1, 0).getDate();
+                var _loop_5 = function (d) {
+                    if (isWE(ay, am, d))
+                        return "continue";
+                    if (fromToday && new Date(ay, am, d) < tod)
+                        return "continue";
+                    var dw = dow(ay, am, d);
+                    var wk = wKey(ay, am, d), wm = tourMed[wk] || { HC: [], USIC: [] };
+                    var allTm = __spreadArray(__spreadArray([], (wm.HC || []), true), (wm.USIC || []), true);
+                    targets.forEach(function (med) {
+                        if (allTm.includes(med.id))
+                            return;
+                        var pt = planningType[med.id];
+                        if (!pt || !pt[dw])
+                            return;
+                        ["M", "AM"].forEach(function (sl) {
+                            var _a;
+                            var k = sk(ay, am, d, sl), ex = (next[k] || {})[med.id];
+                            var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
+                            if (["ABSENCE", "GARDE", "REPOS_GARDE"].includes(exA))
+                                return;
+                            var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1];
+                            if (!acteId)
+                                return;
+                            if (!next[k])
+                                next[k] = {};
+                            next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = { acteId: acteId, salle: salle || null }, _a));
+                            nApplied++;
+                        });
+                    });
+                };
+                for (var d = 1; d <= dim; d++) {
+                    _loop_5(d);
+                }
+            });
+            return next;
+        });
+        var medLbl = medId ? (medecins.find(function (m) { return m.id === medId; }) || {}).init || "" : "tous";
+        toast("Planning type appliqué (" + medLbl + ", " + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")", "info");
+    }, [medecins, planningType, tourMed]);
+    /* ── Modale d'application du PT ── */
+    var _18 = React.useState(null), ptModal = _18[0], setPtModal = _18[1]; // null | {medId:null|number}
+    var _19 = React.useState([]), ptMonths = _19[0], setPtMonths = _19[1]; // indices cochés
+    var _20 = React.useState(true), ptFromToday = _20[0], setPtFromToday = _20[1];
+    var ptPeriodMonths = React.useMemo(function () {
+        var p = perStart(year, month);
+        var arr = [];
+        for (var i = 0; i < PCFG.len; i++) {
+            var mm = (p.sm + i) % 12, yy = p.sm + i > 11 ? p.sy + 1 : p.sy;
+            arr.push({ y: yy, m: mm });
+        }
+        return arr;
+    }, [year, month, PCFG.len, PCFG.startM]);
+    var openPtModal = function (medId) {
+        setPtMonths(ptPeriodMonths.map(function (_, i) { return i; })); // tous cochés par défaut
+        setPtFromToday(true);
+        setPtModal({ medId: medId || null });
+    };
+    var runPtModal = function () {
+        var list = ptPeriodMonths.filter(function (_, i) { return ptMonths.includes(i); });
+        if (list.length === 0) {
+            toast("Sélectionnez au moins un mois", "warn");
+            return;
+        }
+        applyPTFlex(ptModal.medId, list, ptFromToday);
+        setPtModal(null);
+    };
     var applyPlanningType = useCallback(function () {
         setPlan(function (p) {
             var next = __assign({}, p);
@@ -3358,7 +3435,7 @@ function CardioPlanning() {
                         React.createElement("h2", { style: S.mTit }, "📅 " + _titlePeriod),
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        isAnyEdit && React.createElement("button", { style: S.btnP, onClick: applyPlanningType }, "\u25B6 PT"),
+                        isAnyEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8, alignItems: "center" } },
@@ -3413,18 +3490,12 @@ function CardioPlanning() {
                 React.createElement("div", { style: S.bar },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
-                        React.createElement("h2", { style: S.mTit },
-                            "\uD83D\uDCCB Planning type \u2014 ",
-                            MOIS[month],
-                            " ",
-                            year),
+                        React.createElement("h2", { style: S.mTit }, "📋 Planning type — " + (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        isEdit && React.createElement("button", { style: S.btnP, onClick: applyPlanningType },
-                            "\u25B6 Appliquer ",
-                            MOIS[month]),
+                        isEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
-                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Semaine type par m\u00E9decin. Le bouton \u25B6 PT l'applique aux mois de la p\u00E9riode affich\u00E9e (choix des mois et du point de d\u00E9part dans la fen\u00EAtre). TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
                 React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit, orient: orient, acteById: acteById, setMData: setMData, setModal: setModal }))),
             tab === "attache" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
@@ -3433,9 +3504,7 @@ function CardioPlanning() {
                         React.createElement("h2", { style: S.mTit }, "👔 Attachés — " + (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        isEdit && React.createElement("button", { style: S.btnP, onClick: applyPlanningType },
-                            "\u25B6 Appliquer ",
-                            MOIS[month]),
+                        isEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 orient === "H"
@@ -3860,6 +3929,32 @@ function CardioPlanning() {
                             fbStatus === "error" ? "Erreur de connexion — vérifiez votre réseau" :
                                 fbStatus === "offline" ? "Mode local — sans sauvegarde automatique" :
                                     "Connexion en cours...")))))),
+        ptModal && (React.createElement(Ov, { onClose: function () { return setPtModal(null); } },
+            React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 430 }), onClick: function (e) { return e.stopPropagation(); } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
+                    React.createElement("div", { style: S.mTit2 }, "\u25B6 Appliquer le planning type"),
+                    React.createElement("button", { onClick: function () { return setPtModal(null); }, style: S.xBtn }, "\u00D7")),
+                React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 12, fontWeight: 600 } }, ptModal.medId
+                    ? ("Pour : " + ((medecins.find(function (m2) { return m2.id === ptModal.medId; }) || {}).prenom || "") + " " + ((medecins.find(function (m2) { return m2.id === ptModal.medId; }) || {}).nom || ""))
+                    : "Pour : tous les médecins"),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Mois \u00E0 appliquer"),
+                React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 } }, ptPeriodMonths.map(function (pm, i) { return (React.createElement("label", { key: i, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", padding: "5px 10px", borderRadius: 7, border: "1px solid " + (ptMonths.includes(i) ? "#1d4ed8" : "var(--border)"), background: ptMonths.includes(i) ? "rgba(29,78,216,.12)" : "var(--bg2)", cursor: "pointer" } },
+                    React.createElement("input", { type: "checkbox", checked: ptMonths.includes(i), onChange: function () { return setPtMonths(function (p) { return p.includes(i) ? p.filter(function (x) { return x !== i; }) : __spreadArray(__spreadArray([], p, true), [i], false); }); } }),
+                    MOIS[pm.m],
+                    " ",
+                    pm.y)); })),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Point de d\u00E9part"),
+                React.createElement("div", { style: { display: "flex", gap: 12, marginBottom: 16 } },
+                    React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", cursor: "pointer" } },
+                        React.createElement("input", { type: "radio", name: "ptstart", checked: ptFromToday, onChange: function () { return setPtFromToday(true); } }),
+                        "\u00C0 partir d'aujourd'hui"),
+                    React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", cursor: "pointer" } },
+                        React.createElement("input", { type: "radio", name: "ptstart", checked: !ptFromToday, onChange: function () { return setPtFromToday(false); } }),
+                        "Depuis le d\u00E9but des mois coch\u00E9s")),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 14 } }, "Les absences, gardes et repos de garde existants sont pr\u00E9serv\u00E9s. Les semaines de tour m\u00E9dical sont exclues."),
+                React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
+                    React.createElement("button", { onClick: function () { return setPtModal(null); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
+                    React.createElement("button", { onClick: runPtModal, style: __assign(__assign({}, S.btnP), { padding: "9px 18px" }) }, "\u25B6 Appliquer"))))),
         modal === "cell" && mData && (function () {
             var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d, slot = mData.slot;
             var med = medecins.find(function (x) { return x.id === medId; });
@@ -3946,8 +4041,8 @@ function CardioPlanning() {
                 canEditThisMed && (React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } },
                     !isNight && canEditThisMed && React.createElement("button", { style: S.qBtn, onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _absMode: true }); setModal("absence"); } }, "Pose et retrait Abs sur p\u00E9riode"),
                     canEditThisMed && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _clearMode: true }); setModal("clearPeriod"); } }, "\uD83D\uDDD1 Effacer activit\u00E9s sur p\u00E9riode"),
-                    isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { return applyPlanningTypeMed(medId); } },
-                        "\u25B6 Appliquer PT ",
+                    isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setModal(null); openPtModal(medId); } },
+                        "\u25B6 PT ",
                         med && med.init),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { return clearPlanningType(medId); } },
                         "\uD83D\uDDD1 Effacer mois ",
@@ -4079,7 +4174,7 @@ function CardioPlanning() {
                     // Remove all non-system entries for medId over the period
                     var df = new Date(dateFrom), dt = new Date(dateTo);
                     var cur = new Date(df);
-                    var _loop_5 = function () {
+                    var _loop_6 = function () {
                         var y3 = cur.getFullYear(), m3 = cur.getMonth(), d3 = cur.getDate();
                         var slotsToClr = slots.includes("ALL") || slots.length === 2 ? ["M", "AM", "JOUR"] : slots;
                         slotsToClr.forEach(function (sl) {
@@ -4102,7 +4197,7 @@ function CardioPlanning() {
                         cur.setDate(cur.getDate() + 1);
                     };
                     while (cur <= dt) {
-                        _loop_5();
+                        _loop_6();
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
