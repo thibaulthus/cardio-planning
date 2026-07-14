@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.0 — 14/07/2026";
+var APP_VERSION = "v8.1 — 14/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -942,12 +942,25 @@ function GardeView(_a) {
     var _c = React.useState(null), pickerDay = _c[0], setPickerDay = _c[1];
     /* ═══ Répartition automatique des gardes ═══ */
     var _d = React.useState(false), gardeModal = _d[0], setGardeModal = _d[1];
-    var _e = React.useState({}), gMax = _e[0], setGMax = _e[1]; // {medId: maxGardes} optionnel
+    var _e = React.useState(null), lastGReport = _e[0], setLastGReport = _e[1];
+    var _f = React.useState({}), gMax = _f[0], setGMax = _f[1]; // {medId: maxGardes} optionnel
     var gardeMeds = medecins.filter(function (m) { return m.garde; });
     var FACT = { less: 0.75, normal: 1, more: 1.25 };
     // Tous les jours de la période (complets, indépendants de showFull)
     var gvAllDays = React.useMemo(function () { return perDaysList(gvSy, gvSm); }, [gvSy, gvSm, PCFG.len]);
-    var catOf = function (y2, m2, d2) { var dw = dow(y2, m2, d2); return dw === 6 ? "sam" : dw === 0 ? "dim" : dw === 5 ? "ven" : dw === 4 ? "jeu" : "sem"; };
+    var catOf = function (y2, m2, d2) {
+        if (isFerie(y2, m2, d2))
+            return "dim";
+        var dw = dow(y2, m2, d2);
+        if (dw === 6)
+            return "sam";
+        if (dw === 0)
+            return "dim";
+        var nx = new Date(y2, m2, d2 + 1);
+        if (isFerie(nx.getFullYear(), nx.getMonth(), nx.getDate()))
+            return "ven";
+        return dw === 5 ? "ven" : dw === 4 ? "jeu" : "sem";
+    };
     var GCATS = ["sem", "jeu", "ven", "sam", "dim"];
     var hasGardeAlready = function (y2, m2, d2) {
         var dw = dow(y2, m2, d2);
@@ -1133,6 +1146,7 @@ function GardeView(_a) {
             var nCand = function (dd) { return gardeMeds.filter(function (m) { return canTake(m, dd.y, dd.m, dd.d) && cnt[m.id] < maxOf(m.id) && jweOK2(m.id, dd.y, dd.m, dd.d) && gapOK(m.id, dd.y, dd.m, dd.d); }).length; };
             var sorted = __spreadArray([], rest, true).sort(function (a, b) { return nCand(a) - nCand(b); });
             var unfilled = 0;
+            var unfilledList = [];
             sorted.forEach(function (_a) {
                 var y2 = _a.y, m2 = _a.m, d2 = _a.d;
                 var dk4 = dKey(y2, m2, d2);
@@ -1142,6 +1156,7 @@ function GardeView(_a) {
                     cands = gardeMeds.filter(function (m) { return canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && gapOK(m.id, y2, m2, d2); }); // dernier recours : accepter jeudi+WE, mais JAMAIS deux jours consécutifs
                 if (cands.length === 0) {
                     unfilled++;
+                    unfilledList.push(d2 + " " + MOIS[m2].slice(0, 4));
                     return;
                 }
                 var ts2 = new Date(y2, m2, d2).getTime();
@@ -1177,7 +1192,7 @@ function GardeView(_a) {
             gardeMeds.forEach(function (m) { GCATS.forEach(function (c) { dev += Math.abs(catCnt[m.id][c] - target[m.id][c]); }); });
             var score = unfilled * 1000 + wishMiss * 50 + dev * 10;
             if (!best || score < best.score)
-                best = { assign: assign, score: score, unfilled: unfilled, cnt: cnt };
+                best = { assign: assign, score: score, unfilled: unfilled, cnt: cnt, wishMiss: wishMiss, unfilledList: unfilledList };
             if (best.score === 0)
                 return "break";
         };
@@ -1213,12 +1228,14 @@ function GardeView(_a) {
             return next;
         });
         var nA = Object.keys(best.assign).length;
-        var msg = "Gardes attribuées: " + nA + "/" + days.length + ".";
-        if (best.unfilled > 0)
-            msg += " ⚠ " + best.unfilled + " jour(s) sans candidat possible.";
-        var tots = gardeMeds.map(function (m) { return m.init + " " + (best.cnt[m.id] || 0); }).join(" · ");
-        msg += " Totaux: " + tots;
-        toast(msg, "info");
+        setLastGReport({
+            nA: nA,
+            total: days.length,
+            unfilled: best.unfilled, unfilledList: best.unfilledList || [],
+            wishMiss: best.wishMiss || 0,
+            tots: gardeMeds.map(function (m) { return ({ init: m.init, n: best.cnt[m.id] || 0 }); })
+        });
+        toast("Gardes attribuées: " + nA + "/" + days.length, "info");
         setGardeModal(false);
     };
     function getGardeMed2(gvY, gvM, d) {
@@ -1360,6 +1377,31 @@ function GardeView(_a) {
                 React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
                     React.createElement("button", { onClick: function () { return setGardeModal(false); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
                     React.createElement("button", { onClick: runGardeAuto, style: __assign(__assign({}, S.btnP), { background: "#f85149", padding: "9px 18px" }) }, "\uD83C\uDF19 Lancer la r\u00E9partition"))))),
+        lastGReport && (React.createElement("div", { style: { margin: "8px 12px", padding: "9px 12px", borderRadius: 9, border: "1px solid " + (lastGReport.unfilled > 0 ? "#f59e0b" : "#16a34a"), background: lastGReport.unfilled > 0 ? "rgba(245,158,11,.08)" : "rgba(22,163,74,.08)", fontSize: 11, color: "var(--txt)", display: "flex", gap: 8, alignItems: "flex-start" } },
+            React.createElement("span", { style: { fontSize: 13 } }, "\u2139\uFE0F"),
+            React.createElement("div", { style: { flex: 1, lineHeight: 1.5 } },
+                React.createElement("b", null,
+                    "R\u00E9partition effectu\u00E9e : ",
+                    lastGReport.nA,
+                    "/",
+                    lastGReport.total,
+                    " jours attribu\u00E9s."),
+                lastGReport.unfilled === 0 && lastGReport.wishMiss === 0 && " ✓ Toutes les contraintes et préférences ont été respectées.",
+                lastGReport.unfilled > 0 && React.createElement("span", null,
+                    " \u26A0 ",
+                    lastGReport.unfilled,
+                    " jour(s) sans candidat possible : ",
+                    lastGReport.unfilledList.join(", "),
+                    ". V\u00E9rifiez absences, jours autoris\u00E9s, semaines de tour et maximums."),
+                lastGReport.wishMiss > 0 && React.createElement("span", null,
+                    " \u26A0 ",
+                    lastGReport.wishMiss,
+                    " v\u0153u(x) \u2B50 non satisfait(s) (contraintes incompatibles)."),
+                React.createElement("span", { style: { color: "var(--txt3)" } },
+                    " Totaux : ",
+                    lastGReport.tots.map(function (t) { return t.init + " " + t.n; }).join(" · "),
+                    ".")),
+            React.createElement("button", { onClick: function () { return setLastGReport(null); }, style: __assign(__assign({}, S.xBtn), { fontSize: 14 }) }, "\u00D7"))),
         isEdit && (function () {
             // Répartition idéale: count days by type in the 4M period
             var gMeds = medecins.filter(function (m) { return m.garde === true; });
@@ -1367,14 +1409,14 @@ function GardeView(_a) {
             var nSem = 0, nJeu = 0, nVen = 0, nSam = 0, nDim = 0;
             gvEffDays.forEach(function (_a) {
                 var cy = _a.y, cm = _a.m, cd = _a.d;
-                var dw3 = dow(cy, cm, cd);
-                if (dw3 === 4)
+                var c3 = catOf(cy, cm, cd);
+                if (c3 === "jeu")
                     nJeu++;
-                else if (dw3 === 5)
+                else if (c3 === "ven")
                     nVen++;
-                else if (dw3 === 6)
+                else if (c3 === "sam")
                     nSam++;
-                else if (dw3 === 0)
+                else if (c3 === "dim")
                     nDim++;
                 else
                     nSem++;
@@ -1409,7 +1451,7 @@ function GardeView(_a) {
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nJeu),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nJeu))),
                         React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
-                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Vendredi"),
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Vendredi et veilles de f\u00E9ri\u00E9s"),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nVen),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nVen))),
                         React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
@@ -1417,13 +1459,47 @@ function GardeView(_a) {
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nSam),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nSam))),
                         React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
-                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Dimanche"),
+                            React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 600, color: "var(--txt)" } }, "Dimanche et jours f\u00E9ri\u00E9s"),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, color: "var(--txt)" } }, nDim),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, fmt2(nDim))),
                         React.createElement("tr", { style: { background: "var(--bg-we)" } },
                             React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 800, color: "#92400e" } }, "Week-end (ven+sam+dim)"),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, fontWeight: 700, color: "#92400e" } }, nVen + nSam + nDim),
-                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "#92400e" } }, fmt2(nVen + nSam + nDim)))))));
+                            React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "#92400e" } }, fmt2(nVen + nSam + nDim))))),
+                React.createElement("table", { style: { borderCollapse: "collapse", width: "100%", marginTop: 10 } },
+                    React.createElement("thead", null,
+                        React.createElement("tr", null,
+                            React.createElement("th", { style: { textAlign: "left", padding: "3px 8px", fontSize: 10, color: "var(--txt3)" } }, "Gardes pos\u00E9es"),
+                            React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Total"),
+                            React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Sem"),
+                            React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Jeu"),
+                            React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Ven*"),
+                            React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Sam"),
+                            React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Dim*"))),
+                    React.createElement("tbody", null, medecins.filter(function (m2) { return m2.garde; }).map(function (m2) {
+                        var cn = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 };
+                        gvEffDays.forEach(function (_a) {
+                            var ry = _a.y, rm = _a.m, rd = _a.d;
+                            var dwR = dow(ry, rm, rd);
+                            var slotR = (dwR === 6 || dwR === 0) ? "JOUR" : "N";
+                            var dmR = plan[sk(ry, rm, rd, slotR)] || {};
+                            var eR = Array.isArray(dmR[m2.id]) ? dmR[m2.id][0] : dmR[m2.id];
+                            if (eR && eR.acteId === "GARDE")
+                                cn[catOf(ry, rm, rd)]++;
+                        });
+                        var totR = cn.sem + cn.jeu + cn.ven + cn.sam + cn.dim;
+                        return (React.createElement("tr", { key: m2.id, style: { borderBottom: "1px solid var(--border2)" } },
+                            React.createElement("td", { style: { padding: "3px 8px", fontSize: 11, fontWeight: 700, color: "var(--txt)" } },
+                                React.createElement("span", { style: { display: "inline-flex", width: 16, height: 16, borderRadius: "50%", background: m2.color, color: "#fff", fontSize: 7, fontWeight: 800, alignItems: "center", justifyContent: "center", marginRight: 5, verticalAlign: "middle" } }, m2.init),
+                                m2.nom),
+                            React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 12, fontWeight: 800, color: "#f85149" } }, totR),
+                            React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, cn.sem),
+                            React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, cn.jeu),
+                            React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, cn.ven),
+                            React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, cn.sam),
+                            React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, cn.dim)));
+                    }))),
+                React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 3 } }, "* Ven inclut les veilles de f\u00E9ri\u00E9s \u00B7 Dim inclut les jours f\u00E9ri\u00E9s \u00B7 p\u00E9riode affich\u00E9e")));
         })(),
         orient === "V" ? viewV : viewH,
         pickerDay !== null && isEdit && (function () {
@@ -2803,7 +2879,7 @@ function StatsTab(_a) {
     var GARDE_ACTE = { id: "GARDE", label: "Garde", short: "G", color: "#93c47d" };
     var GARDE_SEM = { id: "GARDE_SEM", label: "Garde semaine (lun→mer)", short: "G sem", color: "#93c47d" };
     var GARDE_JEU = { id: "GARDE_JEU", label: "Garde jeudi", short: "G jeu", color: "#6aa84f" };
-    var GARDE_WE = { id: "GARDE_WE", label: "Garde week-end", short: "G WE", color: "#f59e0b" };
+    var GARDE_WE = { id: "GARDE_WE", label: "Garde WE et fériés", short: "G WE", color: "#f59e0b" };
     var allTrack = __spreadArray([GARDE_ACTE, GARDE_SEM, GARDE_JEU, GARDE_WE], trackActes, true);
     // Count per med per acte
     var allStatMeds = medecins.filter(function (m) { return m.role === "medecin"; });
@@ -2831,8 +2907,10 @@ function StatsTab(_a) {
                     // Garde: split by weekday (ven/sam/dim = weekend)
                     if (entry.acteId === "GARDE") {
                         var dw4 = new Date(y2, m2, d).getDay();
-                        var isWEg = dw4 === 5 || dw4 === 6 || dw4 === 0;
-                        var gk = dw4 === 4 ? "GARDE_JEU" : isWEg ? "GARDE_WE" : "GARDE_SEM";
+                        var nxS = new Date(y2, m2, d + 1);
+                        var veilleF = dw4 >= 1 && dw4 <= 5 && isFerie(nxS.getFullYear(), nxS.getMonth(), nxS.getDate());
+                        var isWEg = isFerie(y2, m2, d) || dw4 === 5 || dw4 === 6 || dw4 === 0 || veilleF;
+                        var gk = isWEg ? "GARDE_WE" : dw4 === 4 ? "GARDE_JEU" : "GARDE_SEM";
                         if (counts[medId][gk] !== undefined)
                             counts[medId][gk]++;
                     }
