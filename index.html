@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.1 — 14/07/2026";
+var APP_VERSION = "v8.2 — 14/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2220,20 +2220,132 @@ function TourTab(_a) {
         }
         return false;
     };
+    /* ═══ Échange de semaines de tour ═══ */
+    var _b = React.useState(false), swapOpen = _b[0], setSwapOpen = _b[1];
+    var _c = React.useState(null), swapSrcKey = _c[0], setSwapSrcKey = _c[1];
+    var _d = React.useState(null), swapSrcMed = _d[0], setSwapSrcMed = _d[1];
+    var _e = React.useState(null), swapDstKey = _e[0], setSwapDstKey = _e[1];
+    var _f = React.useState(null), swapDstMed = _f[0], setSwapDstMed = _f[1];
+    var _g = React.useState(true), swapUpdPlan = _g[0], setSwapUpdPlan = _g[1];
+    var JOURS_SW = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+    var absDaysOf = function (medId, wk2) {
+        if (!medId || !wk2)
+            return [];
+        var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+        var days = [];
+        for (var i = 0; i < 5; i++) {
+            var dt = new Date(wy2, wm2, wd2 + i);
+            var dy = dt.getFullYear(), dm = dt.getMonth(), dd = dt.getDate();
+            var es = __spreadArray(__spreadArray([], getEntries(medId, dy, dm, dd, "M"), true), getEntries(medId, dy, dm, dd, "AM"), true);
+            if (es.some(function (e) { return ["ABSENCE", "FORM", "FORMATION"].includes(e.acteId); }))
+                days.push(JOURS_SW[dt.getDay()] + " " + dd);
+        }
+        return days;
+    };
+    var unitOf = function (medId, wk2) {
+        var wm2 = tourMed[wk2] || { HC: [], USIC: [] };
+        if ((wm2.HC || []).includes(medId))
+            return "HC";
+        if ((wm2.USIC || []).includes(medId))
+            return "USIC";
+        return null;
+    };
+    var runSwap = function () {
+        var uSrc = unitOf(swapSrcMed, swapSrcKey), uDst = unitOf(swapDstMed, swapDstKey);
+        if (!uSrc || !uDst)
+            return;
+        // 1. Échange dans tourMed
+        setTourMed(function (p) {
+            var n = __assign({}, p);
+            var src = __assign({}, (n[swapSrcKey] || { HC: [], USIC: [] }));
+            src[uSrc] = (src[uSrc] || []).filter(function (id) { return id !== swapSrcMed; });
+            n[swapSrcKey] = src;
+            var dst = __assign({}, (n[swapDstKey] || { HC: [], USIC: [] }));
+            dst[uDst] = (dst[uDst] || []).filter(function (id) { return id !== swapDstMed; });
+            n[swapDstKey] = dst;
+            var src2 = __assign({}, n[swapSrcKey]);
+            src2[uSrc] = __spreadArray(__spreadArray([], (src2[uSrc] || []), true), [swapDstMed], false);
+            n[swapSrcKey] = src2;
+            var dst2 = __assign({}, n[swapDstKey]);
+            dst2[uDst] = __spreadArray(__spreadArray([], (dst2[uDst] || []), true), [swapSrcMed], false);
+            n[swapDstKey] = dst2;
+            return n;
+        });
+        // 2. Planning : uniquement les 2 personnes, uniquement si semaines différentes
+        if (swapUpdPlan && swapSrcKey !== swapDstKey) {
+            var weekDays_1 = function (wk2) {
+                var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+                return [0, 1, 2, 3, 4].map(function (i) { var dt = new Date(wy2, wm2, wd2 + i); return [dt.getFullYear(), dt.getMonth(), dt.getDate()]; });
+            };
+            var PROT_1 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION"];
+            setPlan(function (p) {
+                var next = __assign({}, p);
+                // Chaque personne : retirer ses activités sur sa semaine d'ARRIVÉE, ré-appliquer son PT sur sa semaine de DÉPART
+                [[swapSrcMed, swapDstKey, swapSrcKey], [swapDstMed, swapSrcKey, swapDstKey]].forEach(function (_a) {
+                    var mid = _a[0], arriveKey = _a[1], leaveKey = _a[2];
+                    weekDays_1(arriveKey).forEach(function (_a) {
+                        var dy = _a[0], dm = _a[1], dd = _a[2];
+                        if (isWE(dy, dm, dd))
+                            return;
+                        ["M", "AM"].forEach(function (sl) {
+                            var k = sk(dy, dm, dd, sl);
+                            if (!next[k] || !next[k][mid])
+                                return;
+                            var e = next[k][mid];
+                            var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
+                            if (PROT_1.includes(a))
+                                return;
+                            var dm3 = __assign({}, next[k]);
+                            delete dm3[mid];
+                            next[k] = dm3;
+                        });
+                    });
+                    var pt = planningType[mid];
+                    if (pt)
+                        weekDays_1(leaveKey).forEach(function (_a) {
+                            var dy = _a[0], dm = _a[1], dd = _a[2];
+                            if (isWE(dy, dm, dd))
+                                return;
+                            var dw2 = dow(dy, dm, dd);
+                            if (!pt[dw2])
+                                return;
+                            ["M", "AM"].forEach(function (sl) {
+                                var _a;
+                                var k = sk(dy, dm, dd, sl);
+                                var ex = (next[k] || {})[mid];
+                                var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
+                                if (PROT_1.includes(exA))
+                                    return;
+                                var _b = (pt[dw2][sl]) || [null, null], acteId = _b[0], salle = _b[1];
+                                if (!acteId)
+                                    return;
+                                if (!next[k])
+                                    next[k] = {};
+                                next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[mid] = { acteId: acteId, salle: salle || null }, _a));
+                            });
+                        });
+                });
+                return next;
+            });
+        }
+        var iS = (medecins.find(function (m) { return m.id === swapSrcMed; }) || {}).init, iD = (medecins.find(function (m) { return m.id === swapDstMed; }) || {}).init;
+        toast("Échange effectué : " + iS + " ⇄ " + iD, "info");
+        setSwapOpen(false);
+    };
     var tourMeds = medecins.filter(function (m) { return m.tourMed; });
     var horsTourSpecMeds = medecins.filter(function (m) { return m.role === "medecin" && !m.tourMed && m.surSpec; });
     var SPEC_COLORS = { coro: "#76a5af", pace: "#e3b341", eep: "#f97316", ett: "#ea9999" };
     // ─── Auto-répartition ───
-    var _b = React.useState(false), autoModal = _b[0], setAutoModal = _b[1];
-    var _c = React.useState(null), lastReport = _c[0], setLastReport = _c[1];
-    var _d = React.useState(1), cfgMinEEP = _d[0], setCfgMinEEP = _d[1];
-    var _e = React.useState(1), cfgMinPace = _e[0], setCfgMinPace = _e[1];
-    var _f = React.useState(1), cfgMinETT = _f[0], setCfgMinETT = _f[1];
-    var _g = React.useState(3), cfgMinCoro = _g[0], setCfgMinCoro = _g[1];
-    var _h = React.useState({}), cfgExcl = _h[0], setCfgExcl = _h[1]; // {medId: true = ne participe pas}
-    var _j = React.useState({}), cfgWeeks = _j[0], setCfgWeeks = _j[1]; // {medId: nWeeks}
-    var _k = React.useState({}), cfgPref2HC = _k[0], setCfgPref2HC = _k[1]; // {medId: bool}
-    var _l = React.useState({}), cfgPref2USIC = _l[0], setCfgPref2USIC = _l[1]; // {medId: bool}
+    var _h = React.useState(false), autoModal = _h[0], setAutoModal = _h[1];
+    var _j = React.useState(null), lastReport = _j[0], setLastReport = _j[1];
+    var _k = React.useState(1), cfgMinEEP = _k[0], setCfgMinEEP = _k[1];
+    var _l = React.useState(1), cfgMinPace = _l[0], setCfgMinPace = _l[1];
+    var _m = React.useState(1), cfgMinETT = _m[0], setCfgMinETT = _m[1];
+    var _o = React.useState(3), cfgMinCoro = _o[0], setCfgMinCoro = _o[1];
+    var _p = React.useState({}), cfgExcl = _p[0], setCfgExcl = _p[1]; // {medId: true = ne participe pas}
+    var _q = React.useState({}), cfgWeeks = _q[0], setCfgWeeks = _q[1]; // {medId: nWeeks}
+    var _r = React.useState({}), cfgPref2HC = _r[0], setCfgPref2HC = _r[1]; // {medId: bool}
+    var _s = React.useState({}), cfgPref2USIC = _s[0], setCfgPref2USIC = _s[1]; // {medId: bool}
     var totalSlots = weeksT.length * 4; // 2 HC + 2 USIC per week
     var activeMeds = tourMeds.filter(function (m) { return !cfgExcl[m.id]; });
     var nominalW = activeMeds.length > 0 ? Math.ceil(totalSlots / activeMeds.length) : 0;
@@ -2680,6 +2792,7 @@ function TourTab(_a) {
                     React.createElement("span", null,
                         "Sem. ",
                         w.label),
+                    isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", cursor: "pointer", fontWeight: 800 }, onClick: function () { setSwapSrcKey(w.key); setSwapSrcMed(null); setSwapDstKey(w.key); setSwapDstMed(null); setSwapUpdPlan(true); setSwapOpen(true); } }, "\u21C4 \u00C9changer"),
                     React.createElement("span", { style: { display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", padding: "1px 7px", borderRadius: 5, background: "var(--bg2)", border: "1px solid var(--border2)" } }, [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
                         var sk2 = _a[0], lb2 = _a[1];
                         var wmS = tourMed[w.key] || { HC: [], USIC: [] };
@@ -2737,52 +2850,105 @@ function TourTab(_a) {
                     React.createElement("div", { style: { marginTop: 4, display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("span", { style: { fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: (wm[unit] || []).length === 2 ? "#3fb950" : (wm[unit] || []).length > 2 ? "#f85149" : "#e3b341" } },
                             (wm[unit] || []).length,
-                            "/2"),
-                        isEdit && React.createElement("button", { style: { fontSize: 10, padding: "2px 7px", borderRadius: 5, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer", fontWeight: 600 }, onClick: function () {
-                                var allTmIds = __spreadArray(__spreadArray([], (wm.HC || []), true), (wm.USIC || []), true);
-                                var _a = w.key.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
-                                var weekDates = [0, 1, 2, 3, 4].map(function (i) { var dt = new Date(wy2, wm2, wd2 + i); return [dt.getFullYear(), dt.getMonth(), dt.getDate()]; });
-                                setPlan(function (p) {
-                                    var next = __assign({}, p);
-                                    weekDates.forEach(function (_a) {
-                                        var dy = _a[0], dm = _a[1], dd = _a[2];
-                                        if (isWE(dy, dm, dd))
-                                            return;
-                                        var dw2 = dow(dy, dm, dd);
-                                        medecins.forEach(function (med) {
-                                            var isTM = allTmIds.includes(med.id);
-                                            ["M", "AM"].forEach(function (sl) {
-                                                var _a, _b;
-                                                var k = sk(dy, dm, dd, sl), ex = (next[k] || {})[med.id];
-                                                var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                                                if (["ABSENCE", "GARDE", "REPOS_GARDE"].includes(exA))
-                                                    return;
-                                                if (isTM) {
-                                                    if ((next[k] || {})[med.id]) {
-                                                        var dm3 = __assign({}, next[k]);
-                                                        delete dm3[med.id];
-                                                        next = __assign(__assign({}, next), (_a = {}, _a[k] = dm3, _a));
-                                                    }
-                                                }
-                                                else {
-                                                    var pt = planningType[med.id];
-                                                    if (!pt || !pt[dw2])
-                                                        return;
-                                                    var _c = (pt[dw2][sl]) || [null, null], acteId = _c[0], salle = _c[1];
-                                                    if (!acteId)
-                                                        return;
-                                                    if (!next[k])
-                                                        next[k] = {};
-                                                    next[k] = __assign(__assign({}, next[k]), (_b = {}, _b[med.id] = { acteId: acteId, salle: salle || null }, _b));
-                                                }
-                                            });
-                                        });
-                                    });
-                                    return next;
-                                });
-                                toast("Semaine du " + w.label + " mise à jour", "info");
-                            } }, "\u21BA M\u00E0j sem.")))); })));
+                            "/2")))); })));
         }),
+        swapOpen && (React.createElement(Ov, { onClose: function () { return setSwapOpen(false); } },
+            React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 560, maxHeight: "88vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } },
+                    React.createElement("div", { style: S.mTit2 }, "\u21C4 \u00C9changer deux semaines de tour"),
+                    React.createElement("button", { onClick: function () { return setSwapOpen(false); }, style: S.xBtn }, "\u00D7")),
+                React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "stretch" } },
+                    React.createElement("div", { style: { flex: 1, padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 6 } },
+                            "Praticien A \u2014 sem. ",
+                            (weeksT.find(function (w2) { return w2.key === swapSrcKey; }) || {}).label),
+                        ["HC", "USIC"].map(function (u2) { return ((tourMed[swapSrcKey] || {})[u2] || []).map(function (mid) {
+                            var md = medecins.find(function (m2) { return m2.id === mid; });
+                            if (!md)
+                                return null;
+                            var sel = swapSrcMed === mid;
+                            return (React.createElement("div", { key: mid, onClick: function () { return setSwapSrcMed(mid); }, style: { display: "flex", alignItems: "center", gap: 7, padding: "7px 9px", borderRadius: 7, marginBottom: 5, cursor: "pointer", border: "2px solid " + (sel ? "#388bfd" : "var(--border2)"), background: sel ? "rgba(56,139,253,.14)" : "var(--bg)" } },
+                                React.createElement("span", { style: { width: 20, height: 20, borderRadius: "50%", background: md.color, color: "#fff", fontSize: 8, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, md.init),
+                                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)", flex: 1 } }, md.nom),
+                                React.createElement("span", { style: { fontSize: 10, fontWeight: 800, color: u2 === "HC" ? "#388bfd" : "#a371f7" } }, u2)));
+                        }); }),
+                        ((tourMed[swapSrcKey] || {}).HC || []).length + ((tourMed[swapSrcKey] || {}).USIC || []).length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucun tourneur cette semaine.")),
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", fontSize: 26, color: "#388bfd", fontWeight: 800 } }, "\u21C4"),
+                    React.createElement("div", { style: { flex: 1, padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 6 } }, "Praticien B \u2014 semaine :"),
+                        React.createElement("select", { value: swapDstKey || "", onChange: function (e) { setSwapDstKey(e.target.value); setSwapDstMed(null); }, style: { width: "100%", padding: "6px 8px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, marginBottom: 8 } }, weeksT.map(function (w2) { return React.createElement("option", { key: w2.key, value: w2.key },
+                            "Sem. ",
+                            w2.label,
+                            w2.key === swapSrcKey ? " (même semaine)" : ""); })),
+                        ["HC", "USIC"].map(function (u2) { return ((tourMed[swapDstKey] || {})[u2] || []).map(function (mid) {
+                            var md = medecins.find(function (m2) { return m2.id === mid; });
+                            if (!md)
+                                return null;
+                            var sel = swapDstMed === mid;
+                            var same = mid === swapSrcMed;
+                            return (React.createElement("div", { key: mid, onClick: function () { if (!same)
+                                    setSwapDstMed(mid); }, style: { display: "flex", alignItems: "center", gap: 7, padding: "7px 9px", borderRadius: 7, marginBottom: 5, cursor: same ? "not-allowed" : "pointer", opacity: same ? .35 : 1, border: "2px solid " + (sel ? "#388bfd" : "var(--border2)"), background: sel ? "rgba(56,139,253,.14)" : "var(--bg)" } },
+                                React.createElement("span", { style: { width: 20, height: 20, borderRadius: "50%", background: md.color, color: "#fff", fontSize: 8, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, md.init),
+                                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)", flex: 1 } }, md.nom),
+                                React.createElement("span", { style: { fontSize: 10, fontWeight: 800, color: u2 === "HC" ? "#388bfd" : "#a371f7" } }, u2)));
+                        }); }))),
+                swapSrcMed && swapDstMed && (function () {
+                    var mS = medecins.find(function (m2) { return m2.id === swapSrcMed; }) || {}, mD = medecins.find(function (m2) { return m2.id === swapDstMed; }) || {};
+                    var lS = (weeksT.find(function (w2) { return w2.key === swapSrcKey; }) || {}).label, lD = (weeksT.find(function (w2) { return w2.key === swapDstKey; }) || {}).label;
+                    var uS = unitOf(swapSrcMed, swapSrcKey), uD = unitOf(swapDstMed, swapDstKey);
+                    var sameWeek = swapSrcKey === swapDstKey;
+                    // Bloquants
+                    var blocks = [];
+                    if (!sameWeek && unitOf(swapSrcMed, swapDstKey))
+                        blocks.push(mS.init + " est déjà de tour la semaine du " + lD + ".");
+                    if (!sameWeek && unitOf(swapDstMed, swapSrcKey))
+                        blocks.push(mD.init + " est déjà de tour la semaine du " + lS + ".");
+                    // Avertissements
+                    var warns = [];
+                    if (!sameWeek) {
+                        var aS = absDaysOf(swapSrcMed, swapDstKey);
+                        if (aS.length >= 5)
+                            warns.push(mS.init + " est absent TOUTE la semaine du " + lD + ".");
+                        else if (aS.length > 0)
+                            warns.push(mS.init + " est absent le " + aS.join(", le ") + " (sem. du " + lD + ") — un remplacement ponctuel reste possible.");
+                        var aD = absDaysOf(swapDstMed, swapSrcKey);
+                        if (aD.length >= 5)
+                            warns.push(mD.init + " est absent TOUTE la semaine du " + lS + ".");
+                        else if (aD.length > 0)
+                            warns.push(mD.init + " est absent le " + aD.join(", le ") + " (sem. du " + lS + ") — un remplacement ponctuel reste possible.");
+                        if (((tourAvoid || {})[swapDstKey] || {})[swapSrcMed])
+                            warns.push(mS.init + " a une préférence 🚫 \"pas de tour\" sur la semaine du " + lD + ".");
+                        if (((tourAvoid || {})[swapSrcKey] || {})[swapDstMed])
+                            warns.push(mD.init + " a une préférence 🚫 \"pas de tour\" sur la semaine du " + lS + ".");
+                    }
+                    return (React.createElement("div", { style: { marginTop: 12 } },
+                        React.createElement("div", { style: { padding: "10px 12px", borderRadius: 9, border: "2px solid #388bfd", background: "rgba(56,139,253,.08)", fontSize: 14, fontWeight: 800, color: "var(--txt)", textAlign: "center" } },
+                            mS.init,
+                            " ",
+                            React.createElement("span", { style: { color: uS === "HC" ? "#388bfd" : "#a371f7" } }, uS),
+                            " sem. ",
+                            lS,
+                            React.createElement("span", { style: { margin: "0 10px", color: "#388bfd" } }, "\u21C4"),
+                            mD.init,
+                            " ",
+                            React.createElement("span", { style: { color: uD === "HC" ? "#388bfd" : "#a371f7" } }, uD),
+                            " sem. ",
+                            lD),
+                        blocks.map(function (b, i2) { return React.createElement("div", { key: i2, style: { marginTop: 6, padding: "7px 10px", borderRadius: 7, border: "1px solid #dc2626", background: "rgba(220,38,38,.10)", fontSize: 12, fontWeight: 700, color: "#dc2626" } },
+                            "\u26D4 ",
+                            b); }),
+                        warns.map(function (wn, i2) { return React.createElement("div", { key: i2, style: { marginTop: 6, padding: "7px 10px", borderRadius: 7, border: "1px solid #f59e0b", background: "rgba(245,158,11,.10)", fontSize: 12, fontWeight: 600, color: "#b45309" } },
+                            "\u26A0 ",
+                            wn); }),
+                        !sameWeek && React.createElement("label", { style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--txt)", marginTop: 10, cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: swapUpdPlan, onChange: function (e) { return setSwapUpdPlan(e.target.checked); }, style: { width: 14, height: 14 } }),
+                            "Mettre \u00E0 jour le planning des 2 praticiens (retirer les activit\u00E9s sur la semaine d'arriv\u00E9e, r\u00E9-appliquer le planning type sur la semaine quitt\u00E9e)"),
+                        sameWeek && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 8 } }, "\u00C9change HC \u21C4 USIC au sein de la m\u00EAme semaine : le planning n'est pas modifi\u00E9."),
+                        React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 } },
+                            React.createElement("button", { onClick: function () { return setSwapOpen(false); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
+                            React.createElement("button", { disabled: blocks.length > 0, onClick: runSwap, style: __assign(__assign({}, S.btnP), { padding: "9px 20px", opacity: blocks.length > 0 ? .4 : 1, cursor: blocks.length > 0 ? "not-allowed" : "pointer" }) }, "\u21C4 Valider l'\u00E9change"))));
+                })(),
+                (!swapSrcMed || !swapDstMed) && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 12, textAlign: "center" } }, "S\u00E9lectionnez un praticien dans chaque panneau.")))),
         autoModal && (React.createElement(Ov, { onClose: closeAutoModal },
             React.createElement("div", { style: { minWidth: 400, maxWidth: 520 } },
                 React.createElement("div", { style: S.mHd },
