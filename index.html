@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.2 — 14/07/2026";
+var APP_VERSION = "v8.5 — 14/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -187,6 +187,7 @@ var DEFAULT_ACTES = [
     { id: "REPOS_GARDE", label: "Repos post-garde", short: "RG", color: "#ffe599", bg: "#8b949e", hasSalle: false, salles: [], isSystem: true, site: "tous", medecinsAutorise: ["VA", "HV", "TOM", "NH", "CV", "TH", "CBV", "JSL", "TD", "ND", "JSS", "PM", "MG", "CB", "AB"] },
     { id: "TOUR_HC", label: "Tour médical HC", short: "HC", color: "#388bfd", bg: "#388bfd", hasSalle: false, salles: [], isSystem: true, site: "tous", medecinsAutorise: [] },
     { id: "TOUR_USIC", label: "Tour médical USIC", short: "USIC", color: "#4285f4", bg: "#4285f4", hasSalle: false, salles: [], isSystem: true, site: "tous", medecinsAutorise: [] },
+    { id: "TP", label: "Temps partiel", short: "TP", color: "#8b949e", bg: "#8b949e", hasSalle: false, salles: [] },
     { id: "ABSENCE", label: "Absence / Congé", short: "ABS", color: "#e06666", bg: "#e06666", hasSalle: false, salles: [], isSystem: true, site: "tous", medecinsAutorise: [] },
     { id: "CORO", label: "Coronarographie", short: "CORO", color: "#76a5af", bg: "#76a5af", hasSalle: true, salles: ["Angio-1", "Angio-2", "Angio-3"], isSystem: false, site: "tous", medecinsAutorise: GRP.CORO, maxParSalle: 1 },
     { id: "TAVI", label: "TAVI", short: "TAVI", color: "#76a5af", bg: "#76a5af", hasSalle: true, salles: ["Angio-1", "Angio-2", "Angio-3"], isSystem: false, site: "tous", medecinsAutorise: GRP.TAVI, maxParSalle: 1 },
@@ -2188,7 +2189,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -2277,7 +2278,7 @@ function TourTab(_a) {
                 var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
                 return [0, 1, 2, 3, 4].map(function (i) { var dt = new Date(wy2, wm2, wd2 + i); return [dt.getFullYear(), dt.getMonth(), dt.getDate()]; });
             };
-            var PROT_1 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION"];
+            var PROT_1 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION", "TOUR_HC", "TOUR_USIC"];
             setPlan(function (p) {
                 var next = __assign({}, p);
                 // Chaque personne : retirer ses activités sur sa semaine d'ARRIVÉE, ré-appliquer son PT sur sa semaine de DÉPART
@@ -2327,6 +2328,20 @@ function TourTab(_a) {
                 });
                 return next;
             });
+        }
+        // Temps partiels : nettoyer les semaines quittées, appliquer sur les semaines d'arrivée (si USIC)
+        var mS2 = medecins.find(function (m) { return m.id === swapSrcMed; }), mD2 = medecins.find(function (m) { return m.id === swapDstMed; });
+        if (mS2 && mS2.partTime) {
+            if (uSrc === "USIC")
+                cleanTPForWeek(swapSrcMed, swapSrcKey);
+            if (uDst === "USIC")
+                setTimeout(function () { return applyTPForWeek(swapSrcMed, swapDstKey); }, 100);
+        }
+        if (mD2 && mD2.partTime) {
+            if (uDst === "USIC")
+                cleanTPForWeek(swapDstMed, swapDstKey);
+            if (uSrc === "USIC")
+                setTimeout(function () { return applyTPForWeek(swapDstMed, swapSrcKey); }, 100);
         }
         var iS = (medecins.find(function (m) { return m.id === swapSrcMed; }) || {}).init, iD = (medecins.find(function (m) { return m.id === swapDstMed; }) || {}).init;
         toast("Échange effectué : " + iS + " ⇄ " + iD, "info");
@@ -2702,7 +2717,29 @@ function TourTab(_a) {
                 break; // palier suffisant : toutes les semaines pleines
         }
         persistCfg();
-        setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { n[w.key] = best.assign[w.key]; }); return n; });
+        setTourMed(function (p) {
+            var n = __assign({}, p);
+            weeksT.forEach(function (w) { n[w.key] = best.assign[w.key]; });
+            // Retirer les activités (PT) de tous les tourneurs affectés
+            var clearPairs = [];
+            weeksT.forEach(function (w) {
+                var a2 = best.assign[w.key] || {};
+                __spreadArray(__spreadArray([], (a2.HC || []), true), (a2.USIC || []), true).forEach(function (mid) { return clearPairs.push({ medId: mid, weekKey: w.key }); });
+            });
+            if (clearPairs.length > 0)
+                setTimeout(function () { return clearWeekActivities(clearPairs); }, 40);
+            // Temps partiels affectés en USIC : dérogation + TP + junior (léger différé pour lire le tourMed à jour)
+            setTimeout(function () {
+                weeksT.forEach(function (w) {
+                    ((best.assign[w.key] || {}).USIC || []).forEach(function (mid) {
+                        var md = medecins.find(function (m2) { return m2.id === mid; });
+                        if (md && md.partTime)
+                            applyTPForWeek(mid, w.key);
+                    });
+                });
+            }, 80);
+            return n;
+        });
         var minBySpec = hardMins;
         var lockedInfo = function (m) {
             if (!m.surSpec)
@@ -2830,18 +2867,32 @@ function TourTab(_a) {
                         var wishW = !!((tourWish || {})[w.key] || {})[m.id];
                         return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "3px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 44,
                                 background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", opacity: dis ? .3 : 1,
-                                outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#a3e635", ett: "#46bdc6" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () { if (dis || !isEdit)
-                                return; setTourMed(function (p) {
-                                var _a;
-                                var cur = __assign({}, (p[w.key] || { HC: [], USIC: [] }));
-                                var l = cur[unit] || [];
-                                if (!on && l.length >= 2) {
-                                    toast("Maximum 2 médecins par unité", "info");
-                                    return p;
+                                outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#a3e635", ett: "#46bdc6" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
+                                if (dis || !isEdit)
+                                    return;
+                                var wasOn = on;
+                                setTourMed(function (p) {
+                                    var _a;
+                                    var cur = __assign({}, (p[w.key] || { HC: [], USIC: [] }));
+                                    var l = cur[unit] || [];
+                                    if (!wasOn && l.length >= 2) {
+                                        toast("Maximum 2 médecins par unité", "info");
+                                        return p;
+                                    }
+                                    cur[unit] = wasOn ? l.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], l, true), [m.id], false);
+                                    return __assign(__assign({}, p), (_a = {}, _a[w.key] = cur, _a));
+                                });
+                                if (!wasOn) {
+                                    clearWeekActivities([{ medId: m.id, weekKey: w.key }]);
+                                    if (unit === "USIC" && m.partTime)
+                                        setTimeout(function () { return applyTPForWeek(m.id, w.key); }, 60);
                                 }
-                                cur[unit] = on ? l.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], l, true), [m.id], false);
-                                return __assign(__assign({}, p), (_a = {}, _a[w.key] = cur, _a));
-                            }); } },
+                                else {
+                                    if (unit === "USIC" && m.partTime)
+                                        cleanTPForWeek(m.id, w.key);
+                                    setTimeout(function () { return reapplyPTWeek(m.id, w.key); }, 60);
+                                }
+                            } },
                             React.createElement("div", { style: { fontWeight: 800, fontSize: 10 }, title: avoidW ? "Préfère ne pas tourner cette semaine" : wishW ? "Souhaite tourner cette semaine" : "" },
                                 m.init,
                                 avoidW ? " 🚫" : wishW ? " ⭐" : ""),
@@ -3219,14 +3270,15 @@ function CardioPlanning() {
     var _4 = useState({}), tourWish = _4[0], setTourWish = _4[1]; // {weekKey:{medId:true}} souhaite tourner
     var _5 = useState({}), gardeAvoid = _5[0], setGardeAvoid = _5[1]; // {dateKey:{medId:true}} préfère pas de garde ce jour
     var _6 = useState({}), gardeWish = _6[0], setGardeWish = _6[1]; // {dateKey:{medId:true}} souhaite la garde ce jour
-    var _7 = useState({ len: 4, startM: 6 }), periodCfg = _7[0], setPeriodCfg = _7[1];
+    var _7 = useState({}), tourDerog = _7[0], setTourDerog = _7[1]; // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
+    var _8 = useState({ len: 4, startM: 6 }), periodCfg = _8[0], setPeriodCfg = _8[1];
     PCFG.len = periodCfg.len;
     PCFG.startM = periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
-    var _8 = useState({}), astreinte = _8[0], setAstreinte = _8[1]; // {wKey: medId}
-    var _9 = useState(null), astDayModal = _9[0], setAstDayModal = _9[1]; // legacy
-    var _10 = useState(null), astPickModal = _10[0], setAstPickModal = _10[1]; // {dayKey,wKey,isWeek,label}
-    var _11 = useState(""), astSearch = _11[0], setAstSearch = _11[1];
-    var _12 = useState(false), ast4M = _12[0], setAst4M = _12[1];
+    var _9 = useState({}), astreinte = _9[0], setAstreinte = _9[1]; // {wKey: medId}
+    var _10 = useState(null), astDayModal = _10[0], setAstDayModal = _10[1]; // legacy
+    var _11 = useState(null), astPickModal = _11[0], setAstPickModal = _11[1]; // {dayKey,wKey,isWeek,label}
+    var _12 = useState(""), astSearch = _12[0], setAstSearch = _12[1];
+    var _13 = useState(false), ast4M = _13[0], setAst4M = _13[1];
     // Get astreinte medId for a given day
     var getAstreinteForDay = React.useCallback(function (y, m, d) {
         var dayKey = y + "-" + m + "-" + d;
@@ -3242,19 +3294,19 @@ function CardioPlanning() {
         return (v !== undefined && v !== null) ? String(v) : null;
     }, [astreinte]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
-    var _13 = useState(function () { return new Date().getFullYear(); }), astYear = _13[0], setAstYear = _13[1];
-    var _14 = useState(function () { return new Date().getMonth(); }), astMonth = _14[0], setAstMonth = _14[1];
-    var _15 = useState(function () { return new Date().getFullYear(); }), tourYear = _15[0], setTourYear = _15[1];
-    var _16 = useState(function () { return new Date().getMonth(); }), tourMonth = _16[0], setTourMonth = _16[1];
-    var _17 = useState("connecting"), fbStatus = _17[0], setFbStatus = _17[1];
-    var _18 = useState(function () { try {
+    var _14 = useState(function () { return new Date().getFullYear(); }), astYear = _14[0], setAstYear = _14[1];
+    var _15 = useState(function () { return new Date().getMonth(); }), astMonth = _15[0], setAstMonth = _15[1];
+    var _16 = useState(function () { return new Date().getFullYear(); }), tourYear = _16[0], setTourYear = _16[1];
+    var _17 = useState(function () { return new Date().getMonth(); }), tourMonth = _17[0], setTourMonth = _17[1];
+    var _18 = useState("connecting"), fbStatus = _18[0], setFbStatus = _18[1];
+    var _19 = useState(function () { try {
         return localStorage.getItem("cp6_vaczone") || "B";
     }
     catch (_a) {
         return "B";
-    } }), vacZone = _18[0], setVacZone = _18[1];
-    var _19 = useState(new Set()), vacDates = _19[0], setVacDates = _19[1]; // Set of "YYYY-MM-DD" strings
-    var _20 = useState(null), vacSource = _20[0], setVacSource = _20[1]; // provenance des données vacances
+    } }), vacZone = _19[0], setVacZone = _19[1];
+    var _20 = useState(new Set()), vacDates = _20[0], setVacDates = _20[1]; // Set of "YYYY-MM-DD" strings
+    var _21 = useState(null), vacSource = _21[0], setVacSource = _21[1]; // provenance des données vacances
     // Vacances scolaires : fichier iCal officiel du ministère (l'ancienne API records a été retirée)
     // + calendrier officiel 2025-2027 embarqué en secours (arrêté du 22/10/2025, JO 23/10/2025)
     var VAC_FALLBACK = {
@@ -3383,6 +3435,8 @@ function CardioPlanning() {
                         setGardeAvoid(JSON.parse(data.gardeAvoid));
                     if (data.gardeWish)
                         setGardeWish(JSON.parse(data.gardeWish));
+                    if (data.tourDerog)
+                        setTourDerog(JSON.parse(data.tourDerog));
                     if (data.periodCfg)
                         setPeriodCfg(JSON.parse(data.periodCfg));
                     if (data.medPins)
@@ -3399,7 +3453,7 @@ function CardioPlanning() {
         return function () { return unsub(); };
     }, []);
     /* ── Sauvegardes automatiques (72h, 10 conservées) ── */
-    var _21 = useState([]), backupList = _21[0], setBackupList = _21[1]; // [{id,ts}]
+    var _22 = useState([]), backupList = _22[0], setBackupList = _22[1]; // [{id,ts}]
     var refreshBackupList = useCallback(function () { return __awaiter(_this, void 0, void 0, function () {
         var snap, items_1, e_1;
         return __generator(this, function (_a) {
@@ -3530,6 +3584,202 @@ function CardioPlanning() {
         }); }, 6000);
         return function () { return clearTimeout(t); };
     }, []);
+    /* ── Cohérence planning ↔ tour : retrait/réapplication à l'assignation ── */
+    var clearWeekActivities = useCallback(function (pairs) {
+        // pairs: [{medId,weekKey}] — retire les activités (dont TP) des nouveaux tourneurs, garde abs/gardes/formations
+        var PROT2 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION"];
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            pairs.forEach(function (_a) {
+                var medId = _a.medId, weekKey = _a.weekKey;
+                var _b = weekKey.split("-").map(Number), wy2 = _b[0], wm2 = _b[1], wd2 = _b[2];
+                var _loop_4 = function (i) {
+                    var dt = new Date(wy2, wm2, wd2 + i);
+                    var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
+                    if (isWE(dy, dm3, dd))
+                        return "continue";
+                    ["M", "AM"].forEach(function (sl) {
+                        var k = sk(dy, dm3, dd, sl);
+                        if (!next[k] || !next[k][medId])
+                            return;
+                        var e = next[k][medId];
+                        var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
+                        if (PROT2.includes(a))
+                            return;
+                        var dm2 = __assign({}, next[k]);
+                        delete dm2[medId];
+                        next[k] = dm2;
+                    });
+                };
+                for (var i = 0; i < 5; i++) {
+                    _loop_4(i);
+                }
+            });
+            return next;
+        });
+    }, []);
+    var reapplyPTWeek = useCallback(function (medId, weekKey) {
+        var med = medecins.find(function (m) { return m.id === medId; });
+        if (!med)
+            return;
+        var pt = planningType[medId];
+        var PROT2 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION", "TOUR_HC", "TOUR_USIC"];
+        var _a = weekKey.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            var _loop_5 = function (i) {
+                var dt = new Date(wy2, wm2, wd2 + i);
+                var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
+                if (isWE(dy, dm3, dd))
+                    return "continue";
+                var dw2 = dow(dy, dm3, dd);
+                var isOff = med.partTime && (med.workDays || {})[String(dw2)] === false;
+                ["M", "AM"].forEach(function (sl) {
+                    var _a, _b;
+                    var k = sk(dy, dm3, dd, sl);
+                    var ex = (next[k] || {})[medId];
+                    var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
+                    if (PROT2.includes(exA))
+                        return;
+                    if (isOff) {
+                        if (!next[k])
+                            next[k] = {};
+                        next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[medId] = { acteId: "TP", salle: null }, _a));
+                        return;
+                    }
+                    if (!pt || !pt[dw2])
+                        return;
+                    var _c = (pt[dw2][sl]) || [null, null], acteId = _c[0], salle = _c[1];
+                    if (!acteId)
+                        return;
+                    if (!next[k])
+                        next[k] = {};
+                    next[k] = __assign(__assign({}, next[k]), (_b = {}, _b[medId] = { acteId: acteId, salle: salle || null }, _b));
+                });
+            };
+            for (var i = 0; i < 5; i++) {
+                _loop_5(i);
+            }
+            return next;
+        });
+    }, [medecins, planningType]);
+    /* ── Temps partiel & USIC : dérogation + TP + junior remplaçant ── */
+    var applyTPForWeek = useCallback(function (medId, weekKey) {
+        var med = medecins.find(function (m) { return m.id === medId; });
+        if (!med || !med.partTime)
+            return;
+        var offDows = [1, 2, 3, 4, 5].filter(function (dw2) { return (med.workDays || {})[String(dw2)] === false; });
+        if (offDows.length === 0)
+            return;
+        var _a = weekKey.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+        var juniors = medecins.filter(function (m) { return m.statut === "junior" && m.tourMed && m.id !== medId; });
+        // compteur de remplacements existants (entrées plan TOUR_USIC réelles) par junior sur ±60 jours
+        var replCount = {};
+        juniors.forEach(function (j) { replCount[j.id] = 0; });
+        Object.keys(plan).forEach(function (k) {
+            var dm2 = plan[k] || {};
+            juniors.forEach(function (j) {
+                var e = Array.isArray(dm2[j.id]) ? dm2[j.id][0] : dm2[j.id];
+                if (e && e.acteId === "TOUR_USIC")
+                    replCount[j.id]++;
+            });
+        });
+        var newDerog = {}, planPatch = {}, choices = [];
+        offDows.forEach(function (dw2) {
+            var dt = new Date(wy2, wm2, wd2 + (dw2 - 1));
+            var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
+            var dk2 = dKey(dy, dm3, dd);
+            newDerog[dk2] = medId;
+            ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][medId] = { acteId: "TP", salle: null }; });
+            // junior dispo ce jour : pas absent, pas déjà tourneur cette semaine
+            var wmW = tourMed[weekKey] || { HC: [], USIC: [] };
+            var busyIds = __spreadArray(__spreadArray([], (wmW.HC || []), true), (wmW.USIC || []), true);
+            var avail = juniors.filter(function (j) {
+                if (busyIds.includes(j.id))
+                    return false;
+                var es = __spreadArray([], (["M", "AM"].map(function (sl) { var e = (plan[sk(dy, dm3, dd, sl)] || {})[j.id]; return Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId); })), true);
+                return !es.some(function (a) { return ["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE"].includes(a); });
+            });
+            avail.sort(function (a, b) { return replCount[a.id] - replCount[b.id] || Math.random() - 0.5; });
+            var jr = avail[0];
+            if (jr) {
+                replCount[jr.id]++;
+                ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][jr.id] = { acteId: "TOUR_USIC", salle: null }; });
+                choices.push(jr.init + " remplace " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + ")");
+            }
+            else {
+                choices.push("⚠ aucun junior dispo pour remplacer " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + ")");
+            }
+        });
+        setTourDerog(function (p) {
+            var n = __assign({}, p);
+            Object.keys(newDerog).forEach(function (dk2) {
+                var _a;
+                n[dk2] = __assign(__assign({}, (n[dk2] || {})), (_a = {}, _a[newDerog[dk2]] = true, _a));
+            });
+            return n;
+        });
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            Object.keys(planPatch).forEach(function (k) { next[k] = __assign(__assign({}, (next[k] || {})), planPatch[k]); });
+            return next;
+        });
+        if (choices.length > 0)
+            toast("Temps partiel USIC : " + choices.join(" · "), "info");
+    }, [medecins, plan, tourMed]);
+    var cleanTPForWeek = useCallback(function (medId, weekKey) {
+        var med = medecins.find(function (m) { return m.id === medId; });
+        if (!med || !med.partTime)
+            return;
+        var offDows = [1, 2, 3, 4, 5].filter(function (dw2) { return (med.workDays || {})[String(dw2)] === false; });
+        if (offDows.length === 0)
+            return;
+        var _a = weekKey.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+        var dks = [], sks = [];
+        offDows.forEach(function (dw2) {
+            var dt = new Date(wy2, wm2, wd2 + (dw2 - 1));
+            var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
+            dks.push(dKey(dy, dm3, dd));
+            ["M", "AM"].forEach(function (sl) { return sks.push(sk(dy, dm3, dd, sl)); });
+        });
+        setTourDerog(function (p) {
+            var n = __assign({}, p);
+            dks.forEach(function (dk2) { if (n[dk2] && n[dk2][medId]) {
+                var o = __assign({}, n[dk2]);
+                delete o[medId];
+                if (Object.keys(o).length === 0)
+                    delete n[dk2];
+                else
+                    n[dk2] = o;
+            } });
+            return n;
+        });
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            sks.forEach(function (k) {
+                if (!next[k])
+                    return;
+                var dm2 = __assign({}, next[k]);
+                var ch = false;
+                // retirer le TP du médecin + les remplacements junior TOUR_USIC posés ce jour
+                var eM = Array.isArray(dm2[medId]) ? dm2[medId][0] : dm2[medId];
+                if (eM && eM.acteId === "TP") {
+                    delete dm2[medId];
+                    ch = true;
+                }
+                Object.keys(dm2).forEach(function (mid) {
+                    var e = Array.isArray(dm2[mid]) ? dm2[mid][0] : dm2[mid];
+                    if (e && e.acteId === "TOUR_USIC") {
+                        delete dm2[mid];
+                        ch = true;
+                    }
+                });
+                if (ch)
+                    next[k] = dm2;
+            });
+            return next;
+        });
+    }, [medecins]);
     var saveToFirebase = useCallback(function (data) { return __awaiter(_this, void 0, void 0, function () {
         var err_1;
         return __generator(this, function (_a) {
@@ -3573,6 +3823,8 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ gardeWish: JSON.stringify(gardeWish) }); }, [gardeWish]);
     useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ tourDerog: JSON.stringify(tourDerog) }); }, [tourDerog]);
+    useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ planningType: JSON.stringify(planningType) }); }, [planningType]);
@@ -3598,7 +3850,7 @@ function CardioPlanning() {
     var isEdit = accessMode === "edit";
     // ─── Undo/Redo history (edit mode) ───
     var histRef = useRef({ stack: [], idx: -1, restoring: false });
-    var _22 = useState(0), histVer = _22[0], setHistVer = _22[1];
+    var _23 = useState(0), histVer = _23[0], setHistVer = _23[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
     useEffect(function () {
         if (isFirstLoad.current)
@@ -3687,6 +3939,8 @@ function CardioPlanning() {
             return Array.isArray(entries) ? entries : [entries];
         if (!isWE(y2, m2, d2) && (slot === "M" || slot === "AM")) {
             var wk = wKey(y2, m2, d2), wm = tourMed[wk] || { HC: [], USIC: [] };
+            if (((tourDerog || {})[dKey(y2, m2, d2)] || {})[medId])
+                return [];
             if ((wm.HC || []).includes(medId))
                 return [{ acteId: "TOUR_HC", salle: null }];
             if ((wm.USIC || []).includes(medId))
@@ -3813,7 +4067,7 @@ function CardioPlanning() {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
             while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_4 = function (d) {
+                var _loop_6 = function (d) {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
@@ -3826,7 +4080,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_4(d);
+                    _loop_6(d);
                 }
                 if (cm === 11) {
                     cy++;
@@ -3847,7 +4101,7 @@ function CardioPlanning() {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
             while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_5 = function (d) {
+                var _loop_7 = function (d) {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
@@ -3866,7 +4120,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_5(d);
+                    _loop_7(d);
                 }
                 if (cm === 11) {
                     cy++;
@@ -3891,7 +4145,7 @@ function CardioPlanning() {
             monthsList.forEach(function (_a) {
                 var ay = _a.y, am = _a.m;
                 var dim = new Date(ay, am + 1, 0).getDate();
-                var _loop_6 = function (d) {
+                var _loop_8 = function (d) {
                     if (isWE(ay, am, d))
                         return "continue";
                     if (fromToday && new Date(ay, am, d) < tod)
@@ -3902,6 +4156,20 @@ function CardioPlanning() {
                     targets.forEach(function (med) {
                         if (allTm.includes(med.id))
                             return;
+                        if (med.partTime && (med.workDays || {})[String(dw)] === false) {
+                            ["M", "AM"].forEach(function (sl) {
+                                var _a;
+                                var k = sk(ay, am, d, sl), ex = (next[k] || {})[med.id];
+                                var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
+                                if (["ABSENCE", "GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"].includes(exA))
+                                    return;
+                                if (!next[k])
+                                    next[k] = {};
+                                next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = { acteId: "TP", salle: null }, _a));
+                                nApplied++;
+                            });
+                            return;
+                        }
                         var pt = planningType[med.id];
                         if (!pt || !pt[dw])
                             return;
@@ -3909,7 +4177,7 @@ function CardioPlanning() {
                             var _a;
                             var k = sk(ay, am, d, sl), ex = (next[k] || {})[med.id];
                             var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                            if (["ABSENCE", "GARDE", "REPOS_GARDE"].includes(exA))
+                            if (["ABSENCE", "GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "TP"].includes(exA))
                                 return;
                             var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1];
                             if (!acteId)
@@ -3922,7 +4190,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dim; d++) {
-                    _loop_6(d);
+                    _loop_8(d);
                 }
             });
             return next;
@@ -3931,9 +4199,9 @@ function CardioPlanning() {
         toast("Planning type appliqué (" + medLbl + ", " + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")", "info");
     }, [medecins, planningType, tourMed]);
     /* ── Modale d'application du PT ── */
-    var _23 = React.useState(null), ptModal = _23[0], setPtModal = _23[1]; // null | {medId:null|number}
-    var _24 = React.useState([]), ptMonths = _24[0], setPtMonths = _24[1]; // indices cochés
-    var _25 = React.useState(true), ptFromToday = _25[0], setPtFromToday = _25[1];
+    var _24 = React.useState(null), ptModal = _24[0], setPtModal = _24[1]; // null | {medId:null|number}
+    var _25 = React.useState([]), ptMonths = _25[0], setPtMonths = _25[1]; // indices cochés
+    var _26 = React.useState(true), ptFromToday = _26[0], setPtFromToday = _26[1];
     var ptPeriodMonths = React.useMemo(function () {
         var p = perStart(year, month);
         var arr = [];
@@ -3953,7 +4221,7 @@ function CardioPlanning() {
             monthsList.forEach(function (_a) {
                 var ay = _a.y, am = _a.m;
                 var dim = new Date(ay, am + 1, 0).getDate();
-                var _loop_7 = function (d) {
+                var _loop_9 = function (d) {
                     if (fromToday && new Date(ay, am, d) < tod)
                         return "continue";
                     ["M", "AM", "JOUR", "N"].forEach(function (sl) {
@@ -3977,7 +4245,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dim; d++) {
-                    _loop_7(d);
+                    _loop_9(d);
                 }
             });
             return next;
@@ -4281,7 +4549,7 @@ function CardioPlanning() {
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
@@ -4942,6 +5210,21 @@ function CardioPlanning() {
                         "\u25B6 PT ",
                         med && med.init),
                     canEditThisMed && med && (med.tourMed || med.garde) && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#7c3aed", background: "#f3e8ff", color: "#6d28d9" }), onClick: function () { setModal("prefs"); } }, "\u2699\uFE0F Pr\u00E9f\u00E9rences tour & garde\u2026"),
+                    canEditThisMed && med && (function () {
+                        var wkC = wKey(y2, m2, d2), wmC = tourMed[wkC] || { HC: [], USIC: [] };
+                        var isTourWk = __spreadArray(__spreadArray([], (wmC.HC || []), true), (wmC.USIC || []), true).includes(medId);
+                        if (!isTourWk || isWE(y2, m2, d2))
+                            return null;
+                        var dkC = dKey(y2, m2, d2);
+                        var derog = ((tourDerog || {})[dkC] || {})[medId];
+                        return (React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: derog ? "#16a34a" : "#f59e0b", background: derog ? "rgba(22,163,74,.10)" : "rgba(245,158,11,.10)", color: derog ? "#16a34a" : "#b45309" }), onClick: function () { setTourDerog(function (p) { var n = __assign({}, p); var o = __assign({}, (n[dkC] || {})); if (o[medId])
+                                delete o[medId];
+                            else
+                                o[medId] = true; if (Object.keys(o).length === 0)
+                                delete n[dkC];
+                            else
+                                n[dkC] = o; return n; }); } }, derog ? "↩ Remettre au tour ce jour" : "✂ Retirer du tour ce jour"));
+                    })(),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { return clearPlanningType(medId); } },
                         "\uD83D\uDDD1 Effacer mois ",
                         med && med.nom),
@@ -5073,7 +5356,7 @@ function CardioPlanning() {
                     // Remove all non-system entries for medId over the period
                     var df = new Date(dateFrom), dt = new Date(dateTo);
                     var cur = new Date(df);
-                    var _loop_8 = function () {
+                    var _loop_10 = function () {
                         var y3 = cur.getFullYear(), m3 = cur.getMonth(), d3 = cur.getDate();
                         var slotsToClr = slots.includes("ALL") || slots.length === 2 ? ["M", "AM", "JOUR"] : slots;
                         slotsToClr.forEach(function (sl) {
@@ -5096,7 +5379,7 @@ function CardioPlanning() {
                         cur.setDate(cur.getDate() + 1);
                     };
                     while (cur <= dt) {
-                        _loop_8();
+                        _loop_10();
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
@@ -5195,6 +5478,20 @@ function CardioPlanning() {
                         React.createElement("label", { style: { display: "flex", gap: 5, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
                             React.createElement("input", { type: "checkbox", checked: !!mData.pref2USIC, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { pref2USIC: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
                             "USIC")),
+                    React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" } },
+                        React.createElement("label", { style: { display: "flex", gap: 5, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: !!mData.partTime, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { partTime: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
+                            "Temps partiel"),
+                        mData.partTime && React.createElement("span", { style: { fontSize: 12, color: "var(--txt3)" } }, "Jours travaill\u00E9s :"),
+                        mData.partTime && [["1", "Lun"], ["2", "Mar"], ["3", "Mer"], ["4", "Jeu"], ["5", "Ven"]].map(function (_a) {
+                            var dk = _a[0], lb = _a[1];
+                            return (React.createElement("label", { key: dk, style: { display: "flex", gap: 3, alignItems: "center", color: "var(--txt2)", fontSize: 12, cursor: "pointer" } },
+                                React.createElement("input", { type: "checkbox", checked: (mData.workDays || {})[dk] !== false, onChange: function (e) { return setMData(function (p) {
+                                        var _a;
+                                        return (__assign(__assign({}, p), { workDays: __assign(__assign({}, (p.workDays || {})), (_a = {}, _a[dk] = e.target.checked, _a)) }));
+                                    }); }, style: { width: 13, height: 13 } }),
+                                lb));
+                        })),
                     mData.garde && React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" } },
                         React.createElement("span", { style: { fontSize: 13, color: "var(--txt2)" } }, "Volume de gardes :"),
                         React.createElement("select", { value: mData.gardeFactor || "normal", onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { gardeFactor: e.target.value })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } },
