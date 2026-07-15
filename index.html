@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.8 — 15/07/2026";
+var APP_VERSION = "v8.10 — 15/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2189,7 +2189,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -2363,7 +2363,7 @@ function TourTab(_a) {
                 if (e && e.acteId === "TOUR_USIC") {
                     var jr = medecins.find(function (m2) { return String(m2.id) === String(mid); });
                     var tp = derogMeds.length > 0 ? medecins.find(function (m2) { return String(m2.id) === String(derogMeds[0]); }) : null;
-                    infos.push((jr ? jr.init : "?") + " remplace " + (tp ? tp.init : "?") + " (" + JOURS_TP[dt.getDay()] + " " + dd + ")");
+                    infos.push((jr ? jr.init : "?") + " remplace " + (tp ? tp.init : "?") + " (" + JOURS_TP[dt.getDay()] + " " + dd + " " + MOIS[dm3].slice(0, 4) + (MOIS[dm3].length > 4 ? "." : "") + ")");
                 }
             });
         };
@@ -2377,15 +2377,14 @@ function TourTab(_a) {
     var SPEC_COLORS = { coro: "#76a5af", pace: "#e3b341", eep: "#f97316", ett: "#ea9999" };
     // ─── Auto-répartition ───
     var _h = React.useState(false), autoModal = _h[0], setAutoModal = _h[1];
-    var _j = React.useState(null), lastReport = _j[0], setLastReport = _j[1];
-    var _k = React.useState(1), cfgMinEEP = _k[0], setCfgMinEEP = _k[1];
-    var _l = React.useState(1), cfgMinPace = _l[0], setCfgMinPace = _l[1];
-    var _m = React.useState(1), cfgMinETT = _m[0], setCfgMinETT = _m[1];
-    var _o = React.useState(3), cfgMinCoro = _o[0], setCfgMinCoro = _o[1];
-    var _p = React.useState({}), cfgExcl = _p[0], setCfgExcl = _p[1]; // {medId: true = ne participe pas}
-    var _q = React.useState({}), cfgWeeks = _q[0], setCfgWeeks = _q[1]; // {medId: nWeeks}
-    var _r = React.useState({}), cfgPref2HC = _r[0], setCfgPref2HC = _r[1]; // {medId: bool}
-    var _s = React.useState({}), cfgPref2USIC = _s[0], setCfgPref2USIC = _s[1]; // {medId: bool}
+    var _j = React.useState(1), cfgMinEEP = _j[0], setCfgMinEEP = _j[1];
+    var _k = React.useState(1), cfgMinPace = _k[0], setCfgMinPace = _k[1];
+    var _l = React.useState(1), cfgMinETT = _l[0], setCfgMinETT = _l[1];
+    var _m = React.useState(3), cfgMinCoro = _m[0], setCfgMinCoro = _m[1];
+    var _o = React.useState({}), cfgExcl = _o[0], setCfgExcl = _o[1]; // {medId: true = ne participe pas}
+    var _p = React.useState({}), cfgWeeks = _p[0], setCfgWeeks = _p[1]; // {medId: nWeeks}
+    var _q = React.useState({}), cfgPref2HC = _q[0], setCfgPref2HC = _q[1]; // {medId: bool}
+    var _r = React.useState({}), cfgPref2USIC = _r[0], setCfgPref2USIC = _r[1]; // {medId: bool}
     var totalSlots = weeksT.length * 4; // 2 HC + 2 USIC per week
     var activeMeds = tourMeds.filter(function (m) { return !cfgExcl[m.id]; });
     var nominalW = activeMeds.length > 0 ? Math.ceil(totalSlots / activeMeds.length) : 0;
@@ -2824,6 +2823,7 @@ function TourTab(_a) {
                         if (!window.confirm("Confirmez-vous la suppression définitive ? (récupérable via le bouton Annuler ↶)"))
                             return;
                         setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { delete n[w.key]; }); return n; });
+                        setLastReport(null);
                         toast("Attributions de la période supprimées", "info");
                     }, title: "Effacer toutes les attributions de la p\u00E9riode", style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "4px 10px", background: "#dc2626" }) }, "\uD83D\uDDD1 Tout effacer"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
@@ -2831,8 +2831,7 @@ function TourTab(_a) {
             React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
             React.createElement("span", { style: { flex: 1 } },
                 lastReport,
-                (function () { var all = []; weeksT.forEach(function (w2) { return weekTPInfo(w2.key).forEach(function (t3) { return all.push(t3); }); }); return all.length > 0 ? " ✂ Remplacements TP : " + all.join(" · ") + "." : ""; })()),
-            React.createElement("button", { onClick: function () { return setLastReport(null); }, style: { border: "none", background: "none", color: "var(--txt3)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 } }, "\u00D7")),
+                (function () { var all = []; weeksT.forEach(function (w2) { return weekTPInfo(w2.key).forEach(function (t3) { return all.push(t3); }); }); return all.length > 0 ? " ✂ Remplacements TP : " + all.join(" · ") + "." : ""; })())),
         React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 4, position: "sticky", top: 44, zIndex: 30, background: "var(--bg)", paddingTop: 4 } }, tourMeds.map(function (m) {
             var hcCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.HC || []).includes(m.id) ? n + 1 : n; }, 0);
             var usicCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.USIC || []).includes(m.id) ? n + 1 : n; }, 0);
@@ -3305,14 +3304,15 @@ function CardioPlanning() {
     var _5 = useState({}), gardeAvoid = _5[0], setGardeAvoid = _5[1]; // {dateKey:{medId:true}} préfère pas de garde ce jour
     var _6 = useState({}), gardeWish = _6[0], setGardeWish = _6[1]; // {dateKey:{medId:true}} souhaite la garde ce jour
     var _7 = useState({}), tourDerog = _7[0], setTourDerog = _7[1]; // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
-    var _8 = useState({ len: 4, startM: 6 }), periodCfg = _8[0], setPeriodCfg = _8[1];
+    var _8 = useState(null), tourReport = _8[0], setTourReport = _8[1]; // rapport persistant de la dernière répartition auto du tour
+    var _9 = useState({ len: 4, startM: 6 }), periodCfg = _9[0], setPeriodCfg = _9[1];
     PCFG.len = periodCfg.len;
     PCFG.startM = periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
-    var _9 = useState({}), astreinte = _9[0], setAstreinte = _9[1]; // {wKey: medId}
-    var _10 = useState(null), astDayModal = _10[0], setAstDayModal = _10[1]; // legacy
-    var _11 = useState(null), astPickModal = _11[0], setAstPickModal = _11[1]; // {dayKey,wKey,isWeek,label}
-    var _12 = useState(""), astSearch = _12[0], setAstSearch = _12[1];
-    var _13 = useState(false), ast4M = _13[0], setAst4M = _13[1];
+    var _10 = useState({}), astreinte = _10[0], setAstreinte = _10[1]; // {wKey: medId}
+    var _11 = useState(null), astDayModal = _11[0], setAstDayModal = _11[1]; // legacy
+    var _12 = useState(null), astPickModal = _12[0], setAstPickModal = _12[1]; // {dayKey,wKey,isWeek,label}
+    var _13 = useState(""), astSearch = _13[0], setAstSearch = _13[1];
+    var _14 = useState(false), ast4M = _14[0], setAst4M = _14[1];
     // Get astreinte medId for a given day
     var getAstreinteForDay = React.useCallback(function (y, m, d) {
         var dayKey = y + "-" + m + "-" + d;
@@ -3328,19 +3328,19 @@ function CardioPlanning() {
         return (v !== undefined && v !== null) ? String(v) : null;
     }, [astreinte]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
-    var _14 = useState(function () { return new Date().getFullYear(); }), astYear = _14[0], setAstYear = _14[1];
-    var _15 = useState(function () { return new Date().getMonth(); }), astMonth = _15[0], setAstMonth = _15[1];
-    var _16 = useState(function () { return new Date().getFullYear(); }), tourYear = _16[0], setTourYear = _16[1];
-    var _17 = useState(function () { return new Date().getMonth(); }), tourMonth = _17[0], setTourMonth = _17[1];
-    var _18 = useState("connecting"), fbStatus = _18[0], setFbStatus = _18[1];
-    var _19 = useState(function () { try {
+    var _15 = useState(function () { return new Date().getFullYear(); }), astYear = _15[0], setAstYear = _15[1];
+    var _16 = useState(function () { return new Date().getMonth(); }), astMonth = _16[0], setAstMonth = _16[1];
+    var _17 = useState(function () { return new Date().getFullYear(); }), tourYear = _17[0], setTourYear = _17[1];
+    var _18 = useState(function () { return new Date().getMonth(); }), tourMonth = _18[0], setTourMonth = _18[1];
+    var _19 = useState("connecting"), fbStatus = _19[0], setFbStatus = _19[1];
+    var _20 = useState(function () { try {
         return localStorage.getItem("cp6_vaczone") || "B";
     }
     catch (_a) {
         return "B";
-    } }), vacZone = _19[0], setVacZone = _19[1];
-    var _20 = useState(new Set()), vacDates = _20[0], setVacDates = _20[1]; // Set of "YYYY-MM-DD" strings
-    var _21 = useState(null), vacSource = _21[0], setVacSource = _21[1]; // provenance des données vacances
+    } }), vacZone = _20[0], setVacZone = _20[1];
+    var _21 = useState(new Set()), vacDates = _21[0], setVacDates = _21[1]; // Set of "YYYY-MM-DD" strings
+    var _22 = useState(null), vacSource = _22[0], setVacSource = _22[1]; // provenance des données vacances
     // Vacances scolaires : fichier iCal officiel du ministère (l'ancienne API records a été retirée)
     // + calendrier officiel 2025-2027 embarqué en secours (arrêté du 22/10/2025, JO 23/10/2025)
     var VAC_FALLBACK = {
@@ -3475,6 +3475,8 @@ function CardioPlanning() {
                         setGardeWish(JSON.parse(data.gardeWish));
                     if (data.tourDerog)
                         setTourDerog(JSON.parse(data.tourDerog));
+                    if (data.tourReport !== undefined && data.tourReport !== "")
+                        setTourReport(data.tourReport);
                     if (data.periodCfg)
                         setPeriodCfg(JSON.parse(data.periodCfg));
                     if (data.medPins)
@@ -3491,7 +3493,7 @@ function CardioPlanning() {
         return function () { return unsub(); };
     }, []);
     /* ── Sauvegardes automatiques (72h, 10 conservées) ── */
-    var _22 = useState([]), backupList = _22[0], setBackupList = _22[1]; // [{id,ts}]
+    var _23 = useState([]), backupList = _23[0], setBackupList = _23[1]; // [{id,ts}]
     var refreshBackupList = useCallback(function () { return __awaiter(_this, void 0, void 0, function () {
         var snap, items_1, e_1;
         return __generator(this, function (_a) {
@@ -3562,8 +3564,74 @@ function CardioPlanning() {
             }
         });
     }); }, [refreshBackupList]);
+    var _24 = useState(null), bkPreview = _24[0], setBkPreview = _24[1]; // {ts, stats}
+    var statsOf = function (planObj, tourObj, medsArr) {
+        var nEntries = 0, nGardes = 0;
+        var byMonth = {};
+        Object.keys(planObj || {}).forEach(function (k) {
+            var dm2 = planObj[k] || {};
+            var n = Object.keys(dm2).length;
+            nEntries += n;
+            var mKey = k.slice(0, 7); // "2026-07"
+            byMonth[mKey] = (byMonth[mKey] || 0) + n;
+            Object.keys(dm2).forEach(function (mid) {
+                var e = Array.isArray(dm2[mid]) ? dm2[mid][0] : dm2[mid];
+                if (e && e.acteId === "GARDE")
+                    nGardes++;
+            });
+        });
+        var nTourW = Object.keys(tourObj || {}).filter(function (k) {
+            var w = tourObj[k] || {};
+            return ((w.HC || []).length + (w.USIC || []).length) > 0;
+        }).length;
+        return { nEntries: nEntries, nGardes: nGardes, nTourW: nTourW, nMeds: (medsArr || []).length, byMonth: byMonth };
+    };
+    var previewBackup = useCallback(function (id, ts) { return __awaiter(_this, void 0, void 0, function () {
+        var snap, d, bPlan_1, bTour, bMeds, sB, sC, added_1, removed_1, changed_1, allK, e_3;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    _a.trys.push([0, 2, , 3]);
+                    return [4 /*yield*/, window.firebaseDB.collection("backups").doc(id).get()];
+                case 1:
+                    snap = _a.sent();
+                    d = snap.data() || {};
+                    bPlan_1 = d.plan ? JSON.parse(d.plan) : {};
+                    bTour = d.tourMed ? JSON.parse(d.tourMed) : {};
+                    bMeds = d.medecins ? JSON.parse(d.medecins) : [];
+                    sB = statsOf(bPlan_1, bTour, bMeds);
+                    sC = statsOf(plan, tourMed, medecins);
+                    added_1 = 0, removed_1 = 0, changed_1 = 0;
+                    allK = new Set(__spreadArray(__spreadArray([], Object.keys(bPlan_1), true), Object.keys(plan), true));
+                    allK.forEach(function (k) {
+                        var a = bPlan_1[k] || {}, c2 = plan[k] || {};
+                        var mids = new Set(__spreadArray(__spreadArray([], Object.keys(a), true), Object.keys(c2), true));
+                        mids.forEach(function (mid) {
+                            var ja = JSON.stringify(a[mid] || null), jc = JSON.stringify(c2[mid] || null);
+                            if (ja === jc)
+                                return;
+                            if (a[mid] && !c2[mid])
+                                removed_1++; // présent dans la sauvegarde, absent aujourd'hui (serait ré-ajouté)
+                            else if (!a[mid] && c2[mid])
+                                added_1++; // ajouté depuis (serait perdu)
+                            else
+                                changed_1++;
+                        });
+                    });
+                    setBkPreview({ id: id, ts: ts, b: sB, c: sC, added: added_1, removed: removed_1, changed: changed_1 });
+                    return [3 /*break*/, 3];
+                case 2:
+                    e_3 = _a.sent();
+                    toast("Impossible de charger l'aperçu", "warn");
+                    return [3 /*break*/, 3];
+                case 3: return [2 /*return*/];
+            }
+        });
+    }); }, [plan, tourMed, medecins]);
+    useEffect(function () { if (tab === "partage")
+        refreshBackupList(); }, [tab]);
     var restoreBackup = useCallback(function (id) { return __awaiter(_this, void 0, void 0, function () {
-        var d, data, _ts, rest, e_3;
+        var d, data, _ts, rest, e_4;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
@@ -3583,8 +3651,8 @@ function CardioPlanning() {
                     toast("Sauvegarde restaurée — rechargez la page si besoin", "info");
                     return [3 /*break*/, 4];
                 case 3:
-                    e_3 = _a.sent();
-                    console.log("restore:", e_3);
+                    e_4 = _a.sent();
+                    console.log("restore:", e_4);
                     toast("Échec de la restauration", "warn");
                     return [3 /*break*/, 4];
                 case 4: return [2 /*return*/];
@@ -3594,7 +3662,7 @@ function CardioPlanning() {
     useEffect(function () {
         // Au chargement : backup auto si la dernière date de plus de 72 h
         var t = setTimeout(function () { return __awaiter(_this, void 0, void 0, function () {
-            var d, last, e_4;
+            var d, last, e_5;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -3613,8 +3681,8 @@ function CardioPlanning() {
                         _a.label = 4;
                     case 4: return [3 /*break*/, 6];
                     case 5:
-                        e_4 = _a.sent();
-                        console.log("backup check:", e_4);
+                        e_5 = _a.sent();
+                        console.log("backup check:", e_5);
                         return [3 /*break*/, 6];
                     case 6: return [2 /*return*/];
                 }
@@ -3788,10 +3856,10 @@ function CardioPlanning() {
                 if (jr) {
                     replCount[jr.id]++;
                     ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][jr.id] = { acteId: "TOUR_USIC", salle: null }; });
-                    choices.push(jr.init + " remplace " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + ")");
+                    choices.push(jr.init + " remplace " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + " " + MOIS[dm3].slice(0, 4) + (MOIS[dm3].length > 4 ? "." : "") + ")");
                 }
                 else {
-                    choices.push("⚠ aucun junior dispo pour remplacer " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + ")");
+                    choices.push("⚠ aucun junior dispo pour remplacer " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + " " + MOIS[dm3].slice(0, 4) + (MOIS[dm3].length > 4 ? "." : "") + ")");
                 }
             });
         });
@@ -3909,6 +3977,8 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourDerog: JSON.stringify(tourDerog) }); }, [tourDerog]);
     useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ tourReport: tourReport || "" }); }, [tourReport]);
+    useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ planningType: JSON.stringify(planningType) }); }, [planningType]);
@@ -3934,7 +4004,7 @@ function CardioPlanning() {
     var isEdit = accessMode === "edit";
     // ─── Undo/Redo history (edit mode) ───
     var histRef = useRef({ stack: [], idx: -1, restoring: false });
-    var _23 = useState(0), histVer = _23[0], setHistVer = _23[1];
+    var _25 = useState(0), histVer = _25[0], setHistVer = _25[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
     useEffect(function () {
         if (isFirstLoad.current)
@@ -4284,9 +4354,9 @@ function CardioPlanning() {
         toast("Planning type appliqué (" + medLbl + ", " + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")", "info");
     }, [medecins, planningType, tourMed]);
     /* ── Modale d'application du PT ── */
-    var _24 = React.useState(null), ptModal = _24[0], setPtModal = _24[1]; // null | {medId:null|number}
-    var _25 = React.useState([]), ptMonths = _25[0], setPtMonths = _25[1]; // indices cochés
-    var _26 = React.useState(true), ptFromToday = _26[0], setPtFromToday = _26[1];
+    var _26 = React.useState(null), ptModal = _26[0], setPtModal = _26[1]; // null | {medId:null|number}
+    var _27 = React.useState([]), ptMonths = _27[0], setPtMonths = _27[1]; // indices cochés
+    var _28 = React.useState(true), ptFromToday = _28[0], setPtFromToday = _28[1];
     var ptPeriodMonths = React.useMemo(function () {
         var p = perStart(year, month);
         var arr = [];
@@ -4506,7 +4576,7 @@ function CardioPlanning() {
         var p = perNext(sy, sm);
         setYearMonth(p.sy, p.sm);
     };
-    var _27 = useState("J"), daySwapSpan = _27[0], setDaySwapSpan = _27[1];
+    var _29 = useState("J"), daySwapSpan = _29[0], setDaySwapSpan = _29[1];
     var openCell = function (medId, y2, m2, d2, slot) {
         if (!canEdit(medId))
             return;
@@ -4635,7 +4705,7 @@ function CardioPlanning() {
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
@@ -5066,6 +5136,7 @@ function CardioPlanning() {
                             backupList.length === 0 && React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune sauvegarde pour l'instant."),
                             backupList.map(function (b) { return (React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--txt)" } },
                                 React.createElement("span", { style: { flex: 1 } }, new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })),
+                                React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #388bfd", background: "var(--bg2)", color: "#388bfd", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { return previewBackup(b.id, b.ts); } }, "\uD83D\uDC41 Aper\u00E7u"),
                                 React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(b.ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?"))
                                         restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
                         React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
@@ -5130,6 +5201,62 @@ function CardioPlanning() {
                             fbStatus === "error" ? "Erreur de connexion — vérifiez votre réseau" :
                                 fbStatus === "offline" ? "Mode local — sans sauvegarde automatique" :
                                     "Connexion en cours...")))))),
+        bkPreview && (function () {
+            var ts = bkPreview.ts, b = bkPreview.b, cc = bkPreview.c, added = bkPreview.added, removed = bkPreview.removed, changed = bkPreview.changed;
+            var months = Object.keys(b.byMonth || {}).concat(Object.keys(cc.byMonth || {})).filter(function (v, i, arr) { return arr.indexOf(v) === i; }).sort();
+            var MOIS_N = { "01": "Janv", "02": "Févr", "03": "Mars", "04": "Avr", "05": "Mai", "06": "Juin", "07": "Juil", "08": "Août", "09": "Sept", "10": "Oct", "11": "Nov", "12": "Déc" };
+            var identical = added === 0 && removed === 0 && changed === 0;
+            var Row = function (_a) {
+                var label = _a.label, vb = _a.vb, vc = _a.vc;
+                return (React.createElement("tr", { style: { borderBottom: "1px solid var(--border2)" } },
+                    React.createElement("td", { style: { padding: "4px 8px", fontSize: 11, color: "var(--txt2)" } }, label),
+                    React.createElement("td", { style: { textAlign: "center", padding: "4px 8px", fontSize: 12, fontWeight: 800, color: "#388bfd" } }, vb),
+                    React.createElement("td", { style: { textAlign: "center", padding: "4px 8px", fontSize: 12, fontWeight: 700, color: "var(--txt)" } }, vc),
+                    React.createElement("td", { style: { textAlign: "center", padding: "4px 8px", fontSize: 11, fontWeight: 700, color: vb === vc ? "var(--txt3)" : (vb > vc ? "#16a34a" : "#f85149") } }, vb === vc ? "=" : (vb > vc ? "+" + (vb - vc) : (vb - vc)))));
+            };
+            return (React.createElement(Ov, { onClose: function () { return setBkPreview(null); } },
+                React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } },
+                    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
+                        React.createElement("div", { style: S.mTit2 },
+                            "\uD83D\uDC41 Aper\u00E7u \u2014 sauvegarde du ",
+                            new Date(ts).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })),
+                        React.createElement("button", { onClick: function () { return setBkPreview(null); }, style: S.xBtn }, "\u00D7")),
+                    identical
+                        ? React.createElement("div", { style: { padding: "8px 12px", borderRadius: 8, border: "1px solid #16a34a", background: "rgba(22,163,74,.08)", fontSize: 12, fontWeight: 700, color: "#16a34a", marginBottom: 10 } }, "\u2713 Cette sauvegarde est identique au planning actuel.")
+                        : React.createElement("div", { style: { padding: "8px 12px", borderRadius: 8, border: "1px solid #f59e0b", background: "rgba(245,158,11,.08)", fontSize: 12, color: "var(--txt)", marginBottom: 10, lineHeight: 1.5 } },
+                            "Restaurer cette sauvegarde : ",
+                            React.createElement("b", { style: { color: "#16a34a" } },
+                                removed,
+                                " case(s) r\u00E9-appara\u00EEtraient"),
+                            " (pr\u00E9sentes alors, effac\u00E9es depuis), ",
+                            React.createElement("b", { style: { color: "#f85149" } },
+                                added,
+                                " case(s) seraient perdues"),
+                            " (ajout\u00E9es depuis), ",
+                            React.createElement("b", { style: { color: "#e3b341" } },
+                                changed,
+                                " case(s) reviendraient \u00E0 leur ancien contenu"),
+                            "."),
+                    React.createElement("table", { style: { borderCollapse: "collapse", width: "100%", marginBottom: 10 } },
+                        React.createElement("thead", null,
+                            React.createElement("tr", null,
+                                React.createElement("th", { style: { textAlign: "left", padding: "3px 8px", fontSize: 10, color: "var(--txt3)" } }),
+                                React.createElement("th", { style: { padding: "3px 8px", fontSize: 10, color: "#388bfd" } }, "Sauvegarde"),
+                                React.createElement("th", { style: { padding: "3px 8px", fontSize: 10, color: "var(--txt3)" } }, "Actuel"),
+                                React.createElement("th", { style: { padding: "3px 8px", fontSize: 10, color: "var(--txt3)" } }, "\u0394"))),
+                        React.createElement("tbody", null,
+                            React.createElement(Row, { label: "Cases remplies (total)", vb: b.nEntries, vc: cc.nEntries }),
+                            React.createElement(Row, { label: "Gardes pos\u00E9es", vb: b.nGardes, vc: cc.nGardes }),
+                            React.createElement(Row, { label: "Semaines de tour attribu\u00E9es", vb: b.nTourW, vc: cc.nTourW }),
+                            React.createElement(Row, { label: "Membres de l'\u00E9quipe", vb: b.nMeds, vc: cc.nMeds }),
+                            months.map(function (mk) { return (React.createElement(Row, { key: mk, label: "— " + (MOIS_N[mk.slice(5, 7)] || mk.slice(5, 7)) + " " + mk.slice(0, 4), vb: b.byMonth[mk] || 0, vc: cc.byMonth[mk] || 0 })); }))),
+                    React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
+                        React.createElement("button", { onClick: function () { return setBkPreview(null); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Fermer"),
+                        React.createElement("button", { style: __assign(__assign({}, S.btnP), { padding: "9px 18px", background: "#dc2626" }), onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?")) {
+                                restoreBackup(bkPreview.id);
+                                setBkPreview(null);
+                            } } }, "\u21A9 Restaurer cette sauvegarde")))));
+        })(),
         modal === "daySwap" && mData && (function () {
             var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d;
             var med = medecins.find(function (m) { return m.id === medId; });
