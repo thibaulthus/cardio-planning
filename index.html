@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.7 — 15/07/2026";
+var APP_VERSION = "v8.8 — 15/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2189,7 +2189,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, plan = _a.plan, tourDerog = _a.tourDerog, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -2745,6 +2745,8 @@ function TourTab(_a) {
         setTourMed(function (p) {
             var n = __assign({}, p);
             weeksT.forEach(function (w) { n[w.key] = best.assign[w.key]; });
+            // Purge : dérogations journalières, remplacements Tour et TP de la période — repartir propre
+            setTimeout(function () { return purgeTourExtras(weeksT.map(function (w) { return w.key; })); }, 20);
             // Retirer les activités (PT) de tous les tourneurs affectés
             var clearPairs = [];
             weeksT.forEach(function (w) {
@@ -3438,8 +3440,12 @@ function CardioPlanning() {
                         setNotes(JSON.parse(data.notes));
                     if (data.medecins)
                         setMedecins(JSON.parse(data.medecins));
-                    if (data.actes)
-                        setActes(JSON.parse(data.actes));
+                    if (data.actes) {
+                        var arrA = JSON.parse(data.actes);
+                        if (!arrA.some(function (a) { return a && a.id === "TP"; }))
+                            arrA.push({ id: "TP", label: "Temps partiel", short: "TP", color: "#8b949e", bg: "#8b949e", hasSalle: false, salles: [] });
+                        setActes(arrA);
+                    }
                     if (data.editPin)
                         setEditPin(data.editPin);
                     if (data.astreinte) {
@@ -3615,6 +3621,48 @@ function CardioPlanning() {
             });
         }); }, 6000);
         return function () { return clearTimeout(t); };
+    }, []);
+    /* ── Purge des dérogations et remplacements Tour d'une liste de semaines ── */
+    var purgeTourExtras = useCallback(function (weekKeys) {
+        var allDates = [];
+        weekKeys.forEach(function (wk2) {
+            var _a = wk2.split("-").map(Number), py = _a[0], pm = _a[1], pd = _a[2];
+            for (var i2 = 0; i2 < 5; i2++) {
+                var dt = new Date(py, pm, pd + i2);
+                allDates.push([dt.getFullYear(), dt.getMonth(), dt.getDate()]);
+            }
+        });
+        setTourDerog(function (p) {
+            var n = __assign({}, p);
+            allDates.forEach(function (_a) {
+                var dy = _a[0], dm3 = _a[1], dd = _a[2];
+                delete n[dKey(dy, dm3, dd)];
+            });
+            return n;
+        });
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            allDates.forEach(function (_a) {
+                var dy = _a[0], dm3 = _a[1], dd = _a[2];
+                ["M", "AM"].forEach(function (sl) {
+                    var k = sk(dy, dm3, dd, sl);
+                    if (!next[k])
+                        return;
+                    var dm2 = __assign({}, next[k]);
+                    var ch = false;
+                    Object.keys(dm2).forEach(function (mid) {
+                        var e = Array.isArray(dm2[mid]) ? dm2[mid][0] : dm2[mid];
+                        if (e && (e.acteId === "TOUR_HC" || e.acteId === "TOUR_USIC")) {
+                            delete dm2[mid];
+                            ch = true;
+                        }
+                    });
+                    if (ch)
+                        next[k] = dm2;
+                });
+            });
+            return next;
+        });
     }, []);
     /* ── Cohérence planning ↔ tour : retrait/réapplication à l'assignation ── */
     var clearWeekActivities = useCallback(function (pairs) {
@@ -4587,7 +4635,7 @@ function CardioPlanning() {
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, plan: plan, tourDerog: tourDerog, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
@@ -5263,7 +5311,7 @@ function CardioPlanning() {
                 if (we)
                     return a.id === "ABSENCE" || (a.id === "GARDE" && canGarde);
                 if (SYS.includes(a.id))
-                    return a.id === "ABSENCE" || a.id === "TOUR_HC" || a.id === "TOUR_USIC";
+                    return a.id === "ABSENCE";
                 // Check if medecin is authorized for this activity
                 if ((a.medecinsAutorise && a.medecinsAutorise.length) > 0 && !(med && a.medecinsAutorise.includes(med.init)))
                     return false;
