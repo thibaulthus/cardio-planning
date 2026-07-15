@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.5 — 14/07/2026";
+var APP_VERSION = "v8.7 — 15/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2189,7 +2189,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, plan = _a.plan, tourDerog = _a.tourDerog, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -2346,6 +2346,31 @@ function TourTab(_a) {
         var iS = (medecins.find(function (m) { return m.id === swapSrcMed; }) || {}).init, iD = (medecins.find(function (m) { return m.id === swapDstMed; }) || {}).init;
         toast("Échange effectué : " + iS + " ⇄ " + iD, "info");
         setSwapOpen(false);
+    };
+    // Remplacements TP de la semaine, calculés depuis le plan : ["M8 remplace M1 (Mer 22)"]
+    var JOURS_TP = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+    var weekTPInfo = function (wk2) {
+        var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+        var infos = [];
+        var _loop_2 = function (i) {
+            var dt = new Date(wy2, wm2, wd2 + i);
+            var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
+            var dk2 = dKey(dy, dm3, dd);
+            var dm2 = (plan || {})[sk(dy, dm3, dd, "M")] || {};
+            var derogMeds = Object.keys((tourDerog || {})[dk2] || {});
+            Object.keys(dm2).forEach(function (mid) {
+                var e = Array.isArray(dm2[mid]) ? dm2[mid][0] : dm2[mid];
+                if (e && e.acteId === "TOUR_USIC") {
+                    var jr = medecins.find(function (m2) { return String(m2.id) === String(mid); });
+                    var tp = derogMeds.length > 0 ? medecins.find(function (m2) { return String(m2.id) === String(derogMeds[0]); }) : null;
+                    infos.push((jr ? jr.init : "?") + " remplace " + (tp ? tp.init : "?") + " (" + JOURS_TP[dt.getDay()] + " " + dd + ")");
+                }
+            });
+        };
+        for (var i = 0; i < 5; i++) {
+            _loop_2(i);
+        }
+        return infos;
     };
     var tourMeds = medecins.filter(function (m) { return m.tourMed; });
     var horsTourSpecMeds = medecins.filter(function (m) { return m.role === "medecin" && !m.tourMed && m.surSpec; });
@@ -2606,7 +2631,7 @@ function TourTab(_a) {
                                 && !assignedThisWeek[w.key].includes(c.id)
                                 && !isBlockedInWeek(c.id, w.key); });
                             var repaired = false;
-                            var _loop_2 = function (c) {
+                            var _loop_3 = function (c) {
                                 if (repaired)
                                     return "break";
                                 for (var _a = 0, weeksT_1 = weeksT; _a < weeksT_1.length; _a++) {
@@ -2619,7 +2644,7 @@ function TourTab(_a) {
                                         var unit2 = _c[_b];
                                         if (repaired)
                                             break;
-                                        var _loop_3 = function (m2id) {
+                                        var _loop_4 = function (m2id) {
                                             if (assignedThisWeek[w.key].includes(m2id))
                                                 return "continue";
                                             if (isBlockedInWeek(m2id, w.key))
@@ -2671,7 +2696,7 @@ function TourTab(_a) {
                                         };
                                         for (var _d = 0, _e = __spreadArray([], assign[w2.key][unit2], true); _d < _e.length; _d++) {
                                             var m2id = _e[_d];
-                                            var state_3 = _loop_3(m2id);
+                                            var state_3 = _loop_4(m2id);
                                             if (state_3 === "break")
                                                 break;
                                         }
@@ -2680,7 +2705,7 @@ function TourTab(_a) {
                             };
                             for (var _i = 0, stuck_1 = stuck; _i < stuck_1.length; _i++) {
                                 var c = stuck_1[_i];
-                                var state_2 = _loop_2(c);
+                                var state_2 = _loop_3(c);
                                 if (state_2 === "break")
                                     break;
                             }
@@ -2730,13 +2755,15 @@ function TourTab(_a) {
                 setTimeout(function () { return clearWeekActivities(clearPairs); }, 40);
             // Temps partiels affectés en USIC : dérogation + TP + junior (léger différé pour lire le tourMed à jour)
             setTimeout(function () {
+                var byMed = {};
                 weeksT.forEach(function (w) {
                     ((best.assign[w.key] || {}).USIC || []).forEach(function (mid) {
                         var md = medecins.find(function (m2) { return m2.id === mid; });
                         if (md && md.partTime)
-                            applyTPForWeek(mid, w.key);
+                            (byMed[mid] = byMed[mid] || []).push(w.key);
                     });
                 });
+                Object.keys(byMed).forEach(function (mid) { return applyTPForWeek(parseInt(mid), byMed[mid]); });
             }, 80);
             return n;
         });
@@ -2800,7 +2827,9 @@ function TourTab(_a) {
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
         isEdit && lastReport && React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", fontSize: 11, color: "var(--txt2)" } },
             React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
-            React.createElement("span", { style: { flex: 1 } }, lastReport),
+            React.createElement("span", { style: { flex: 1 } },
+                lastReport,
+                (function () { var all = []; weeksT.forEach(function (w2) { return weekTPInfo(w2.key).forEach(function (t3) { return all.push(t3); }); }); return all.length > 0 ? " ✂ Remplacements TP : " + all.join(" · ") + "." : ""; })()),
             React.createElement("button", { onClick: function () { return setLastReport(null); }, style: { border: "none", background: "none", color: "var(--txt3)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 } }, "\u00D7")),
         React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 4, position: "sticky", top: 44, zIndex: 30, background: "var(--bg)", paddingTop: 4 } }, tourMeds.map(function (m) {
             var hcCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.HC || []).includes(m.id) ? n + 1 : n; }, 0);
@@ -2829,6 +2858,9 @@ function TourTab(_a) {
                     React.createElement("span", null,
                         "Sem. ",
                         w.label),
+                    weekTPInfo(w.key).map(function (t3, i3) { return React.createElement("span", { key: i3, style: { fontSize: 10, fontWeight: 700, color: "#8b5cf6", padding: "1px 8px", borderRadius: 5, background: "rgba(139,92,246,.10)", border: "1px solid rgba(139,92,246,.35)" } },
+                        "\u2702 ",
+                        t3); }),
                     isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", cursor: "pointer", fontWeight: 800 }, onClick: function () { setSwapSrcKey(w.key); setSwapSrcMed(null); setSwapDstKey(w.key); setSwapDstMed(null); setSwapUpdPlan(true); setSwapOpen(true); } }, "\u21C4 \u00C9changer"),
                     React.createElement("span", { style: { display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", padding: "1px 7px", borderRadius: 5, background: "var(--bg2)", border: "1px solid var(--border2)" } }, [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
                         var sk2 = _a[0], lb2 = _a[1];
@@ -3593,7 +3625,7 @@ function CardioPlanning() {
             pairs.forEach(function (_a) {
                 var medId = _a.medId, weekKey = _a.weekKey;
                 var _b = weekKey.split("-").map(Number), wy2 = _b[0], wm2 = _b[1], wd2 = _b[2];
-                var _loop_4 = function (i) {
+                var _loop_5 = function (i) {
                     var dt = new Date(wy2, wm2, wd2 + i);
                     var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
                     if (isWE(dy, dm3, dd))
@@ -3612,7 +3644,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var i = 0; i < 5; i++) {
-                    _loop_4(i);
+                    _loop_5(i);
                 }
             });
             return next;
@@ -3627,7 +3659,7 @@ function CardioPlanning() {
         var _a = weekKey.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
         setPlan(function (p) {
             var next = __assign({}, p);
-            var _loop_5 = function (i) {
+            var _loop_6 = function (i) {
                 var dt = new Date(wy2, wm2, wd2 + i);
                 var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
                 if (isWE(dy, dm3, dd))
@@ -3658,22 +3690,22 @@ function CardioPlanning() {
                 });
             };
             for (var i = 0; i < 5; i++) {
-                _loop_5(i);
+                _loop_6(i);
             }
             return next;
         });
     }, [medecins, planningType]);
     /* ── Temps partiel & USIC : dérogation + TP + junior remplaçant ── */
-    var applyTPForWeek = useCallback(function (medId, weekKey) {
+    var applyTPForWeek = useCallback(function (medId, weekKeyOrList) {
         var med = medecins.find(function (m) { return m.id === medId; });
         if (!med || !med.partTime)
             return;
         var offDows = [1, 2, 3, 4, 5].filter(function (dw2) { return (med.workDays || {})[String(dw2)] === false; });
         if (offDows.length === 0)
             return;
-        var _a = weekKey.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+        var weekList = Array.isArray(weekKeyOrList) ? weekKeyOrList : [weekKeyOrList];
         var juniors = medecins.filter(function (m) { return m.statut === "junior" && m.tourMed && m.id !== medId; });
-        // compteur de remplacements existants (entrées plan TOUR_USIC réelles) par junior sur ±60 jours
+        // compteur de remplacements existants (entrées plan TOUR_USIC réelles) par junior — partagé entre toutes les semaines traitées
         var replCount = {};
         juniors.forEach(function (j) { replCount[j.id] = 0; });
         Object.keys(plan).forEach(function (k) {
@@ -3685,31 +3717,35 @@ function CardioPlanning() {
             });
         });
         var newDerog = {}, planPatch = {}, choices = [];
-        offDows.forEach(function (dw2) {
-            var dt = new Date(wy2, wm2, wd2 + (dw2 - 1));
-            var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
-            var dk2 = dKey(dy, dm3, dd);
-            newDerog[dk2] = medId;
-            ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][medId] = { acteId: "TP", salle: null }; });
-            // junior dispo ce jour : pas absent, pas déjà tourneur cette semaine
-            var wmW = tourMed[weekKey] || { HC: [], USIC: [] };
-            var busyIds = __spreadArray(__spreadArray([], (wmW.HC || []), true), (wmW.USIC || []), true);
-            var avail = juniors.filter(function (j) {
-                if (busyIds.includes(j.id))
-                    return false;
-                var es = __spreadArray([], (["M", "AM"].map(function (sl) { var e = (plan[sk(dy, dm3, dd, sl)] || {})[j.id]; return Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId); })), true);
-                return !es.some(function (a) { return ["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE"].includes(a); });
+        weekList.forEach(function (weekKey) {
+            var _a = weekKey.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+            offDows.forEach(function (dw2) {
+                var dt = new Date(wy2, wm2, wd2 + (dw2 - 1));
+                var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
+                var dk2 = dKey(dy, dm3, dd);
+                newDerog[dk2] = medId;
+                ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][medId] = { acteId: "TP", salle: null }; });
+                // junior dispo ce jour : pas absent, pas déjà tourneur cette semaine
+                var wmW = tourMed[weekKey] || { HC: [], USIC: [] };
+                var busyIds = __spreadArray(__spreadArray([], (wmW.HC || []), true), (wmW.USIC || []), true);
+                var avail = juniors.filter(function (j) {
+                    if (busyIds.includes(j.id))
+                        return false;
+                    var es = __spreadArray([], (["M", "AM"].map(function (sl) { var e = (plan[sk(dy, dm3, dd, sl)] || {})[j.id]; return Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId); })), true);
+                    return !es.some(function (a) { return ["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE"].includes(a); });
+                });
+                var shuffled = avail.map(function (j) { return ({ j: j, r: Math.random() }); }).sort(function (a, b) { return a.r - b.r; }).map(function (x) { return x.j; });
+                shuffled.sort(function (a, b) { return replCount[a.id] - replCount[b.id]; });
+                var jr = shuffled[0];
+                if (jr) {
+                    replCount[jr.id]++;
+                    ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][jr.id] = { acteId: "TOUR_USIC", salle: null }; });
+                    choices.push(jr.init + " remplace " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + ")");
+                }
+                else {
+                    choices.push("⚠ aucun junior dispo pour remplacer " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + ")");
+                }
             });
-            avail.sort(function (a, b) { return replCount[a.id] - replCount[b.id] || Math.random() - 0.5; });
-            var jr = avail[0];
-            if (jr) {
-                replCount[jr.id]++;
-                ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][jr.id] = { acteId: "TOUR_USIC", salle: null }; });
-                choices.push(jr.init + " remplace " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + ")");
-            }
-            else {
-                choices.push("⚠ aucun junior dispo pour remplacer " + med.init + " (" + JOURSC[dt.getDay()] + " " + dd + ")");
-            }
         });
         setTourDerog(function (p) {
             var n = __assign({}, p);
@@ -3939,7 +3975,8 @@ function CardioPlanning() {
             return Array.isArray(entries) ? entries : [entries];
         if (!isWE(y2, m2, d2) && (slot === "M" || slot === "AM")) {
             var wk = wKey(y2, m2, d2), wm = tourMed[wk] || { HC: [], USIC: [] };
-            if (((tourDerog || {})[dKey(y2, m2, d2)] || {})[medId])
+            var dgS = ((tourDerog || {})[dKey(y2, m2, d2)] || {})[medId];
+            if (dgS === true || (dgS && dgS[slot]))
                 return [];
             if ((wm.HC || []).includes(medId))
                 return [{ acteId: "TOUR_HC", salle: null }];
@@ -4067,7 +4104,7 @@ function CardioPlanning() {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
             while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_6 = function (d) {
+                var _loop_7 = function (d) {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
@@ -4080,7 +4117,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_6(d);
+                    _loop_7(d);
                 }
                 if (cm === 11) {
                     cy++;
@@ -4101,7 +4138,7 @@ function CardioPlanning() {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
             while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_7 = function (d) {
+                var _loop_8 = function (d) {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
@@ -4120,7 +4157,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_7(d);
+                    _loop_8(d);
                 }
                 if (cm === 11) {
                     cy++;
@@ -4145,7 +4182,7 @@ function CardioPlanning() {
             monthsList.forEach(function (_a) {
                 var ay = _a.y, am = _a.m;
                 var dim = new Date(ay, am + 1, 0).getDate();
-                var _loop_8 = function (d) {
+                var _loop_9 = function (d) {
                     if (isWE(ay, am, d))
                         return "continue";
                     if (fromToday && new Date(ay, am, d) < tod)
@@ -4190,7 +4227,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dim; d++) {
-                    _loop_8(d);
+                    _loop_9(d);
                 }
             });
             return next;
@@ -4221,7 +4258,7 @@ function CardioPlanning() {
             monthsList.forEach(function (_a) {
                 var ay = _a.y, am = _a.m;
                 var dim = new Date(ay, am + 1, 0).getDate();
-                var _loop_9 = function (d) {
+                var _loop_10 = function (d) {
                     if (fromToday && new Date(ay, am, d) < tod)
                         return "continue";
                     ["M", "AM", "JOUR", "N"].forEach(function (sl) {
@@ -4245,7 +4282,7 @@ function CardioPlanning() {
                     });
                 };
                 for (var d = 1; d <= dim; d++) {
-                    _loop_9(d);
+                    _loop_10(d);
                 }
             });
             return next;
@@ -4421,6 +4458,7 @@ function CardioPlanning() {
         var p = perNext(sy, sm);
         setYearMonth(p.sy, p.sm);
     };
+    var _27 = useState("J"), daySwapSpan = _27[0], setDaySwapSpan = _27[1];
     var openCell = function (medId, y2, m2, d2, slot) {
         if (!canEdit(medId))
             return;
@@ -4549,7 +4587,7 @@ function CardioPlanning() {
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, plan: plan, tourDerog: tourDerog, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
@@ -5044,6 +5082,96 @@ function CardioPlanning() {
                             fbStatus === "error" ? "Erreur de connexion — vérifiez votre réseau" :
                                 fbStatus === "offline" ? "Mode local — sans sauvegarde automatique" :
                                     "Connexion en cours...")))))),
+        modal === "daySwap" && mData && (function () {
+            var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d;
+            var med = medecins.find(function (m) { return m.id === medId; });
+            var wkC = wKey(y2, m2, d2), wmC = tourMed[wkC] || { HC: [], USIC: [] };
+            var unitC = (wmC.HC || []).includes(medId) ? "HC" : "USIC";
+            var busyC = __spreadArray(__spreadArray([], (wmC.HC || []), true), (wmC.USIC || []), true);
+            var dkC = dKey(y2, m2, d2);
+            var spanSel = daySwapSpan; // "J","M","AM"
+            var slots = spanSel === "J" ? ["M", "AM"] : [spanSel];
+            var cands = medecins.filter(function (mc) { return mc.role === "medecin" && mc.tourMed && mc.id !== medId && !busyC.includes(mc.id); }).map(function (mc) {
+                var blockedBy = [];
+                slots.forEach(function (sl) {
+                    var e = (plan[sk(y2, m2, d2, sl)] || {})[mc.id];
+                    var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
+                    if (["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE", "TP"].includes(a))
+                        blockedBy.push(a === "ABSENCE" ? "absent" : a === "TP" ? "temps partiel" : a === "GARDE" ? "garde" : a === "REPOS_GARDE" ? "repos de garde" : "formation");
+                });
+                return { m: mc, blocked: blockedBy.length > 0, reason: blockedBy[0] || "" };
+            });
+            var doDaySwap = function (replId) {
+                var repl = medecins.find(function (m2) { return m2.id === replId; });
+                // 1. dérogation du tourneur (jour entier ou slot)
+                setTourDerog(function (p) {
+                    var n = __assign({}, p);
+                    var o = __assign({}, (n[dkC] || {}));
+                    if (spanSel === "J")
+                        o[medId] = true;
+                    else {
+                        var cur = o[medId];
+                        var obj = cur === true ? { M: true, AM: true } : __assign({}, (cur || {}));
+                        obj[spanSel] = true;
+                        o[medId] = (obj.M && obj.AM) ? true : obj;
+                    }
+                    n[dkC] = o;
+                    return n;
+                });
+                // 2. entrée Tour réelle pour le remplaçant sur les slots
+                setPlan(function (p) {
+                    var next = __assign({}, p);
+                    slots.forEach(function (sl) {
+                        var _a;
+                        var k = sk(y2, m2, d2, sl);
+                        if (!next[k])
+                            next[k] = {};
+                        next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[replId] = { acteId: "TOUR_" + unitC, salle: null }, _a));
+                    });
+                    return next;
+                });
+                toast(repl.init + " remplace " + med.init + " au tour " + unitC + " (" + JOURSL[dow(y2, m2, d2)] + " " + d2 + (spanSel === "J" ? ", journée" : spanSel === "M" ? ", matin" : ", après-midi") + ")", "info");
+                setModal(null);
+            };
+            return (React.createElement(Ov, { onClose: function () { return setModal("cell"); } },
+                React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 430 }), onClick: function (e) { return e.stopPropagation(); } },
+                    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
+                        React.createElement("div", { style: S.mTit2 }, "\u21C4 \u00C9changer ce jour de tour"),
+                        React.createElement("button", { onClick: function () { return setModal("cell"); }, style: S.xBtn }, "\u00D7")),
+                    React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 8 } },
+                        React.createElement("b", { style: { color: med && med.color } }, med && med.init),
+                        " quitte le tour ",
+                        React.createElement("b", null, unitC),
+                        " le ",
+                        JOURSL[dow(y2, m2, d2)],
+                        " ",
+                        d2,
+                        " ",
+                        MOIS[m2],
+                        " \u2014 choisissez son rempla\u00E7ant :"),
+                    React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, [["J", "Journée"], ["M", "Matin"], ["AM", "Après-midi"]].map(function (_a) {
+                        var v = _a[0], lb = _a[1];
+                        return (React.createElement("button", { key: v, onClick: function () { return setDaySwapSpan(v); }, style: { flex: 1, padding: "6px 4px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                                border: "2px solid " + (spanSel === v ? "#388bfd" : "var(--border2)"),
+                                background: spanSel === v ? "rgba(56,139,253,.14)" : "var(--bg2)", color: spanSel === v ? "#388bfd" : "var(--txt2)" } }, lb));
+                    })),
+                    React.createElement("div", { style: { maxHeight: "46vh", overflowY: "auto" } },
+                        cands.map(function (_a) {
+                            var m2 = _a.m, blocked = _a.blocked, reason = _a.reason;
+                            return (React.createElement("div", { key: m2.id, onClick: function () { if (!blocked)
+                                    doDaySwap(m2.id); }, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, marginBottom: 5,
+                                    cursor: blocked ? "not-allowed" : "pointer", opacity: blocked ? .45 : 1,
+                                    border: "1px solid var(--border2)", background: "var(--bg2)" } },
+                                React.createElement("span", { style: { width: 22, height: 22, borderRadius: "50%", background: m2.color, color: "#fff", fontSize: 8, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, m2.init),
+                                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)", flex: 1 } },
+                                    m2.nom,
+                                    " ",
+                                    m2.statut === "junior" ? React.createElement("span", { style: { fontSize: 9, color: "#8b5cf6" } }, "junior") : null),
+                                blocked && React.createElement("span", { style: { fontSize: 10, color: "#f85149", fontWeight: 600 } }, reason),
+                                !blocked && React.createElement("span", { style: { fontSize: 11, color: "#388bfd", fontWeight: 800 } }, "\u21C4")));
+                        }),
+                        cands.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucun candidat (tous d\u00E9j\u00E0 de tour cette semaine).")))));
+        })(),
         modal === "prefs" && mData && (function () {
             var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d;
             var med = medecins.find(function (mm) { return mm.id === medId; });
@@ -5135,7 +5263,7 @@ function CardioPlanning() {
                 if (we)
                     return a.id === "ABSENCE" || (a.id === "GARDE" && canGarde);
                 if (SYS.includes(a.id))
-                    return a.id === "ABSENCE";
+                    return a.id === "ABSENCE" || a.id === "TOUR_HC" || a.id === "TOUR_USIC";
                 // Check if medecin is authorized for this activity
                 if ((a.medecinsAutorise && a.medecinsAutorise.length) > 0 && !(med && a.medecinsAutorise.includes(med.init)))
                     return false;
@@ -5217,13 +5345,38 @@ function CardioPlanning() {
                             return null;
                         var dkC = dKey(y2, m2, d2);
                         var derog = ((tourDerog || {})[dkC] || {})[medId];
-                        return (React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: derog ? "#16a34a" : "#f59e0b", background: derog ? "rgba(22,163,74,.10)" : "rgba(245,158,11,.10)", color: derog ? "#16a34a" : "#b45309" }), onClick: function () { setTourDerog(function (p) { var n = __assign({}, p); var o = __assign({}, (n[dkC] || {})); if (o[medId])
-                                delete o[medId];
-                            else
-                                o[medId] = true; if (Object.keys(o).length === 0)
-                                delete n[dkC];
-                            else
-                                n[dkC] = o; return n; }); } }, derog ? "↩ Remettre au tour ce jour" : "✂ Retirer du tour ce jour"));
+                        var unitC = (wmC.HC || []).includes(medId) ? "HC" : "USIC";
+                        if (derog)
+                            return (React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a" }), onClick: function () {
+                                    // Annulation : lever la dérogation + retirer les entrées Tour réelles du jour (le remplaçant)
+                                    setTourDerog(function (p) { var n = __assign({}, p); var o = __assign({}, (n[dkC] || {})); delete o[medId]; if (Object.keys(o).length === 0)
+                                        delete n[dkC];
+                                    else
+                                        n[dkC] = o; return n; });
+                                    setPlan(function (p) {
+                                        var next = __assign({}, p);
+                                        ["M", "AM"].forEach(function (sl) {
+                                            var k = sk(y2, m2, d2, sl);
+                                            if (!next[k])
+                                                return;
+                                            var dm3 = __assign({}, next[k]);
+                                            var ch = false;
+                                            Object.keys(dm3).forEach(function (mid2) {
+                                                var e2 = Array.isArray(dm3[mid2]) ? dm3[mid2][0] : dm3[mid2];
+                                                if (e2 && e2.acteId === "TOUR_" + unitC) {
+                                                    delete dm3[mid2];
+                                                    ch = true;
+                                                }
+                                            });
+                                            if (ch)
+                                                next[k] = dm3;
+                                        });
+                                        return next;
+                                    });
+                                    toast(med.init + " remis au tour " + unitC + " ce jour (remplacement retiré)", "info");
+                                    setModal(null);
+                                } }, "\u21A9 Remettre au tour ce jour"));
+                        return (React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#f59e0b", background: "rgba(245,158,11,.10)", color: "#b45309" }), onClick: function () { setModal("daySwap"); } }, "\u21C4 \u00C9changer ce jour de tour\u2026"));
                     })(),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { return clearPlanningType(medId); } },
                         "\uD83D\uDDD1 Effacer mois ",
@@ -5356,7 +5509,7 @@ function CardioPlanning() {
                     // Remove all non-system entries for medId over the period
                     var df = new Date(dateFrom), dt = new Date(dateTo);
                     var cur = new Date(df);
-                    var _loop_10 = function () {
+                    var _loop_11 = function () {
                         var y3 = cur.getFullYear(), m3 = cur.getMonth(), d3 = cur.getDate();
                         var slotsToClr = slots.includes("ALL") || slots.length === 2 ? ["M", "AM", "JOUR"] : slots;
                         slotsToClr.forEach(function (sl) {
@@ -5379,7 +5532,7 @@ function CardioPlanning() {
                         cur.setDate(cur.getDate() + 1);
                     };
                     while (cur <= dt) {
-                        _loop_10();
+                        _loop_11();
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
