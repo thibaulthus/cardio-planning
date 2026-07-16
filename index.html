@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.12 — 15/07/2026";
+var APP_VERSION = "v8.13 — 15/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1003,11 +1003,20 @@ function GardeView(_a) {
         }
         return days;
     }, [gvSm, gvSy, showFull, PCFG.len]);
-    var _c = React.useState(null), pickerDay = _c[0], setPickerDay = _c[1];
+    var _c = React.useState(false), gvSwapOpen = _c[0], setGvSwapOpen = _c[1];
+    var gvIsAbs = function (mid, y2, m2, d2) {
+        var sls = isWE(y2, m2, d2) ? ["JOUR"] : ["M", "AM"];
+        return sls.some(function (sl) {
+            var e = getEntry(mid, y2, m2, d2, sl);
+            var a = e && (Array.isArray(e) ? (e[0] && e[0].acteId) : e.acteId);
+            return ["ABSENCE", "FORM", "FORMATION"].includes(a);
+        });
+    };
+    var _d = React.useState(null), pickerDay = _d[0], setPickerDay = _d[1];
     /* ═══ Répartition automatique des gardes ═══ */
-    var _d = React.useState(false), gardeModal = _d[0], setGardeModal = _d[1];
-    var _e = React.useState(null), lastGReport = _e[0], setLastGReport = _e[1];
-    var _f = React.useState({}), gMax = _f[0], setGMax = _f[1]; // {medId: maxGardes} optionnel
+    var _e = React.useState(false), gardeModal = _e[0], setGardeModal = _e[1];
+    var _f = React.useState(null), lastGReport = _f[0], setLastGReport = _f[1];
+    var _g = React.useState({}), gMax = _g[0], setGMax = _g[1]; // {medId: maxGardes} optionnel
     var gardeMeds = medecins.filter(function (m) { return m.garde; });
     var FACT = { less: 0.75, normal: 1, more: 1.25 };
     // Tous les jours de la période (complets, indépendants de showFull)
@@ -1590,6 +1599,44 @@ function GardeView(_a) {
                             gMed.prenom,
                             " ",
                             gMed.nom)),
+                    React.createElement("button", { onClick: function () { return setGvSwapOpen(function (v) { return !v; }); }, style: { width: "100%", padding: "6px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, fontSize: 12, cursor: "pointer", marginBottom: 6 } }, "\u21C4 \u00C9changer cette garde\u2026"),
+                    gvSwapOpen && (function () {
+                        var A = { y: pd.y, m: pd.m, d: pd.d, medId: gMed.id };
+                        var others = gvEffDays.map(function (_a) {
+                            var gy = _a.y, gm = _a.m, gd = _a.d;
+                            if (gy === pd.y && gm === pd.m && gd === pd.d)
+                                return null;
+                            var mB = getGardeMed2(gy, gm, gd);
+                            if (!mB || mB.id === gMed.id)
+                                return null;
+                            var blockA = gvIsAbs(gMed.id, gy, gm, gd);
+                            var blockB = gvIsAbs(mB.id, pd.y, pd.m, pd.d);
+                            var reason = blockA ? (gMed.init + " absent ce jour") : blockB ? (mB.init + " absent le " + pd.d) : null;
+                            return { y: gy, m: gm, d: gd, mB: mB, reason: reason };
+                        }).filter(Boolean);
+                        return (React.createElement("div", { style: { marginBottom: 8, padding: "7px 8px", borderRadius: 7, border: "1px solid #388bfd55", background: "rgba(56,139,253,.05)" } },
+                            React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#388bfd", marginBottom: 5 } }, "Choisissez la garde \u00E0 \u00E9changer (repos d\u00E9plac\u00E9s automatiquement) :"),
+                            React.createElement("div", { style: { maxHeight: "32vh", overflowY: "auto" } },
+                                others.map(function (o, i2) { return (React.createElement("div", { key: i2, onClick: function () {
+                                        if (o.reason)
+                                            return;
+                                        applyGarde(o.mB.id, pd.y, pd.m, pd.d);
+                                        setTimeout(function () { return applyGarde(gMed.id, o.y, o.m, o.d); }, 40);
+                                        toast(gMed.init + " ⇄ " + o.mB.init + " : gardes des " + pd.d + " " + MOIS[pd.m].slice(0, 4) + " et " + o.d + " " + MOIS[o.m].slice(0, 4) + " échangées", "info");
+                                        setGvSwapOpen(false);
+                                        setPickerDay(null);
+                                    }, style: { display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 6, marginBottom: 3, cursor: o.reason ? "not-allowed" : "pointer", opacity: o.reason ? .45 : 1, border: "1px solid var(--border2)", background: "var(--bg2)" } },
+                                    React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt)", width: 86 } },
+                                        JOURSC[dow(o.y, o.m, o.d)],
+                                        " ",
+                                        o.d,
+                                        " ",
+                                        MOIS[o.m].slice(0, 4)),
+                                    React.createElement("span", { style: { width: 18, height: 18, borderRadius: "50%", background: o.mB.color, color: "#fff", fontSize: 7, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, o.mB.init),
+                                    React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: "var(--txt)", flex: 1 } }, o.mB.nom),
+                                    o.reason ? React.createElement("span", { style: { fontSize: 8, color: "#f85149", fontWeight: 600 } }, o.reason) : React.createElement("span", { style: { fontSize: 10, color: "#388bfd", fontWeight: 800 } }, "\u21C4"))); }),
+                                others.length === 0 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Aucune autre garde attribu\u00E9e sur la p\u00E9riode affich\u00E9e."))));
+                    })(),
                     React.createElement("button", { style: { width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { removeGarde(typeof pickerDay === "object" ? pickerDay.d : pickerDay, pd && pd.y, pd && pd.m); setPickerDay(null); } }, "Retirer la garde + repos"))),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, gMed ? "Changer :" : "Assigner :"),
                 React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 360, overflowY: "auto" } }, medecins.filter(function (m) { return m.garde === true; }).map(function (m) {
