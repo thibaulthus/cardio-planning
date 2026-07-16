@@ -584,7 +584,7 @@ function GridV(_a) {
                             " ",
                             cgm.nom),
                         React.createElement("button", { onClick: function () { return setGardeSwapOpen(function (v) { return !v; }); }, style: { marginLeft: "auto", fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" } }, "\u21C4 \u00C9changer"),
-                        React.createElement("button", { onClick: function () { onCell(cgm.id, year, month, pickGardeDay, "N"); setPickGardeDay(null); }, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 8px" }) }, "Modifier"))) : null;
+                        React.createElement("button", { onClick: function () { var pgf3 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var dwB = dow(pgf3.y, pgf3.m, pgf3.d); onCell(cgm.id, pgf3.y, pgf3.m, pgf3.d, (dwB === 6 || dwB === 0) ? "JOUR" : "N"); setPickGardeDay(null); }, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 8px" }) }, "Modifier"))) : null;
                 })(),
                 gardeSwapOpen && (function () {
                     var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
