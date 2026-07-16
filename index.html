@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.10 — 15/07/2026";
+var APP_VERSION = "v8.11 — 15/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3628,10 +3628,39 @@ function CardioPlanning() {
             }
         });
     }); }, [plan, tourMed, medecins]);
-    useEffect(function () { if (tab === "partage")
-        refreshBackupList(); }, [tab]);
+    var _25 = useState(null), docSize = _25[0], setDocSize = _25[1];
+    useEffect(function () {
+        if (tab !== "partage")
+            return;
+        refreshBackupList();
+        (function () { return __awaiter(_this, void 0, void 0, function () {
+            var d_1, bytes_1, e_4;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        _a.trys.push([0, 2, , 3]);
+                        return [4 /*yield*/, window.firebaseDB.collection("planning").doc("main").get()];
+                    case 1:
+                        d_1 = (_a.sent()).data() || {};
+                        bytes_1 = 0;
+                        Object.keys(d_1).forEach(function (k) {
+                            var v = d_1[k];
+                            var s = typeof v === "string" ? v : JSON.stringify(v);
+                            bytes_1 += new Blob([k]).size + new Blob([s || ""]).size + 2;
+                        });
+                        setDocSize(bytes_1);
+                        return [3 /*break*/, 3];
+                    case 2:
+                        e_4 = _a.sent();
+                        setDocSize(null);
+                        return [3 /*break*/, 3];
+                    case 3: return [2 /*return*/];
+                }
+            });
+        }); })();
+    }, [tab]);
     var restoreBackup = useCallback(function (id) { return __awaiter(_this, void 0, void 0, function () {
-        var d, data, _ts, rest, e_4;
+        var d, data, _ts, rest, e_5;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
@@ -3651,8 +3680,8 @@ function CardioPlanning() {
                     toast("Sauvegarde restaurée — rechargez la page si besoin", "info");
                     return [3 /*break*/, 4];
                 case 3:
-                    e_4 = _a.sent();
-                    console.log("restore:", e_4);
+                    e_5 = _a.sent();
+                    console.log("restore:", e_5);
                     toast("Échec de la restauration", "warn");
                     return [3 /*break*/, 4];
                 case 4: return [2 /*return*/];
@@ -3662,7 +3691,7 @@ function CardioPlanning() {
     useEffect(function () {
         // Au chargement : backup auto si la dernière date de plus de 72 h
         var t = setTimeout(function () { return __awaiter(_this, void 0, void 0, function () {
-            var d, last, e_5;
+            var d, last, e_6;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -3681,8 +3710,8 @@ function CardioPlanning() {
                         _a.label = 4;
                     case 4: return [3 /*break*/, 6];
                     case 5:
-                        e_5 = _a.sent();
-                        console.log("backup check:", e_5);
+                        e_6 = _a.sent();
+                        console.log("backup check:", e_6);
                         return [3 /*break*/, 6];
                     case 6: return [2 /*return*/];
                 }
@@ -4004,7 +4033,7 @@ function CardioPlanning() {
     var isEdit = accessMode === "edit";
     // ─── Undo/Redo history (edit mode) ───
     var histRef = useRef({ stack: [], idx: -1, restoring: false });
-    var _25 = useState(0), histVer = _25[0], setHistVer = _25[1];
+    var _26 = useState(0), histVer = _26[0], setHistVer = _26[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
     useEffect(function () {
         if (isFirstLoad.current)
@@ -4354,9 +4383,9 @@ function CardioPlanning() {
         toast("Planning type appliqué (" + medLbl + ", " + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")", "info");
     }, [medecins, planningType, tourMed]);
     /* ── Modale d'application du PT ── */
-    var _26 = React.useState(null), ptModal = _26[0], setPtModal = _26[1]; // null | {medId:null|number}
-    var _27 = React.useState([]), ptMonths = _27[0], setPtMonths = _27[1]; // indices cochés
-    var _28 = React.useState(true), ptFromToday = _28[0], setPtFromToday = _28[1];
+    var _27 = React.useState(null), ptModal = _27[0], setPtModal = _27[1]; // null | {medId:null|number}
+    var _28 = React.useState([]), ptMonths = _28[0], setPtMonths = _28[1]; // indices cochés
+    var _29 = React.useState(true), ptFromToday = _29[0], setPtFromToday = _29[1];
     var ptPeriodMonths = React.useMemo(function () {
         var p = perStart(year, month);
         var arr = [];
@@ -4576,7 +4605,7 @@ function CardioPlanning() {
         var p = perNext(sy, sm);
         setYearMonth(p.sy, p.sm);
     };
-    var _29 = useState("J"), daySwapSpan = _29[0], setDaySwapSpan = _29[1];
+    var _30 = useState("J"), daySwapSpan = _30[0], setDaySwapSpan = _30[1];
     var openCell = function (medId, y2, m2, d2, slot) {
         if (!canEdit(medId))
             return;
@@ -5127,6 +5156,25 @@ function CardioPlanning() {
                             vacSource && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 3 } },
                                 "Source : ",
                                 vacSource))),
+                    docSize !== null && (function () {
+                        var LIMIT = 1048576;
+                        var pct = Math.min(100, Math.round(docSize / LIMIT * 100));
+                        var col = pct < 60 ? "#16a34a" : pct < 85 ? "#f59e0b" : "#dc2626";
+                        return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 5 } },
+                                "\uD83D\uDCE6 Poids des donn\u00E9es : ",
+                                (docSize / 1024).toFixed(0),
+                                " Ko / 1024 Ko ",
+                                React.createElement("span", { style: { color: col, fontWeight: 800 } },
+                                    "(",
+                                    pct,
+                                    "%)")),
+                            React.createElement("div", { style: { height: 8, borderRadius: 4, background: "var(--border2)", overflow: "hidden" } },
+                                React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 4 } })),
+                            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } },
+                                "Limite Firebase : 1 Mo par document. ",
+                                pct < 60 ? "Large marge." : pct < 85 ? "À surveiller — un archivage des anciens mois sera à prévoir." : "⚠ Proche de la limite : archivez les anciens mois rapidement.")));
+                    })(),
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde des donn\u00E9es"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "T\u00E9l\u00E9chargez une copie de toutes vos donn\u00E9es. En cas de probl\u00E8me, importez ce fichier pour tout restaurer."),
                     React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
