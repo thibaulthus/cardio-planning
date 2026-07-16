@@ -790,7 +790,7 @@ function SiteView(_a) {
                 (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-            React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
+            React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
     if (orient === "H")
         return (React.createElement("div", null,
@@ -921,7 +921,7 @@ function ActTabView(_a) {
                 (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-            React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
+            React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
     if (orient === "H")
         return (React.createElement("div", null,
@@ -1418,7 +1418,7 @@ function GardeView(_a) {
                         });
                         toast("Gardes et repos retirés sur la période", "info");
                     } }, "\uD83D\uDDD1 Retirer les gardes"),
-                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
+                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                 React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
         gardeModal && (React.createElement(Ov, { onClose: function () { return setGardeModal(false); } },
             React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 460, maxHeight: "85vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } },
@@ -2936,7 +2936,7 @@ function TourTab(_a) {
                         setLastReport(null);
                         toast("Attributions de la période supprimées", "info");
                     }, title: "Effacer toutes les attributions de la p\u00E9riode", style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "4px 10px", background: "#dc2626" }) }, "\uD83D\uDDD1 Tout effacer"),
-                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
+                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         isEdit && lastReport && React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", fontSize: 11, color: "var(--txt2)" } },
             React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
             React.createElement("span", { style: { flex: 1 } },
@@ -3310,7 +3310,7 @@ function StatsTab(_a) {
                 React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                 React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11 }) }, "\uD83D\uDDA8\uFE0F Export"),
-                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
+                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 } },
             React.createElement("button", { onClick: function () { return setMedFilter([]); }, style: { padding: "4px 10px", borderRadius: 20, border: "1px solid var(--border)", cursor: "pointer", fontSize: 11, fontWeight: 700,
                     background: medFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: medFilter.length === 0 ? "#fff" : "var(--txt2)" } }, "Tous"),
@@ -4835,7 +4835,7 @@ function CardioPlanning() {
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         isAnyEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
-                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
+                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8, alignItems: "center" } },
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginRight: 4 } }, "Filtre:"),
@@ -4894,7 +4894,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         isEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
                         isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "var(--bg2)", color: "#dc2626" }), onClick: function () { return openPtModal(null, "remove"); } }, "\uD83E\uDDF9 Retirer"),
-                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
+                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Semaine type par m\u00E9decin. Le bouton \u25B6 PT l'applique aux mois de la p\u00E9riode affich\u00E9e (choix des mois et du point de d\u00E9part dans la fen\u00EAtre). TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
                 React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit, orient: orient, acteById: acteById, setMData: setMData, setModal: setModal }))),
             tab === "attache" && (React.createElement("div", null,
@@ -4905,7 +4905,7 @@ function CardioPlanning() {
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         isEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
-                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"),
+                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, getAstreinteForDay: getAstreinteForDay })
@@ -4917,7 +4917,7 @@ function CardioPlanning() {
                         React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
                     isEdit && React.createElement("button", { style: S.btnP, onClick: function () { setMData({ _new: true, id: "", label: "", short: "", color: "#3b82f6", bg: "#0c1a2e", hasSalle: false, salles: [], isSystem: false, site: "tous", medecinsAutorise: [] }); setModal("editActe"); } }, "+ Nouvelle"),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
+                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
                 ["tous", "CHL", "CHB"].map(function (site) { return (React.createElement("div", { key: site, style: { marginBottom: 14 } },
                     React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 } }, site === "tous" ? "Toutes" : site),
                     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))", gap: 6 } }, actes.filter(function (a) { return (a.site || "tous") === site; }).map(function (a) { return (React.createElement("div", { key: a.id, style: __assign(__assign({}, S.card), { borderLeft: "3px solid ".concat(a.color), display: "flex", alignItems: "center", gap: 9 }) },
@@ -4935,7 +4935,7 @@ function CardioPlanning() {
                     React.createElement("h2", { style: S.mTit }, "\uD83D\uDC65 \u00C9quipe"),
                     isEdit && React.createElement("button", { style: S.btnP, onClick: function () { setMData({ _new: true, id: Date.now(), nom: "", prenom: "", init: "", color: "#3b82f6", garde: true, tourMed: true, role: "medecin" }); setModal("editMed"); } }, "+ Ajouter"),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
+                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
                 ["medecin", "attache", "ide"].map(function (role) { return (React.createElement("div", { key: role, style: { marginBottom: 18 } },
                     React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 7 } }, role === "medecin" ? "Médecins" : role === "attache" ? "Attachés" : "IDE"),
                     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 7 } }, medecins.filter(function (m) { return (m.role || "medecin") === role; }).map(function (m) { return (React.createElement("div", { key: m.id, style: __assign(__assign({}, S.card), { display: "flex", alignItems: "center", gap: 9 }) },
@@ -5183,7 +5183,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontWeight: 700, color: "#3fb950", fontSize: 13, marginBottom: 6 } },
                         "\uD83D\uDC41 Lecture seule",
                         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                            React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌙"))),
+                            React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Partagez l'URL directement. Sans PIN, le planning est consultable mais non modifiable.")),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD10 Code PIN \u00E9diteur"),
