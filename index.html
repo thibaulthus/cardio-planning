@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.13 — 15/07/2026";
+var APP_VERSION = "v8.14 — 15/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4992,6 +4992,98 @@ function CardioPlanning() {
                 var prevP = function () { var p = perPrev(sy, sm); setAstYear(p.sy); setAstMonth(p.sm); };
                 var nextP = function () { var p = perNext(sy, sm); setAstYear(p.sy); setAstMonth(p.sm); };
                 var pLabel = MOIS[sm] + " — " + MOIS[(sm + PCFG.len - 1) % 12] + " " + sy;
+                // ── Répartition automatique des astreintes (semaines complètes lun→dim) ──
+                var astMondays = (function () {
+                    var first = allDays4M[0], last = allDays4M[allDays4M.length - 1];
+                    var d0 = new Date(first.y, first.m, first.d);
+                    var dw0 = d0.getDay();
+                    var shift = dw0 === 0 ? -6 : 1 - dw0;
+                    var mon0 = new Date(first.y, first.m, first.d + shift);
+                    var end = new Date(last.y, last.m, last.d);
+                    var list = [];
+                    for (var mn = new Date(mon0); mn <= end; mn.setDate(mn.getDate() + 7)) {
+                        list.push({ y: mn.getFullYear(), m: mn.getMonth(), d: mn.getDate() });
+                    }
+                    return list;
+                })();
+                var astWeekDays = function (mon) { return [0, 1, 2, 3, 4, 5, 6].map(function (i) { var dt = new Date(mon.y, mon.m, mon.d + i); return { y: dt.getFullYear(), m: dt.getMonth(), d: dt.getDate() }; }); };
+                var astAbsPart = function (mid, days) { return days.some(function (_a) {
+                    var y = _a.y, m = _a.m, d = _a.d;
+                    var sls = isWE(y, m, d) ? ["JOUR"] : ["M", "AM"];
+                    return sls.some(function (sl) { return getEntries(mid, y, m, d, sl).some(function (e) { return ["ABSENCE", "FORM", "FORMATION"].includes(e.acteId); }); });
+                }); };
+                var runAstAuto = function () {
+                    if (astMeds.length === 0) {
+                        toast("Aucun médecin d'astreinte (cochez-le dans l'onglet Équipe)", "warn");
+                        return;
+                    }
+                    if (!window.confirm("Assigner automatiquement une semaine d'astreinte (lun→dim) sur chaque semaine vide de la période, équitablement entre " + astMeds.length + " médecins ?\nLes semaines et jours déjà posés sont conservés."))
+                        return;
+                    var counts = {};
+                    astMeds.forEach(function (m2) { counts[String(m2.id)] = 0; });
+                    var lastW = {};
+                    var patch = {};
+                    var skipped = [];
+                    var nA = 0;
+                    astMondays.forEach(function (mon, idx) {
+                        var mk = mon.y + "-" + mon.m + "-" + mon.d;
+                        var days = astWeekDays(mon);
+                        var taken = astreinte[mk] !== undefined || days.some(function (_a) {
+                            var y = _a.y, m = _a.m, d = _a.d;
+                            return astreinte[y + "-" + m + "-" + d] !== undefined;
+                        });
+                        if (taken) {
+                            var v = astreinte[mk];
+                            if (v !== undefined && counts[String(v)] !== undefined) {
+                                counts[String(v)] += 7;
+                                lastW[String(v)] = idx;
+                            }
+                            return;
+                        }
+                        var cands = astMeds.filter(function (m2) { return !astAbsPart(m2.id, days); });
+                        if (cands.length === 0) {
+                            skipped.push(mon.d + " " + MOIS[mon.m].slice(0, 4));
+                            return;
+                        }
+                        var shuffled = cands.map(function (m2) { return ({ m2: m2, r: Math.random() }); }).sort(function (a, b) { return a.r - b.r; }).map(function (x) { return x.m2; });
+                        shuffled.sort(function (a, b) {
+                            var ca = counts[String(a.id)], cb = counts[String(b.id)];
+                            if (ca !== cb)
+                                return ca - cb;
+                            var la = lastW[String(a.id)] !== undefined ? idx - lastW[String(a.id)] : 999;
+                            var lb = lastW[String(b.id)] !== undefined ? idx - lastW[String(b.id)] : 999;
+                            return lb - la;
+                        });
+                        var pick = shuffled[0];
+                        patch[mk] = String(pick.id);
+                        counts[String(pick.id)] += 7;
+                        lastW[String(pick.id)] = idx;
+                        nA++;
+                    });
+                    if (nA > 0)
+                        setAstreinte(function (p) { return (__assign(__assign({}, p), patch)); });
+                    var msg = "Astreintes : " + nA + " semaine(s) assignée(s).";
+                    if (skipped.length > 0)
+                        msg += " ⚠ Aucun candidat disponible (absences) : sem. du " + skipped.join(", ") + " — à gérer manuellement (exception).";
+                    msg += " Totaux (jours) : " + astMeds.map(function (m2) { return m2.init + " " + counts[String(m2.id)]; }).join(" · ");
+                    toast(msg, skipped.length > 0 ? "warn" : "info");
+                };
+                var clearAstPeriod = function () {
+                    if (!window.confirm("Retirer TOUTES les astreintes de la période affichée (" + pLabel + ") ?"))
+                        return;
+                    if (!window.confirm("Confirmer définitivement ? (récupérable via Annuler ↶)"))
+                        return;
+                    setAstreinte(function (p) {
+                        var n = __assign({}, p);
+                        astMondays.forEach(function (mon) { delete n[mon.y + "-" + mon.m + "-" + mon.d]; });
+                        allDays4M.forEach(function (_a) {
+                            var y = _a.y, m = _a.m, d = _a.d;
+                            delete n[y + "-" + m + "-" + d];
+                        });
+                        return n;
+                    });
+                    toast("Astreintes de la période retirées", "info");
+                };
                 var exportCSV = function () {
                     var rows = [["Date", "Jour", "Médecin"]];
                     allDays4M.forEach(function (_a) {
@@ -5017,6 +5109,8 @@ function CardioPlanning() {
                             " ",
                             pLabel),
                         React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A"),
+                        isEdit && React.createElement("button", { onClick: runAstAuto, style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
+                        isEdit && React.createElement("button", { onClick: clearAstPeriod, style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer"),
                         React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export")),
                     React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
                         React.createElement("div", { style: { flex: "2 1 280px", maxWidth: 400, borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden", maxHeight: "calc(100vh - 180px)", overflowY: "auto" } }, allDays4M.map(function (_a) {
