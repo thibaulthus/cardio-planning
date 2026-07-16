@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.15 — 15/07/2026";
+var APP_VERSION = "v8.16 — 16/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -5097,7 +5097,10 @@ function CardioPlanning() {
                                 patch[dd.y + "-" + dd.m + "-" + dd.d] = String(pick.m2.id);
                                 counts[String(pick.m2.id)]++;
                             }
-                            segs.push(pick.m2.init + " (" + days[i2].d + (pick.L > 1 ? "→" + days[i2 + pick.L - 1].d : "") + " " + MOIS[days[i2].m].slice(0, 4) + ")");
+                            var dA = days[i2], dB = days[i2 + pick.L - 1];
+                            var lblA = dA.d + " " + MOIS[dA.m].slice(0, 4);
+                            var lblB = dB.d + " " + MOIS[dB.m].slice(0, 4);
+                            segs.push(pick.m2.init + " (" + (pick.L > 1 ? lblA + "→" + lblB : lblA) + ")");
                             i2 += pick.L;
                         };
                         while (i2 < 7) {
@@ -5166,63 +5169,59 @@ function CardioPlanning() {
                     astReport && (React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid " + (astReport.includes("⚠") ? "#f59e0b" : "#16a34a"), background: astReport.includes("⚠") ? "rgba(245,158,11,.08)" : "rgba(22,163,74,.08)", fontSize: 11, color: "var(--txt)", lineHeight: 1.5 } },
                         React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
                         React.createElement("span", { style: { flex: 1 } }, astReport))),
-                    React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
-                        React.createElement("div", { style: { flex: "2 1 280px", maxWidth: 400, borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden", maxHeight: "calc(100vh - 180px)", overflowY: "auto" } }, allDays4M.map(function (_a) {
-                            var y = _a.y, m = _a.m, d = _a.d;
-                            var dt = new Date(y, m, d);
-                            var dw = (dt.getDay() + 6) % 7;
-                            var isWe = dw >= 5;
-                            var isT = d === astToday.getDate() && m === astToday.getMonth() && y === astToday.getFullYear();
-                            var dk = y + "-" + m + "-" + d;
-                            var wk = monKey2(y, m, d);
-                            var wkk = monKey2(y, m, d);
-                            var hasExc = dk !== wkk && typeof astreinte[dk] === "string";
-                            var mid = astForDay2(y, m, d);
-                            var med = mid ? medecins.find(function (x) { return String(x.id) === String(mid); }) : null;
-                            var isNewM = d === 1;
-                            return (React.createElement("div", { key: dk },
-                                isNewM && React.createElement("div", { style: { background: "var(--th)", borderBottom: "1px solid var(--border)", padding: "3px 8px", fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase" } },
-                                    MOIS[m],
-                                    " ",
-                                    y),
-                                React.createElement("div", { onClick: isAnyEdit ? function () { setAstPickModal({ dayKey: dk, wKey: wk, isWeek: false, label: JOURS_C[dw] + " " + d + " " + MOIS[m] + " " + y }); setAstSearch(""); } : undefined, style: { display: "flex", alignItems: "center", gap: 8, height: 28, borderBottom: "1px solid var(--border2)", padding: "0 8px",
-                                        background: isT ? "var(--bg-td)" : isWe ? "var(--bg-we)" : "var(--bg)",
-                                        cursor: isAnyEdit ? "pointer" : "default",
-                                        outline: hasExc ? "2px solid #7c3aed" : "none", outlineOffset: -2 } },
-                                    React.createElement("span", { style: { width: 80, fontSize: 11, fontWeight: isWe || isT ? 700 : 500, color: isT ? "var(--today-c)" : isWe ? "#92400e" : "var(--txt)", flexShrink: 0 } },
-                                        JOURS_C[dw],
-                                        " ",
-                                        d,
-                                        " ",
-                                        MOIS[m].slice(0, 4)),
-                                    med ? (function () {
-                                        var dk2 = y + "-" + m + "-" + d;
-                                        var parts2 = dk2.split("-");
-                                        var isAbsMed = getEntries(med.id, parseInt(parts2[0]), parseInt(parts2[1]), parseInt(parts2[2]), "M").some(function (e) { return ["ABSENCE", "FORMATION"].includes(e.acteId); }) ||
-                                            getEntries(med.id, parseInt(parts2[0]), parseInt(parts2[1]), parseInt(parts2[2]), "JOUR").some(function (e) { return ["ABSENCE", "FORMATION"].includes(e.acteId); });
-                                        return (React.createElement(React.Fragment, null,
-                                            React.createElement("div", { style: { width: 18, height: 18, borderRadius: "50%", background: med.color, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 7, fontWeight: 800 } }, med.init),
-                                            React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: isAbsMed ? "#ef4444" : "var(--txt)" } },
-                                                med.prenom,
-                                                " ",
-                                                med.nom),
-                                            isAbsMed && React.createElement("span", { style: { fontSize: 9, color: "#ef4444" } }, "\u26A0 abs"),
-                                            hasExc && !isAbsMed && React.createElement("span", { style: { fontSize: 9, color: "#7c3aed", marginLeft: "auto" } }, "exc.")));
-                                    })() : (React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "\u2014")))));
-                        })),
-                        React.createElement("div", { style: { flex: "0 0 160px", width: 160, borderRadius: 8, border: "1px solid var(--border)", padding: 10, background: "var(--bg2)", alignSelf: "start" } },
-                            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Jours par m\u00E9decin"),
-                            astMeds.sort(function (a, b) { return (stats[b.id] || 0) - (stats[a.id] || 0); }).map(function (m) { return (React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 5, padding: "4px 6px", borderRadius: 5, background: "var(--bg)" } },
-                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 7, fontWeight: 800 } }, m.init),
-                                React.createElement("span", { style: { fontSize: 11, flex: 1 } },
-                                    m.prenom,
-                                    " ",
+                    React.createElement("div", { style: { maxWidth: 560, marginBottom: 14, padding: 12, borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "var(--txt2)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 } },
+                            "\uD83D\uDCE1 Astreintes pos\u00E9es \u2014 ",
+                            pLabel),
+                        React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
+                            React.createElement("thead", null,
+                                React.createElement("tr", null,
+                                    React.createElement("th", { style: { textAlign: "left", padding: "3px 8px", fontSize: 10, color: "var(--txt3)" } }, "Praticien"),
+                                    React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Jours"),
+                                    React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Semaines \u00E9quiv."))),
+                            React.createElement("tbody", null, astMeds.slice().sort(function (a, b) { return (stats[b.id] || 0) - (stats[a.id] || 0); }).map(function (m) { return (React.createElement("tr", { key: m.id, style: { borderBottom: "1px solid var(--border2)" } },
+                                React.createElement("td", { style: { padding: "3px 8px", fontSize: 11, fontWeight: 700, color: "var(--txt)" } },
+                                    React.createElement("span", { style: { display: "inline-flex", width: 16, height: 16, borderRadius: "50%", background: m.color, color: "#fff", fontSize: 7, fontWeight: 800, alignItems: "center", justifyContent: "center", marginRight: 5, verticalAlign: "middle" } }, m.init),
                                     m.nom),
-                                React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: stats[m.id] > 0 ? "var(--txt)" : "var(--txt3)" } }, stats[m.id] || 0))); }),
-                            React.createElement("div", { style: { marginTop: 10, fontSize: 10, color: "var(--txt3)" } },
-                                React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 2, border: "2px solid #7c3aed", marginRight: 4 } }),
-                                "exception jour"),
-                            React.createElement("div", { style: { marginTop: 4, fontSize: 10, color: "var(--txt3)" } }, "Clic sur un lundi (\uD83D\uDCC5) pour assigner la semaine")))));
+                                React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 12, fontWeight: 800, color: (stats[m.id] || 0) > 0 ? "#f85149" : "var(--txt3)" } }, stats[m.id] || 0),
+                                React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, ((stats[m.id] || 0) / 7).toFixed(1)))); }))),
+                        React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } },
+                            React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 2, border: "2px solid #7c3aed", marginRight: 4, verticalAlign: "middle" } }),
+                            "exception jour \u00B7 p\u00E9riode affich\u00E9e")),
+                    React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)", maxWidth: 520 } },
+                        React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed", width: "100%" } },
+                            React.createElement("thead", null,
+                                React.createElement("tr", null,
+                                    React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 80 }) }, "Date"),
+                                    React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: 150 }) }, "Astreinte"))),
+                            React.createElement("tbody", null, allDays4M.map(function (_a) {
+                                var y = _a.y, m = _a.m, d = _a.d;
+                                var dt = new Date(y, m, d);
+                                var dw2 = dt.getDay();
+                                var we = dw2 === 6 || dw2 === 0;
+                                var isT = d === astToday.getDate() && m === astToday.getMonth() && y === astToday.getFullYear();
+                                var dk = y + "-" + m + "-" + d;
+                                var wk = monKey2(y, m, d);
+                                var hasExc = dk !== wk && typeof astreinte[dk] === "string";
+                                var mid = astForDay2(y, m, d);
+                                var med = mid ? medecins.find(function (x) { return String(x.id) === String(mid); }) : null;
+                                var isAbsMed = med ? (getEntries(med.id, y, m, d, "M").some(function (e) { return ["ABSENCE", "FORMATION", "FORM"].includes(e.acteId); }) || getEntries(med.id, y, m, d, "JOUR").some(function (e) { return ["ABSENCE", "FORMATION", "FORM"].includes(e.acteId); })) : false;
+                                return (React.createElement("tr", { key: dk, style: __assign(__assign({ height: 36, borderBottom: "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})) },
+                                    React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, textAlign: "center", background: isT ? "var(--bg-td)" : we ? "var(--bg-we)" : "var(--td-fix)" }) },
+                                        React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 13, fontFamily: "'JetBrains Mono',monospace" } },
+                                            d,
+                                            " ",
+                                            React.createElement("span", { style: { fontSize: 9, fontWeight: 600 } }, MOIS[m].slice(0, 4))),
+                                        React.createElement("div", { style: { fontSize: 9, color: we ? "#92400e" : isT ? "var(--today-c)" : "var(--txt3)", fontWeight: 600 } }, ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2])),
+                                    React.createElement("td", { style: __assign(__assign(__assign({}, S.td), { padding: 4, cursor: isAnyEdit ? "pointer" : "default" }), (hasExc ? { outline: "2px solid #7c3aed", outlineOffset: -2 } : {})), onClick: isAnyEdit ? function () { setAstPickModal({ dayKey: dk, wKey: wk, isWeek: false, label: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2] + " " + d + " " + MOIS[m] + " " + y }); setAstSearch(""); } : undefined }, med ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 6, background: med.color + "22" } },
+                                        React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, med.init),
+                                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: isAbsMed ? "#ef4444" : "var(--txt)" } },
+                                            med.prenom,
+                                            " ",
+                                            med.nom),
+                                        isAbsMed && React.createElement("span", { style: { fontSize: 9, color: "#ef4444", fontWeight: 700 } }, "\u26A0 abs"),
+                                        hasExc && !isAbsMed && React.createElement("span", { style: { fontSize: 9, color: "#7c3aed", marginLeft: "auto", fontWeight: 700 } }, "exc."))) : (React.createElement("span", { style: { color: "var(--txt3)", fontSize: 11 } }, "\u2014")))));
+                            }))))));
             })(),
             astPickModal && (function () {
                 var astMeds2 = medecins.filter(function (m) { return m.astreinte === true; });
