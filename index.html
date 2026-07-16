@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.16 — 16/07/2026";
+var APP_VERSION = "v8.16.1 — 16/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1004,6 +1004,21 @@ function GardeView(_a) {
         return days;
     }, [gvSm, gvSy, showFull, PCFG.len]);
     var _c = React.useState(false), gvSwapOpen = _c[0], setGvSwapOpen = _c[1];
+    var exportGardesCSV = function () {
+        var rows = [["Date", "Jour", "Garde"]];
+        var JX = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+        gvEffDays.forEach(function (_a) {
+            var gy = _a.y, gm = _a.m, gd = _a.d;
+            var gm2 = getGardeMed2(gy, gm, gd);
+            rows.push([gd + "/" + (gm + 1) + "/" + gy, JX[dow(gy, gm, gd)], gm2 ? (gm2.prenom + " " + gm2.nom) : ""]);
+        });
+        var csv = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(";"); }).join("\n");
+        var blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "gardes.csv";
+        a.click();
+    };
     var gvIsAbs = function (mid, y2, m2, d2) {
         var sls = isWE(y2, m2, d2) ? ["JOUR"] : ["M", "AM"];
         return sls.some(function (sl) {
@@ -1385,8 +1400,8 @@ function GardeView(_a) {
                     MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy),
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#f85149" }), onClick: function () { setGMax({}); setGardeModal(true); } }, "\u2699\uFE0F R\u00E9partition auto"),
-                isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "var(--bg2)", color: "#dc2626" }), onClick: function () {
+                isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" }, onClick: function () { setGMax({}); setGardeModal(true); } }, "\u2699\uFE0F R\u00E9partition auto"),
+                isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: function () {
                         var lbl = MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy;
                         if (!window.confirm("Retirer TOUTES les gardes et repos de garde de la période " + lbl + " ?"))
                             return;
@@ -1417,7 +1432,8 @@ function GardeView(_a) {
                             return next;
                         });
                         toast("Gardes et repos retirés sur la période", "info");
-                    } }, "\uD83D\uDDD1 Retirer les gardes"),
+                    } }, "\uD83D\uDDD1 Retirer"),
+                React.createElement("button", { onClick: exportGardesCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                 React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
         gardeModal && (React.createElement(Ov, { onClose: function () { return setGardeModal(false); } },
@@ -2926,7 +2942,7 @@ function TourTab(_a) {
                         " ",
                         lb));
                 }),
-                isEdit && React.createElement("button", { onClick: openAutoModal, title: "R\u00E9partition automatique", style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "4px 10px" }) }, "\u2699\uFE0F R\u00E9partition auto"),
+                isEdit && React.createElement("button", { onClick: openAutoModal, title: "R\u00E9partition automatique", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
                 isEdit && React.createElement("button", { onClick: function () {
                         if (!window.confirm("Supprimer TOUTES les attributions du tour sur la période affichée ?"))
                             return;
@@ -2935,7 +2951,7 @@ function TourTab(_a) {
                         setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { delete n[w.key]; }); return n; });
                         setLastReport(null);
                         toast("Attributions de la période supprimées", "info");
-                    }, title: "Effacer toutes les attributions de la p\u00E9riode", style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "4px 10px", background: "#dc2626" }) }, "\uD83D\uDDD1 Tout effacer"),
+                    }, title: "Effacer toutes les attributions de la p\u00E9riode", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         isEdit && lastReport && React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", fontSize: 11, color: "var(--txt2)" } },
             React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
