@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.16.3 — 16/07/2026";
+var APP_VERSION = "v8.16.4 — 16/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3021,7 +3021,7 @@ function TourTab(_a) {
                         var wishW = !!((tourWish || {})[w.key] || {})[m.id];
                         return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "3px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 44,
                                 background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", opacity: dis ? .3 : 1,
-                                outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#a3e635", ett: "#46bdc6" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
+                                outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#f97316", ett: "#ea9999" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
                                 if (dis || !isEdit)
                                     return;
                                 var wasOn = on;
@@ -3050,7 +3050,7 @@ function TourTab(_a) {
                             React.createElement("div", { style: { fontWeight: 800, fontSize: 10 }, title: avoidW ? "Préfère ne pas tourner cette semaine" : wishW ? "Souhaite tourner cette semaine" : "" },
                                 m.init,
                                 avoidW ? " 🚫" : wishW ? " ⭐" : ""),
-                            React.createElement("div", { style: { fontSize: 8, color: blocked ? "inherit" : m.surSpec && !on ? ({ coro: "#76a5af", pace: "#e3b341", eep: "#a3e635", ett: "#46bdc6" }[m.surSpec]) : "inherit" } }, blocked ? "indispo" : inOther ? "≠" : "")));
+                            React.createElement("div", { style: { fontSize: 8, color: blocked ? "inherit" : m.surSpec && !on ? ({ coro: "#76a5af", pace: "#e3b341", eep: "#f97316", ett: "#ea9999" }[m.surSpec]) : "inherit" } }, blocked ? "indispo" : inOther ? "≠" : "")));
                     })),
                     React.createElement("div", { style: { marginTop: 4, display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("span", { style: { fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: (wm[unit] || []).length === 2 ? "#3fb950" : (wm[unit] || []).length > 2 ? "#f85149" : "#e3b341" } },
