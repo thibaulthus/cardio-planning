@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.16.4 — 16/07/2026";
+var APP_VERSION = "v8.17 — 16/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -250,6 +250,15 @@ var MEDECINS_INIT = [
     { id: 32, nom: "Lantez", prenom: "Juliette", init: "JL", color: "#14b8a6", garde: false, tourMed: false, role: "attache" },
     { id: 33, nom: "Interne Vasc.", prenom: "", init: "IV", color: "#94a3b8", garde: false, tourMed: false, role: "attache" },
 ];
+var lightenHex = function (hex, amt) { try {
+    var h = hex.replace("#", "");
+    var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    var f = function (v) { return Math.round(v + (255 - v) * amt); };
+    return "rgb(" + f(r) + "," + f(g) + "," + f(b) + ")";
+}
+catch (e) {
+    return hex;
+} };
 /* ════ THEME ════ */
 function applyTheme(dark) {
     var r = document.documentElement;
@@ -258,6 +267,10 @@ function applyTheme(dark) {
         r.style.setProperty("--bg2", "#242938");
         r.style.setProperty("--bg-n", "#141720");
         r.style.setProperty("--bg-we", "#1f1a0e");
+        r.style.setProperty("--vac-bg", "#2a3040");
+        r.style.setProperty("--garde-bg", "#0f2318");
+        r.style.setProperty("--ast-bg", "#11291c");
+        r.style.setProperty("--ast-bord", "#2f6b45");
         r.style.setProperty("--bg-weh", "#231e0e");
         r.style.setProperty("--bg-td", "#0f1f1a");
         r.style.setProperty("--border", "#3d4559");
@@ -281,6 +294,10 @@ function applyTheme(dark) {
         r.style.setProperty("--bg", "#f1f5f9");
         r.style.setProperty("--bg2", "#ffffff");
         r.style.setProperty("--bg-n", "#e2e8f0");
+        r.style.setProperty("--vac-bg", "#e2e8f0");
+        r.style.setProperty("--garde-bg", "#f0fdf4");
+        r.style.setProperty("--ast-bg", "#dcfce7");
+        r.style.setProperty("--ast-bord", "#4ade80");
         r.style.setProperty("--bg-we", "#fef9ee");
         r.style.setProperty("--bg-weh", "#fef3c7");
         r.style.setProperty("--bg-td", "#f0fdf4");
@@ -340,7 +357,7 @@ var S = {
     fGrd: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
     fl: { display: "block", fontSize: 10, fontWeight: 700, color: "var(--txt2)", marginBottom: 3, textTransform: "uppercase", letterSpacing: .4 },
     fi: { padding: "6px 9px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, outline: "none", fontFamily: "'Sora',sans-serif" },
-    icnBtn: { background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 7px", cursor: "pointer", fontSize: 12, color: "#475569" },
+    icnBtn: { background: "var(--icon)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 7px", cursor: "pointer", fontSize: 12, color: "var(--txt2)" },
     btnP: { padding: "6px 12px", borderRadius: 7, border: "none", background: "#1d4ed8", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 },
     btnAbs: { padding: "4px 9px", borderRadius: 6, border: "1px solid #ef4444", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 600 },
     notif: { position: "fixed", top: 58, right: 12, padding: "8px 13px", borderRadius: 8, border: "1.5px solid", fontSize: 12, fontWeight: 600, zIndex: 2000, color: "var(--txt)" },
@@ -492,7 +509,7 @@ function GridH(_a) {
                         var noteT = notes[nk(med.id, ghY, ghM, d, sl)];
                         var astIdH = getAstreinteForDay ? getAstreinteForDay(ghY, ghM, d) : null;
                         var isAstH = astIdH !== null && String(astIdH) === String(med.id);
-                        return React.createElement("td", { key: d + sl + ghM + ghY, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (sl === "N" ? S.tdN : {})), (isAstH ? { background: "#fef9c3", outline: "1px solid #fbbf24" } : {})), (isTgh ? { background: "var(--bg-td)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ghY, ghM, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                        return React.createElement("td", { key: d + sl + ghM + ghY, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (sl === "N" ? S.tdN : {})), (isAstH ? { background: "var(--ast-bg)", outline: "1px solid var(--ast-bord)" } : {})), (isTgh ? { background: "var(--bg-td)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ghY, ghM, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                     });
                 }))); })))));
 }
@@ -576,7 +593,7 @@ function GridV(_a) {
                 (function () {
                     var pgf2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
                     var cgm = getGardeMed2(pgf2.y, pgf2.m, pgf2.d);
-                    return cgm ? (React.createElement("div", { style: { marginBottom: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#f0fdf4", borderRadius: 7, border: "1px solid #86efac" } },
+                    return cgm ? (React.createElement("div", { style: { marginBottom: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "var(--garde-bg)", borderRadius: 7, border: "1px solid #86efac" } },
                         React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: cgm.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, cgm.init),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600 } },
                             "Garde actuelle : ",
@@ -678,13 +695,13 @@ function GridV(_a) {
                     var isMonGV = !we && dow(ey, em, d) === 1;
                     var gardeMed = getGardeMed2(ey, em, d);
                     return slots.map(function (sl, si) { return (React.createElement("tr", { key: ey + "-" + em + "-" + d + sl, style: __assign(__assign(__assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMonGV ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
-                        si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: C0, background: isVac && isVac(ey, em, d) ? "#e2e8f0" : "var(--td-fix)" }), rowSpan: slots.length },
+                        si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: C0, background: isVac && isVac(ey, em, d) ? "var(--vac-bg)" : "var(--td-fix)" }), rowSpan: slots.length },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
                                 viewPeriod && React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700, fontFamily: "sans-serif", lineHeight: 1.2 } }, MOIS[em])),
                             React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)", textTransform: "uppercase", textAlign: "center" } }, JOURSC[dow(ey, em, d)])),
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, SLOTS[sl]),
-                        si === 0 && React.createElement("td", { rowSpan: slots.length, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0 + C1, zIndex: 9, borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "#f0fdf4" : "var(--td-fix)" }), onClick: function () { if (!isEdit)
+                        si === 0 && React.createElement("td", { rowSpan: slots.length, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0 + C1, zIndex: 9, borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "var(--garde-bg)" : "var(--td-fix)" }), onClick: function () { if (!isEdit)
                                 return; setGardeSearch(""); setPickGardeDayFull({ d: d, y: ey, m: em }); } }, gardeMed && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2 } },
                             React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: gardeMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, gardeMed.init),
                             React.createElement(Badge, { a: gardeActe }))),
@@ -694,7 +711,7 @@ function GridV(_a) {
                             var noteT = notes[nk(med.id, ey, em, d, sl)];
                             var astId = getAstreinteForDay ? getAstreinteForDay(ey, em, d) : null;
                             var isAst = astId !== null && String(astId) === String(med.id);
-                            return React.createElement("td", { key: med.id, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "#fef9c3", outline: "1px solid #fbbf24" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                            return React.createElement("td", { key: med.id, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", outline: "1px solid var(--ast-bord)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                         }))); });
                 }))))));
 }
@@ -817,7 +834,7 @@ function SiteView(_a) {
                             }))),
                     React.createElement("tbody", null, allSalles.map(function (salle) { return (React.createElement("tr", { key: salle, style: { borderBottom: "1px solid var(--border2)" } },
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5 }) },
-                            React.createElement("div", { style: { fontWeight: 700, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "#111" } }, salle === "CHB-BIP" ? "BIP" : salle),
+                            React.createElement("div", { style: { fontWeight: 700, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "var(--txt)" } }, salle === "CHB-BIP" ? "BIP" : salle),
                             React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)" } }, salle === "CHB-BIP" ? "BIP CHB" : siteActes.filter(function (a) { return a.id !== "BIP" && a.salles.includes(salle); }).map(function (a) { return a.short; }).join(", "))),
                         wdays.map(function (_a) {
                             var wY = _a.y, wM = _a.m, d = _a.d;
@@ -832,7 +849,7 @@ function SiteView(_a) {
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 42 }) }, "Jour"),
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 42, zIndex: 40, minWidth: 24, borderRight: "2px solid var(--border)" }) }, "Sl"),
                         allSalles.map(function (salle) { return React.createElement("th", { key: salle, style: __assign(__assign({}, S.th), { minWidth: 80, position: "sticky", top: 0, zIndex: 20 }) },
-                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10, color: "#111", fontFamily: "'JetBrains Mono',monospace" } }, salle)); }))),
+                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10, color: "var(--txt)", fontFamily: "'JetBrains Mono',monospace" } }, salle)); }))),
                 React.createElement("tbody", null, wdays.map(function (_a) {
                     var wY = _a.y, wM = _a.m, d = _a.d;
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
@@ -842,7 +859,7 @@ function SiteView(_a) {
                             React.createElement("td", { colSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, background: "var(--bg-we)" }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: "#92400e", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     d,
-                                    viewPeriod && React.createElement("span", { style: { fontSize: 7, display: "block", color: "#92400e", fontWeight: 600, lineHeight: 1 } }, MOIS[wM]),
+                                    viewPeriod && React.createElement("span", { style: { fontSize: 7, color: "#92400e", fontWeight: 600, marginLeft: 2 } }, MOIS[wM].slice(0, 4)),
                                     " ",
                                     JOURSC[dSV])),
                             allSalles.map(function (s) { return React.createElement("td", { key: s, style: __assign(__assign({}, S.td), S.tdWE) }); })));
@@ -948,7 +965,7 @@ function ActTabView(_a) {
                             }))),
                     React.createElement("tbody", null, rows.map(function (row) { return (React.createElement("tr", { key: row.label, style: { borderBottom: "1px solid var(--border2)" } },
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5 }) },
-                            React.createElement("div", { style: { fontWeight: 700, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: row.color } }, row.label)),
+                            React.createElement("div", { style: { fontWeight: 700, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: darkMode ? lightenHex(row.color, .55) : row.color } }, row.label)),
                         wdays.map(function (_a) {
                             var wY = _a.y, wM = _a.m, d = _a.d;
                             return isWE(wY, wM, d) ? React.createElement("td", { key: d + wM + wY, style: __assign(__assign(__assign({}, S.td), S.tdWE), { padding: 2 }) }) : ["M", "AM"].map(function (sl) { return renderActCell(row, d, sl, wY, wM); });
@@ -962,7 +979,7 @@ function ActTabView(_a) {
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 42 }) }, "Jour"),
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 42, zIndex: 40, minWidth: 24, borderRight: "2px solid var(--border)" }) }, "Sl"),
                         rows.map(function (row) { return React.createElement("th", { key: row.label, style: __assign(__assign({}, S.th), { minWidth: 95, position: "sticky", top: 0, zIndex: 20 }) },
-                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10, color: "#111", fontFamily: "'JetBrains Mono',monospace" } }, row.label)); }))),
+                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10, color: darkMode ? lightenHex(row.color, .55) : row.color, fontFamily: "'JetBrains Mono',monospace" } }, row.label)); }))),
                 React.createElement("tbody", null, wdays.map(function (_a) {
                     var wY = _a.y, wM = _a.m, d = _a.d;
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
@@ -972,6 +989,7 @@ function ActTabView(_a) {
                             React.createElement("td", { colSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, background: "var(--bg-we)" }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: "#92400e", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     d,
+                                    viewPeriod && React.createElement("span", { style: { fontSize: 7, color: "#92400e", fontWeight: 600, marginLeft: 2 } }, MOIS[wM].slice(0, 4)),
                                     " ",
                                     JOURSC[dAT])),
                             rows.map(function (r) { return React.createElement("td", { key: r.label, style: __assign(__assign({}, S.td), S.tdWE) }); })));
@@ -3378,7 +3396,22 @@ function CardioPlanning() {
     var setMonth = function (m) { return setYM(function (p) { return (__assign(__assign({}, p), { month: typeof m === "function" ? m(p.month) : m })); }); };
     var setYearMonth = function (y, m) { return setYM({ year: y, month: m }); };
     var _h = useState("V"), orient = _h[0], setOrient = _h[1]; // H/V toggle removed - V only
-    var _j = useState(false), darkMode = _j[0], setDarkMode = _j[1];
+    var _j = useState(function () {
+        try {
+            var v = localStorage.getItem("cp6_theme");
+            if (v === "dark")
+                return true;
+            if (v === "light")
+                return false;
+        }
+        catch (e) { }
+        var h = new Date().getHours();
+        return h >= 20 || h < 7; // auto : nuit de 20h à 7h
+    }), darkMode = _j[0], setDarkModeRaw = _j[1];
+    var setDarkMode = function (fn) { setDarkModeRaw(function (prev) { var nv = typeof fn === "function" ? fn(prev) : fn; try {
+        localStorage.setItem("cp6_theme", nv ? "dark" : "light");
+    }
+    catch (e) { } return nv; }); };
     var DEFAULT_TABS = [["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📡 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"]];
     var _k = useState(function () { try {
         var v = localStorage.getItem("cp6_taborder");
@@ -4986,8 +5019,8 @@ function CardioPlanning() {
                                 React.createElement("button", { style: __assign({}, S.icnBtn), onClick: function () { setMData(__assign(__assign({}, m), { _new: false })); setModal("editMed"); } }, "\u270F\uFE0F"),
                                 isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#fff1f2", border: "1px solid #fecdd3", color: "#dc2626" }), onClick: function () { if (confirm("Supprimer ".concat(m.nom, " ?")))
                                         setMedecins(function (p) { return p.filter(function (x) { return x.id !== m.id; }); }); } }, "\uD83D\uDDD1\uFE0F")),
-                            React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#f1f5f9", border: "1px solid #cbd5e1", fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign({}, m)); setModal("editMedActivites"); } }, "\uD83C\uDFAF"),
-                            isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#f1f5f9", border: "1px solid #cbd5e1", fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign(__assign({}, m), { _pinMode: true })); setModal("editMedPin"); } }, "\uD83D\uDD11")))); })))); }))),
+                            React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign({}, m)); setModal("editMedActivites"); } }, "\uD83C\uDFAF"),
+                            isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign(__assign({}, m), { _pinMode: true })); setModal("editMedPin"); } }, "\uD83D\uDD11")))); })))); }))),
             tab === "astreinte" && (function () {
                 var astMeds = medecins.filter(function (m) { return m.astreinte === true; });
                 var astToday = new Date();
@@ -5431,6 +5464,16 @@ function CardioPlanning() {
                             vacSource && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 3 } },
                                 "Source : ",
                                 vacSource))),
+                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDF13 Th\u00E8me"),
+                        React.createElement("div", { style: { display: "flex", gap: 6 } },
+                            React.createElement("button", { onClick: function () { try {
+                                    localStorage.removeItem("cp6_theme");
+                                }
+                                catch (e) { } ; var h = new Date().getHours(); setDarkModeRaw(h >= 20 || h < 7); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDD50 Auto (20h\u20137h)"),
+                            React.createElement("button", { onClick: function () { return setDarkMode(false); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: !darkMode ? "var(--nav-act)" : "var(--bg2)", color: !darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\u2600\uFE0F Jour"),
+                            React.createElement("button", { onClick: function () { return setDarkMode(true); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: darkMode ? "var(--nav-act)" : "var(--bg2)", color: darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\uD83C\uDF13 Nuit")),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit l'heure de l'appareil \u00E0 l'ouverture. Jour/Nuit : choix m\u00E9moris\u00E9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil).")),
                     docSize !== null && (function () {
                         var LIMIT = 1048576;
                         var pct = Math.min(100, Math.round(docSize / LIMIT * 100));
