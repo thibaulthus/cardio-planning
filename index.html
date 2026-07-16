@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.16.1 — 16/07/2026";
+var APP_VERSION = "v8.16.3 — 16/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1400,42 +1400,43 @@ function GardeView(_a) {
                     MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy),
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" }, onClick: function () { setGMax({}); setGardeModal(true); } }, "\u2699\uFE0F R\u00E9partition auto"),
-                isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: function () {
-                        var lbl = MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy;
-                        if (!window.confirm("Retirer TOUTES les gardes et repos de garde de la période " + lbl + " ?"))
-                            return;
-                        if (!window.confirm("Confirmer définitivement ? Cette action retire les gardes posées manuellement comme automatiquement."))
-                            return;
-                        setPlan(function (p) {
-                            var next = __assign({}, p);
-                            gvAllDays.forEach(function (_a) {
-                                var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-                                ["M", "AM", "JOUR", "N"].forEach(function (sl) {
-                                    var k = sk(y2, m2, d2, sl);
-                                    if (!next[k])
-                                        return;
-                                    var dm = __assign({}, next[k]);
-                                    var changed = false;
-                                    Object.keys(dm).forEach(function (mid) {
-                                        var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
-                                        var a = e && e.acteId;
-                                        if (a === "GARDE" || a === "REPOS_GARDE") {
-                                            delete dm[mid];
-                                            changed = true;
-                                        }
-                                    });
-                                    if (changed)
-                                        next[k] = dm;
-                                });
-                            });
-                            return next;
-                        });
-                        toast("Gardes et repos retirés sur la période", "info");
-                    } }, "\uD83D\uDDD1 Retirer"),
-                React.createElement("button", { onClick: exportGardesCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                 React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
+        React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
+            isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" }, onClick: function () { setGMax({}); setGardeModal(true); } }, "\u2699\uFE0F R\u00E9partition auto"),
+            isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: function () {
+                    var lbl = MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy;
+                    if (!window.confirm("Retirer TOUTES les gardes et repos de garde de la période " + lbl + " ?"))
+                        return;
+                    if (!window.confirm("Confirmer définitivement ? Cette action retire les gardes posées manuellement comme automatiquement."))
+                        return;
+                    setPlan(function (p) {
+                        var next = __assign({}, p);
+                        gvAllDays.forEach(function (_a) {
+                            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
+                            ["M", "AM", "JOUR", "N"].forEach(function (sl) {
+                                var k = sk(y2, m2, d2, sl);
+                                if (!next[k])
+                                    return;
+                                var dm = __assign({}, next[k]);
+                                var changed = false;
+                                Object.keys(dm).forEach(function (mid) {
+                                    var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
+                                    var a = e && e.acteId;
+                                    if (a === "GARDE" || a === "REPOS_GARDE") {
+                                        delete dm[mid];
+                                        changed = true;
+                                    }
+                                });
+                                if (changed)
+                                    next[k] = dm;
+                            });
+                        });
+                        return next;
+                    });
+                    toast("Gardes et repos retirés sur la période", "info");
+                } }, "\uD83D\uDDD1 Retirer"),
+            React.createElement("button", { onClick: exportGardesCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export")),
         gardeModal && (React.createElement(Ov, { onClose: function () { return setGardeModal(false); } },
             React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 460, maxHeight: "85vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } },
@@ -2935,24 +2936,18 @@ function TourTab(_a) {
                 React.createElement("h2", { style: S.mTit }, "🔄 Tour médical — " + perLabelT + " " + perT.startY),
                 React.createElement("button", { onClick: nextPeriodT, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                [["■", "Coro", "#76a5af"], ["■", "Pace", "#e3b341"], ["■", "EEP", "#f97316"], ["■", "ETT", "#ea9999"]].map(function (_a) {
-                    var ic = _a[0], lb = _a[1], lc = _a[2];
-                    return (React.createElement("span", { key: lb, style: { fontSize: 10, color: lc, display: "flex", alignItems: "center", gap: 2, fontWeight: 700 } },
-                        ic,
-                        " ",
-                        lb));
-                }),
-                isEdit && React.createElement("button", { onClick: openAutoModal, title: "R\u00E9partition automatique", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
-                isEdit && React.createElement("button", { onClick: function () {
-                        if (!window.confirm("Supprimer TOUTES les attributions du tour sur la période affichée ?"))
-                            return;
-                        if (!window.confirm("Confirmez-vous la suppression définitive ? (récupérable via le bouton Annuler ↶)"))
-                            return;
-                        setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { delete n[w.key]; }); return n; });
-                        setLastReport(null);
-                        toast("Attributions de la période supprimées", "info");
-                    }, title: "Effacer toutes les attributions de la p\u00E9riode", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
+        React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
+            isEdit && React.createElement("button", { onClick: openAutoModal, title: "R\u00E9partition automatique", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
+            isEdit && React.createElement("button", { onClick: function () {
+                    if (!window.confirm("Supprimer TOUTES les attributions du tour sur la période affichée ?"))
+                        return;
+                    if (!window.confirm("Confirmez-vous la suppression définitive ? (récupérable via le bouton Annuler ↶)"))
+                        return;
+                    setTourMed(function (p) { var n = __assign({}, p); weeksT.forEach(function (w) { delete n[w.key]; }); return n; });
+                    setLastReport(null);
+                    toast("Attributions de la période supprimées", "info");
+                }, title: "Effacer toutes les attributions de la p\u00E9riode", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer")),
         isEdit && lastReport && React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", fontSize: 11, color: "var(--txt2)" } },
             React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
             React.createElement("span", { style: { flex: 1 } },
@@ -3325,8 +3320,9 @@ function StatsTab(_a) {
                 React.createElement("h2", { style: S.mTit }, "📊 Stats — " + perLabelS + " " + per.startY),
                 React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11 }) }, "\uD83D\uDDA8\uFE0F Export"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
+        React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
+            React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export")),
         React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 } },
             React.createElement("button", { onClick: function () { return setMedFilter([]); }, style: { padding: "4px 10px", borderRadius: 20, border: "1px solid var(--border)", cursor: "pointer", fontSize: 11, fontWeight: 700,
                     background: medFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: medFilter.length === 0 ? "#fff" : "var(--txt2)" } }, "Tous"),
@@ -4855,9 +4851,10 @@ function CardioPlanning() {
                         React.createElement("h2", { style: S.mTit }, "📅 " + _titlePeriod),
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        isAnyEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
+                isAnyEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 8 } },
+                    React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type")),
                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8, alignItems: "center" } },
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginRight: 4 } }, "Filtre:"),
                     React.createElement("button", { onClick: function () { return setPlanFilter([]); }, style: { padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border)", background: planFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: planFilter.length === 0 ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: 600 } }, "Tous"),
@@ -4913,9 +4910,10 @@ function CardioPlanning() {
                         React.createElement("h2", { style: S.mTit }, "📋 Planning type — " + (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        isEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
-                        isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "var(--bg2)", color: "#dc2626" }), onClick: function () { return openPtModal(null, "remove"); } }, "\uD83E\uDDF9 Retirer"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
+                isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 8 } },
+                    React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type"),
+                    React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: function () { return openPtModal(null, "remove"); } }, "\uD83D\uDDD1 Retirer")),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Semaine type par m\u00E9decin. Le bouton \u25B6 PT l'applique aux mois de la p\u00E9riode affich\u00E9e (choix des mois et du point de d\u00E9part dans la fen\u00EAtre). TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
                 React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit, orient: orient, acteById: acteById, setMData: setMData, setModal: setModal }))),
             tab === "attache" && (React.createElement("div", null,
@@ -4925,9 +4923,10 @@ function CardioPlanning() {
                         React.createElement("h2", { style: S.mTit }, "👔 Attachés — " + (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                        isEdit && React.createElement("button", { style: S.btnP, onClick: function () { return openPtModal(null); } }, "\u25B6 PT"),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
+                isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 8 } },
+                    React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type")),
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
@@ -4936,9 +4935,10 @@ function CardioPlanning() {
                     React.createElement("h2", { style: S.mTit },
                         "\u2699\uFE0F Activit\u00E9s ",
                         React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
-                    isEdit && React.createElement("button", { style: S.btnP, onClick: function () { setMData({ _new: true, id: "", label: "", short: "", color: "#3b82f6", bg: "#0c1a2e", hasSalle: false, salles: [], isSystem: false, site: "tous", medecinsAutorise: [] }); setModal("editActe"); } }, "+ Nouvelle"),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
+                isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
+                    React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer" }, onClick: function () { setMData({ _new: true, id: "", label: "", short: "", color: "#3b82f6", bg: "#0c1a2e", hasSalle: false, salles: [], isSystem: false, site: "tous", medecinsAutorise: [] }); setModal("editActe"); } }, "+ Nouvelle activit\u00E9")),
                 ["tous", "CHL", "CHB"].map(function (site) { return (React.createElement("div", { key: site, style: { marginBottom: 14 } },
                     React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 } }, site === "tous" ? "Toutes" : site),
                     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))", gap: 6 } }, actes.filter(function (a) { return (a.site || "tous") === site; }).map(function (a) { return (React.createElement("div", { key: a.id, style: __assign(__assign({}, S.card), { borderLeft: "3px solid ".concat(a.color), display: "flex", alignItems: "center", gap: 9 }) },
@@ -4954,9 +4954,10 @@ function CardioPlanning() {
             tab === "equipe" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit }, "\uD83D\uDC65 \u00C9quipe"),
-                    isEdit && React.createElement("button", { style: S.btnP, onClick: function () { setMData({ _new: true, id: Date.now(), nom: "", prenom: "", init: "", color: "#3b82f6", garde: true, tourMed: true, role: "medecin" }); setModal("editMed"); } }, "+ Ajouter"),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
+                isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
+                    React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer" }, onClick: function () { setMData({ _new: true, id: Date.now(), nom: "", prenom: "", init: "", color: "#3b82f6", garde: true, tourMed: true, role: "medecin" }); setModal("editMed"); } }, "+ Ajouter")),
                 ["medecin", "attache", "ide"].map(function (role) { return (React.createElement("div", { key: role, style: { marginBottom: 18 } },
                     React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 7 } }, role === "medecin" ? "Médecins" : role === "attache" ? "Attachés" : "IDE"),
                     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 7 } }, medecins.filter(function (m) { return (m.role || "medecin") === role; }).map(function (m) { return (React.createElement("div", { key: m.id, style: __assign(__assign({}, S.card), { display: "flex", alignItems: "center", gap: 9 }) },
@@ -5178,7 +5179,8 @@ function CardioPlanning() {
                             React.createElement("span", { style: { color: "#7c3aed" } }, "\uD83D\uDCE1"),
                             " ",
                             pLabel),
-                        React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A"),
+                        React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A")),
+                    React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
                         isEdit && React.createElement("button", { onClick: runAstAuto, style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
                         isEdit && React.createElement("button", { onClick: clearAstPeriod, style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer"),
                         React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export")),
