@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.19 — 16/07/2026";
+var APP_VERSION = "v8.20 — 16/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3636,8 +3636,16 @@ function CardioPlanning() {
                         setTourReport(data.tourReport);
                     if (data.astReport !== undefined && data.astReport !== "")
                         setAstReport(data.astReport);
-                    if (data.salleReg)
+                    if (data.salleReg && JSON.parse(data.salleReg).length > 0) {
                         setSalleReg(JSON.parse(data.salleReg));
+                    }
+                    else {
+                        var acts = data.actes ? JSON.parse(data.actes) : [];
+                        var found = acts.flatMap(function (a) { return a.salles || []; }).filter(function (s, i2, arr) { return arr.indexOf(s) === i2; });
+                        var guess_1 = function (s) { return s.indexOf("Angio") === 0 ? "ANGIO" : s.indexOf("CHB") === 0 ? "CHB" : (/Stim|EEP|Echo|ETO|Dobu/i.test(s) && s.indexOf("CHL") !== 0) ? "PLATEAU" : "CHL"; };
+                        if (found.length > 0)
+                            setSalleReg(found.map(function (s) { return ({ n: s, s: guess_1(s) }); }));
+                    }
                     if (data.periodCfg)
                         setPeriodCfg(JSON.parse(data.periodCfg));
                     if (data.medPins)
@@ -4920,7 +4928,7 @@ function CardioPlanning() {
                     { label: "ETO", ids: ["ETO_CHL"], color: "#2dd4bf", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "Reveal", ids: ["REVEAL"], color: "#818cf8", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "EE CHL", ids: ["EE_CHL"], color: "#4ade80", salle: S_EE_CHL },
-                ], year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
+                ].concat(actes.filter(function (a) { return a.ptCardio && !a.isSystem; }).map(function (a) { return ({ label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null }); })), year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
@@ -6161,13 +6169,16 @@ function CardioPlanning() {
                 React.createElement("div", { style: { gridColumn: "1/-1", display: "flex", gap: 8, alignItems: "center" } },
                     React.createElement("input", { type: "checkbox", checked: mData.hasSalle, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { hasSalle: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
                     React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "A une salle associ\u00E9e")),
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+                    React.createElement("input", { type: "checkbox", checked: !!mData.ptCardio, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { ptCardio: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
+                    React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "Afficher dans l'onglet \u2764\uFE0F PT Cardio")),
                 mData.hasSalle && React.createElement("div", { style: { gridColumn: "1/-1" } },
                     React.createElement("label", { style: S.fl }, "Salles"),
                     React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 } }, salleReg.map(function (x) { return x.n; }).concat(actes.flatMap(function (a2) { return a2.salles || []; })).filter(function (s, ix, arr) { return arr.indexOf(s) === ix; }).sort().map(function (s) {
                         var on = (mData.salles || []).includes(s);
                         return React.createElement("button", { key: s, type: "button", onClick: function () { return setMData(function (p) { var cur = p.salles || []; var nx = on ? cur.filter(function (x) { return x !== s; }) : cur.concat([s]); return __assign(__assign({}, p), { salles: nx, sallesStr: nx.join(", ") }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid #388bfd" : "1px solid var(--border)", background: on ? "rgba(56,139,253,.15)" : "var(--bg2)", color: on ? "#388bfd" : "var(--txt2)" } }, s);
                     })),
-                    React.createElement("input", { value: mData.sallesStr || "", onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { sallesStr: e.target.value, salles: e.target.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean) })); }); }, style: __assign(__assign({}, S.fi), { width: "100%" }), placeholder: "ou tapez : Salle-A, Salle-B (nouvelles salles)" })),
+                    React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "Cr\u00E9er/renommer une salle : Param\u00E8tres \u2192 \uD83C\uDFE5 Salles.")),
                 React.createElement("div", { style: { gridColumn: "1/-1" } },
                     React.createElement("label", { style: S.fl }, "M\u00E9decins autoris\u00E9s (vide = tous)"),
                     React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, maxHeight: 120, overflowY: "auto" } }, medecins.filter(function (m2) { return m2.role !== "ide"; }).map(function (m2) {
