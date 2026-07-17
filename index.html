@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.24 — 17/07/2026";
+var APP_VERSION = "v8.25 — 17/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -259,6 +259,8 @@ var lightenHex = function (hex, amt) { try {
 catch (e) {
     return hex;
 } };
+var acteRecapIn = function (a, site) { if (!a)
+    return false; var arr = a.recapSites || []; return arr.includes(site) || a.recapSite === site || (site === "PLATEAU" && !!a.ptCardio); };
 /* ════ THEME ════ */
 function applyTheme(dark) {
     var r = document.documentElement;
@@ -750,7 +752,7 @@ function SiteView(_a) {
     var _robustSalles = site === "CHL" ? _chlSalles : site === "CHB" ? _chbSalles : null;
     var _regS = (salleReg || []).filter(function (x) { return x.s === site; }).map(function (x) { return x.n; });
     var _uniq = function (arr) { return arr.filter(function (s, i2, a2) { return s && a2.indexOf(s) === i2; }); };
-    var _recapCols = actes.filter(function (a) { return a.recapSite === site; }).map(function (a) { return a.id === "BIP" ? "CHB-BIP" : "RECAP:" + a.id; });
+    var _recapCols = actes.filter(function (a) { return acteRecapIn(a, site); }).map(function (a) { return a.id === "BIP" ? "CHB-BIP" : "RECAP:" + a.id; });
     var _legacy = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }) : (_robustSalles || __spreadArray([], new Set(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles || []; })), true));
     var _allSallesBase = _uniq(_regS.concat(_legacy).filter(function (s) { return s !== "CHB-BIP"; }));
     var allSalles = _allSallesBase.concat(_recapCols);
@@ -3602,8 +3604,8 @@ function CardioPlanning() {
                         setMedecins(JSON.parse(data.medecins));
                     if (data.actes) {
                         var arrA = JSON.parse(data.actes);
-                        arrA.forEach(function (a) { if (a && a.id === "BIP" && a.recapSite === undefined)
-                            a.recapSite = "CHB"; });
+                        arrA.forEach(function (a) { if (a && a.id === "BIP" && a.recapSite === undefined && !(a.recapSites && a.recapSites.length))
+                            a.recapSites = ["CHB"]; });
                         if (!arrA.some(function (a) { return a && a.id === "TP"; }))
                             arrA.push({ id: "TP", label: "Temps partiel", short: "TP", color: "#8b949e", bg: "#8b949e", hasSalle: false, salles: [] });
                         setActes(arrA);
@@ -4933,7 +4935,7 @@ function CardioPlanning() {
                     { label: "ETO", ids: ["ETO_CHL"], color: "#2dd4bf", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "Reveal", ids: ["REVEAL"], color: "#818cf8", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "EE CHL", ids: ["EE_CHL"], color: "#4ade80", salle: S_EE_CHL },
-                ].concat(actes.filter(function (a) { return a.ptCardio && !a.isSystem; }).map(function (a) { return ((a.salles || []).length > 1 ? { label: a.label, ids: [a.id], color: a.color, salle: null, hasSalleChoice: true, sallesDisp: a.salles } : { label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null }); })), year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
+                ].concat(actes.filter(function (a) { return acteRecapIn(a, "PLATEAU") && !a.isSystem; }).map(function (a) { return ((a.salles || []).length > 1 ? { label: a.label, ids: [a.id], color: a.color, salle: null, hasSalleChoice: true, sallesDisp: a.salles } : { label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null }); })), year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
@@ -6230,15 +6232,20 @@ function CardioPlanning() {
                 React.createElement("div", { style: { gridColumn: "1/-1", display: "flex", gap: 8, alignItems: "center" } },
                     React.createElement("input", { type: "checkbox", checked: mData.hasSalle, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { hasSalle: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
                     React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "A une salle associ\u00E9e")),
-                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                    React.createElement("input", { type: "checkbox", checked: !!mData.ptCardio, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { ptCardio: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
-                    React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "Afficher dans l'onglet \u2764\uFE0F PT Cardio")),
-                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                    React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "Colonne de reprise :"),
-                    React.createElement("select", { value: mData.recapSite || "", onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { recapSite: e.target.value || undefined })); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11, width: 110 }) },
-                        React.createElement("option", { value: "" }, "Aucune"),
-                        React.createElement("option", { value: "CHL" }, "CHL"),
-                        React.createElement("option", { value: "CHB" }, "CHB"))),
+                React.createElement("div", { style: { gridColumn: "1/-1" } },
+                    React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12, display: "block", marginBottom: 3 } }, "\u21A9 Colonne/ligne de reprise dans :"),
+                    React.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap" } }, [["CHL", "🏥 CHL"], ["CHB", "🏥 CHB"], ["ANGIO", "🔬 PT Angio"], ["PLATEAU", "❤️ PT Cardio"]].map(function (_a) {
+                        var v2 = _a[0], l2 = _a[1];
+                        var cur = mData.recapSites || [].concat(mData.recapSite ? [mData.recapSite] : []).concat(mData.ptCardio ? ["PLATEAU"] : []);
+                        var on = cur.includes(v2);
+                        return React.createElement("label", { key: v2, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--txt2)", cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: on, onChange: function () { return setMData(function (p) {
+                                    var base = p.recapSites || [].concat(p.recapSite ? [p.recapSite] : []).concat(p.ptCardio ? ["PLATEAU"] : []);
+                                    var nx = on ? base.filter(function (x) { return x !== v2; }) : base.concat([v2]);
+                                    return __assign(__assign({}, p), { recapSites: nx, recapSite: undefined, ptCardio: undefined });
+                                }); }, style: { width: 13, height: 13 } }),
+                            l2);
+                    }))),
                 mData.hasSalle && React.createElement("div", { style: { gridColumn: "1/-1" } },
                     React.createElement("label", { style: S.fl }, "Salles"),
                     React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 } }, salleReg.map(function (x) { return x.n; }).concat(actes.flatMap(function (a2) { return a2.salles || []; })).filter(function (s, ix, arr) { return arr.indexOf(s) === ix; }).sort().map(function (s) {
