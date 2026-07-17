@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.22 — 17/07/2026";
+var APP_VERSION = "v8.22.1 — 17/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2223,9 +2223,10 @@ function EditPTModal(_a) {
                         var usedBy = medecins.filter(function (o) { return o.id !== medId; }).find(function (o) {
                             var op = planningType[o.id] || {};
                             var oe = ((op[dayOfWeek] || {})[slot]) || [];
-                            return oe[0] === a.id && oe[1] === s;
+                            return oe[1] === s; // salle occupée quelle que soit l'activité
                         });
-                        return (React.createElement("button", { key: s, title: usedBy ? "\u26A0 Attribu\u00E9e \u00E0 Dr. ".concat(usedBy.nom) : "", style: { padding: "5px 9px", borderRadius: 5, border: "1px solid ".concat(usedBy ? "#f59e0b" : "var(--border)"), cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: curSalle === s ? a.color : usedBy ? "#1a1000" : "var(--bg2)", color: curSalle === s ? "#fff" : usedBy ? "#f59e0b" : "var(--txt2)" }, onClick: function () { setPT(a.id, s); onClose(); } },
+                        var usedActe = usedBy ? (actes.find(function (x) { return x.id === (((planningType[usedBy.id] || {})[dayOfWeek] || {})[slot] || [])[0]; }) || {}).short : null;
+                        return (React.createElement("button", { key: s, title: usedBy ? "\u26A0 Occup\u00E9e par Dr. ".concat(usedBy.nom).concat(usedActe ? " (" + usedActe + ")" : "") : "", style: { padding: "5px 9px", borderRadius: 5, border: "1px solid ".concat(usedBy ? "#f59e0b" : "var(--border)"), cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: curSalle === s ? a.color : usedBy ? "#1a1000" : "var(--bg2)", color: curSalle === s ? "#fff" : usedBy ? "#f59e0b" : "var(--txt2)" }, onClick: function () { setPT(a.id, s); onClose(); } },
                             s,
                             usedBy ? " ⚠" : ""));
                     }))));
