@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.20 — 16/07/2026";
+var APP_VERSION = "v8.20.1 — 16/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4928,7 +4928,7 @@ function CardioPlanning() {
                     { label: "ETO", ids: ["ETO_CHL"], color: "#2dd4bf", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "Reveal", ids: ["REVEAL"], color: "#818cf8", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "EE CHL", ids: ["EE_CHL"], color: "#4ade80", salle: S_EE_CHL },
-                ].concat(actes.filter(function (a) { return a.ptCardio && !a.isSystem; }).map(function (a) { return ({ label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null }); })), year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
+                ].concat(actes.filter(function (a) { return a.ptCardio && !a.isSystem; }).map(function (a) { return ((a.salles || []).length > 1 ? { label: a.label, ids: [a.id], color: a.color, salle: null, hasSalleChoice: true, sallesDisp: a.salles } : { label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null }); })), year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
