@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.25 — 17/07/2026";
+var APP_VERSION = "v8.25.1 — 17/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4565,7 +4565,7 @@ function CardioPlanning() {
     /* ── Modale d'application du PT ── */
     var _30 = React.useState(null), ptModal = _30[0], setPtModal = _30[1]; // null | {medId:null|number}
     var _31 = React.useState([]), ptMonths = _31[0], setPtMonths = _31[1]; // indices cochés
-    var _32 = React.useState(true), ptFromToday = _32[0], setPtFromToday = _32[1];
+    var _32 = React.useState(false), ptFromToday = _32[0], setPtFromToday = _32[1];
     var ptPeriodMonths = React.useMemo(function () {
         var p = perStart(year, month);
         var arr = [];
@@ -5938,6 +5938,11 @@ function CardioPlanning() {
                 if (salle === void 0) { salle = null; }
                 if (acteId === "GARDE") {
                     doGarde();
+                    return;
+                }
+                var _curA = getEntries(medId, y2, m2, d2, we ? "JOUR" : slot).map(function (e2) { return e2.acteId; });
+                if (_curA.includes(acteId)) {
+                    toast("Cette activité est déjà posée sur ce créneau — retirez-la d'abord (×) si besoin", "warn");
                     return;
                 }
                 var acteObj = acteById(acteId);
