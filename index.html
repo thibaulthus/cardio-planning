@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.22.1 — 17/07/2026";
+var APP_VERSION = "v8.24 — 17/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -750,12 +750,10 @@ function SiteView(_a) {
     var _robustSalles = site === "CHL" ? _chlSalles : site === "CHB" ? _chbSalles : null;
     var _regS = (salleReg || []).filter(function (x) { return x.s === site; }).map(function (x) { return x.n; });
     var _uniq = function (arr) { return arr.filter(function (s, i2, a2) { return s && a2.indexOf(s) === i2; }); };
-    var allSalles = site === "ANGIO" ? _uniq(_regS.concat(siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }))) : _uniq((_robustSalles || (function () {
-        var salles = __spreadArray([], new Set(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles; })), true);
-        if (site === "CHB")
-            return __spreadArray(__spreadArray([], salles, true), ["CHB-BIP"], false);
-        return __spreadArray([], new Set(siteActes.flatMap(function (a) { return a.salles; })), true);
-    })()).concat(_regS));
+    var _recapCols = actes.filter(function (a) { return a.recapSite === site; }).map(function (a) { return a.id === "BIP" ? "CHB-BIP" : "RECAP:" + a.id; });
+    var _legacy = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }) : (_robustSalles || __spreadArray([], new Set(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles || []; })), true));
+    var _allSallesBase = _uniq(_regS.concat(_legacy).filter(function (s) { return s !== "CHB-BIP"; }));
+    var allSalles = _allSallesBase.concat(_recapCols);
     var wdays = svEffDays; // keep full {y,m,d} objects
     var siteColor = site === "CHL" ? "#388bfd" : site === "ANGIO" ? "#76a5af" : "#3fb950";
     function renderCell(salle, d, sl, ry, rm) {
@@ -765,15 +763,16 @@ function SiteView(_a) {
             rm = month;
         var isTdRC = d === sv_today.getDate() && rm === sv_today.getMonth() && ry === sv_today.getFullYear();
         // CHB-BIP pseudo-column: show all BIP entries across CHB-1/2/3
-        if (salle === "CHB-BIP") {
-            var bipActe_1 = siteActes.find(function (a) { return a.id === "BIP"; });
+        if (salle === "CHB-BIP" || String(salle).indexOf("RECAP:") === 0) {
+            var _rId_1 = salle === "CHB-BIP" ? "BIP" : salle.slice(6);
+            var bipActe_1 = actes.find(function (a) { return a.id === _rId_1; });
             if (!bipActe_1)
                 return React.createElement("td", { key: "bip" + d + sl, style: __assign({}, S.td) });
             var bipOcc2 = medecins.flatMap(function (med) {
                 var es = getEntries(med.id, ry, rm, d, sl);
-                return es.filter(function (e) { return e.acteId === "BIP"; }).map(function (e) { return ({ med: med, acte: bipActe_1, rs: e.salle }); });
+                return es.filter(function (e) { return e.acteId === _rId_1; }).map(function (e) { return ({ med: med, acte: bipActe_1, rs: e.salle }); });
             });
-            return (React.createElement("td", { key: "bip" + d + sl, style: __assign(__assign({}, S.td), { cursor: isEdit ? "pointer" : "default", padding: 2, verticalAlign: "middle", textAlign: "center" }), onClick: function () { return isEdit && onPickSite({ salle: "CHB-BIP", siteActes: [bipActe_1], d: d, sl: sl, y: year, m: month }); } }, bipOcc2.map(function (_a, i) {
+            return (React.createElement("td", { key: "bip" + d + sl, style: __assign(__assign({}, S.td), { borderLeft: "3px solid var(--border)", cursor: isEdit ? "pointer" : "default", padding: 2, verticalAlign: "middle", textAlign: "center" }), onClick: function () { return isEdit && onPickSite({ salle: salle, siteActes: [bipActe_1], d: d, sl: sl, y: year, m: month }); } }, bipOcc2.map(function (_a, i) {
                 var med = _a.med, acte = _a.acte, rs = _a.rs;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 2, margin: "1px 0" } },
                     React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, med.init),
@@ -836,8 +835,8 @@ function SiteView(_a) {
                             }))),
                     React.createElement("tbody", null, allSalles.map(function (salle) { return (React.createElement("tr", { key: salle, style: { borderBottom: "1px solid var(--border2)" } },
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5 }) },
-                            React.createElement("div", { style: { fontWeight: 700, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "var(--txt)" } }, salle === "CHB-BIP" ? "BIP" : salle),
-                            React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)" } }, salle === "CHB-BIP" ? "BIP CHB" : siteActes.filter(function (a) { return a.id !== "BIP" && a.salles.includes(salle); }).map(function (a) { return a.short; }).join(", "))),
+                            React.createElement("div", { style: { fontWeight: 700, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "var(--txt)" } }, salle === "CHB-BIP" ? "BIP" : String(salle).indexOf("RECAP:") === 0 ? ((actes.find(function (a2) { return a2.id === salle.slice(6); }) || {}).short || salle.slice(6)) : salle),
+                            React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)" } }, (salle === "CHB-BIP" || String(salle).indexOf("RECAP:") === 0) ? "↩ reprise activité" : siteActes.filter(function (a) { return a.id !== "BIP" && a.salles.includes(salle); }).map(function (a) { return a.short; }).join(", "))),
                         wdays.map(function (_a) {
                             var wY = _a.y, wM = _a.m, d = _a.d;
                             return isWE(wY, wM, d) ? React.createElement("td", { key: d + wM + wY, style: __assign(__assign(__assign({}, S.td), S.tdWE), { padding: 2 }) }) : ["M", "AM"].map(function (sl) { return renderCell(salle, d, sl, wY, wM); });
@@ -851,7 +850,7 @@ function SiteView(_a) {
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 42 }) }, "Jour"),
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 42, zIndex: 40, minWidth: 24, borderRight: "2px solid var(--border)" }) }, "Sl"),
                         allSalles.map(function (salle) { return React.createElement("th", { key: salle, style: __assign(__assign({}, S.th), { minWidth: 80, position: "sticky", top: 0, zIndex: 20 }) },
-                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10, color: "var(--txt)", fontFamily: "'JetBrains Mono',monospace" } }, salle)); }))),
+                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10, color: "var(--txt)", fontFamily: "'JetBrains Mono',monospace" } }, salle === "CHB-BIP" ? "BIP" : String(salle).indexOf("RECAP:") === 0 ? ((actes.find(function (a2) { return a2.id === salle.slice(6); }) || {}).short || salle.slice(6)) : salle)); }))),
                 React.createElement("tbody", null, wdays.map(function (_a) {
                     var wY = _a.y, wM = _a.m, d = _a.d;
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
@@ -2046,7 +2045,7 @@ function PickMedSiteModal(_a) {
     var _b = useState("med"), step = _b[0], setStep = _b[1]; // med | acte | salle
     var _c = useState(null), selMedId = _c[0], setSelMedId = _c[1];
     var selMed = medecins.find(function (x) { return x.id === selMedId; });
-    var isBipCol = mData && mData.salle === "CHB-BIP";
+    var isBipCol = mData && (mData.salle === "CHB-BIP" || String(mData.salle || "").indexOf("RECAP:") === 0);
     var curOcc = [];
     siteActes.forEach(function (acte) {
         medecins.forEach(function (med) {
@@ -3464,15 +3463,16 @@ function CardioPlanning() {
     var _7 = useState({}), tourDerog = _7[0], setTourDerog = _7[1]; // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
     var _8 = useState(null), tourReport = _8[0], setTourReport = _8[1]; // rapport persistant de la dernière répartition auto du tour
     var _9 = useState(null), astReport = _9[0], setAstReport = _9[1];
-    var _10 = useState([]), salleReg = _10[0], setSalleReg = _10[1]; // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]   // rapport persistant de la dernière répartition auto des astreintes
-    var _11 = useState({ len: 4, startM: 6 }), periodCfg = _11[0], setPeriodCfg = _11[1];
+    var _10 = useState([]), salleReg = _10[0], setSalleReg = _10[1]; // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
+    var _11 = useState(null), salleEdit = _11[0], setSalleEdit = _11[1]; // salle en cours d'édition (activités associées)   // rapport persistant de la dernière répartition auto des astreintes
+    var _12 = useState({ len: 4, startM: 6 }), periodCfg = _12[0], setPeriodCfg = _12[1];
     PCFG.len = periodCfg.len;
     PCFG.startM = periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
-    var _12 = useState({}), astreinte = _12[0], setAstreinte = _12[1]; // {wKey: medId}
-    var _13 = useState(null), astDayModal = _13[0], setAstDayModal = _13[1]; // legacy
-    var _14 = useState(null), astPickModal = _14[0], setAstPickModal = _14[1]; // {dayKey,wKey,isWeek,label}
-    var _15 = useState(""), astSearch = _15[0], setAstSearch = _15[1];
-    var _16 = useState(false), ast4M = _16[0], setAst4M = _16[1];
+    var _13 = useState({}), astreinte = _13[0], setAstreinte = _13[1]; // {wKey: medId}
+    var _14 = useState(null), astDayModal = _14[0], setAstDayModal = _14[1]; // legacy
+    var _15 = useState(null), astPickModal = _15[0], setAstPickModal = _15[1]; // {dayKey,wKey,isWeek,label}
+    var _16 = useState(""), astSearch = _16[0], setAstSearch = _16[1];
+    var _17 = useState(false), ast4M = _17[0], setAst4M = _17[1];
     // Get astreinte medId for a given day
     var getAstreinteForDay = React.useCallback(function (y, m, d) {
         var dayKey = y + "-" + m + "-" + d;
@@ -3488,19 +3488,19 @@ function CardioPlanning() {
         return (v !== undefined && v !== null) ? String(v) : null;
     }, [astreinte]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
-    var _17 = useState(function () { return new Date().getFullYear(); }), astYear = _17[0], setAstYear = _17[1];
-    var _18 = useState(function () { return new Date().getMonth(); }), astMonth = _18[0], setAstMonth = _18[1];
-    var _19 = useState(function () { return new Date().getFullYear(); }), tourYear = _19[0], setTourYear = _19[1];
-    var _20 = useState(function () { return new Date().getMonth(); }), tourMonth = _20[0], setTourMonth = _20[1];
-    var _21 = useState("connecting"), fbStatus = _21[0], setFbStatus = _21[1];
-    var _22 = useState(function () { try {
+    var _18 = useState(function () { return new Date().getFullYear(); }), astYear = _18[0], setAstYear = _18[1];
+    var _19 = useState(function () { return new Date().getMonth(); }), astMonth = _19[0], setAstMonth = _19[1];
+    var _20 = useState(function () { return new Date().getFullYear(); }), tourYear = _20[0], setTourYear = _20[1];
+    var _21 = useState(function () { return new Date().getMonth(); }), tourMonth = _21[0], setTourMonth = _21[1];
+    var _22 = useState("connecting"), fbStatus = _22[0], setFbStatus = _22[1];
+    var _23 = useState(function () { try {
         return localStorage.getItem("cp6_vaczone") || "B";
     }
     catch (_a) {
         return "B";
-    } }), vacZone = _22[0], setVacZone = _22[1];
-    var _23 = useState(new Set()), vacDates = _23[0], setVacDates = _23[1]; // Set of "YYYY-MM-DD" strings
-    var _24 = useState(null), vacSource = _24[0], setVacSource = _24[1]; // provenance des données vacances
+    } }), vacZone = _23[0], setVacZone = _23[1];
+    var _24 = useState(new Set()), vacDates = _24[0], setVacDates = _24[1]; // Set of "YYYY-MM-DD" strings
+    var _25 = useState(null), vacSource = _25[0], setVacSource = _25[1]; // provenance des données vacances
     // Vacances scolaires : fichier iCal officiel du ministère (l'ancienne API records a été retirée)
     // + calendrier officiel 2025-2027 embarqué en secours (arrêté du 22/10/2025, JO 23/10/2025)
     var VAC_FALLBACK = {
@@ -3602,6 +3602,8 @@ function CardioPlanning() {
                         setMedecins(JSON.parse(data.medecins));
                     if (data.actes) {
                         var arrA = JSON.parse(data.actes);
+                        arrA.forEach(function (a) { if (a && a.id === "BIP" && a.recapSite === undefined)
+                            a.recapSite = "CHB"; });
                         if (!arrA.some(function (a) { return a && a.id === "TP"; }))
                             arrA.push({ id: "TP", label: "Temps partiel", short: "TP", color: "#8b949e", bg: "#8b949e", hasSalle: false, salles: [] });
                         setActes(arrA);
@@ -3665,7 +3667,7 @@ function CardioPlanning() {
         return function () { return unsub(); };
     }, []);
     /* ── Sauvegardes automatiques (72h, 10 conservées) ── */
-    var _25 = useState([]), backupList = _25[0], setBackupList = _25[1]; // [{id,ts}]
+    var _26 = useState([]), backupList = _26[0], setBackupList = _26[1]; // [{id,ts}]
     var refreshBackupList = useCallback(function () { return __awaiter(_this, void 0, void 0, function () {
         var snap, items_1, e_1;
         return __generator(this, function (_a) {
@@ -3736,7 +3738,7 @@ function CardioPlanning() {
             }
         });
     }); }, [refreshBackupList]);
-    var _26 = useState(null), bkPreview = _26[0], setBkPreview = _26[1]; // {ts, stats}
+    var _27 = useState(null), bkPreview = _27[0], setBkPreview = _27[1]; // {ts, stats}
     var statsOf = function (planObj, tourObj, medsArr) {
         var nEntries = 0, nGardes = 0;
         var byMonth = {};
@@ -3800,7 +3802,7 @@ function CardioPlanning() {
             }
         });
     }); }, [plan, tourMed, medecins]);
-    var _27 = useState(null), docSize = _27[0], setDocSize = _27[1];
+    var _28 = useState(null), docSize = _28[0], setDocSize = _28[1];
     useEffect(function () {
         if (tab !== "partage")
             return;
@@ -4209,7 +4211,7 @@ function CardioPlanning() {
     var isEdit = accessMode === "edit";
     // ─── Undo/Redo history (edit mode) ───
     var histRef = useRef({ stack: [], idx: -1, restoring: false });
-    var _28 = useState(0), histVer = _28[0], setHistVer = _28[1];
+    var _29 = useState(0), histVer = _29[0], setHistVer = _29[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
     useEffect(function () {
         if (isFirstLoad.current)
@@ -4559,9 +4561,9 @@ function CardioPlanning() {
         toast("Planning type appliqué (" + medLbl + ", " + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")", "info");
     }, [medecins, planningType, tourMed]);
     /* ── Modale d'application du PT ── */
-    var _29 = React.useState(null), ptModal = _29[0], setPtModal = _29[1]; // null | {medId:null|number}
-    var _30 = React.useState([]), ptMonths = _30[0], setPtMonths = _30[1]; // indices cochés
-    var _31 = React.useState(true), ptFromToday = _31[0], setPtFromToday = _31[1];
+    var _30 = React.useState(null), ptModal = _30[0], setPtModal = _30[1]; // null | {medId:null|number}
+    var _31 = React.useState([]), ptMonths = _31[0], setPtMonths = _31[1]; // indices cochés
+    var _32 = React.useState(true), ptFromToday = _32[0], setPtFromToday = _32[1];
     var ptPeriodMonths = React.useMemo(function () {
         var p = perStart(year, month);
         var arr = [];
@@ -4781,7 +4783,7 @@ function CardioPlanning() {
         var p = perNext(sy, sm);
         setYearMonth(p.sy, p.sm);
     };
-    var _32 = useState("J"), daySwapSpan = _32[0], setDaySwapSpan = _32[1];
+    var _33 = useState("J"), daySwapSpan = _33[0], setDaySwapSpan = _33[1];
     var openCell = function (medId, y2, m2, d2, slot) {
         if (!canEdit(medId))
             return;
@@ -5488,13 +5490,47 @@ function CardioPlanning() {
                             return React.createElement("div", { key: site2, style: { marginBottom: 6 } },
                                 React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, lbl),
                                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
-                                    list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
-                                        s.n,
+                                    list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: salleEdit === s.n ? "1.5px solid #388bfd" : "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
+                                        React.createElement("span", { onClick: function () { return setSalleEdit(function (v) { return v === s.n ? null : s.n; }); }, style: { cursor: "pointer", textDecoration: "underline dotted" } }, s.n),
                                         React.createElement("select", { value: s.s, onChange: function (e) { return setSalleReg(function (p) { return p.map(function (x) { return x.n === s.n ? __assign(__assign({}, x), { s: e.target.value }) : x; }); }); }, style: { fontSize: 8, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg2)", color: "var(--txt2)", padding: "0 1px" } },
                                             React.createElement("option", { value: "CHL" }, "CHL"),
                                             React.createElement("option", { value: "CHB" }, "CHB"),
                                             React.createElement("option", { value: "ANGIO" }, "Angio"),
                                             React.createElement("option", { value: "PLATEAU" }, "PT Car.")),
+                                        React.createElement("button", { onClick: function () {
+                                                setSalleReg(function (p) {
+                                                    var idx = p.findIndex(function (x) { return x.n === s.n; });
+                                                    if (idx <= 0)
+                                                        return p;
+                                                    var k2 = idx - 1;
+                                                    while (k2 >= 0 && p[k2].s !== s.s)
+                                                        k2--;
+                                                    if (k2 < 0)
+                                                        return p;
+                                                    var n2 = p.slice();
+                                                    var tmp = n2[idx];
+                                                    n2[idx] = n2[k2];
+                                                    n2[k2] = tmp;
+                                                    return n2;
+                                                });
+                                            }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 8, padding: 0, color: "var(--txt3)" } }, "\u25C0"),
+                                        React.createElement("button", { onClick: function () {
+                                                setSalleReg(function (p) {
+                                                    var idx = p.findIndex(function (x) { return x.n === s.n; });
+                                                    if (idx < 0)
+                                                        return p;
+                                                    var k2 = idx + 1;
+                                                    while (k2 < p.length && p[k2].s !== s.s)
+                                                        k2++;
+                                                    if (k2 >= p.length)
+                                                        return p;
+                                                    var n2 = p.slice();
+                                                    var tmp = n2[idx];
+                                                    n2[idx] = n2[k2];
+                                                    n2[k2] = tmp;
+                                                    return n2;
+                                                });
+                                            }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 8, padding: 0, color: "var(--txt3)" } }, "\u25B6"),
                                         React.createElement("button", { onClick: function () {
                                                 var nn = window.prompt("Renommer la salle " + s.n + " :", s.n);
                                                 if (!nn || nn === s.n)
@@ -5512,6 +5548,23 @@ function CardioPlanning() {
                                             }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 9, padding: 0, color: "#dc2626" } }, "\u00D7"))); }),
                                     list.length === 0 && React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "\u2014")));
                         }),
+                        salleEdit && (function () {
+                            var inSalle = actes.filter(function (a) { return (a.salles || []).includes(salleEdit); });
+                            return (React.createElement("div", { style: { marginTop: 6, marginBottom: 6, padding: 8, borderRadius: 7, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.05)" } },
+                                React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#388bfd", marginBottom: 5 } },
+                                    "Activit\u00E9s possibles dans ",
+                                    salleEdit,
+                                    " ",
+                                    React.createElement("span", { style: { color: "var(--txt3)", fontWeight: 600 } },
+                                        "(",
+                                        inSalle.length,
+                                        ")")),
+                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, actes.filter(function (a) { return a.hasSalle && !a.isSystem; }).map(function (a) {
+                                    var on = (a.salles || []).includes(salleEdit);
+                                    return React.createElement("button", { key: a.id, type: "button", onClick: function () { return setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== salleEdit; }) : (x.salles || []).concat([salleEdit]) }); }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
+                                })),
+                                React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Un clic ajoute/retire la salle de l'activit\u00E9 \u2014 c'est la m\u00EAme donn\u00E9e que les pastilles de l'\u00E9diteur d'activit\u00E9.")));
+                        })(),
                         React.createElement("div", { style: { display: "flex", gap: 5, marginTop: 6 } },
                             React.createElement("input", { id: "newSalleName", placeholder: "Nouvelle salle\u2026", style: __assign(__assign({}, S.fi), { flex: 1, fontSize: 11 }) }),
                             React.createElement("select", { id: "newSalleSite", style: __assign(__assign({}, S.fi), { fontSize: 11, width: 110 }) },
@@ -6180,6 +6233,12 @@ function CardioPlanning() {
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
                     React.createElement("input", { type: "checkbox", checked: !!mData.ptCardio, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { ptCardio: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
                     React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "Afficher dans l'onglet \u2764\uFE0F PT Cardio")),
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+                    React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "Colonne de reprise :"),
+                    React.createElement("select", { value: mData.recapSite || "", onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { recapSite: e.target.value || undefined })); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11, width: 110 }) },
+                        React.createElement("option", { value: "" }, "Aucune"),
+                        React.createElement("option", { value: "CHL" }, "CHL"),
+                        React.createElement("option", { value: "CHB" }, "CHB"))),
                 mData.hasSalle && React.createElement("div", { style: { gridColumn: "1/-1" } },
                     React.createElement("label", { style: S.fl }, "Salles"),
                     React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 } }, salleReg.map(function (x) { return x.n; }).concat(actes.flatMap(function (a2) { return a2.salles || []; })).filter(function (s, ix, arr) { return arr.indexOf(s) === ix; }).sort().map(function (s) {
