@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.21 — 17/07/2026";
+var APP_VERSION = "v8.22 — 17/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -717,7 +717,7 @@ function GridV(_a) {
 }
 /* ════ SITE VIEW (CHL/CHB) ════ */
 function SiteView(_a) {
-    var site = _a.site, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, actes = _a.actes, medecins = _a.medecins, getEntries = _a.getEntries, salleOcc = _a.salleOcc, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, onPickSite = _a.onPickSite, _b = _a.notes, notes = _b === void 0 ? {} : _b, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod;
+    var site = _a.site, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, actes = _a.actes, medecins = _a.medecins, getEntries = _a.getEntries, salleOcc = _a.salleOcc, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, onPickSite = _a.onPickSite, _b = _a.notes, notes = _b === void 0 ? {} : _b, _c = _a.salleReg, salleReg = _c === void 0 ? [] : _c, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod;
     var today = new Date();
     var ANGIO_SALLES_ALL = ["Angio-1", "Angio-2", "Angio-3"];
     var EXCL_SALLES = site === "CHL" ? __spreadArray([S_STIM, S_EEP, S_EE_CHB], ANGIO_SALLES_ALL, true) : site === "ANGIO" ? [] : __spreadArray([S_STIM, S_EEP, S_EE_CHL], ANGIO_SALLES_ALL, true);
@@ -748,12 +748,14 @@ function SiteView(_a) {
     var _chlSalles = ["CHL-1", "CHL-2", "CHL-3", "CHL-4", "CHL-5", "CHL-6", "CHL-7", "Holter", "HC-Exam"];
     var _chbSalles = ["CHB-1", "CHB-2", "CHB-3", "CHB-VASC", "EE-CHB", "Rythmo-CHB", "CHB-BIP"];
     var _robustSalles = site === "CHL" ? _chlSalles : site === "CHB" ? _chbSalles : null;
-    var allSalles = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s, i, arr) { return String(s).startsWith("Angio") && arr.indexOf(s) === i; }) : _robustSalles || (function () {
+    var _regS = (salleReg || []).filter(function (x) { return x.s === site; }).map(function (x) { return x.n; });
+    var _uniq = function (arr) { return arr.filter(function (s, i2, a2) { return s && a2.indexOf(s) === i2; }); };
+    var allSalles = site === "ANGIO" ? _uniq(_regS.concat(siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }))) : _uniq((_robustSalles || (function () {
         var salles = __spreadArray([], new Set(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles; })), true);
         if (site === "CHB")
             return __spreadArray(__spreadArray([], salles, true), ["CHB-BIP"], false);
         return __spreadArray([], new Set(siteActes.flatMap(function (a) { return a.salles; })), true);
-    })();
+    })()).concat(_regS));
     var wdays = svEffDays; // keep full {y,m,d} objects
     var siteColor = site === "CHL" ? "#388bfd" : site === "ANGIO" ? "#76a5af" : "#3fb950";
     function renderCell(salle, d, sl, ry, rm) {
@@ -3642,7 +3644,7 @@ function CardioPlanning() {
                     else {
                         var acts = data.actes ? JSON.parse(data.actes) : [];
                         var found = acts.flatMap(function (a) { return a.salles || []; }).filter(function (s, i2, arr) { return arr.indexOf(s) === i2; });
-                        var guess_1 = function (s) { return s.indexOf("Angio") === 0 ? "ANGIO" : s.indexOf("CHB") === 0 ? "CHB" : (/Stim|EEP|Echo|ETO|Dobu/i.test(s) && s.indexOf("CHL") !== 0) ? "PLATEAU" : "CHL"; };
+                        var guess_1 = function (s) { return s.indexOf("Angio") === 0 ? "ANGIO" : (s.indexOf("CHB") === 0 || /B[eé]thune/i.test(s)) ? "CHB" : (/Stim|EEP|Echo|ETO|Dobu/i.test(s) && s.indexOf("CHL") !== 0) ? "PLATEAU" : "CHL"; };
                         if (found.length > 0)
                             setSalleReg(found.map(function (s) { return ({ n: s, s: guess_1(s) }); }));
                     }
@@ -4909,12 +4911,12 @@ function CardioPlanning() {
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
-            tab === "chl" && React.createElement(SiteView, { site: "CHL", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "chl" && React.createElement(SiteView, { site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
-            tab === "chb" && React.createElement(SiteView, { site: "CHB", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "chb" && React.createElement(SiteView, { site: "CHB", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
                     var full = bip && ["CHB-1", "CHB-2", "CHB-3"].includes(salle) ? __spreadArray(__spreadArray([], siteActes.filter(function (a) { return a.id !== "BIP"; }), true), [bip], false) : siteActes;
@@ -4933,7 +4935,7 @@ function CardioPlanning() {
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "angio" && React.createElement(SiteView, { site: "ANGIO", year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "angio" && React.createElement(SiteView, { site: "ANGIO", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
@@ -5487,6 +5489,11 @@ function CardioPlanning() {
                                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
                                     list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
                                         s.n,
+                                        React.createElement("select", { value: s.s, onChange: function (e) { return setSalleReg(function (p) { return p.map(function (x) { return x.n === s.n ? __assign(__assign({}, x), { s: e.target.value }) : x; }); }); }, style: { fontSize: 8, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg2)", color: "var(--txt2)", padding: "0 1px" } },
+                                            React.createElement("option", { value: "CHL" }, "CHL"),
+                                            React.createElement("option", { value: "CHB" }, "CHB"),
+                                            React.createElement("option", { value: "ANGIO" }, "Angio"),
+                                            React.createElement("option", { value: "PLATEAU" }, "PT Car.")),
                                         React.createElement("button", { onClick: function () {
                                                 var nn = window.prompt("Renommer la salle " + s.n + " :", s.n);
                                                 if (!nn || nn === s.n)
