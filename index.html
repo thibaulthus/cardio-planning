@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.29 — 18/07/2026";
+var APP_VERSION = "v8.30 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -750,7 +750,7 @@ function SiteView(_a) {
     var _chlSalles = ["CHL-1", "CHL-2", "CHL-3", "CHL-4", "CHL-5", "CHL-6", "CHL-7", "Holter", "HC-Exam"];
     var _chbSalles = ["CHB-1", "CHB-2", "CHB-3", "CHB-VASC", "EE-CHB", "Rythmo-CHB", "CHB-BIP"];
     var _robustSalles = site === "CHL" ? _chlSalles : site === "CHB" ? _chbSalles : null;
-    var _regS = (salleReg || []).filter(function (x) { return x.s === site; }).map(function (x) { return x.n; });
+    var _regS = (salleReg || []).filter(function (x) { return Array.isArray(x.s) ? x.s.indexOf(site) >= 0 : x.s === site; }).map(function (x) { return x.n; });
     var _uniq = function (arr) { return arr.filter(function (s, i2, a2) { return s && a2.indexOf(s) === i2; }); };
     var _recapCols = actes.filter(function (a) { return acteRecapIn(a, site); }).map(function (a) { return a.id === "BIP" ? "CHB-BIP" : "RECAP:" + a.id; });
     var _legacy = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }) : (_robustSalles || __spreadArray([], new Set(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles || []; })), true));
@@ -5695,7 +5695,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDFE5 Salles"),
                         ["CHL", "CHB", "ANGIO", "PLATEAU"].map(function (site2) {
-                            var list = salleReg.filter(function (s) { return s.s === site2; });
+                            var list = salleReg.filter(function (s) { return Array.isArray(s.s) ? s.s.indexOf(site2) >= 0 : s.s === site2; });
                             var lbl = { CHL: "CHL", CHB: "CHB", ANGIO: "PT Angio", PLATEAU: "PT Cardio" }[site2];
                             return React.createElement("div", { key: site2, style: { marginBottom: 6 } },
                                 React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, lbl),
@@ -6434,24 +6434,30 @@ function CardioPlanning() {
                 React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Onglet"),
                 React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } }, [["CHL", "\ud83c\udfe5 CHL"], ["CHB", "\ud83c\udfe5 CHB"], ["ANGIO", "\ud83d\udd2c PT Angio"], ["PLATEAU", "\u2764\ufe0f PT Cardio"]].map(function (_a) {
                     var v2 = _a[0], l2 = _a[1];
-                    return (React.createElement("button", { key: v2, onClick: function () { return setMData(function (p) { return (__assign(__assign({}, p), { s: v2 })); }); }, style: { flex: "1 1 40%", padding: "9px 6px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: mData.s === v2 ? "#1d4ed8" : "var(--bg2)", color: mData.s === v2 ? "#fff" : "var(--txt2)" } }, l2));
+                    return (React.createElement("button", { key: v2, onClick: function () { return setMData(function (p) { var cur = Array.isArray(p.s) ? p.s : (p.s ? [p.s] : []); var nx = cur.includes(v2) ? cur.filter(function (x) { return x !== v2; }) : cur.concat([v2]); return __assign(__assign({}, p), { s: nx }); }); }, style: { flex: "1 1 40%", padding: "9px 6px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: (Array.isArray(mData.s) ? mData.s : [mData.s]).includes(v2) ? "#1d4ed8" : "var(--bg2)", color: (Array.isArray(mData.s) ? mData.s : [mData.s]).includes(v2) ? "#fff" : "var(--txt2)" } }, l2));
                 })),
-                !mData._new && React.createElement("div", { style: { marginTop: 12 } },
+                React.createElement("div", { style: { marginTop: 12 } },
                     React.createElement("label", { style: S.fl }, "Activit\u00E9s possibles dans cette salle"),
                     React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 } }, actes.filter(function (a) { return a.hasSalle && !a.isSystem; }).map(function (a) {
-                        var on = (a.salles || []).includes(mData._origN);
-                        return React.createElement("button", { key: a.id, onClick: function () { return setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== mData._origN; }) : (x.salles || []).concat([mData._origN]) }); }); }); }, style: { fontSize: 12, padding: "7px 12px", borderRadius: 14, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
+                        var on = mData._new ? (mData._acts || []).includes(a.id) : (a.salles || []).includes(mData._origN);
+                        return React.createElement("button", { key: a.id, onClick: function () {
+                                if (mData._new) {
+                                    setMData(function (p) { return (__assign(__assign({}, p), { _acts: on ? (p._acts || []).filter(function (x) { return x !== a.id; }) : (p._acts || []).concat([a.id]) })); });
+                                    return;
+                                }
+                                setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== mData._origN; }) : (x.salles || []).concat([mData._origN]) }); }); });
+                            }, style: { fontSize: 12, padding: "7px 12px", borderRadius: 14, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
                     }))),
                 !mData._new && React.createElement("div", { style: { marginTop: 12, display: "flex", gap: 8, alignItems: "center" } },
                     React.createElement("span", { style: { fontSize: 12, color: "var(--txt2)" } }, "Position dans l'onglet :"),
                     React.createElement("button", { onClick: function () { return setSalleReg(function (p) { var idx = p.findIndex(function (x) { return x.n === mData._origN; }); if (idx <= 0)
                             return p; var k2 = idx - 1; while (k2 >= 0 && p[k2].s !== p[idx].s)
                             k2--; if (k2 < 0)
-                            return p; var n2 = p.slice(); var t2 = n2[idx]; n2[idx] = n2[k2]; n2[k2] = t2; return n2; }); }, style: __assign(__assign({}, S.arr), { fontSize: 14 }) }, "\\u25c0"),
+                            return p; var n2 = p.slice(); var t2 = n2[idx]; n2[idx] = n2[k2]; n2[k2] = t2; return n2; }); }, style: __assign(__assign({}, S.arr), { fontSize: 14 }) }, "\u25C0"),
                     React.createElement("button", { onClick: function () { return setSalleReg(function (p) { var idx = p.findIndex(function (x) { return x.n === mData._origN; }); if (idx < 0)
                             return p; var k2 = idx + 1; while (k2 < p.length && p[k2].s !== p[idx].s)
                             k2++; if (k2 >= p.length)
-                            return p; var n2 = p.slice(); var t2 = n2[idx]; n2[idx] = n2[k2]; n2[k2] = t2; return n2; }); }, style: __assign(__assign({}, S.arr), { fontSize: 14 }) }, "\\u25b6")),
+                            return p; var n2 = p.slice(); var t2 = n2[idx]; n2[idx] = n2[k2]; n2[k2] = t2; return n2; }); }, style: __assign(__assign({}, S.arr), { fontSize: 14 }) }, "\u25B6")),
                 React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 14 } },
                     !mData._new && React.createElement("button", { onClick: function () {
                             if (!window.confirm("Supprimer la salle " + mData._origN + " du registre ?\n(Retirée aussi des activités ; les cases déjà posées la gardent.)"))
@@ -6459,16 +6465,21 @@ function CardioPlanning() {
                             setSalleReg(function (p) { return p.filter(function (x) { return x.n !== mData._origN; }); });
                             setActes(function (p) { return p.map(function (a) { return (__assign(__assign({}, a), { salles: (a.salles || []).filter(function (s2) { return s2 !== mData._origN; }) })); }); });
                             setModal(null);
-                        }, style: { padding: "9px 12px", borderRadius: 8, border: "1px solid #dc2626", background: "rgba(220,38,38,.08)", color: "#dc2626", fontWeight: 700, cursor: "pointer", fontSize: 13 } }, "\\ud83d\\uddd1 Supprimer"),
+                        }, style: { padding: "9px 12px", borderRadius: 8, border: "1px solid #dc2626", background: "rgba(220,38,38,.08)", color: "#dc2626", fontWeight: 700, cursor: "pointer", fontSize: 13 } }, "\uD83D\uDDD1 Supprimer"),
                     React.createElement("button", { onClick: function () {
                             var nm = (mData.n || "").trim();
                             if (!nm)
                                 return toast("Nom requis", "warn");
+                            var sArr = Array.isArray(mData.s) ? mData.s : (mData.s ? [mData.s] : []);
+                            if (sArr.length === 0)
+                                return toast("Choisissez au moins un onglet", "warn");
                             if (mData._new) {
                                 if (salleReg.some(function (x) { return x.n === nm; }))
                                     return toast("Cette salle existe déjà", "warn");
-                                setSalleReg(function (p) { return __spreadArray(__spreadArray([], p, true), [{ n: nm, s: mData.s || "CHL" }], false); });
-                                toast("Salle créée : " + nm + " — ouvrez-la pour cocher ses activités", "info");
+                                setSalleReg(function (p) { return __spreadArray(__spreadArray([], p, true), [{ n: nm, s: sArr.length === 1 ? sArr[0] : sArr }], false); });
+                                if ((mData._acts || []).length > 0)
+                                    setActes(function (p) { return p.map(function (a) { return (mData._acts.includes(a.id) && !(a.salles || []).includes(nm)) ? __assign(__assign({}, a), { salles: (a.salles || []).concat([nm]) }) : a; }); });
+                                toast("Salle créée : " + nm, "info");
                             }
                             else if (nm !== mData._origN) {
                                 if (salleReg.some(function (x) { return x.n === nm; }))
