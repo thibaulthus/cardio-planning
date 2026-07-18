@@ -25,7 +25,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v8.33 — 18/07/2026";
+const APP_VERSION="v9.0 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3220,6 +3220,114 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
   );
 }
 
+/* ════ AIDE (V9) — composant partagé jsx/html, React.createElement pur ════ */
+const HE=React.createElement;
+/* Reproductions visuelles des éléments de l'interface */
+function HBtn(p){
+  const st={green:{border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"},
+    blue:{border:"none",background:"#1d4ed8",color:"#fff"},
+    red:{border:"1px solid #fecdd3",background:"#fff1f2",color:"#dc2626"},
+    violet:{border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed"},
+    ghost:{border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)"}}[p.kind||"ghost"];
+  return HE("span",{style:Object.assign({display:"inline-block",fontSize:11,padding:"2px 9px",borderRadius:6,fontWeight:800,verticalAlign:"middle",whiteSpace:"nowrap"},st)},p.children);
+}
+function HAvat(p){return HE("span",{style:{display:"inline-flex",width:19,height:19,borderRadius:"50%",background:p.color||"#3b82f6",color:"#fff",fontSize:8,fontWeight:800,alignItems:"center",justifyContent:"center",verticalAlign:"middle"}},p.txt||"AB");}
+function HBadg(p){return HE("span",{style:{display:"inline-block",padding:"1px 6px",borderRadius:5,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:p.color,color:p.dark?"#fff":"#111",verticalAlign:"middle"}},p.txt);}
+function HChip(p){return HE("span",{style:{display:"inline-block",padding:"1px 7px",borderRadius:9,fontSize:9,fontWeight:800,background:p.bg,color:"#fff",verticalAlign:"middle"}},p.txt);}
+function HP(p){return HE("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.65,marginBottom:p.last?0:8}},p.children);}
+function HT(p){return HE("div",{style:{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,margin:"12px 0 4px"}},p.children);}
+function HStep(p){return HE("div",{style:{display:"flex",gap:8,marginBottom:7,alignItems:"flex-start"}},
+  HE("span",{style:{flexShrink:0,width:20,height:20,borderRadius:"50%",background:"#1d4ed8",color:"#fff",fontSize:11,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}},p.n),
+  HE("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.6}},p.children));}
+function HTab(p){return HE("div",{style:{marginBottom:7}},
+  HE("span",{style:{fontWeight:800,fontSize:12,color:"var(--txt)"}},p.t+" — "),
+  HE("span",{style:{fontSize:12,color:"var(--txt2)",lineHeight:1.6}},p.children));}
+
+const HELP_SECTIONS=[
+ {id:"consult",icon:"👤",title:"Utiliser le planning sans être éditeur",body:()=>HE("div",null,
+  HP({children:["Sur la page d'accueil, deux façons d'entrer :"]}),
+  HP({children:[HBtn({kind:"ghost",children:"👁 Consulter"})," — lecture libre de tous les onglets, sans code et sans risque de rien modifier."]}),
+  HP({children:["Ou bien votre ",HE("b",null,"PIN personnel")," : tapez-le dans le champ PIN puis ",HBtn({kind:"blue",children:"✏️ Édition"}),". Vous entrez en ",HE("b",null,"édition personnelle"),", signalée par un bandeau bleu en bas d'écran : vous pouvez modifier ",HE("b",null,"uniquement votre ligne"),", tout le reste demeure en lecture seule."]}),
+  HT({children:"Ce que votre PIN vous permet"}),
+  HP({children:["• ",HE("b",null,"Poser vos absences et formations")," : cliquez sur vos cases dans le Planning, ou utilisez la modale d'absence pour une période (dates de début/fin, matin/après-midi)."]}),
+  HP({children:["• ",HE("b",null,"Vos préférences de gardes")," : dans l'onglet Gardes, marquez un jour ⭐ (je souhaite cette garde) ou 🚫 (je préfère éviter). La répartition automatique en tient compte."]}),
+  HP({children:["• ",HE("b",null,"Vos préférences de tour")," : même principe par semaine dans l'onglet Tour (⭐ je souhaite tourner / 🚫 pas cette semaine)."]}),
+  HP({children:["• ",HE("b",null,"Vos propres activités")," : modifier le contenu de vos cases (activité, salle, note)."]}),
+  HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
+
+ {id:"creer",icon:"🚀",title:"Créer un planning de A à Z",body:()=>HE("div",null,
+  HP({children:["L'ordre compte : chaque étape s'appuie sur la précédente. Tout se fait sur la ",HE("b",null,"période affichée")," (généralement 4 mois)."]}),
+  HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — onglet Tour : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫."]}),
+  HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — onglet Gardes : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
+  HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
+  HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
+  HStep({n:"6",children:[HE("b",null,"Ajuster")," — cases individuelles, échanges de gardes ⇄, dérogations de tour, notes 📝."]}),
+  HP({last:true,children:["En fin de période : archiver les mois écoulés (voir la tuile Archiver)."]}))},
+
+ {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
+  HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible."]}),
+  HTab({t:"🔄 Tour",children:["attribution des semaines de tour HC / USIC, répartition automatique, préférences ⭐/🚫 par semaine, échanges, compteurs de disponibilité par sur-spécialité, badges ✂ temps partiel."]}),
+  HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour."]}),
+  HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
+  HTab({t:"🌙 Gardes",children:["tableau jour par jour, répartition automatique, échanges ⇄ entre deux gardes, préférences, volumes et statistiques par médecin, export CSV."]}),
+  HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
+  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période."]}),
+  HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
+  HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
+  HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées 🎯, PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
+  HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase."]}),
+  HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}))},
+
+ {id:"edition",icon:"🔒",title:"Modes d'accès et PIN",body:()=>HE("div",null,
+  HP({children:["Trois niveaux d'accès depuis la page d'accueil :"]}),
+  HP({children:["• ",HBtn({kind:"ghost",children:"👁 Consulter"})," — lecture seule, sans code."]}),
+  HP({children:["• ",HE("b",null,"PIN médecin")," — édition personnelle : uniquement sa propre ligne (voir la première tuile). Défini par un éditeur dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"."]}),
+  HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
+  HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
+
+ {id:"cellules",icon:"🔲",title:"Les cellules du planning",body:()=>HE("div",null,
+  HP({children:["Chaque jour de semaine a deux créneaux (M matin, AM après-midi) plus la nuit N pour la garde ; le week-end une seule case JOUR. Cliquez sur une case (en mode édition) pour ouvrir la modale :"]}),
+  HP({children:["• choisir l'",HE("b",null,"activité")," (seules celles autorisées pour ce médecin apparaissent), la ",HE("b",null,"salle")," si l'activité en demande une, ajouter une ",HE("b",null,"note")," 📝 (un point sur le badge la signale, elle s'affiche au survol)."]}),
+  HP({children:["• ",HE("b",null,"retirer")," : rouvrir la case et choisir Retirer."]}),
+  HP({children:["Repères visuels : cases grisées = bloquées par une semaine de tour · fond jaune pâle = week-end · fond et contour verts = semaine d'astreinte · ",HBadg({txt:"G",color:"#93c47d"})," garde · ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde."]}),
+  HP({last:true,children:["Les activités cochées « reprise » affichent le nom du médecin seul dans les onglets concernés."]}))},
+
+ {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée. En naviguant vers un mois archivé, il se recharge automatiquement en consultation. Désarchivage possible mois par mois."]}),
+  HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète toutes les 72 h, les 10 dernières conservées, avec aperçu avant restauration."]}),
+  HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
+  HP({last:true,children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}))},
+
+ {id:"legende",icon:"🎨",title:"Légende",body:()=>HE("div",null,
+  HP({children:[HAvat({txt:"TH",color:"#ec4899"})," pastille d'initiales : chaque médecin a sa couleur · ",HBadg({txt:"CORO",color:"#76a5af"})," badge d'activité, dans la couleur de l'activité."]}),
+  HP({children:["Fiches Équipe : ",HChip({txt:"Garde",bg:"#16a34a"})," / ",HChip({txt:"Sans garde",bg:"#dc2626"})," · ",HChip({txt:"TM",bg:"#1d4ed8"})," / ",HChip({txt:"Sans TM",bg:"#d97706"}),"."]}),
+  HP({children:["Sur-spécialités : ",HE("span",{style:{color:"#76a5af",fontWeight:800}},"Coro")," · ",HE("span",{style:{color:"#e3b341",fontWeight:800}},"Pace")," · ",HE("span",{style:{color:"#8b5cf6",fontWeight:800}},"EEP")," · ",HE("span",{style:{color:"#ec4899",fontWeight:800}},"ETT"),"."]}),
+  HP({children:["⭐ souhaite (garde ou tour) · 🚫 préfère éviter · ⇄ échange · ✂ temps partiel · 📝 note sur la case."]}),
+  HP({last:true,children:["Fonds : jaune pâle = week-end · bleuté = aujourd'hui · vert clair + contour vert = astreinte de la semaine · contour violet = exception d'astreinte posée sur un jour précis."]}))}
+];
+
+function HelpView(){
+  const [hOpen,setHOpen]=React.useState({});
+  const toggleH=(id)=>setHOpen(p=>Object.assign({},p,{[id]:!p[id]}));
+  const goH=(id)=>{setHOpen(p=>Object.assign({},p,{[id]:true}));setTimeout(()=>{const el=document.getElementById("help-"+id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},80);};
+  return HE("div",{style:{maxWidth:760}},
+    HE("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}},
+      HE("h2",{style:{fontSize:17,fontWeight:800,color:"var(--txt)",margin:0}},"❓ Aide"),
+      HE("span",{style:{fontSize:11,color:"var(--txt3)"}},"— cliquez sur une tuile pour l'ouvrir")),
+    HE("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:6,marginBottom:14}},
+      HELP_SECTIONS.map(s=>HE("button",{key:s.id,onClick:()=>goH(s.id),
+        style:{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"left"}},
+        HE("span",null,s.icon),HE("span",{style:{lineHeight:1.25}},s.title)))),
+    HELP_SECTIONS.map(s=>HE("div",{key:s.id,id:"help-"+s.id,style:{marginBottom:8,borderRadius:10,border:"1px solid var(--border)",background:"var(--card)",overflow:"hidden",scrollMarginTop:70}},
+      HE("button",{onClick:()=>toggleH(s.id),
+        style:{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"11px 13px",border:"none",background:"transparent",cursor:"pointer",textAlign:"left"}},
+        HE("span",{style:{fontSize:16}},s.icon),
+        HE("span",{style:{flex:1,fontSize:13,fontWeight:800,color:"var(--txt)"}},s.title),
+        HE("span",{style:{fontSize:11,color:"var(--txt3)",transform:hOpen[s.id]?"rotate(180deg)":"none",transition:"transform .18s"}},"▼")),
+      hOpen[s.id]&&HE("div",{style:{padding:"2px 14px 13px"}},s.body()))));
+}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -3239,7 +3347,7 @@ function CardioPlanning(){
     const h=new Date().getHours();return h>=20||h<7; // auto : nuit de 20h à 7h
   });
   const setDarkMode=(fn)=>{setDarkModeRaw(prev=>{const nv=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("cp6_theme",nv?"dark":"light");}catch(e){}return nv;});};
-  const DEFAULT_TABS=[["planning","📅 Planning"],["tourmedical","🔄 Tour"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["plantype","📋 Type"],["attache","👔 Attachés"],["activites","⚙️ Activités"],["equipe","👥 Équipe"],["partage","⚙️ Paramètres"],["stats","📊 Stats"]];
+  const DEFAULT_TABS=[["planning","📅 Planning"],["tourmedical","🔄 Tour"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["plantype","📋 Type"],["attache","👔 Attachés"],["activites","⚙️ Activités"],["equipe","👥 Équipe"],["partage","⚙️ Paramètres"],["stats","📊 Stats"],["aide","❓ Aide"]];
   const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
   useEffect(()=>{ try{ localStorage.setItem("cp6_taborder",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
@@ -3249,7 +3357,6 @@ function CardioPlanning(){
   const [mData,setMData]=useState(null);
   const [notif,setNotif]=useState(null);
   const [planFilter,setPlanFilter]=useState([]);
-  const [userProfile,setUserProfile]=useState(0);
   const [showFull,setShowFull]=useState(false);
   const viewPeriod=true;const setViewPeriod=()=>{};
   const snapToPeriodStart=React.useCallback((y,m)=>{
@@ -4257,13 +4364,6 @@ function CardioPlanning(){
         <div style={{fontSize:32,marginBottom:8}}>♥</div>
         <div style={{fontWeight:800,fontSize:20,color:"var(--txt)",marginBottom:4}}>CardioPlanning</div>
         <div style={{color:"var(--txt2)",fontSize:13,marginBottom:20}}>CHL & CHB</div>
-        <div style={{marginBottom:14}}>
-          <label style={{display:"block",fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>Profil (optionnel)</label>
-          <select value={userProfile} onChange={e=>setUserProfile(parseInt(e.target.value))} style={{...S.fi,width:"100%"}}>
-            <option value={0}>— Aucun —</option>
-            {MEDECINS_INIT.filter(m=>m.role==="medecin").map(m=><option key={m.id} value={m.id}>Dr. {m.prenom} {m.nom}</option>)}
-          </select>
-        </div>
         <button style={{width:"100%",padding:"11px",borderRadius:9,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontSize:14,marginBottom:14,fontWeight:600}} onClick={()=>setAccessMode("view")}>👁 Consulter</button>
         <div style={{color:"var(--txt3)",fontSize:12,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           — édition —
@@ -4273,7 +4373,7 @@ function CardioPlanning(){
         <input value={pinInput} onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){
     if(pinInput===editPin){setAccessMode("edit");setPinError(false);return;}
     const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3);
-    if(medEntry){setEditMedId(parseInt(medEntry[0]));setUserProfile(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);}
+    if(medEntry){setEditMedId(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);}
     else setPinError(true);
   }}}
           type="password" placeholder="PIN" style={{...S.fi,width:"100%",textAlign:"center",letterSpacing:6,fontSize:16,marginBottom:8}}/>
@@ -4285,7 +4385,6 @@ function CardioPlanning(){
             const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3);
             if(medEntry){
               setEditMedId(parseInt(medEntry[0]));
-              setUserProfile(parseInt(medEntry[0]));
               setAccessMode("medecinEdit");
               setPinError(false);
             } else {
@@ -4612,6 +4711,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
+      {tab==="aide"&&<HelpView/>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
         const astToday=new Date();
