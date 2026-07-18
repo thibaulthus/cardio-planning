@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.30.1 — 18/07/2026";
+var APP_VERSION = "v8.32.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -511,15 +511,15 @@ function GridH(_a) {
                         var noteT = notes[nk(med.id, ghY, ghM, d, sl)];
                         var astIdH = getAstreinteForDay ? getAstreinteForDay(ghY, ghM, d) : null;
                         var isAstH = astIdH !== null && String(astIdH) === String(med.id);
-                        return React.createElement("td", { key: d + sl + ghM + ghY, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (sl === "N" ? S.tdN : {})), (isAstH ? { background: "var(--ast-bg)", outline: "1px solid var(--ast-bord)" } : {})), (isTgh ? { background: "var(--bg-td)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ghY, ghM, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                        return React.createElement("td", { key: d + sl + ghM + ghY, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (sl === "N" ? S.tdN : {})), (isAstH ? { background: "var(--ast-bg)", boxShadow: "inset 0 0 0 1px var(--ast-bord)" } : {})), (isTgh ? { background: "var(--bg-td)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ghY, ghM, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                     });
                 }))); })))));
 }
 /* ════ GRID V ════ */
 function GridV(_a) {
-    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, getAstreinteForDay = _a.getAstreinteForDay;
+    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _sg = _a.showGarde, showGarde = _sg === void 0 ? true : _sg, getAstreinteForDay = _a.getAstreinteForDay;
     var today = new Date();
-    var C0 = 42, C1 = 24, CG = 36;
+    var C0 = 42, C1 = 24, CG = 44;
     // Find garde med for a given day (slot N)
     var _c = useState(null), pickGardeDayFull = _c[0], setPickGardeDayFull = _c[1];
     var pickGardeDay = pickGardeDayFull ? pickGardeDayFull.d : null;
@@ -685,7 +685,7 @@ function GridV(_a) {
                     React.createElement("tr", null,
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: C0 }) }, "Jour"),
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: C0, zIndex: 40, minWidth: C1 }) }, "Sl"),
-                        React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: C0 + C1, zIndex: 40, minWidth: CG, borderRight: "2px solid var(--border)", fontSize: 8, color: "#93c47d" }) }, "\uD83C\uDF19"),
+                        showGarde && React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: CG, borderRight: "2px solid var(--border)", fontSize: 9, color: "#93c47d" }) }, "Garde"),
                         meds.map(function (m) { return React.createElement("th", { key: m.id, style: __assign(__assign({}, S.th), { minWidth: 46, position: "sticky", top: 0, zIndex: 20 }), title: "Dr. ".concat(m.prenom, " ").concat(m.nom) },
                             React.createElement("div", { style: __assign(__assign({}, S.avT), { background: m.color, margin: "0 auto" }) }, m.init)); }))),
                 React.createElement("tbody", null, effectiveDays.map(function (_a, di) {
@@ -703,17 +703,16 @@ function GridV(_a) {
                                 viewPeriod && React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700, fontFamily: "sans-serif", lineHeight: 1.2 } }, MOIS[em])),
                             React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)", textTransform: "uppercase", textAlign: "center" } }, JOURSC[dow(ey, em, d)])),
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, SLOTS[sl]),
-                        si === 0 && React.createElement("td", { rowSpan: slots.length, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0 + C1, zIndex: 9, borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "var(--garde-bg)" : "var(--td-fix)" }), onClick: function () { if (!isEdit)
+                        si === 0 && showGarde && React.createElement("td", { rowSpan: slots.length, style: __assign(__assign({}, S.tdFix), { borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "var(--garde-bg)" : "var(--td-fix)" }), onClick: function () { if (!isEdit)
                                 return; setGardeSearch(""); setPickGardeDayFull({ d: d, y: ey, m: em }); } }, gardeMed && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2 } },
-                            React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: gardeMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, gardeMed.init),
-                            React.createElement(Badge, { a: gardeActe }))),
+                            React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: gardeMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, gardeMed.init))),
                         meds.map(function (med) {
                             var es = getEntries(med.id, ey, em, d, sl);
                             var bl = es[0] && es[0]._blocked;
                             var noteT = notes[nk(med.id, ey, em, d, sl)];
                             var astId = getAstreinteForDay ? getAstreinteForDay(ey, em, d) : null;
                             var isAst = astId !== null && String(astId) === String(med.id);
-                            return React.createElement("td", { key: med.id, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", outline: "1px solid var(--ast-bord)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                            return React.createElement("td", { key: med.id, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: "inset 0 0 0 1px var(--ast-bord)" } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                         }))); });
                 }))))));
 }
@@ -2526,7 +2525,7 @@ function TourTab(_a) {
     };
     var tourMeds = medecins.filter(function (m) { return m.tourMed; });
     var horsTourSpecMeds = medecins.filter(function (m) { return m.role === "medecin" && !m.tourMed && m.surSpec; });
-    var SPEC_COLORS = { coro: "#76a5af", pace: "#e3b341", eep: "#f97316", ett: "#ea9999" };
+    var SPEC_COLORS = { coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" };
     // ─── Auto-répartition ───
     var _h = React.useState(false), autoModal = _h[0], setAutoModal = _h[1];
     var _j = React.useState(1), cfgMinEEP = _j[0], setCfgMinEEP = _j[1];
@@ -3046,7 +3045,7 @@ function TourTab(_a) {
                         var wishW = !!((tourWish || {})[w.key] || {})[m.id];
                         return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "3px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 44,
                                 background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", opacity: dis ? .3 : 1,
-                                outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#f97316", ett: "#ea9999" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
+                                outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
                                 if (dis || !isEdit)
                                     return;
                                 var wasOn = on;
@@ -3075,7 +3074,7 @@ function TourTab(_a) {
                             React.createElement("div", { style: { fontWeight: 800, fontSize: 10 }, title: avoidW ? "Préfère ne pas tourner cette semaine" : wishW ? "Souhaite tourner cette semaine" : "" },
                                 m.init,
                                 avoidW ? " 🚫" : wishW ? " ⭐" : ""),
-                            React.createElement("div", { style: { fontSize: 8, color: blocked ? "inherit" : m.surSpec && !on ? ({ coro: "#76a5af", pace: "#e3b341", eep: "#f97316", ett: "#ea9999" }[m.surSpec]) : "inherit" } }, blocked ? "indispo" : inOther ? "≠" : "")));
+                            React.createElement("div", { style: { fontSize: 8, color: blocked ? "inherit" : m.surSpec && !on ? ({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec]) : "inherit" } }, blocked ? "indispo" : inOther ? "≠" : "")));
                     })),
                     React.createElement("div", { style: { marginTop: 4, display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("span", { style: { fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: (wm[unit] || []).length === 2 ? "#3fb950" : (wm[unit] || []).length > 2 ? "#f85149" : "#e3b341" } },
@@ -3419,7 +3418,7 @@ function CardioPlanning() {
         localStorage.setItem("cp6_theme", nv ? "dark" : "light");
     }
     catch (e) { } return nv; }); };
-    var DEFAULT_TABS = [["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📡 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"]];
+    var DEFAULT_TABS = [["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"]];
     var _k = useState(function () { try {
         var v = localStorage.getItem("cp6_taborder");
         if (v) {
@@ -4269,6 +4268,24 @@ function CardioPlanning() {
         saveToFirebase({ medecins: JSON.stringify(medecins) }); }, [medecins]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ actes: JSON.stringify(actes) }); }, [actes]);
+    // ── Source de vérité : coche "Garde" de l'onglet Équipe → médecins autorisés des activités GARDE et REPOS_GARDE ──
+    useEffect(function () {
+        var gInits = medecins.filter(function (m) { return m.garde === true; }).map(function (m) { return m.init; });
+        var key = gInits.slice().sort().join(",");
+        setActes(function (prev) {
+            var changed = false;
+            var next = prev.map(function (a) {
+                if (a.id !== "GARDE" && a.id !== "REPOS_GARDE")
+                    return a;
+                var cur = a.medecinsAutorise || [];
+                if (cur.slice().sort().join(",") === key)
+                    return a;
+                changed = true;
+                return __assign(__assign({}, a), { medecinsAutorise: gInits });
+            });
+            return changed ? next : prev;
+        });
+    }, [medecins]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ editPin: editPin }); }, [editPin]);
     useEffect(function () { if (!isFirstLoad.current)
@@ -5072,7 +5089,7 @@ function CardioPlanning() {
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type")),
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, getAstreinteForDay: getAstreinteForDay })
-                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay }))),
+                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, getAstreinteForDay: getAstreinteForDay }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit },
@@ -5089,7 +5106,8 @@ function CardioPlanning() {
                         React.createElement("div", { style: { flex: 1 } },
                             React.createElement("div", { style: { fontWeight: 700, color: "var(--txt)", fontSize: 12 } }, a.label),
                             a.hasSalle && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, a.salles.join(", ") || "—"),
-                            (a.medecinsAutorise && a.medecinsAutorise.length) > 0 && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, a.medecinsAutorise.join(", "))),
+                            (a.medecinsAutorise && a.medecinsAutorise.length) > 0 && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, a.medecinsAutorise.join(", ")),
+                            (a.id === "GARDE" || a.id === "REPOS_GARDE") && React.createElement("div", { style: { fontSize: 9, color: "#16a34a", fontWeight: 700 } }, "\u2699 Synchronis\u00E9 avec la coche \u00AB Garde \u00BB de l'onglet \u00C9quipe")),
                         isEdit && React.createElement("div", { style: { display: "flex", gap: 4 } },
                             React.createElement("button", { style: __assign({}, S.icnBtn), onClick: function () { setMData(__assign(__assign({}, a), { _new: false, sallesStr: (a.salles || []).join(","), medStr: (a.medecinsAutorise || []).join(",") })); setModal("editActe"); } }, "\u270F\uFE0F"),
                             !a.isSystem && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#fff1f2", border: "1px solid #fecdd3", color: "#dc2626" }), onClick: function () { if (confirm("Supprimer \"".concat(a.label, "\" ?")))
@@ -5319,7 +5337,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" } },
                         React.createElement("button", { onClick: prevP, style: S.arr }, "\u2039"),
                         React.createElement("h2", { style: __assign(__assign({}, S.mTit), { margin: 0 }) },
-                            React.createElement("span", { style: { color: "#7c3aed" } }, "\uD83D\uDCE1"),
+                            React.createElement("span", { style: { color: "#7c3aed" } }, "\uD83D\uDCDE"),
                             " ",
                             pLabel),
                         React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A")),
@@ -5332,7 +5350,7 @@ function CardioPlanning() {
                         React.createElement("span", { style: { flex: 1 } }, astReport))),
                     React.createElement("div", { style: { maxWidth: 560, marginBottom: 14, padding: 12, borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "var(--txt2)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 } },
-                            "\uD83D\uDCE1 Astreintes pos\u00E9es \u2014 ",
+                            "\uD83D\uDCDE Astreintes pos\u00E9es \u2014 ",
                             pLabel),
                         React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
                             React.createElement("thead", null,
@@ -5349,8 +5367,8 @@ function CardioPlanning() {
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } },
                             React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 2, border: "2px solid #7c3aed", marginRight: 4, verticalAlign: "middle" } }),
                             "exception jour \u00B7 p\u00E9riode affich\u00E9e")),
-                    React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)", maxWidth: 520 } },
-                        React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed", width: "100%" } },
+                    React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)" } },
+                        React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
                             React.createElement("thead", null,
                                 React.createElement("tr", null,
                                     React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 80 }) }, "Date"),
@@ -5432,7 +5450,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { minWidth: 300 } },
                         React.createElement("div", { style: S.mHd },
                             React.createElement("div", { style: S.mTit2 },
-                                "\uD83D\uDCE1 Astreinte \u2014 ",
+                                "\uD83D\uDCDE Astreinte \u2014 ",
                                 label),
                             React.createElement("button", { onClick: function () { return setAstPickModal(null); }, style: S.xBtn }, "\u00D7")),
                         isWeek && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8, padding: "4px 0" } }, "Assigne toute la semaine (lun\u2192dim)"),
@@ -6401,8 +6419,14 @@ function CardioPlanning() {
                     })),
                     React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "Cr\u00E9er/renommer une salle : Param\u00E8tres \u2192 \uD83C\uDFE5 Salles.")),
                 React.createElement("div", { style: { gridColumn: "1/-1" } },
-                    React.createElement("label", { style: S.fl }, "M\u00E9decins autoris\u00E9s (vide = tous)"),
-                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, maxHeight: 120, overflowY: "auto" } }, medecins.filter(function (m2) { return m2.role !== "ide"; }).map(function (m2) {
+                    React.createElement("label", { style: S.fl }, (mData.id === "GARDE" || mData.id === "REPOS_GARDE") ? "M\u00E9decins autoris\u00E9s" : "M\u00E9decins autoris\u00E9s (vide = tous)"),
+                    (mData.id === "GARDE" || mData.id === "REPOS_GARDE") ? React.createElement("div", null,
+                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 } }, medecins.filter(function (m2) { return m2.garde === true; }).map(function (m2) {
+                            return React.createElement("span", { key: m2.id, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4, border: "1.5px solid " + m2.color, background: m2.color + "26", color: "var(--txt)" } },
+                                React.createElement("span", { style: { width: 12, height: 12, borderRadius: "50%", background: m2.color, display: "inline-block" } }),
+                                m2.init);
+                        })),
+                        React.createElement("div", { style: { fontSize: 10, color: "#16a34a", fontWeight: 700 } }, "\u2699 Liste g\u00E9r\u00E9e par la coche \u00AB Garde \u00BB de l'onglet \u00C9quipe \u2014 modifiez-la l\u00E0-bas.")) : React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, maxHeight: 120, overflowY: "auto" } }, medecins.filter(function (m2) { return m2.role !== "ide"; }).map(function (m2) {
                         var on = (mData.medecinsAutorise || []).includes(m2.init);
                         return React.createElement("button", { key: m2.id, type: "button", onClick: function () { return setMData(function (p) { var cur = p.medecinsAutorise || []; var nx = on ? cur.filter(function (x) { return x !== m2.init; }) : cur.concat([m2.init]); return __assign(__assign({}, p), { medecinsAutorise: nx, medStr: nx.join(", ") }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4, border: on ? "1.5px solid " + m2.color : "1px solid var(--border)", background: on ? m2.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } },
                             React.createElement("span", { style: { width: 12, height: 12, borderRadius: "50%", background: m2.color, display: "inline-block" } }),
@@ -6584,7 +6608,7 @@ function CardioPlanning() {
                 (mData.role || "medecin") === "medecin" && React.createElement("div", { style: { gridColumn: "1/-1", borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 8, fontSize: 10, fontWeight: 800, color: "#388bfd", textTransform: "uppercase", letterSpacing: .5 } }, "\uD83C\uDFAF Sursp\u00E9cialit\u00E9 (tour m\u00E9dical)"),
                 (mData.role || "medecin") === "medecin" && React.createElement("div", { style: { gridColumn: "1/-1" } },
                     React.createElement("label", { style: __assign(__assign({}, S.fl), { display: "none" }) }, "Sursp\u00E9cialit\u00E9 (Tour m\u00E9dical)"),
-                    React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 } }, [["coro", "Coro", "#76a5af"], ["pace", "Pace", "#e3b341"], ["eep", "EEP", "#f97316"], ["ett", "ETT", "#ea9999"]].map(function (_a) {
+                    React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 } }, [["coro", "Coro", "#76a5af"], ["pace", "Pace", "#e3b341"], ["eep", "EEP", "#8b5cf6"], ["ett", "ETT", "#ec4899"]].map(function (_a) {
                         var v = _a[0], l = _a[1], c = _a[2];
                         return (React.createElement("button", { key: v, onClick: function () { return setMData(function (p) { return (__assign(__assign({}, p), { surSpec: p.surSpec === v ? null : v })); }); }, style: { padding: "5px 12px", borderRadius: 6, border: "1px solid " + c, cursor: "pointer", fontWeight: 700, fontSize: 12,
                                 background: mData.surSpec === v ? c : "var(--bg2)", color: mData.surSpec === v ? "#fff" : c } }, l));

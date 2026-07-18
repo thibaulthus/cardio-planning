@@ -25,7 +25,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v8.31 — 18/07/2026";
+const APP_VERSION="v8.32.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2426,7 +2426,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
   };
   const tourMeds=medecins.filter(m=>m.tourMed);
   const horsTourSpecMeds=medecins.filter(m=>m.role==="medecin"&&!m.tourMed&&m.surSpec);
-  const SPEC_COLORS={coro:"#76a5af",pace:"#e3b341",eep:"#f97316",ett:"#ea9999"};
+  const SPEC_COLORS={coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"};
   // ─── Auto-répartition ───
   const [autoModal,setAutoModal]=React.useState(false);
   const [cfgMinEEP,setCfgMinEEP]=React.useState(1);
@@ -2856,7 +2856,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
                       <button key={m.id} disabled={dis||!isEdit}
                         style={{padding:"3px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:44,
                           background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",opacity:dis?.3:1,
-                          outline:on?"2px solid "+m.color:m.surSpec&&!blocked?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#f97316",ett:"#ea9999"}[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
+                          outline:on?"2px solid "+m.color:m.surSpec&&!blocked?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
                         onClick={()=>{if(dis||!isEdit)return;
                         const wasOn=on;
                         setTourMed(p=>{const cur={...(p[w.key]||{HC:[],USIC:[]})};const l=cur[unit]||[];if(!wasOn&&l.length>=2){toast("Maximum 2 médecins par unité","info");return p;}cur[unit]=wasOn?l.filter(x=>x!==m.id):[...l,m.id];return{...p,[w.key]:cur};});
@@ -2868,7 +2868,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
                           setTimeout(()=>reapplyPTWeek(m.id,w.key),60);
                         }}}>
                         <div style={{fontWeight:800,fontSize:10}} title={avoidW?"Préfère ne pas tourner cette semaine":wishW?"Souhaite tourner cette semaine":""}>{m.init}{avoidW?" 🚫":wishW?" ⭐":""}</div>
-                        <div style={{fontSize:8,color:blocked?"inherit":m.surSpec&&!on?({coro:"#76a5af",pace:"#e3b341",eep:"#f97316",ett:"#ea9999"}[m.surSpec]):"inherit"}}>
+                        <div style={{fontSize:8,color:blocked?"inherit":m.surSpec&&!on?({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]):"inherit"}}>
                           {blocked?"indispo":inOther?"≠":""}
                         </div>
                       </button>
@@ -3784,6 +3784,21 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({notes:JSON.stringify(notes)});},[notes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medecins:JSON.stringify(medecins)});},[medecins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({actes:JSON.stringify(actes)});},[actes]);
+  // ── Source de vérité : coche "Garde" de l'onglet Équipe → médecins autorisés des activités GARDE et REPOS_GARDE ──
+  useEffect(()=>{
+    const gInits=medecins.filter(m=>m.garde===true).map(m=>m.init);
+    const key=[...gInits].sort().join(",");
+    setActes(prev=>{
+      let changed=false;
+      const next=prev.map(a=>{
+        if(a.id!=="GARDE"&&a.id!=="REPOS_GARDE")return a;
+        const cur=a.medecinsAutorise||[];
+        if([...cur].sort().join(",")===key)return a;
+        changed=true;return {...a,medecinsAutorise:gInits};
+      });
+      return changed?next:prev;
+    });
+  },[medecins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({editPin});},[editPin]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astreinte:JSON.stringify(astreinte)});},[astreinte]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medPins:JSON.stringify(medPins)});},[medPins]);
@@ -4521,6 +4536,7 @@ header::-webkit-scrollbar { display: none; }
                       <div style={{fontWeight:700,color:"var(--txt)",fontSize:12}}>{a.label}</div>
                       {a.hasSalle&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.salles.join(", ")||"—"}</div>}
                       {(a.medecinsAutorise&&a.medecinsAutorise.length)>0&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.medecinsAutorise.join(", ")}</div>}
+                      {(a.id==="GARDE"||a.id==="REPOS_GARDE")&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Garde » de l'onglet Équipe</div>}
                     </div>
                     {isEdit&&<div style={{display:"flex",gap:4}}>
                       <button style={{...S.icnBtn}} onClick={()=>{setMData({...a,_new:false,sallesStr:(a.salles||[]).join(","),medStr:(a.medecinsAutorise||[]).join(",")});setModal("editActe");}}>✏️</button>
@@ -5744,7 +5760,19 @@ header::-webkit-scrollbar { display: none; }
                 })}
               </div>
               <div style={{fontSize:9,color:"var(--txt3)"}}>Créer/renommer une salle : Paramètres → 🏥 Salles.</div></div>}
-            <div style={{gridColumn:"1/-1"}}><label style={S.fl}>Médecins autorisés (vide = tous)</label>
+            <div style={{gridColumn:"1/-1"}}><label style={S.fl}>{(mData.id==="GARDE"||mData.id==="REPOS_GARDE")?"Médecins autorisés":"Médecins autorisés (vide = tous)"}</label>
+              {(mData.id==="GARDE"||mData.id==="REPOS_GARDE")?(
+                <div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+                    {medecins.filter(m2=>m2.garde===true).map(m2=>(
+                      <span key={m2.id} style={{fontSize:10,padding:"3px 8px",borderRadius:12,fontWeight:700,display:"inline-flex",alignItems:"center",gap:4,border:"1.5px solid "+m2.color,background:m2.color+"26",color:"var(--txt)"}}>
+                        <span style={{width:12,height:12,borderRadius:"50%",background:m2.color,display:"inline-block"}}/>{m2.init}
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{fontSize:10,color:"#16a34a",fontWeight:700}}>⚙ Liste gérée par la coche « Garde » de l'onglet Équipe — modifiez-la là-bas.</div>
+                </div>
+              ):(
               <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:120,overflowY:"auto"}}>
                 {medecins.filter(m2=>m2.role!=="ide").map(m2=>{
                   const on=(mData.medecinsAutorise||[]).includes(m2.init);
@@ -5752,7 +5780,7 @@ header::-webkit-scrollbar { display: none; }
                     style={{fontSize:10,padding:"3px 8px",borderRadius:12,cursor:"pointer",fontWeight:700,display:"inline-flex",alignItems:"center",gap:4,border:on?"1.5px solid "+m2.color:"1px solid var(--border)",background:on?m2.color+"26":"var(--bg2)",color:on?"var(--txt)":"var(--txt3)"}}>
                     <span style={{width:12,height:12,borderRadius:"50%",background:m2.color,display:"inline-block"}}/>{m2.init}</button>;
                 })}
-              </div></div>
+              </div>)}</div>
           </div>
           <button style={{...S.btnP,width:"100%",marginTop:10}} onClick={()=>{
             if(!mData.label||!mData.short)return toast("Libellé et abréviation requis","warn");
@@ -5906,7 +5934,7 @@ header::-webkit-scrollbar { display: none; }
             {(mData.role||"medecin")==="medecin"&&<div style={{gridColumn:"1/-1"}}>
               <label style={{...S.fl,display:"none"}}>Surspécialité (Tour médical)</label>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
-                {[["coro","Coro","#76a5af"],["pace","Pace","#e3b341"],["eep","EEP","#f97316"],["ett","ETT","#ea9999"]].map(([v,l,c])=>(
+                {[["coro","Coro","#76a5af"],["pace","Pace","#e3b341"],["eep","EEP","#8b5cf6"],["ett","ETT","#ec4899"]].map(([v,l,c])=>(
                   <button key={v} onClick={()=>setMData(p=>({...p,surSpec:p.surSpec===v?null:v}))}
                     style={{padding:"5px 12px",borderRadius:6,border:"1px solid "+c,cursor:"pointer",fontWeight:700,fontSize:12,
                       background:mData.surSpec===v?c:"var(--bg2)",color:mData.surSpec===v?"#fff":c}}>
