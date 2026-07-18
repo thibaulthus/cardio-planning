@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.30 — 18/07/2026";
+var APP_VERSION = "v8.30.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -6438,16 +6438,24 @@ function CardioPlanning() {
                 })),
                 React.createElement("div", { style: { marginTop: 12 } },
                     React.createElement("label", { style: S.fl }, "Activit\u00E9s possibles dans cette salle"),
-                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 } }, actes.filter(function (a) { return a.hasSalle && !a.isSystem; }).map(function (a) {
-                        var on = mData._new ? (mData._acts || []).includes(a.id) : (a.salles || []).includes(mData._origN);
-                        return React.createElement("button", { key: a.id, onClick: function () {
-                                if (mData._new) {
-                                    setMData(function (p) { return (__assign(__assign({}, p), { _acts: on ? (p._acts || []).filter(function (x) { return x !== a.id; }) : (p._acts || []).concat([a.id]) })); });
-                                    return;
-                                }
-                                setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== mData._origN; }) : (x.salles || []).concat([mData._origN]) }); }); });
-                            }, style: { fontSize: 12, padding: "7px 12px", borderRadius: 14, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
-                    }))),
+                    [["CHL", "CHL"], ["CHB", "CHB"], ["tous", "Communes aux deux sites"]].map(function (_a) {
+                        var sv = _a[0], sl2 = _a[1];
+                        var grp = actes.filter(function (a) { return a.hasSalle && !a.isSystem && (a.site || "tous") === sv; });
+                        if (grp.length === 0)
+                            return null;
+                        return (React.createElement("div", { key: sv, style: { marginTop: 6 } },
+                            React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, sl2),
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, grp.map(function (a) {
+                                var on = mData._new ? (mData._acts || []).includes(a.id) : (a.salles || []).includes(mData._origN);
+                                return React.createElement("button", { key: a.id, onClick: function () {
+                                        if (mData._new) {
+                                            setMData(function (p) { return (__assign(__assign({}, p), { _acts: on ? (p._acts || []).filter(function (x) { return x !== a.id; }) : (p._acts || []).concat([a.id]) })); });
+                                            return;
+                                        }
+                                        setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== mData._origN; }) : (x.salles || []).concat([mData._origN]) }); }); });
+                                    }, style: { fontSize: 12, padding: "7px 12px", borderRadius: 14, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" }, title: a.label }, a.label.length <= 16 ? a.label : a.short);
+                            }))));
+                    })),
                 !mData._new && React.createElement("div", { style: { marginTop: 12, display: "flex", gap: 8, alignItems: "center" } },
                     React.createElement("span", { style: { fontSize: 12, color: "var(--txt2)" } }, "Position dans l'onglet :"),
                     React.createElement("button", { onClick: function () { return setSalleReg(function (p) { var idx = p.findIndex(function (x) { return x.n === mData._origN; }); if (idx <= 0)
