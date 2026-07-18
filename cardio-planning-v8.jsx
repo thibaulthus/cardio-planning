@@ -25,7 +25,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v8.32.1 — 18/07/2026";
+const APP_VERSION="v8.33 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -4228,6 +4228,19 @@ function CardioPlanning(){
 
   const medPlan=medecins.filter(m=>m.role==="medecin");
   const medAttache=medecins.filter(m=>m.role==="attache");
+  // ── Ordre d'affichage : déplace un médecin dans son groupe de rôle (ordre du tableau = ordre partout) ──
+  const moveMed=(id,dir)=>{
+    setMedecins(prev=>{
+      const idx=prev.findIndex(m=>String(m.id)===String(id));
+      if(idx<0)return prev;
+      const role=prev[idx].role||"medecin";
+      let j=idx+dir;
+      while(j>=0&&j<prev.length&&(prev[j].role||"medecin")!==role)j+=dir;
+      if(j<0||j>=prev.length)return prev;
+      const next=[...prev];const t=next[idx];next[idx]=next[j];next[j]=t;
+      return next;
+    });
+  };
   const filteredMeds=medPlan.filter(m=>planFilter.length===0||planFilter.includes(m.id));
 
   /* ── Login ── */
@@ -4555,6 +4568,7 @@ header::-webkit-scrollbar { display: none; }
           <div style={S.bar}><h2 style={S.mTit}>👥 Équipe</h2><div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
       {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
         <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}} onClick={()=>{setMData({_new:true,id:Date.now(),nom:"",prenom:"",init:"",color:"#3b82f6",garde:true,tourMed:true,role:"medecin"});setModal("editMed");}}>+ Ajouter</button>
+        <span style={{fontSize:10,color:"var(--txt3)"}}>▲▼ sur une fiche : ordre d'affichage dans tous les plannings</span>
       </div>}
           {["medecin","attache","ide"].map(role=>(
             <div key={role} style={{marginBottom:18}}>
@@ -4585,6 +4599,10 @@ header::-webkit-scrollbar { display: none; }
                       </div>
                       <button style={{...S.icnBtn,fontSize:11,textAlign:"center"}} onClick={()=>{setMData({...m});setModal("editMedActivites");}}>🎯</button>
                       {isEdit&&<button style={{...S.icnBtn,fontSize:11,textAlign:"center"}} onClick={()=>{setMData({...m,_pinMode:true});setModal("editMedPin");}}>🔑</button>}
+                      {isEdit&&<div style={{display:"flex",gap:3}}>
+                        <button title="Avancer dans l'ordre" style={{...S.icnBtn,fontSize:11,fontWeight:800}} onClick={()=>moveMed(m.id,-1)}>▲</button>
+                        <button title="Reculer dans l'ordre" style={{...S.icnBtn,fontSize:11,fontWeight:800}} onClick={()=>moveMed(m.id,1)}>▼</button>
+                      </div>}
                     </div>
                   </div>
                 ))}

@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v8.32.1 — 18/07/2026";
+var APP_VERSION = "v8.33 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4884,6 +4884,25 @@ function CardioPlanning() {
     };
     var medPlan = medecins.filter(function (m) { return m.role === "medecin"; });
     var medAttache = medecins.filter(function (m) { return m.role === "attache"; });
+    // ── Ordre d'affichage : déplace un médecin dans son groupe de rôle (ordre du tableau = ordre partout) ──
+    var moveMed = function (id, dir) {
+        setMedecins(function (prev) {
+            var idx = prev.findIndex(function (m) { return String(m.id) === String(id); });
+            if (idx < 0)
+                return prev;
+            var role = prev[idx].role || "medecin";
+            var j = idx + dir;
+            while (j >= 0 && j < prev.length && (prev[j].role || "medecin") !== role)
+                j += dir;
+            if (j < 0 || j >= prev.length)
+                return prev;
+            var next = prev.slice();
+            var t = next[idx];
+            next[idx] = next[j];
+            next[j] = t;
+            return next;
+        });
+    };
     var filteredMeds = medPlan.filter(function (m) { return planFilter.length === 0 || planFilter.includes(m.id); });
     /* ── Login ── */
     // Show loading while Firebase connects (so medPins are available for login)
@@ -5118,7 +5137,8 @@ function CardioPlanning() {
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
                 isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
-                    React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer" }, onClick: function () { setMData({ _new: true, id: Date.now(), nom: "", prenom: "", init: "", color: "#3b82f6", garde: true, tourMed: true, role: "medecin" }); setModal("editMed"); } }, "+ Ajouter")),
+                    React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer" }, onClick: function () { setMData({ _new: true, id: Date.now(), nom: "", prenom: "", init: "", color: "#3b82f6", garde: true, tourMed: true, role: "medecin" }); setModal("editMed"); } }, "+ Ajouter"),
+                    React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "\u25B2\u25BC sur une fiche : ordre d'affichage dans tous les plannings")),
                 ["medecin", "attache", "ide"].map(function (role) { return (React.createElement("div", { key: role, style: { marginBottom: 18 } },
                     React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 7 } }, role === "medecin" ? "Médecins" : role === "attache" ? "Attachés" : "IDE"),
                     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 7 } }, medecins.filter(function (m) { return (m.role || "medecin") === role; }).map(function (m) { return (React.createElement("div", { key: m.id, style: __assign(__assign({}, S.card), { display: "flex", alignItems: "center", gap: 9 }) },
@@ -5148,7 +5168,10 @@ function CardioPlanning() {
                                 isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#fff1f2", border: "1px solid #fecdd3", color: "#dc2626" }), onClick: function () { if (confirm("Supprimer ".concat(m.nom, " ?")))
                                         setMedecins(function (p) { return p.filter(function (x) { return x.id !== m.id; }); }); } }, "\uD83D\uDDD1\uFE0F")),
                             React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign({}, m)); setModal("editMedActivites"); } }, "\uD83C\uDFAF"),
-                            isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign(__assign({}, m), { _pinMode: true })); setModal("editMedPin"); } }, "\uD83D\uDD11")))); })))); }))),
+                            isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign(__assign({}, m), { _pinMode: true })); setModal("editMedPin"); } }, "\uD83D\uDD11"),
+                            isEdit && React.createElement("div", { style: { display: "flex", gap: 3 } },
+                                React.createElement("button", { title: "Avancer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, -1); } }, "\u25B2"),
+                                React.createElement("button", { title: "Reculer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, 1); } }, "\u25BC"))))); })))); }))),
             tab === "astreinte" && (function () {
                 var astMeds = medecins.filter(function (m) { return m.astreinte === true; });
                 var astToday = new Date();
