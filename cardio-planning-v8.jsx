@@ -25,7 +25,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.2 — 18/07/2026";
+const APP_VERSION="v9.3 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3343,8 +3343,10 @@ function ReportsView(p){
   const editable=isEdit||(accessMode==="medecinEdit"&&editMedId===mid);
   const dk3=(y,m,d)=>y+"-"+m+"-"+d;
   const wkOf=(y,m,d)=>{const dt=new Date(y,m,d);const dw=dt.getDay();const diff=dw===0?-6:1-dw;const mn=new Date(y,m,d+diff);return dk3(mn.getFullYear(),mn.getMonth(),mn.getDate());};
-  /* ── Période et semaines ── */
-  const per=perStart(year,month);
+  /* ── Période : sélecteur local, défaut = période suivante (outil de préparation) ── */
+  const [repPer,setRepPer]=React.useState(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
+  const per=repPer;
+  const perLbl=MOIS[per.sm]+" — "+MOIS[(per.sm+PCFG.len-1)%12]+" "+per.sy;
   const days=React.useMemo(()=>perDaysList(per.sy,per.sm),[per.sy,per.sm]);
   const weeks=React.useMemo(()=>{
     const map={},order=[];
@@ -3367,13 +3369,14 @@ function ReportsView(p){
     setBlDays(vd,true);toast(vd.length+" jour(s) de vacances scolaires précochés — ajustez ensuite","info");
   };
   /* ── Activités "consultation" du médecin ── */
-  const defActs=actes.filter(a=>a.id==="CS_CHL"||a.id==="CS_CHB").map(a=>a.id);
-  const myActs=csActsSel[mid]&&csActsSel[mid].length?csActsSel[mid]:defActs;
+  const globalOK=(p.csActsGlobal&&p.csActsGlobal.length)?p.csActsGlobal:["CS_CHL","CS_CHB","DOBU","DOBU_CHB","ETO_CHL","PM_CS","DEFIB_CS","RYTHMO_CHB"];
+  const defActs=actes.filter(a=>globalOK.indexOf(a.id)>=0).map(a=>a.id).filter(id=>id==="CS_CHL"||id==="CS_CHB");
+  const myActs=(csActsSel[mid]&&csActsSel[mid].length?csActsSel[mid]:defActs).filter(id=>globalOK.indexOf(id)>=0);
   const toggleAct=(aid)=>{if(!editable)return;
     setCsActsSel(prev=>{const cur=(prev[mid]&&prev[mid].length?prev[mid]:defActs).slice();
       const i=cur.indexOf(aid);if(i>=0)cur.splice(i,1);else cur.push(aid);
       return Object.assign({},prev,{[mid]:cur});});};
-  const candActs=actes.filter(a=>!a.isSystem&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(medSel.init)));
+  const candActs=actes.filter(a=>globalOK.indexOf(a.id)>=0&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(medSel.init)));
   /* ── Jours habituels de consultation (planning type) ── */
   const pt=planningType[mid]||{};
   const habCS={};// {dw:{M:acteId,AM:acteId}}
@@ -3405,7 +3408,7 @@ function ReportsView(p){
         const hab=habCS[dw]&&habCS[dw][sl];
         const st=slotState(o.y,o.m,o.d,sl);
         if(hab&&!blanche&&(tour||st==="abs"))lost.push({y:o.y,m:o.m,d:o.d,sl,why:tour?"tour":"absence"});
-        else if(blanche&&!tour&&st==="free")recvA.push({y:o.y,m:o.m,d:o.d,sl,hab:!!hab});
+        else if(blanche&&!tour&&st==="free"&&hab)recvA.push({y:o.y,m:o.m,d:o.d,sl,hab:true});
         else if(!blanche&&!tour&&st==="free"&&!hab)recvB.push({y:o.y,m:o.m,d:o.d,sl});
       });
     });
@@ -3415,7 +3418,7 @@ function ReportsView(p){
     const usedA=new Set(),usedB=new Set(),pairs=[];
     lost.forEach(L=>{
       let best=null,bestS=1e9,bestT=null,bestI=-1;
-      recvA.forEach((R,i)=>{if(usedA.has(i))return;const s=score(L,R)+(R.hab?0:3);if(s<bestS){bestS=s;best=R;bestT="A";bestI=i;}});
+      recvA.forEach((R,i)=>{if(usedA.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="A";bestI=i;}});
       if(!best)recvB.forEach((R,i)=>{if(usedB.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="B";bestI=i;}});
       if(best){if(bestT==="A")usedA.add(bestI);else usedB.add(bestI);}
       pairs.push({lost:L,to:best,type:bestT});
@@ -3426,7 +3429,7 @@ function ReportsView(p){
   const exportCSVR=()=>{
     const rows=[["Consultation perdue","Cause","Proposition"]];
     analysis.pairs.forEach(pr=>rows.push([fmtD(pr.lost)+" "+pr.lost.sl,pr.lost.why==="tour"?"Semaine de tour":"Absence",
-      pr.to?(fmtD(pr.to)+" "+pr.to.sl+(pr.type==="A"?" (semaine blanche)":" (ouvrir un créneau)")):"3-4 patients en semaine de tour"]));
+      pr.to?(fmtD(pr.to)+" "+pr.to.sl+(pr.type==="A"?" (semaine blanche — date habituelle)":" (ouvrir un créneau)")):"3-4 patients en semaine de tour"]));
     const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\n");
     const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
     const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="reports-consultations.csv";a.click();
@@ -3443,7 +3446,11 @@ function ReportsView(p){
       accessMode==="medecinEdit"
         ?RE("span",{style:{fontSize:12,fontWeight:700,color:"var(--txt)"}},medSel.prenom+" "+medSel.nom)
         :RE("select",{value:selId||"",onChange:e=>setSelId(parseInt(e.target.value)),style:{padding:"5px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:12,fontWeight:700}},
-          medsCS.map(m=>RE("option",{key:m.id,value:m.id},"Dr. "+m.prenom+" "+m.nom)))),
+          medsCS.map(m=>RE("option",{key:m.id,value:m.id},"Dr. "+m.prenom+" "+m.nom))),
+      RE("span",{style:{display:"inline-flex",alignItems:"center",gap:4,marginLeft:"auto"}},
+        RE("button",{onClick:()=>setRepPer(pp=>perPrev(pp.sy,pp.sm)),style:{fontSize:12,padding:"3px 9px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontWeight:800}},"◀"),
+        RE("span",{style:{fontSize:12,fontWeight:800,color:"#1d4ed8",minWidth:150,textAlign:"center"}},perLbl),
+        RE("button",{onClick:()=>setRepPer(pp=>perNext(pp.sy,pp.sm)),style:{fontSize:12,padding:"3px 9px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontWeight:800}},"▶"))),
     RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:12,lineHeight:1.6}},
       "Outil individuel et facultatif : cochez vos jours/semaines sans consultation (« blanches ») laissés par votre secrétaire dans le logiciel métier, l'application propose ensuite les reports les plus adaptés."),
     editable&&RE("div",{style:{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}},
@@ -3513,14 +3520,14 @@ function ReportsView(p){
             ?RE("span",null,RE("b",{style:{color:"var(--txt)"}},fmtD(pr.to)+" "+pr.to.sl),
               RE("span",{style:{fontSize:9,marginLeft:6,padding:"1px 6px",borderRadius:5,fontWeight:800,
                 background:pr.type==="A"?"rgba(245,158,11,.2)":"rgba(124,58,237,.12)",color:pr.type==="A"?"#b45309":"#7c3aed"}},
-                pr.type==="A"?"semaine blanche":"ouvrir un créneau"))
+                pr.type==="A"?"date habituelle (blanche)":"ouvrir un créneau"))
             :RE("span",{style:{color:"#ef4444",fontWeight:700}},"aucune place — 3-4 patients en semaine de tour")))),
     RE("div",{style:{fontSize:11,color:"var(--txt)",lineHeight:1.7,marginBottom:10}},
-      RE("b",null,"Offs restants après reports : "),
+      RE("b",null,"Places restantes après reports : "),
       (analysis.restA.length+analysis.restB.length)>0
         ?analysis.restA.concat(analysis.restB).slice(0,20).map((o,i)=>RE("span",{key:i,style:{display:"inline-block",marginRight:6,fontSize:10,color:"var(--txt2)"}},fmtD(o)+" "+o.sl+(i<Math.min(analysis.restA.length+analysis.restB.length,20)-1?" ·":"")))
         :RE("span",{style:{color:"#b45309",fontWeight:700}},"aucun — pensez aux créneaux de 3-4 patients pendant vos semaines de tour."),
-      (analysis.restA.length+analysis.restB.length)>0&&RE("span",{style:{color:"var(--txt3)",fontSize:10}}," → consultations supplémentaires possibles (nouveaux patients, urgences)")),
+      (analysis.restA.length+analysis.restB.length)>0&&RE("span",{style:{color:"var(--txt3)",fontSize:10}}," → à réouvrir pour des consultations supplémentaires : d'abord vos dates habituelles en semaine blanche, puis les offs (nouveaux patients, urgences)")),
     analysis.pairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"));
 }
 
@@ -3575,6 +3582,7 @@ function CardioPlanning(){
   const [gardeWish,setGardeWish]=useState({});   // {dateKey:{medId:true}} souhaite la garde ce jour
   const [csBlanches,setCsBlanches]=useState({}); // {medId:{"y-m-d":true}} jours sans consultation (logiciel métier)
   const [csActsSel,setCsActsSel]=useState({});   // {medId:[acteIds]} activités comptées comme consultation
+  const [csActsGlobal,setCsActsGlobal]=useState(["CS_CHL","CS_CHB","DOBU","DOBU_CHB","ETO_CHL","PM_CS","DEFIB_CS","RYTHMO_CHB"]); // activités proposables dans l'onglet Reports (réglé dans Paramètres)
   const [tourDerog,setTourDerog]=useState({});   // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
   const [tourReport,setTourReport]=useState(null); // rapport persistant de la dernière répartition auto du tour
   const [astReport,setAstReport]=useState(null);
@@ -3716,6 +3724,7 @@ function CardioPlanning(){
           if(data.gardeWish)setGardeWish(JSON.parse(data.gardeWish));
           if(data.csBlanches)setCsBlanches(JSON.parse(data.csBlanches));
           if(data.csActsSel)setCsActsSel(JSON.parse(data.csActsSel));
+          if(data.csActsGlobal)setCsActsGlobal(JSON.parse(data.csActsGlobal));
           if(data.tourDerog)setTourDerog(JSON.parse(data.tourDerog));
           if(data.tourReport!==undefined&&data.tourReport!=="")setTourReport(data.tourReport);
           if(data.astReport!==undefined&&data.astReport!=="")setAstReport(data.astReport);
@@ -4064,6 +4073,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({gardeWish:JSON.stringify(gardeWish)});},[gardeWish]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csBlanches:JSON.stringify(csBlanches)});},[csBlanches]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsSel:JSON.stringify(csActsSel)});},[csActsSel]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsGlobal:JSON.stringify(csActsGlobal)});},[csActsGlobal]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourDerog:JSON.stringify(tourDerog)});},[tourDerog]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourReport:tourReport||""});},[tourReport]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astReport:astReport||""});},[astReport]);
@@ -4909,7 +4919,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csActsSel={csActsSel} setCsActsSel={setCsActsSel} year={year} month={month} toast={toast}/>}
+      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csActsSel={csActsSel} setCsActsSel={setCsActsSel} csActsGlobal={csActsGlobal} year={year} month={month} toast={toast}/>}
       {tab==="aide"&&<HelpView/>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -5440,6 +5450,17 @@ header::-webkit-scrollbar { display: none; }
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>💾 Sauvegarde des données</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
               Téléchargez une copie de toutes vos données. En cas de problème, importez ce fichier pour tout restaurer.
+            </div>
+            <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>📥 Onglet Reports — activités « consultation »</div>
+              <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Seules les activités cochées ici sont proposées dans l'aide au report (consultations, ETO, Dobu, cs pacemaker…).</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                {actes.filter(a=>!a.isSystem).map(a=>{
+                  const onG=csActsGlobal.indexOf(a.id)>=0;
+                  return <button key={a.id} disabled={!isEdit} onClick={()=>setCsActsGlobal(pg=>onG?pg.filter(x=>x!==a.id):[...pg,a.id])}
+                    style={{fontSize:10,padding:"3px 8px",borderRadius:11,cursor:isEdit?"pointer":"default",fontWeight:700,border:onG?"1.5px solid "+a.color:"1px solid var(--border)",background:onG?a.color+"33":"var(--bg2)",color:onG?"var(--txt)":"var(--txt3)"}}>{a.short}</button>;
+                })}
+              </div>
             </div>
             <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
               <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>🕐 Sauvegardes automatiques (toutes les 72 h, 10 conservées)</div>
