@@ -25,7 +25,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v8.30.1 — 18/07/2026";
+const APP_VERSION="v8.31 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -347,7 +347,7 @@ function GridH({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   const astIdH=getAstreinteForDay?getAstreinteForDay(ghY,ghM,d):null;
                   const isAstH=astIdH!==null&&String(astIdH)===String(med.id);
                   return <td key={d+sl+ghM+ghY} title={noteT||undefined}
-                    style={{...S.td,...(sl==="N"?S.tdN:{}),...(isAstH?{background:"var(--ast-bg)",outline:"1px solid var(--ast-bord)"}:{}),...(isTgh?{background:"var(--bg-td)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
+                    style={{...S.td,...(sl==="N"?S.tdN:{}),...(isAstH?{background:"var(--ast-bg)",boxShadow:"inset 0 0 0 1px var(--ast-bord)"}:{}),...(isTgh?{background:"var(--bg-td)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
                     onClick={bl||!isEdit?undefined:()=>onCell(med.id,ghY,ghM,d,sl)}>
                     {!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
@@ -364,9 +364,9 @@ function GridH({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
 }
 
 /* ════ GRID V ════ */
-function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,getAstreinteForDay}){
+function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,getAstreinteForDay}){
   const today=new Date();
-  const C0=42,C1=24,CG=36;
+  const C0=42,C1=24,CG=44;
   // Find garde med for a given day (slot N)
   const [pickGardeDayFull,setPickGardeDayFull]=useState(null);
   const pickGardeDay=pickGardeDayFull?pickGardeDayFull.d:null;
@@ -498,7 +498,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
           <tr>
             <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:C0}}>Jour</th>
             <th style={{...S.thFix,position:"sticky",top:0,left:C0,zIndex:40,minWidth:C1}}>Sl</th>
-            <th style={{...S.thFix,position:"sticky",top:0,left:C0+C1,zIndex:40,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:8,color:"#93c47d"}}>🌙</th>
+            {showGarde&&<th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#93c47d"}}>Garde</th>}
             {meds.map(m=><th key={m.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20}} title={`Dr. ${m.prenom} ${m.nom}`}>
               <div style={{...S.avT,background:m.color,margin:"0 auto"}}>{m.init}</div>
             </th>)}
@@ -519,7 +519,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dow(ey,em,d)]}</div>
                 </td>}
                 <td style={{...S.tdFix,position:"sticky",left:C0,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:we?"var(--bg-we)":"var(--td-fix)",minWidth:C1,padding:"2px"}}>{SLOTS[sl]}</td>
-                {si===0&&<td rowSpan={slots.length} style={{...S.tdFix,position:"sticky",left:C0+C1,zIndex:9,
+                {si===0&&showGarde&&<td rowSpan={slots.length} style={{...S.tdFix,
                   borderRight:"2px solid var(--border)",
                   minWidth:CG,padding:"2px",verticalAlign:"middle",
                   cursor:isEdit?"pointer":"default",
@@ -527,7 +527,6 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   onClick={()=>{ if(!isEdit)return; setGardeSearch(""); setPickGardeDayFull({d,y:ey,m:em}); }}>
                   {gardeMed&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                     <div style={{width:20,height:20,borderRadius:"50%",background:gardeMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{gardeMed.init}</div>
-                    <Badge a={gardeActe}/>
                   </div>}
                 </td>}
                 {meds.map(med=>{
@@ -537,7 +536,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   const astId=getAstreinteForDay?getAstreinteForDay(ey,em,d):null;
                   const isAst=astId!==null&&String(astId)===String(med.id);
                   return <td key={med.id} title={noteT||undefined}
-                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",outline:"1px solid var(--ast-bord)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
+                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:"inset 0 0 0 1px var(--ast-bord)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
                     onClick={bl||!isEdit?undefined:()=>onCell(med.id,ey,em,d,sl)}>
                     {!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
@@ -3240,7 +3239,7 @@ function CardioPlanning(){
     const h=new Date().getHours();return h>=20||h<7; // auto : nuit de 20h à 7h
   });
   const setDarkMode=(fn)=>{setDarkModeRaw(prev=>{const nv=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("cp6_theme",nv?"dark":"light");}catch(e){}return nv;});};
-  const DEFAULT_TABS=[["planning","📅 Planning"],["tourmedical","🔄 Tour"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["garde","🌙 Gardes"],["astreinte","📡 Astreinte"],["plantype","📋 Type"],["attache","👔 Attachés"],["activites","⚙️ Activités"],["equipe","👥 Équipe"],["partage","⚙️ Paramètres"],["stats","📊 Stats"]];
+  const DEFAULT_TABS=[["planning","📅 Planning"],["tourmedical","🔄 Tour"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["plantype","📋 Type"],["attache","👔 Attachés"],["activites","⚙️ Activités"],["equipe","👥 Équipe"],["partage","⚙️ Paramètres"],["stats","📊 Stats"]];
   const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
   useEffect(()=>{ try{ localStorage.setItem("cp6_taborder",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
@@ -4501,7 +4500,7 @@ header::-webkit-scrollbar { display: none; }
            </div>}
           {orient==="H"
             ?<GridH allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>}
+            :<GridV allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -4712,7 +4711,7 @@ header::-webkit-scrollbar { display: none; }
           <div style={{padding:16}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,flexWrap:"wrap"}}>
               <button onClick={prevP} style={S.arr}>‹</button>
-              <h2 style={{...S.mTit,margin:0}}><span style={{color:"#7c3aed"}}>📡</span> {pLabel}</h2>
+              <h2 style={{...S.mTit,margin:0}}><span style={{color:"#7c3aed"}}>📞</span> {pLabel}</h2>
               <button onClick={nextP} style={S.arr}>›</button>
               </div>
             <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
@@ -4728,7 +4727,7 @@ header::-webkit-scrollbar { display: none; }
             )}
             {/* Stats — au-dessus, style onglet Gardes */}
             <div style={{maxWidth:560,marginBottom:14,padding:12,borderRadius:10,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-              <div style={{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>📡 Astreintes posées — {pLabel}</div>
+              <div style={{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>📞 Astreintes posées — {pLabel}</div>
               <table style={{borderCollapse:"collapse",width:"100%"}}>
                 <thead><tr>
                   <th style={{textAlign:"left",padding:"3px 8px",fontSize:10,color:"var(--txt3)"}}>Praticien</th>
@@ -4751,8 +4750,8 @@ header::-webkit-scrollbar { display: none; }
               <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,border:"2px solid #7c3aed",marginRight:4,verticalAlign:"middle"}}/>exception jour · période affichée</div>
             </div>
             {/* Tableau des jours — style onglet Gardes */}
-            <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)",maxWidth:520}}>
-              <table style={{borderCollapse:"collapse",tableLayout:"fixed",width:"100%"}}>
+            <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+              <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
                 <thead>
                   <tr>
                     <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:80}}>Date</th>
@@ -4832,7 +4831,7 @@ header::-webkit-scrollbar { display: none; }
           <Ov onClose={()=>setAstPickModal(null)}>
             <div style={{minWidth:300}}>
               <div style={S.mHd}>
-                <div style={S.mTit2}>📡 Astreinte — {label}</div>
+                <div style={S.mTit2}>📞 Astreinte — {label}</div>
                 <button onClick={()=>setAstPickModal(null)} style={S.xBtn}>×</button>
               </div>
               {isWeek&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8,padding:"4px 0"}}>Assigne toute la semaine (lun→dim)</div>}
