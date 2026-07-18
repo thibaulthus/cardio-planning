@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.0 — 18/07/2026";
+var APP_VERSION = "v9.2 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -137,14 +137,28 @@ function perStart(y, m) {
 }
 function perNext(sy, sm) { var t = sm + PCFG.len; return { sy: t > 11 ? sy + 1 : sy, sm: t % 12 }; }
 function perPrev(sy, sm) { var t = sm - PCFG.len; return { sy: t < 0 ? sy - 1 : sy, sm: (t + 12) % 12 }; }
+// ── Règle "semaines complètes" : la période s'étend jusqu'au dimanche qui clôt la dernière semaine,
+//    puis inclut le lundi suivant s'il est férié (ex. 1er novembre). La période suivante démarre le lendemain.
+function perEnd(sy, sm) {
+    var t = sm + PCFG.len - 1;
+    var em = t % 12, ey = t > 11 ? sy + 1 : sy;
+    var dt = new Date(ey, em + 1, 0);
+    while (dt.getDay() !== 0)
+        dt.setDate(dt.getDate() + 1);
+    var mon = new Date(dt);
+    mon.setDate(mon.getDate() + 1);
+    if (isFerie(mon.getFullYear(), mon.getMonth(), mon.getDate()))
+        return mon;
+    return dt;
+}
 function perDaysList(sy, sm) {
+    var pv = perPrev(sy, sm);
+    var start = new Date(perEnd(pv.sy, pv.sm));
+    start.setDate(start.getDate() + 1);
+    var end = perEnd(sy, sm);
     var days = [];
-    for (var i = 0; i < PCFG.len; i++) {
-        var mm = (sm + i) % 12, yy = sm + i > 11 ? sy + 1 : sy;
-        var dim = new Date(yy, mm + 1, 0).getDate();
-        for (var d = 1; d <= dim; d++)
-            days.push({ y: yy, m: mm, d: d });
-    }
+    for (var dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1))
+        days.push({ y: dt.getFullYear(), m: dt.getMonth(), d: dt.getDate() });
     return days;
 }
 var SYS = ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE"];
@@ -443,13 +457,7 @@ function GridH(_a) {
     var ghEffDays = useMemo(function () {
         if (viewPeriod) {
             var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
-            var days = [];
-            for (var mi = 0; mi < PCFG.len; mi++) {
-                var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
-                var dim = new Date(y2, m2 + 1, 0).getDate();
-                for (var d = 1; d <= dim; d++)
-                    days.push({ y: y2, m: m2, d: d });
-            }
+            var days = perDaysList(sy, sm);
             if (!showFull) {
                 var tod_1 = new Date();
                 tod_1.setHours(0, 0, 0, 0);
@@ -543,13 +551,7 @@ function GridV(_a) {
         }
         // Mode période
         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
-        var days = [];
-        for (var mi = 0; mi < PCFG.len; mi++) {
-            var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
-            var dim = new Date(y2, m2 + 1, 0).getDate();
-            for (var d = 1; d <= dim; d++)
-                days.push({ y: y2, m: m2, d: d, label: null });
-        }
+        var days = perDaysList(sy, sm).map(function (o) { return { y: o.y, m: o.m, d: o.d, label: null }; });
         if (!showFull) {
             var tod_4 = new Date();
             tod_4.setHours(0, 0, 0, 0);
@@ -3423,7 +3425,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
  {id:"creer",icon:"🚀",title:"Créer un planning de A à Z",body:()=>HE("div",null,
-  HP({children:["L'ordre compte : chaque étape s'appuie sur la précédente. Tout se fait sur la ",HE("b",null,"période affichée")," (généralement 4 mois)."]}),
+  HP({children:["L'ordre compte : chaque étape s'appuie sur la précédente. Tout se fait sur la ",HE("b",null,"période affichée")," (généralement 4 mois). La période s'étend jusqu'au ",HE("b",null,"dimanche qui clôt la dernière semaine"),", et rattache le lundi suivant s'il est férié (ex. 1er novembre) : la répartition se fait en semaines complètes, et la période suivante démarre le lendemain."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
   HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — onglet Tour : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — onglet Gardes : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
@@ -3444,7 +3446,8 @@ const HELP_SECTIONS=[
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées 🎯, PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
   HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase."]}),
-  HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}))},
+  HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}),
+  HTab({t:"📥 Reports",children:["outil individuel et facultatif d'aide au report de consultations : cochez vos semaines blanches, l'application propose les reports (blanches d'abord, puis créneaux à ouvrir), avec export CSV."]}))},
 
  {id:"edition",icon:"🔒",title:"Modes d'accès et PIN",body:()=>HE("div",null,
   HP({children:["Trois niveaux d'accès depuis la page d'accueil :"]}),
@@ -3495,6 +3498,202 @@ function HelpView(){
       hOpen[s.id]&&HE("div",{style:{padding:"2px 14px 13px"}},s.body()))));
 }
 
+/* ════ REPORTS (v9.2) — aide au report de consultations, composant partagé jsx/html ════ */
+function ReportsView(p){
+  const RE=React.createElement;
+  const medecins=p.medecins,actes=p.actes,getEntries=p.getEntries,tourMed=p.tourMed,planningType=p.planningType,
+    isVac=p.isVac,isEdit=p.isEdit,editMedId=p.editMedId,accessMode=p.accessMode,
+    csBlanches=p.csBlanches,setCsBlanches=p.setCsBlanches,csActsSel=p.csActsSel,setCsActsSel=p.setCsActsSel,
+    year=p.year,month=p.month,toast=p.toast;
+  const medsCS=medecins.filter(m=>m.role==="medecin");
+  const [selId,setSelId]=React.useState(accessMode==="medecinEdit"?editMedId:(medsCS[0]?medsCS[0].id:null));
+  const medSel=medecins.find(m=>m.id===(accessMode==="medecinEdit"?editMedId:selId));
+  if(!medSel)return RE("div",{style:{color:"var(--txt3)",fontSize:12}},"Aucun médecin.");
+  const mid=medSel.id;
+  const editable=isEdit||(accessMode==="medecinEdit"&&editMedId===mid);
+  const dk3=(y,m,d)=>y+"-"+m+"-"+d;
+  const wkOf=(y,m,d)=>{const dt=new Date(y,m,d);const dw=dt.getDay();const diff=dw===0?-6:1-dw;const mn=new Date(y,m,d+diff);return dk3(mn.getFullYear(),mn.getMonth(),mn.getDate());};
+  /* ── Période et semaines ── */
+  const per=perStart(year,month);
+  const days=React.useMemo(()=>perDaysList(per.sy,per.sm),[per.sy,per.sm]);
+  const weeks=React.useMemo(()=>{
+    const map={},order=[];
+    days.forEach(o=>{const dw=new Date(o.y,o.m,o.d).getDay();if(dw===0||dw===6)return;
+      const wk=wkOf(o.y,o.m,o.d);if(!map[wk]){map[wk]=[];order.push(wk);}map[wk].push(o);});
+    return order.map(wk=>({key:wk,days:map[wk]}));
+  },[days]);
+  /* ── Blanches du médecin ── */
+  const bl=csBlanches[mid]||{};
+  const isBl=(y,m,d)=>!!bl[dk3(y,m,d)];
+  const setBlDays=(list,on)=>{
+    if(!editable)return;
+    setCsBlanches(prev=>{const cur=Object.assign({},prev[mid]||{});
+      list.forEach(o=>{const k=dk3(o.y,o.m,o.d);if(on)cur[k]=true;else delete cur[k];});
+      return Object.assign({},prev,{[mid]:cur});});
+  };
+  const prefillVac=()=>{
+    const vd=days.filter(o=>{const dw=new Date(o.y,o.m,o.d).getDay();return dw>=1&&dw<=5&&isVac(o.y,o.m,o.d)&&!isFerie(o.y,o.m,o.d);});
+    if(vd.length===0){toast("Aucune vacance scolaire chargée sur la période","warn");return;}
+    setBlDays(vd,true);toast(vd.length+" jour(s) de vacances scolaires précochés — ajustez ensuite","info");
+  };
+  /* ── Activités "consultation" du médecin ── */
+  const defActs=actes.filter(a=>a.id==="CS_CHL"||a.id==="CS_CHB").map(a=>a.id);
+  const myActs=csActsSel[mid]&&csActsSel[mid].length?csActsSel[mid]:defActs;
+  const toggleAct=(aid)=>{if(!editable)return;
+    setCsActsSel(prev=>{const cur=(prev[mid]&&prev[mid].length?prev[mid]:defActs).slice();
+      const i=cur.indexOf(aid);if(i>=0)cur.splice(i,1);else cur.push(aid);
+      return Object.assign({},prev,{[mid]:cur});});};
+  const candActs=actes.filter(a=>!a.isSystem&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(medSel.init)));
+  /* ── Jours habituels de consultation (planning type) ── */
+  const pt=planningType[mid]||{};
+  const habCS={};// {dw:{M:acteId,AM:acteId}}
+  [1,2,3,4,5].forEach(dw=>["M","AM"].forEach(sl=>{
+    const e=(pt[dw]||{})[sl];if(e&&e[0]&&myActs.indexOf(e[0])>=0){if(!habCS[dw])habCS[dw]={};habCS[dw][sl]=e[0];}
+  }));
+  const habList=[];Object.keys(habCS).forEach(dw=>Object.keys(habCS[dw]).forEach(sl=>habList.push({dw:+dw,sl})));
+  /* ── Analyse ── */
+  const JR=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+  const fmtD=(o)=>JR[new Date(o.y,o.m,o.d).getDay()]+" "+o.d+" "+MOIS[o.m].slice(0,4);
+  const inTour=(y,m,d)=>{const wm=tourMed[wkOf(y,m,d)]||{};return((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid));};
+  const slotState=(y,m,d,sl)=>{
+    const es=getEntries(mid,y,m,d,sl);
+    if(es.some(e=>["ABSENCE","FORM","FORMATION"].includes(e.acteId))||(es[0]&&es[0]._blocked))return "abs";
+    if(es.length>0)return "busy";
+    return "free";
+  };
+  const analysis=React.useMemo(()=>{
+    const lost=[],recvA=[],recvB=[],tourWeeks=[];
+    weeks.forEach(w=>{
+      const isTW=(()=>{const wm=tourMed[w.key]||{};return((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid));})();
+      if(isTW){const nb=w.days.filter(o=>isBl(o.y,o.m,o.d)).length;tourWeeks.push({key:w.key,days:w.days,nbBl:nb});}
+    });
+    days.forEach(o=>{
+      const dt=new Date(o.y,o.m,o.d),dw=dt.getDay();
+      if(dw===0||dw===6||isFerie(o.y,o.m,o.d))return;
+      const blanche=isBl(o.y,o.m,o.d),tour=inTour(o.y,o.m,o.d);
+      ["M","AM"].forEach(sl=>{
+        const hab=habCS[dw]&&habCS[dw][sl];
+        const st=slotState(o.y,o.m,o.d,sl);
+        if(hab&&!blanche&&(tour||st==="abs"))lost.push({y:o.y,m:o.m,d:o.d,sl,why:tour?"tour":"absence"});
+        else if(blanche&&!tour&&st==="free")recvA.push({y:o.y,m:o.m,d:o.d,sl,hab:!!hab});
+        else if(!blanche&&!tour&&st==="free"&&!hab)recvB.push({y:o.y,m:o.m,d:o.d,sl});
+      });
+    });
+    /* Appariement glouton chronologique : blanches d'abord, puis offs ; préférence après la date perdue */
+    const score=(L,R)=>{const dl=new Date(L.y,L.m,L.d),dr=new Date(R.y,R.m,R.d);
+      const diff=Math.round((dr-dl)/86400000);return diff>=0?diff:(-diff+45);};
+    const usedA=new Set(),usedB=new Set(),pairs=[];
+    lost.forEach(L=>{
+      let best=null,bestS=1e9,bestT=null,bestI=-1;
+      recvA.forEach((R,i)=>{if(usedA.has(i))return;const s=score(L,R)+(R.hab?0:3);if(s<bestS){bestS=s;best=R;bestT="A";bestI=i;}});
+      if(!best)recvB.forEach((R,i)=>{if(usedB.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="B";bestI=i;}});
+      if(best){if(bestT==="A")usedA.add(bestI);else usedB.add(bestI);}
+      pairs.push({lost:L,to:best,type:bestT});
+    });
+    const restA=recvA.filter((_,i)=>!usedA.has(i)),restB=recvB.filter((_,i)=>!usedB.has(i));
+    return {lost,pairs,restA,restB,tourWeeks};
+  },[days,weeks,bl,tourMed,planningType,myActs.join(","),mid]);
+  const exportCSVR=()=>{
+    const rows=[["Consultation perdue","Cause","Proposition"]];
+    analysis.pairs.forEach(pr=>rows.push([fmtD(pr.lost)+" "+pr.lost.sl,pr.lost.why==="tour"?"Semaine de tour":"Absence",
+      pr.to?(fmtD(pr.to)+" "+pr.to.sl+(pr.type==="A"?" (semaine blanche)":" (ouvrir un créneau)")):"3-4 patients en semaine de tour"]));
+    const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\n");
+    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="reports-consultations.csv";a.click();
+  };
+  /* ── Rendu ── */
+  const cellSt=(o,dw)=>{
+    const blanche=isBl(o.y,o.m,o.d),tour=inTour(o.y,o.m,o.d),fer=isFerie(o.y,o.m,o.d);
+    const absD=slotState(o.y,o.m,o.d,"M")==="abs"||slotState(o.y,o.m,o.d,"AM")==="abs";
+    return {blanche,tour,fer,absD};
+  };
+  return RE("div",{style:{maxWidth:820}},
+    RE("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}},
+      RE("h2",{style:{fontSize:17,fontWeight:800,color:"var(--txt)",margin:0}},"📥 Reports de consultations"),
+      accessMode==="medecinEdit"
+        ?RE("span",{style:{fontSize:12,fontWeight:700,color:"var(--txt)"}},medSel.prenom+" "+medSel.nom)
+        :RE("select",{value:selId||"",onChange:e=>setSelId(parseInt(e.target.value)),style:{padding:"5px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:12,fontWeight:700}},
+          medsCS.map(m=>RE("option",{key:m.id,value:m.id},"Dr. "+m.prenom+" "+m.nom)))),
+    RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:12,lineHeight:1.6}},
+      "Outil individuel et facultatif : cochez vos jours/semaines sans consultation (« blanches ») laissés par votre secrétaire dans le logiciel métier, l'application propose ensuite les reports les plus adaptés."),
+    editable&&RE("div",{style:{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}},
+      RE("button",{onClick:prefillVac,style:{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1.5px solid #f59e0b",background:"rgba(245,158,11,.10)",color:"#b45309",fontWeight:800,cursor:"pointer"}},"☀️ Précocher les vacances scolaires"),
+      RE("button",{onClick:()=>{if(confirm("Effacer toutes vos semaines blanches de la période ?"))setCsBlanches(prev=>Object.assign({},prev,{[mid]:{}}));},
+        style:{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}},"Tout effacer")),
+    RE("div",{style:{fontSize:10,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:5}},"Mes activités de consultation"),
+    RE("div",{style:{display:"flex",flexWrap:"wrap",gap:4,marginBottom:12}},
+      candActs.map(a=>{const on=myActs.indexOf(a.id)>=0;
+        return RE("button",{key:a.id,onClick:()=>toggleAct(a.id),disabled:!editable,
+          style:{fontSize:10,padding:"3px 8px",borderRadius:11,cursor:editable?"pointer":"default",fontWeight:700,
+            border:on?"1.5px solid "+a.color:"1px solid var(--border)",background:on?a.color+"33":"var(--bg2)",color:on?"var(--txt)":"var(--txt3)"}},a.short);})),
+    habList.length===0&&RE("div",{style:{fontSize:11,color:"#b45309",background:"rgba(245,158,11,.10)",border:"1px solid rgba(245,158,11,.4)",borderRadius:7,padding:"6px 10px",marginBottom:12}},
+      "Aucune demi-journée de consultation trouvée dans votre planning type pour ces activités — renseignez votre planning type (onglet Type) ou ajustez les activités ci-dessus."),
+    /* Calendrier des semaines */
+    RE("div",{style:{fontSize:10,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:5}},"Semaines blanches (cliquez un jour, ou « Sem. » pour la semaine entière)"),
+    RE("div",{style:{overflowX:"auto",border:"1px solid var(--border)",borderRadius:8,marginBottom:14}},
+      RE("table",{style:{borderCollapse:"collapse",width:"100%"}},
+        RE("thead",null,RE("tr",null,
+          RE("th",{style:{padding:"4px 8px",fontSize:9,color:"var(--txt3)",textAlign:"left",background:"var(--th)"}},"Semaine"),
+          ["Lun","Mar","Mer","Jeu","Ven"].map(j=>RE("th",{key:j,style:{padding:"4px 6px",fontSize:9,color:"var(--txt3)",background:"var(--th)"}},j)),
+          RE("th",{style:{padding:"4px 6px",fontSize:9,color:"var(--txt3)",background:"var(--th)"}},""))),
+        RE("tbody",null,weeks.map(w=>{
+          const allBl=w.days.every(o=>isBl(o.y,o.m,o.d)||isFerie(o.y,o.m,o.d));
+          const first=w.days[0];
+          const wm=tourMed[w.key]||{};const isTW=((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid));
+          return RE("tr",{key:w.key,style:{borderTop:"1px solid var(--border2)"}},
+            RE("td",{style:{padding:"3px 8px",fontSize:10,fontWeight:700,color:isTW?"#1d4ed8":"var(--txt)",whiteSpace:"nowrap"}},
+              first.d+" "+MOIS[first.m].slice(0,4)+(isTW?" · TOUR":"")),
+            [1,2,3,4,5].map(dw=>{
+              const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===dw);
+              if(!o)return RE("td",{key:dw,style:{padding:"2px"}});
+              const st=cellSt(o,dw);
+              return RE("td",{key:dw,onClick:()=>{if(!st.fer)setBlDays([o],!st.blanche);},
+                title:st.fer?"Férié":(st.blanche?"Blanche — cliquer pour retirer":"Cliquer pour marquer blanche"),
+                style:{padding:"4px 2px",textAlign:"center",fontSize:10,fontWeight:800,
+                  cursor:st.fer||!editable?"default":"pointer",
+                  background:st.fer?"var(--bg2)":st.blanche?"rgba(245,158,11,.25)":st.tour?"rgba(29,78,216,.12)":"transparent",
+                  color:st.fer?"var(--txt3)":st.absD?"#ef4444":"var(--txt)",
+                  border:"1px solid var(--border2)",borderRadius:4}},
+                st.fer?"F":o.d);
+            }),
+            RE("td",{style:{padding:"2px 6px",textAlign:"center"}},
+              editable&&RE("button",{onClick:()=>setBlDays(w.days.filter(o=>!isFerie(o.y,o.m,o.d)),!allBl),
+                style:{fontSize:9,padding:"2px 7px",borderRadius:5,border:"1px solid var(--border)",background:allBl?"rgba(245,158,11,.25)":"var(--bg2)",color:"var(--txt2)",fontWeight:800,cursor:"pointer"}},"Sem.")));
+        })))),
+    RE("div",{style:{fontSize:9,color:"var(--txt3)",marginBottom:14}},
+      RE("span",{style:{background:"rgba(245,158,11,.25)",padding:"0 6px",borderRadius:3,marginRight:6}},"blanche"),
+      RE("span",{style:{background:"rgba(29,78,216,.12)",padding:"0 6px",borderRadius:3,marginRight:6}},"semaine de tour"),
+      RE("span",{style:{color:"#ef4444",marginRight:6}},"date rouge = absence"),"F = férié"),
+    /* ── Rapport ── */
+    RE("div",{style:{fontSize:10,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:6}},"Propositions de report"),
+    analysis.tourWeeks.length>0&&RE("div",{style:{fontSize:11,color:"var(--txt)",marginBottom:8,lineHeight:1.7}},
+      RE("b",null,"Tour ↔ blanches : "),
+      analysis.tourWeeks.map(t=>RE("span",{key:t.key,style:{display:"inline-block",marginRight:8,padding:"1px 7px",borderRadius:6,fontSize:10,fontWeight:700,
+        background:t.nbBl>=5?"rgba(22,163,74,.15)":t.nbBl>0?"rgba(245,158,11,.15)":"rgba(239,68,68,.12)",
+        color:t.nbBl>=5?"#16a34a":t.nbBl>0?"#b45309":"#ef4444"}},
+        "sem. "+t.days[0].d+" "+MOIS[t.days[0].m].slice(0,4)+" : "+(t.nbBl>=5?"✓ blanche":t.nbBl>0?t.nbBl+"/5 blanche":"non blanche")))),
+    analysis.pairs.length===0
+      ?RE("div",{style:{fontSize:12,color:"#16a34a",fontWeight:700,marginBottom:10}},"✓ Aucune consultation à reporter sur la période.")
+      :RE("div",{style:{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden",marginBottom:10}},
+        analysis.pairs.map((pr,i)=>RE("div",{key:i,style:{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderTop:i>0?"1px solid var(--border2)":"none",fontSize:11,flexWrap:"wrap"}},
+          RE("span",{style:{fontWeight:800,color:"var(--txt)",minWidth:120}},fmtD(pr.lost)+" "+pr.lost.sl),
+          RE("span",{style:{fontSize:9,padding:"1px 6px",borderRadius:5,fontWeight:800,background:pr.lost.why==="tour"?"rgba(29,78,216,.12)":"rgba(239,68,68,.12)",color:pr.lost.why==="tour"?"#1d4ed8":"#ef4444"}},pr.lost.why==="tour"?"tour":"absence"),
+          RE("span",{style:{color:"var(--txt3)"}},"→"),
+          pr.to
+            ?RE("span",null,RE("b",{style:{color:"var(--txt)"}},fmtD(pr.to)+" "+pr.to.sl),
+              RE("span",{style:{fontSize:9,marginLeft:6,padding:"1px 6px",borderRadius:5,fontWeight:800,
+                background:pr.type==="A"?"rgba(245,158,11,.2)":"rgba(124,58,237,.12)",color:pr.type==="A"?"#b45309":"#7c3aed"}},
+                pr.type==="A"?"semaine blanche":"ouvrir un créneau"))
+            :RE("span",{style:{color:"#ef4444",fontWeight:700}},"aucune place — 3-4 patients en semaine de tour")))),
+    RE("div",{style:{fontSize:11,color:"var(--txt)",lineHeight:1.7,marginBottom:10}},
+      RE("b",null,"Offs restants après reports : "),
+      (analysis.restA.length+analysis.restB.length)>0
+        ?analysis.restA.concat(analysis.restB).slice(0,20).map((o,i)=>RE("span",{key:i,style:{display:"inline-block",marginRight:6,fontSize:10,color:"var(--txt2)"}},fmtD(o)+" "+o.sl+(i<Math.min(analysis.restA.length+analysis.restB.length,20)-1?" ·":"")))
+        :RE("span",{style:{color:"#b45309",fontWeight:700}},"aucun — pensez aux créneaux de 3-4 patients pendant vos semaines de tour."),
+      (analysis.restA.length+analysis.restB.length)>0&&RE("span",{style:{color:"var(--txt3)",fontSize:10}}," → consultations supplémentaires possibles (nouveaux patients, urgences)")),
+    analysis.pairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"));
+}
+
 function CardioPlanning() {
     var _this = this;
     var today = new Date();
@@ -3526,7 +3725,7 @@ function CardioPlanning() {
         localStorage.setItem("cp6_theme", nv ? "dark" : "light");
     }
     catch (e) { } return nv; }); };
-    var DEFAULT_TABS = [["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"], ["aide", "❓ Aide"]];
+    var DEFAULT_TABS = [["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"], ["reports", "📥 Reports"], ["aide", "❓ Aide"]];
     var _k = useState(function () { try {
         var v = localStorage.getItem("cp6_taborder");
         if (v) {
@@ -3571,6 +3770,8 @@ function CardioPlanning() {
     var _5 = useState({}), tourWish = _5[0], setTourWish = _5[1]; // {weekKey:{medId:true}} souhaite tourner
     var _6 = useState({}), gardeAvoid = _6[0], setGardeAvoid = _6[1]; // {dateKey:{medId:true}} préfère pas de garde ce jour
     var _7 = useState({}), gardeWish = _7[0], setGardeWish = _7[1]; // {dateKey:{medId:true}} souhaite la garde ce jour
+    var _csB = useState({}), csBlanches = _csB[0], setCsBlanches = _csB[1]; // {medId:{"y-m-d":true}} jours sans consultation (logiciel métier)
+    var _csA = useState({}), csActsSel = _csA[0], setCsActsSel = _csA[1]; // {medId:[acteIds]} activités comptées comme consultation
     var _8 = useState({}), tourDerog = _8[0], setTourDerog = _8[1]; // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
     var _9 = useState(null), tourReport = _9[0], setTourReport = _9[1]; // rapport persistant de la dernière répartition auto du tour
     var _10 = useState(null), astReport = _10[0], setAstReport = _10[1];
@@ -3748,6 +3949,10 @@ function CardioPlanning() {
                         setGardeAvoid(JSON.parse(data.gardeAvoid));
                     if (data.gardeWish)
                         setGardeWish(JSON.parse(data.gardeWish));
+                    if (data.csBlanches)
+                        setCsBlanches(JSON.parse(data.csBlanches));
+                    if (data.csActsSel)
+                        setCsActsSel(JSON.parse(data.csActsSel));
                     if (data.tourDerog)
                         setTourDerog(JSON.parse(data.tourDerog));
                     if (data.tourReport !== undefined && data.tourReport !== "")
@@ -4315,6 +4520,10 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ gardeWish: JSON.stringify(gardeWish) }); }, [gardeWish]);
     useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ csBlanches: JSON.stringify(csBlanches) }); }, [csBlanches]);
+    useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ csActsSel: JSON.stringify(csActsSel) }); }, [csActsSel]);
+    useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourDerog: JSON.stringify(tourDerog) }); }, [tourDerog]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourReport: tourReport || "" }); }, [tourReport]);
@@ -4326,6 +4535,10 @@ function CardioPlanning() {
     useEffect(function () {
         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
         var wanted = [];
+        var _pe = perEnd(sy, sm);
+        var _pemk = _pe.getFullYear() + "-" + String(_pe.getMonth() + 1).padStart(2, "0");
+        if (_pe.getMonth() !== (sm + PCFG.len - 1) % 12 && !Object.keys(plan).some(function (k) { return k.indexOf(_pemk) === 0; }))
+            wanted.push(_pemk);
         var _loop_7 = function (mi) {
             var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
             var mk = y2 + "-" + String(m2 + 1).padStart(2, "0");
@@ -4474,14 +4687,7 @@ function CardioPlanning() {
     var getPeriodRange = function (y, m) { return perStart(y, m); };
     var allDays4 = useMemo(function () {
         var _a = getPeriodRange(year, month), sy = _a.sy, sm = _a.sm;
-        var days = [];
-        for (var mi = 0; mi < PCFG.len; mi++) {
-            var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
-            var dim = new Date(y2, m2 + 1, 0).getDate();
-            for (var d = 1; d <= dim; d++)
-                days.push({ y: y2, m: m2, d: d, label: MOIS[m2].slice(0, 3) });
-        }
-        return days;
+        return perDaysList(sy, sm).map(function (o) { return { y: o.y, m: o.m, d: o.d, label: MOIS[o.m].slice(0, 3) }; });
     }, [year, month]);
     var getEntries = useCallback(function (medId, y2, m2, d2, slot) {
         var _p = Object.keys(archPlan).length > 0 ? __assign(__assign({}, archPlan), plan) : plan;
@@ -5268,6 +5474,7 @@ function CardioPlanning() {
                             isEdit && React.createElement("div", { style: { display: "flex", gap: 3 } },
                                 React.createElement("button", { title: "Avancer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, -1); } }, "\u25B2"),
                                 React.createElement("button", { title: "Reculer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, 1); } }, "\u25BC"))))); })))); }))),
+            tab === "reports" && React.createElement(ReportsView, { medecins: medecins, actes: actes, getEntries: getEntries, tourMed: tourMed, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csActsSel: csActsSel, setCsActsSel: setCsActsSel, year: year, month: month, toast: toast }),
             tab === "aide" && React.createElement(HelpView, null),
             tab === "astreinte" && (function () {
                 var astMeds = medecins.filter(function (m) { return m.astreinte === true; });
@@ -5305,6 +5512,10 @@ function CardioPlanning() {
                     var end = new Date(last.y, last.m, last.d);
                     var list = [];
                     for (var mn = new Date(mon0); mn <= end; mn.setDate(mn.getDate() + 7)) {
+                        var sun = new Date(mn);
+                        sun.setDate(sun.getDate() + 6);
+                        if (sun > end)
+                            break; // semaine incomplète (ex. lundi férié isolé) → attribuée par la période suivante
                         list.push({ y: mn.getFullYear(), m: mn.getMonth(), d: mn.getDate() });
                     }
                     return list;
