@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.7.1 — 18/07/2026";
+const APP_VERSION="v9.8 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -100,21 +100,21 @@ const DEFAULT_ACTES=[
   {id:"STIM_AG",label:"Stimulation AG",short:"Stim-AG",color:"#f97316",bg:"#f97316",hasSalle:false,salles:[S_STIM],isSystem:false,site:"CHL",medecinsAutorise:GRP.STIM,fixedSalle:S_STIM},
   {id:"EEP_AG",label:"EEP sous AG",short:"EEP-AG",color:"#f97316",bg:"#f97316",hasSalle:false,salles:[S_STIM],isSystem:false,site:"CHL",medecinsAutorise:GRP.EEP_AG,fixedSalle:S_STIM},
   {id:"EEP",label:"Électrophysiologie",short:"EEP",color:"#e3b341",bg:"#e3b341",hasSalle:false,salles:[S_EEP],isSystem:false,site:"CHL",medecinsAutorise:GRP.EEP,fixedSalle:S_EEP},
-  {id:"CS_CHL",label:"Consultation CHL",short:"CsL",color:"#c9daf8",bg:"#388bfd",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:["MP","VA","BS","HV","TOM","NH","CV","TH","CBV","JSL","TD","ND","JSS","PM","MG","CB","AB","SD","YL","MCD","BF"],csReport:true,maxParSalle:1},
+  {id:"CS_CHL",label:"Consultation CHL",short:"CsL",color:"#c9daf8",bg:"#388bfd",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:["MP","VA","BS","HV","TOM","NH","CV","TH","CBV","JSL","TD","ND","JSS","PM","MG","CB","AB","SD","YL","MCD","BF"],csReport:true,adminOk:true,maxParSalle:1},
   {id:"ETT_CHL",label:"ETT",short:"ETT",color:"#ea9999",bg:"#ea9999",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:["MP","VA","BS","HV","TOM","NH","CV","TH","CBV","JSL","TD","ND","JSS","PM","MG","CB","AB"],maxParSalle:1},
-  {id:"ETO_CHL",label:"ETO",short:"ETO",color:"#46bdc6",bg:"#46bdc6",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:GRP.ETO,csReport:true,maxParSalle:1},
-  {id:"DOBU",label:"Dobutamine",short:"Dobu",color:"#46bdc6",bg:"#46bdc6",hasSalle:true,salles:["CHL-4","CHL-5"],isSystem:false,site:"CHL",medecinsAutorise:GRP.DOBU,csReport:true,maxParSalle:1},
-  {id:"PM_CS",label:"Cs Pacemaker",short:"CsPM",color:"#c9daf8",bg:"#c9daf8",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:GRP.PM_CS,csReport:true,maxParSalle:1},
-  {id:"DEFIB_CS",label:"Cs DAI",short:"CsDAI",color:"#c9daf8",bg:"#c9daf8",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:GRP.DEFIB,csReport:true,maxParSalle:1},
+  {id:"ETO_CHL",label:"ETO",short:"ETO",color:"#46bdc6",bg:"#46bdc6",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:GRP.ETO,csReport:true,adminOk:true,maxParSalle:1},
+  {id:"DOBU",label:"Dobutamine",short:"Dobu",color:"#46bdc6",bg:"#46bdc6",hasSalle:true,salles:["CHL-4","CHL-5"],isSystem:false,site:"CHL",medecinsAutorise:GRP.DOBU,csReport:true,adminOk:true,maxParSalle:1},
+  {id:"PM_CS",label:"Cs Pacemaker",short:"CsPM",color:"#c9daf8",bg:"#c9daf8",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:GRP.PM_CS,csReport:true,adminOk:true,maxParSalle:1},
+  {id:"DEFIB_CS",label:"Cs DAI",short:"CsDAI",color:"#c9daf8",bg:"#c9daf8",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:GRP.DEFIB,csReport:true,adminOk:true,maxParSalle:1},
   {id:"REVEAL",label:"Reveal",short:"Reveal",color:"#e3b341",bg:"#e3b341",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:GRP.REVEAL,maxParSalle:1},
   {id:"VASC_CHL",label:"Vasculaire CHL",short:"Vasc",color:"#94a3b8",bg:"#94a3b8",hasSalle:true,salles:SALLES_CHL,isSystem:false,site:"CHL",medecinsAutorise:GRP.VASC_CHL,maxParSalle:1},
   {id:"EE_CHL",label:"Épreuve effort CHL",short:"EE",color:"#4ade80",bg:"#4ade80",hasSalle:true,salles:[S_EE_CHL],isSystem:false,site:"CHL",medecinsAutorise:["VA","BS","HV","TOM","NH","CV","TH","CBV","JSL","TD","ND","JSS","PM","MG","CB","AB","BL"],fixedSalle:S_EE_CHL,maxParSalle:1},
-  {id:"CS_CHB",label:"Consultation CHB",short:"CsB",color:"#b4a7d6",bg:"#b4a7d6",hasSalle:true,salles:["CHB-1","CHB-2","CHB-3"],isSystem:false,site:"CHB",medecinsAutorise:["BS","HV","TOM","NH","CV","TH","CBV","JSL","TD","ND","JSS","PM","MG","CB","AB"],csReport:true,maxParSalle:1},
+  {id:"CS_CHB",label:"Consultation CHB",short:"CsB",color:"#b4a7d6",bg:"#b4a7d6",hasSalle:true,salles:["CHB-1","CHB-2","CHB-3"],isSystem:false,site:"CHB",medecinsAutorise:["BS","HV","TOM","NH","CV","TH","CBV","JSL","TD","ND","JSS","PM","MG","CB","AB"],csReport:true,adminOk:true,maxParSalle:1},
   {id:"CARDIOPEDS",label:"Cardiopédiatrie",short:"Pédia",color:"#f9a8d4",bg:"#f9a8d4",hasSalle:true,salles:["CHB-1","CHB-2","CHB-3"],isSystem:false,site:"CHB",medecinsAutorise:GRP.CARDIOPEDS,maxParSalle:1},
   {id:"VASC_CHB2",label:"Vasculaire CHB",short:"Vasc",color:"#64748b",bg:"#64748b",hasSalle:true,salles:["CHB-VASC","CHB-3"],isSystem:false,site:"CHB",medecinsAutorise:GRP.VASC_CHL,fixedSalle:"CHB-VASC",maxParSalle:1},
   {id:"EE_CHB",label:"Réadaptation cardiaque",short:"Réab",color:"#b4a7d6",bg:"#b4a7d6",hasSalle:true,salles:[S_EE_CHB],isSystem:false,site:"CHB",medecinsAutorise:GRP.EE_CHB,fixedSalle:S_EE_CHB,maxParSalle:1},
-  {id:"RYTHMO_CHB",label:"Rythmologie CHB",short:"CsPM",color:"#b4a7d6",bg:"#b4a7d6",hasSalle:true,salles:["Rythmo-CHB"],isSystem:false,site:"CHB",medecinsAutorise:GRP.RYTHMO,csReport:true,maxParSalle:1},
-  {id:"DOBU_CHB",label:"Dobu/ETO CHB",short:"Dobu",color:"#6db8c4",bg:"#6db8c4",hasSalle:true,salles:["CHB-1","CHB-2"],isSystem:false,site:"CHB",medecinsAutorise:["JSS","PM","CB","AB"],csReport:true,maxParSalle:1},
+  {id:"RYTHMO_CHB",label:"Rythmologie CHB",short:"CsPM",color:"#b4a7d6",bg:"#b4a7d6",hasSalle:true,salles:["Rythmo-CHB"],isSystem:false,site:"CHB",medecinsAutorise:GRP.RYTHMO,csReport:true,adminOk:true,maxParSalle:1},
+  {id:"DOBU_CHB",label:"Dobu/ETO CHB",short:"Dobu",color:"#6db8c4",bg:"#6db8c4",hasSalle:true,salles:["CHB-1","CHB-2"],isSystem:false,site:"CHB",medecinsAutorise:["JSS","PM","CB","AB"],csReport:true,adminOk:true,maxParSalle:1},
   {id:"SCINTI",label:"Scintigraphie",short:"Scinti",color:"#c3aed6",bg:"#c3aed6",hasSalle:false,salles:[],isSystem:false,site:"CHB",medecinsAutorise:["JSS","CB","AB","MG"],maxParSalle:1},
   {id:"BIP",label:"BIP CHB",short:"BIP",color:"#46bdc6",bg:"#46bdc6",hasSalle:true,salles:["CHB-1","CHB-2","CHB-3"],isSystem:false,site:"CHB",medecinsAutorise:["BS","HV","TOM","NH","CV","TH","CBV","JSL","TD","ND","JSS","PM","MG","CB","AB"],maxParSalle:1},
   {id:"FORMATION",label:"Formation",short:"Form",color:"#a3e635",bg:"#a3e635",hasSalle:false,salles:[],isSystem:false,site:"tous",medecinsAutorise:["MP","VA","BS","HV","TOM","NH","CV","TH","CBV","JSL","TD","ND","JSS","PM","MG","CB","AB","EJ","LP","LF","JL","IV"]},
@@ -165,7 +165,7 @@ function applyTheme(dark){
     r.style.setProperty("--bg","#1a1f2e");r.style.setProperty("--bg2","#242938");
     r.style.setProperty("--bg-n","#141720");r.style.setProperty("--bg-we","#1f1a0e");
     r.style.setProperty("--vac-bg","#2a3040");r.style.setProperty("--garde-bg","#0f2318");
-    r.style.setProperty("--ast-bg","#11291c");r.style.setProperty("--ast-bord","#2f6b45");
+    r.style.setProperty("--ast-bg","#173a24");r.style.setProperty("--ast-bord","#4ade80");
     r.style.setProperty("--bg-weh","#231e0e");r.style.setProperty("--bg-td","#0f1f1a");
     r.style.setProperty("--border","#3d4559");r.style.setProperty("--border2","#2d3347");
     r.style.setProperty("--txt","#e8ecf0");r.style.setProperty("--txt2","#8d95a8");r.style.setProperty("--txt3","#4d5568");
@@ -379,7 +379,7 @@ function GridH({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
 }
 
 /* ════ GRID V ════ */
-function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,getAstreinteForDay}){
+function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,getAstreinteForDay}){
   const today=new Date();
   const C0=42,C1=24,CG=44;
   // Find garde med for a given day (slot N)
@@ -534,7 +534,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   minWidth:CG,padding:"2px",verticalAlign:"middle",
                   cursor:isEdit?"pointer":"default",
                   background:we?"var(--bg-we)":gardeMed?"var(--garde-bg)":"var(--td-fix)"}}
-                  onClick={()=>{ if(!isEdit)return; setGardeSearch(""); setPickGardeDayFull({d,y:ey,m:em}); }}>
+                  onClick={()=>{ if(!isEdit||gardeLocked)return; setGardeSearch(""); setPickGardeDayFull({d,y:ey,m:em}); }}>
                   {gardeMed&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                     <div style={{width:20,height:20,borderRadius:"50%",background:gardeMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{gardeMed.init}</div>
                   </div>}
@@ -3305,6 +3305,7 @@ const HELP_SECTIONS=[
   HP({children:["Trois niveaux d'accès depuis la page d'accueil :"]}),
   HP({children:["• ",HBtn({kind:"ghost",children:"👁 Consulter"})," — lecture seule, sans code."]}),
   HP({children:["• ",HE("b",null,"PIN médecin")," — édition personnelle : uniquement sa propre ligne (voir la première tuile). Défini par un éditeur dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"."]}),
+  HP({children:["• ",HE("b",null,"PIN administratif")," — pour les secrétaires et cadres : un code partagé (défini dans Paramètres) ; chacun saisit son prénom à la connexion. Il permet de poser, modifier ou retirer les activités cochées « ✏️ administratif » (consultations…) sur la ligne de n'importe quel médecin, et de remplir les semaines blanches de l'onglet Reports. Gardes, tours, astreintes et réglages restent hors de portée."]}),
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
 
@@ -3326,7 +3327,12 @@ const HELP_SECTIONS=[
   HP({children:["Fiches Équipe : ",HChip({txt:"Garde",bg:"#16a34a"})," / ",HChip({txt:"Sans garde",bg:"#dc2626"})," · ",HChip({txt:"TM",bg:"#1d4ed8"})," / ",HChip({txt:"Sans TM",bg:"#d97706"}),"."]}),
   HP({children:["Sur-spécialités : ",HE("span",{style:{color:"#76a5af",fontWeight:800}},"Coro")," · ",HE("span",{style:{color:"#e3b341",fontWeight:800}},"Pace")," · ",HE("span",{style:{color:"#8b5cf6",fontWeight:800}},"EEP")," · ",HE("span",{style:{color:"#ec4899",fontWeight:800}},"ETT"),"."]}),
   HP({children:["⭐ souhaite (garde ou tour) · 🚫 préfère éviter · ⇄ échange · ✂ temps partiel · 📝 note sur la case."]}),
-  HP({last:true,children:["Fonds : jaune pâle = week-end · bleuté = aujourd'hui · vert clair + contour vert = astreinte de la semaine · contour violet = exception d'astreinte posée sur un jour précis."]}))}
+  HP({last:true,children:["Fonds : jaune pâle = week-end · bleuté = aujourd'hui · vert clair + contour vert = astreinte de la semaine · contour violet = exception d'astreinte posée sur un jour précis."]}))},
+
+ {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"iPhone / iPad (Safari)")," : ouvrez le planning dans Safari, touchez le bouton Partager (le carré avec une flèche vers le haut), faites défiler et choisissez ",HE("b",null,"« Sur l'écran d'accueil »"),", puis Ajouter. L'icône CardioPlanning apparaît et s'ouvre en plein écran, comme une vraie application."]}),
+  HP({children:[HE("b",null,"Android (Chrome)")," : ouvrez le planning dans Chrome, menu ⋮ en haut à droite, puis ",HE("b",null,"« Ajouter à l'écran d'accueil »")," (ou « Installer l'application » si Chrome le propose) et validez."]}),
+  HP({last:true,children:["Dans les deux cas, l'icône ouvre toujours la dernière version : c'est le site lui-même, aucune mise à jour manuelle à faire. Astuce : refaites simplement l'ajout si vous changez de téléphone."]}))}
 ];
 
 function HelpView(){
@@ -3362,7 +3368,7 @@ function ReportsView(p){
   const medSel=medecins.find(m=>m.id===(accessMode==="medecinEdit"?editMedId:selId));
   if(!medSel)return RE("div",{style:{color:"var(--txt3)",fontSize:12}},"Aucun médecin.");
   const mid=medSel.id;
-  const editable=isEdit||(accessMode==="medecinEdit"&&editMedId===mid);
+  const editable=isEdit||(accessMode==="medecinEdit"&&editMedId===mid)||p.adminReports===true;
   const dk3=(y,m,d)=>y+"-"+m+"-"+d;
   const wkOf=(y,m,d)=>{const dt=new Date(y,m,d);const dw=dt.getDay();const diff=dw===0?-6:1-dw;const mn=new Date(y,m,d+diff);return dk3(mn.getFullYear(),mn.getMonth(),mn.getDate());};
   /* ── Période : sélecteur local, défaut = période suivante (outil de préparation) ── */
@@ -3634,6 +3640,14 @@ function CardioPlanning(){
   const [pinInput,setPinInput]=useState("");
   const [pinError,setPinError]=useState(false);
   const [editPin,setEditPin]=useState(EDIT_PIN_DEFAULT);
+  /* ── v9.8 : rôle Administratif (secrétaires + cadres) ── */
+  const [adminPin,setAdminPin]=useState("");
+  const [adminEnabled,setAdminEnabled]=useState(true);
+  const [adminCanReports,setAdminCanReports]=useState(true);
+  const [adminCanNotes,setAdminCanNotes]=useState(false);
+  const [adminName,setAdminName]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
+  const [adminAsk,setAdminAsk]=useState(false);
+  const [adminNameInput,setAdminNameInput]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
   const [editMedId,setEditMedId]=useState(null); // medecin logged in with personal PIN
   const [tab,setTab]=useState("planning");
   const [ym,setYM]=useState(()=>({year:new Date().getFullYear(),month:new Date().getMonth()}));
@@ -3843,6 +3857,10 @@ function CardioPlanning(){
             setActes(arrA);
           }
             if(data.editPin)setEditPin(data.editPin);
+            if(data.adminPin!==undefined)setAdminPin(data.adminPin);
+            if(data.adminEnabled!==undefined)setAdminEnabled(data.adminEnabled);
+            if(data.adminCanReports!==undefined)setAdminCanReports(data.adminCanReports);
+            if(data.adminCanNotes!==undefined)setAdminCanNotes(data.adminCanNotes);
           if(data.astreinte){
             const raw=JSON.parse(data.astreinte);
             // Convert all values to strings (medecin IDs may be numeric)
@@ -4260,6 +4278,7 @@ function CardioPlanning(){
     });
   },[medecins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({editPin});},[editPin]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,adminEnabled,adminCanReports,adminCanNotes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astreinte:JSON.stringify(astreinte)});},[astreinte]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medPins:JSON.stringify(medPins)});},[medPins]);
 
@@ -4305,9 +4324,10 @@ function CardioPlanning(){
     setHistVer(v=>v+1);
   };
   const isMedEdit=accessMode==="medecinEdit";
+  const isAdminEdit=accessMode==="adminEdit";
   // Returns true if current user can edit this specific medecin's data
-  const canEdit=(medId)=>isEdit||(isMedEdit&&editMedId===medId);
-  const isAnyEdit=isEdit||isMedEdit;
+  const canEdit=(medId)=>isEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
+  const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
   const nDays=dIM(year,month);
   const todayY=today.getFullYear(), todayM=today.getMonth(), todayD=today.getDate();
   const allDays=useMemo(()=>{
@@ -4376,6 +4396,7 @@ function CardioPlanning(){
 
   /* ── applyGarde (atomic) ── */
   const applyGarde=useCallback((medId,y2,m2,d2)=>{
+    if(accessMode==="adminEdit")return;
     const dw=dow(y2,m2,d2);
     const gardeSlot=(dw===6||dw===0)?"JOUR":"N";
     const dt=new Date(y2,m2,d2+1);
@@ -4721,6 +4742,7 @@ function CardioPlanning(){
     if(pinInput===editPin){setAccessMode("edit");setPinError(false);return;}
     const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3);
     if(medEntry){setEditMedId(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);}
+    else if(adminEnabled&&adminPin&&adminPin.length>=3&&pinInput===adminPin){setAdminAsk(true);setPinError(false);}
     else setPinError(true);
   }}}
           type="password" placeholder="PIN" style={{...S.fi,width:"100%",textAlign:"center",letterSpacing:6,fontSize:16,marginBottom:8}}/>
@@ -4734,10 +4756,18 @@ function CardioPlanning(){
               setEditMedId(parseInt(medEntry[0]));
               setAccessMode("medecinEdit");
               setPinError(false);
+            } else if(adminEnabled&&adminPin&&adminPin.length>=3&&pinInput===adminPin){
+              setAdminAsk(true);setPinError(false);
             } else {
               setPinError(true);
             }
           }}>✏️ Édition</button>
+        {adminAsk&&<div style={{marginTop:10,padding:10,borderRadius:9,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.08)"}}>
+          <div style={{fontSize:11,color:"#7c3aed",fontWeight:800,marginBottom:6}}>🗝 Accès administratif — votre prénom :</div>
+          <input value={adminNameInput} onChange={e=>setAdminNameInput(e.target.value)} placeholder="Prénom" style={{...S.fi,width:"100%",textAlign:"center",marginBottom:8}}/>
+          <button style={{width:"100%",padding:"9px",borderRadius:9,border:"none",background:"#7c3aed",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:800}}
+            onClick={()=>{const n=(adminNameInput||"").trim();if(!n)return;setAdminName(n);try{localStorage.setItem("cp6_adminName",n);}catch(e){}setAccessMode("adminEdit");setAdminAsk(false);}}>Entrer (administratif)</button>
+        </div>}
         <div style={{marginTop:14,fontSize:10,color:"var(--txt3)",textAlign:"center"}}>{APP_VERSION}</div>
       </div>
     </div>
@@ -4821,6 +4851,9 @@ header::-webkit-scrollbar { display: none; }
       {isMedEdit&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         ✏️ Mode édition restreinte — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
       </div>}
+      {isAdminEdit&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+        🗝 Édition administrative — {adminName||"?"} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
+      </div>}
 
       {/* HEADER */}
       <header style={S.hdr}>
@@ -4891,7 +4924,7 @@ header::-webkit-scrollbar { display: none; }
           </div>
           {orient==="H"
             ?<GridH allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>}
+            :<GridV allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -4974,7 +5007,7 @@ header::-webkit-scrollbar { display: none; }
            </div>}
           {orient==="H"
             ?<GridH allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>}
+            :<GridV allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -4999,6 +5032,7 @@ header::-webkit-scrollbar { display: none; }
                       {(a.id==="GARDE"||a.id==="REPOS_GARDE")&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Garde » de l'onglet Équipe</div>}
                       {a.id==="TP"&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Temps partiel » des fiches médecins</div>}
                       {a.csReport&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>📥 Proposée dans l'onglet Reports</div>}
+                      {a.adminOk&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>✏️ Modifiable par le rôle administratif</div>}
                     </div>
                     {isEdit&&<div style={{display:"flex",gap:4}}>
                       <button style={{...S.icnBtn}} onClick={()=>{setMData({...a,_new:false,sallesStr:(a.salles||[]).join(","),medStr:(a.medecinsAutorise||[]).join(",")});setModal("editActe");}}>✏️</button>
@@ -5060,7 +5094,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csActsSel={csActsSel} setCsActsSel={setCsActsSel} csActsGlobal={csActsGlobal} year={year} month={month} toast={toast}/>}
+      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csActsSel={csActsSel} setCsActsSel={setCsActsSel} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} year={year} month={month} toast={toast}/>}
       {tab==="aide"&&<HelpView/>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -5386,6 +5420,26 @@ header::-webkit-scrollbar { display: none; }
           </div>}
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
+            <div style={{fontWeight:700,color:"#7c3aed",fontSize:13,marginBottom:6}}>🗝 Rôle administratif (secrétaires, cadres)</div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un PIN partagé : à la connexion, chaque personne saisit son prénom (mémorisé sur son appareil). Le rôle peut poser, modifier et retirer les activités cochées « ✏️ administratif » sur la ligne de n'importe quel médecin.</div>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <input type="password" id="nap" placeholder={adminPin?"PIN défini — nouveau PIN":"Définir le PIN"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
+              <button style={S.btnP} onClick={()=>{const v=document.getElementById("nap").value;if(v.length>=4){setAdminPin(v);toast("PIN administratif mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:8}}>
+              <label style={{display:"flex",gap:8,alignItems:"center",fontSize:12,color:"var(--txt2)",cursor:"pointer"}}><input type="checkbox" checked={adminEnabled} onChange={e=>setAdminEnabled(e.target.checked)} style={{width:14,height:14}}/>Rôle activé (décocher suspend l'accès sans changer le PIN)</label>
+              <label style={{display:"flex",gap:8,alignItems:"center",fontSize:12,color:"var(--txt2)",cursor:"pointer"}}><input type="checkbox" checked={adminCanReports} onChange={e=>setAdminCanReports(e.target.checked)} style={{width:14,height:14}}/>Peut remplir les semaines blanches (onglet Reports)</label>
+              <label style={{display:"flex",gap:8,alignItems:"center",fontSize:12,color:"var(--txt2)",cursor:"pointer"}}><input type="checkbox" checked={adminCanNotes} onChange={e=>setAdminCanNotes(e.target.checked)} style={{width:14,height:14}}/>Peut ajouter des notes 📝 sur les cases</label>
+            </div>
+            <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>Activités ouvertes au rôle</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:4}}>
+              {actes.filter(a=>a.adminOk===true).map(a=><span key={a.id} style={{padding:"1px 7px",borderRadius:5,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a.color,color:"#111"}}>{a.short}</span>)}
+              {actes.filter(a=>a.adminOk===true).length===0&&<span style={{fontSize:11,color:"#b45309",fontWeight:700}}>aucune — cochez « ✏️ administratif » sur les activités concernées</span>}
+            </div>
+            <div style={{fontSize:9,color:"var(--txt3)"}}>⚙ Se gère dans l'onglet Activités (case « ✏️ Modifiable par le rôle administratif »).</div>
+          </div>}
+
+          {isEdit&&<div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>📆 Période d'affichage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>Tous les onglets affichent le planning par blocs de cette durée, alignés sur le mois de départ.</div>
             <div style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"center"}}>
@@ -5615,7 +5669,7 @@ header::-webkit-scrollbar { display: none; }
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button style={{...S.btnP,background:"#e3b341",color:"#111"}} onClick={()=>{
-                const data={plan,tourMed,planningType,notes,medecins,actes,editPin,
+                const data={plan,tourMed,planningType,notes,medecins,actes,editPin,adminPin,adminEnabled,adminCanReports,adminCanNotes,
                   exportDate:new Date().toISOString(),version:"v6"};
                 const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
                 const url=URL.createObjectURL(blob);
@@ -5908,7 +5962,7 @@ header::-webkit-scrollbar { display: none; }
           // Check if medecin is authorized for this activity
           if((a.medecinsAutorise&&a.medecinsAutorise.length)>0&&!(med&&a.medecinsAutorise.includes(med.init)))return false;
           return true;
-        });
+        }).filter(a=>!isAdminEdit||a.adminOk===true); // rôle administratif : uniquement les activités cochées ✏️
 
         const doGarde=()=>{ applyGarde(medId,y2,m2,d2); setModal(null); };
         const doAdd=(acteId,salle=null)=>{
@@ -5942,7 +5996,7 @@ header::-webkit-scrollbar { display: none; }
                     return(
                       <div key={i} style={{display:"flex",alignItems:"center",gap:3}}>
                         <Badge a={a}/>
-                        {canEditThisMed&&<button onClick={()=>{
+                        {canEditThisMed&&(!isAdminEdit||a.adminOk===true)&&<button onClick={()=>{
                           if(e.acteId==="GARDE"){
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);
                             const dt=new Date(y2,m2,d2+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd3=dt.getDate();
@@ -5964,7 +6018,7 @@ header::-webkit-scrollbar { display: none; }
 
             {canEditThisMed&&(
               <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
-                {!isNight&&canEditThisMed&&<button style={S.qBtn} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_absMode:true});setModal("absence");}}>Pose et retrait Abs sur période</button>}
+                {!isNight&&canEditThisMed&&!isAdminEdit&&<button style={S.qBtn} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_absMode:true});setModal("absence");}}>Pose et retrait Abs sur période</button>}
                 {canEditThisMed&&<button style={{...S.qBtn,borderColor:"#dc2626",background:"#fee2e2",color:"#991b1b"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_clearMode:true});setModal("clearPeriod");}}>🗑 Effacer activités sur période</button>}
                 {isEdit&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setModal(null);openPtModal(medId);}}>▶ PT {med&&med.init}</button>}
                 {canEditThisMed&&med&&(med.tourMed||med.garde)&&<button style={{...S.qBtn,borderColor:"#7c3aed",background:"#f3e8ff",color:"#6d28d9"}}
@@ -6090,7 +6144,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
               <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>📝 Note</div>
               <textarea value={notes[nk(medId,y2,m2,d2,slot)]||""} onChange={e=>setNotes(p=>({...p,[nk(medId,y2,m2,d2,slot)]:e.target.value}))}
-                placeholder="Note visible au survol..." readOnly={!canEditThisMed}
+                placeholder="Note visible au survol..." readOnly={!canEditThisMed||(isAdminEdit&&!adminCanNotes)}
                 style={{width:"100%",padding:"6px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)",fontSize:12,fontFamily:"'Sora',sans-serif",resize:"vertical",minHeight:48,outline:"none"}}/>
             </div>
           </Ov>
@@ -6207,6 +6261,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{gridColumn:"1/-1"}}><label style={S.fl}>Site</label><div style={{display:"flex",gap:5}}>{["tous","CHL","CHB"].map(s=><button key={s} onClick={()=>setMData(p=>({...p,site:s}))} style={{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,background:mData.site===s?"#1d4ed8":"var(--bg2)",color:mData.site===s?"#fff":"var(--txt2)"}}>{s}</button>)}</div></div>
             <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={mData.hasSalle} onChange={e=>setMData(p=>({...p,hasSalle:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>A une salle associée</label></div>
             <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.csReport} onChange={e=>setMData(p=>({...p,csReport:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>📥 Consultation à reporter (proposée dans l'onglet Reports)</label></div>
+            {!(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")&&<div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.adminOk} onChange={e=>setMData(p=>({...p,adminOk:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>✏️ Modifiable par le rôle administratif (secrétaires, cadres)</label></div>}
             <div style={{gridColumn:"1/-1"}}>
               <label style={{color:"var(--txt2)",fontSize:12,display:"block",marginBottom:3}}>↩ Colonne/ligne de reprise dans :</label>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
