@@ -6,6 +6,7 @@ const db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseD
 const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", "main") : null;
 const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? window.firebaseSetDoc : null;
 const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? window.firebaseOnSnapshot : null;
+const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? window.firebaseUpdatePaths : null;
 
 /* ════ FÉRIÉS ════ */
 function getFeries(y){
@@ -25,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.6.1 — 18/07/2026";
+const APP_VERSION="v9.7 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3763,6 +3764,25 @@ function CardioPlanning(){
   const isVac=(y,m,d)=>vacDates.has(`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`);
   const isFirstLoad=useRef(true);
   const localChange=useRef(false);
+  const planSynced=useRef(null);
+  const planPending=useRef({});
+  const planMigrated=useRef(false);
+  /* ── v9.7 : écriture du plan en delta — seules les cases modifiées partent vers Firebase,
+     la fusion se fait champ par champ côté serveur : zéro écrasement entre éditeurs simultanés ── */
+  const flushPlan=useCallback((cur)=>{
+    if(!PLANNING_DOC||!updatePaths)return;
+    const prev=planSynced.current||{};
+    const pairs=[];
+    Object.keys(cur).forEach(k=>{if(JSON.stringify(cur[k])!==JSON.stringify(prev[k])){pairs.push([["planV2",k],cur[k]]);planPending.current[k]=cur[k];}});
+    Object.keys(prev).forEach(k=>{if(!(k in cur)){pairs.push([["planV2",k],"__DELETE__"]);planPending.current[k]=null;}});
+    planSynced.current=cur;
+    if(pairs.length===0)return;
+    localChange.current=true;
+    (async()=>{
+      try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
+      catch(e){console.log("sync plan:",e);if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:cur},{merge:true})).catch(()=>{});}
+    })();
+  },[]);
 
   useEffect(()=>{
     if(!PLANNING_DOC||!onSnapshot){setFbStatus("offline");return;}
@@ -3771,8 +3791,27 @@ function CardioPlanning(){
       (snap)=>{
         if(snap.exists){
           const data=snap.data();
+          /* ── plan V2 (objet) : toujours appliqué, modifications locales en attente ré-appliquées jusqu'à confirmation ── */
+          if(data.planV2){
+            const incoming=data.planV2;
+            const merged={...incoming};
+            Object.keys(planPending.current).forEach(k=>{
+              const pv=planPending.current[k];
+              const confirmed=pv===null?!(k in incoming):JSON.stringify(incoming[k])===JSON.stringify(pv);
+              if(confirmed)delete planPending.current[k];
+              else{if(pv===null)delete merged[k];else merged[k]=pv;}
+            });
+            planSynced.current=merged;
+            setPlan(merged);
+            if(data.plan&&updatePaths)Promise.resolve(updatePaths(PLANNING_DOC,[[["plan"],"__DELETE__"]])).catch(()=>{}); // purge de l'ancien format (économie de stockage)
+          }else if(data.plan&&!planMigrated.current){
+            /* ── migration douce : première lecture de l'ancien format chaîne → écriture unique en V2 ── */
+            const legacy=JSON.parse(data.plan);
+            planSynced.current=legacy;setPlan(legacy);
+            planMigrated.current=true;
+            if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:legacy},{merge:true})).catch(e=>console.log("migration plan:",e));
+          }
           if(isFirstLoad.current||!localChange.current){
-            if(data.plan)setPlan(JSON.parse(data.plan));
             if(data.tourMed)setTourMed(JSON.parse(data.tourMed));
             if(data.planningType)setPlanningType(JSON.parse(data.planningType));
             if(data.notes)setNotes(JSON.parse(data.notes));
@@ -3929,7 +3968,8 @@ function CardioPlanning(){
       const data=d.data();
       if(!data){toast("Sauvegarde introuvable","warn");return;}
       const{_ts,...rest}=data;
-      await window.firebaseDB.collection("planning").doc("main").set(rest,{merge:true});
+      planPending.current={};planSynced.current=null;
+      await window.firebaseDB.collection("planning").doc("main").set(rest); // remplacement complet : une restauration EST l'état intégral
       toast("Sauvegarde restaurée — rechargez la page si besoin","info");
     }catch(e){console.log("restore:",e);toast("Échec de la restauration","warn");}
   },[]);
@@ -4138,7 +4178,7 @@ function CardioPlanning(){
     catch(err){console.error("Save:",err);setFbStatus("error");}
   },[]);
 
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({plan:JSON.stringify(plan)});},[plan]);
+  useEffect(()=>{if(!isFirstLoad.current)flushPlan(plan);},[plan]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourMed:JSON.stringify(tourMed)});},[tourMed]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourMins:JSON.stringify(tourMins)});},[tourMins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourMinsHard:JSON.stringify(tourMinsHard)});},[tourMinsHard]);
