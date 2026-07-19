@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.3.1 — 18/07/2026";
+var APP_VERSION = "v9.4 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3447,7 +3447,7 @@ const HELP_SECTIONS=[
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées 🎯, PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
   HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase."]}),
   HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}),
-  HTab({t:"📥 Reports",children:["outil individuel et facultatif d'aide au report de consultations : cochez vos semaines blanches, l'application propose les reports (blanches d'abord, puis créneaux à ouvrir), avec export CSV."]}))},
+  HTab({t:"📥 Reports",children:["outil individuel et facultatif : cochez vos semaines blanches, l'application propose le décalage de vos semaines à reporter (tour, absences) vers vos semaines blanches aux dates habituelles, signale ce qui est sans report possible par consultation, et liste les places libres. Export CSV."]}))},
 
  {id:"edition",icon:"🔒",title:"Modes d'accès et PIN",body:()=>HE("div",null,
   HP({children:["Trois niveaux d'accès depuis la page d'accueil :"]}),
@@ -3565,43 +3565,82 @@ function ReportsView(p){
     if(es.length>0)return "busy";
     return "free";
   };
+  const acteOf=(id)=>actes.find(a=>a.id===id);
+  /* Sur une semaine blanche, une date habituelle portant uniquement l'activité de consultation (posée par le type) est disponible : la blanche est vide de patients */
+  const slotFreeCS=(y,m,d,sl)=>{const es=getEntries(mid,y,m,d,sl);if(es.length===0)return true;if(es[0]&&es[0]._blocked)return false;return es.every(e=>myActs.indexOf(e.acteId)>=0);};
   const analysis=React.useMemo(()=>{
-    const lost=[],recvA=[],recvB=[],recvC=[],tourWeeks=[];
-    weeks.forEach(w=>{
-      const isTW=(()=>{const wm=tourMed[w.key]||{};return((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid));})();
-      if(isTW){const nb=w.days.filter(o=>isBl(o.y,o.m,o.d)).length;tourWeeks.push({key:w.key,days:w.days,nbBl:nb});}
-    });
+    /* Semaines à reporter : dates habituelles perdues (tour ou absence) hors blanche, groupées par semaine */
+    const lostByWeek={},weekOrder=[];
     days.forEach(o=>{
       const dt=new Date(o.y,o.m,o.d),dw=dt.getDay();
       if(dw===0||dw===6||isFerie(o.y,o.m,o.d))return;
       const blanche=isBl(o.y,o.m,o.d),tour=inTour(o.y,o.m,o.d);
       ["M","AM"].forEach(sl=>{
         const hab=habCS[dw]&&habCS[dw][sl];
+        if(!hab)return;
         const st=slotState(o.y,o.m,o.d,sl);
-        if(hab&&!blanche&&(tour||st==="abs"))lost.push({y:o.y,m:o.m,d:o.d,sl,why:tour?"tour":"absence"});
-        else if(blanche&&!tour&&st==="free"&&hab)recvA.push({y:o.y,m:o.m,d:o.d,sl,hab:true});
-        else if(!blanche&&!tour&&st==="free"&&!hab)(habDW.indexOf(dw)>=0?recvB:recvC).push({y:o.y,m:o.m,d:o.d,sl});
+        if(!blanche&&(tour||st==="abs")){
+          const wk=wkOf(o.y,o.m,o.d);
+          if(!lostByWeek[wk]){lostByWeek[wk]=[];weekOrder.push(wk);}
+          lostByWeek[wk].push({y:o.y,m:o.m,d:o.d,sl,dw,acte:hab,why:tour?"tour":"absence"});
+        }
       });
     });
-    /* Appariement glouton chronologique : blanches d'abord, puis offs ; préférence après la date perdue */
-    const score=(L,R)=>{const dl=new Date(L.y,L.m,L.d),dr=new Date(R.y,R.m,R.d);
-      const diff=Math.round((dr-dl)/86400000);return diff>=0?diff:(-diff+45);};
-    const usedA=new Set(),usedB=new Set(),usedC=new Set(),pairs=[];
-    lost.forEach(L=>{
-      let best=null,bestS=1e9,bestT=null,bestI=-1;
-      recvA.forEach((R,i)=>{if(usedA.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="A";bestI=i;}});
-      if(!best)recvB.forEach((R,i)=>{if(usedB.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="B";bestI=i;}});
-      if(!best)recvC.forEach((R,i)=>{if(usedC.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="C";bestI=i;}});
-      if(best){if(bestT==="A")usedA.add(bestI);else if(bestT==="B")usedB.add(bestI);else usedC.add(bestI);}
-      pairs.push({lost:L,to:best,type:bestT});
+    /* Semaines blanches d'accueil : sans tour, sans perte, au moins une date habituelle disponible */
+    const recvWeeks=weeks.filter(w=>{
+      const wm=tourMed[w.key]||{};if((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid))return false;
+      if(lostByWeek[w.key])return false;
+      return habList.some(hb=>{const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===hb.dw);
+        return o&&isBl(o.y,o.m,o.d)&&!isFerie(o.y,o.m,o.d)&&slotFreeCS(o.y,o.m,o.d,hb.sl);});
     });
-    const restA=recvA.filter((_,i)=>!usedA.has(i)),restB=recvB.filter((_,i)=>!usedB.has(i)),restC=recvC.filter((_,i)=>!usedC.has(i));
-    return {lost,pairs,restA,restB,restC,tourWeeks};
+    /* Appariement semaine → semaine blanche : toutes les dates perdues doivent y être disponibles */
+    const usedW=new Set();
+    const weekPairs=weekOrder.map(wk=>{
+      const lost=lostByWeek[wk];
+      const src=new Date(lost[0].y,lost[0].m,lost[0].d);
+      let best=null,bestS=1e9;
+      recvWeeks.forEach(w=>{
+        if(usedW.has(w.key))return;
+        const fits=lost.every(L=>{const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===L.dw);
+          return o&&isBl(o.y,o.m,o.d)&&!isFerie(o.y,o.m,o.d)&&slotFreeCS(o.y,o.m,o.d,L.sl);});
+        if(!fits)return;
+        const diff=Math.round((new Date(w.days[0].y,w.days[0].m,w.days[0].d)-src)/86400000);
+        const s=diff>=0?diff:(-diff+45);
+        if(s<bestS){bestS=s;best=w;}
+      });
+      if(best)usedW.add(best.key);
+      const dest=best?lost.map(L=>{const o=best.days.find(x=>new Date(x.y,x.m,x.d).getDay()===L.dw);return {y:o.y,m:o.m,d:o.d,sl:L.sl};}):null;
+      return {wk,lost,to:best,dest};
+    });
+    /* Sans report possible : regroupé par activité */
+    const noRepByActe={};
+    weekPairs.filter(wp=>!wp.to).forEach(wp=>wp.lost.forEach(L=>{(noRepByActe[L.acte]=noRepByActe[L.acte]||[]).push(L);}));
+    /* Places libres restantes (hors dates déjà proposées en destination) */
+    const usedKeys=new Set();weekPairs.forEach(wp=>{if(wp.dest)wp.dest.forEach(D=>usedKeys.add(dk3(D.y,D.m,D.d)+D.sl));});
+    const restHab=[],offHab=[],offAutre=[];
+    days.forEach(o=>{
+      const dt=new Date(o.y,o.m,o.d),dw=dt.getDay();
+      if(dw===0||dw===6||isFerie(o.y,o.m,o.d))return;
+      if(inTour(o.y,o.m,o.d))return;
+      const blanche=isBl(o.y,o.m,o.d);
+      ["M","AM"].forEach(sl=>{
+        if(usedKeys.has(dk3(o.y,o.m,o.d)+sl))return;
+        const hab=habCS[dw]&&habCS[dw][sl];
+        if(blanche&&hab&&slotFreeCS(o.y,o.m,o.d,sl))restHab.push({y:o.y,m:o.m,d:o.d,sl});
+        else if(!blanche&&!hab&&slotState(o.y,o.m,o.d,sl)==="free"){(habDW.indexOf(dw)>=0?offHab:offAutre).push({y:o.y,m:o.m,d:o.d,sl});}
+      });
+    });
+    const tourWeeks=[];weeks.forEach(w=>{const wm=tourMed[w.key]||{};
+      if((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid)){const nb=w.days.filter(o=>isBl(o.y,o.m,o.d)).length;tourWeeks.push({key:w.key,days:w.days,nbBl:nb});}});
+    return {weekPairs,noRepByActe,restHab,offHab,offAutre,tourWeeks};
   },[days,weeks,bl,tourMed,planningType,myActs.join(","),mid]);
   const exportCSVR=()=>{
-    const rows=[["Consultation perdue","Cause","Proposition"]];
-    analysis.pairs.forEach(pr=>rows.push([fmtD(pr.lost)+" "+pr.lost.sl,pr.lost.why==="tour"?"Semaine de tour":"Absence",
-      pr.to?(fmtD(pr.to)+" "+pr.to.sl+(pr.type==="A"?" (semaine blanche — date habituelle)":pr.type==="B"?" (ouvrir un créneau — jour habituel)":" (ouvrir un créneau — jour inhabituel)")):"3-4 patients en semaine de tour"]));
+    const rows=[["Consultation perdue","Activité","Cause","Report proposé"]];
+    analysis.weekPairs.forEach(wp=>wp.lost.forEach((L,i)=>{
+      const a2=acteOf(L.acte);
+      rows.push([fmtD(L)+" "+L.sl,a2?a2.short:L.acte,L.why==="tour"?"Semaine de tour":"Absence",
+        wp.dest?(fmtD(wp.dest[i])+" "+wp.dest[i].sl+" (semaine blanche)"):"Pas de report possible"]);
+    }));
     const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\n");
     const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
     const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="reports-consultations.csv";a.click();
@@ -3681,26 +3720,38 @@ function ReportsView(p){
         background:t.nbBl>=5?"rgba(22,163,74,.15)":t.nbBl>0?"rgba(245,158,11,.15)":"rgba(239,68,68,.12)",
         color:t.nbBl>=5?"#16a34a":t.nbBl>0?"#b45309":"#ef4444"}},
         "sem. "+t.days[0].d+" "+MOIS[t.days[0].m].slice(0,4)+" : "+(t.nbBl>=5?"✓ blanche":t.nbBl>0?t.nbBl+"/5 blanche":"non blanche")))),
-    analysis.pairs.length===0
+    analysis.weekPairs.length===0
       ?RE("div",{style:{fontSize:12,color:"#16a34a",fontWeight:700,marginBottom:10}},"✓ Aucune consultation à reporter sur la période.")
       :RE("div",{style:{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden",marginBottom:10}},
-        analysis.pairs.map((pr,i)=>RE("div",{key:i,style:{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderTop:i>0?"1px solid var(--border2)":"none",fontSize:11,flexWrap:"wrap"}},
-          RE("span",{style:{fontWeight:800,color:"var(--txt)",minWidth:120}},fmtD(pr.lost)+" "+pr.lost.sl),
-          RE("span",{style:{fontSize:9,padding:"1px 6px",borderRadius:5,fontWeight:800,background:pr.lost.why==="tour"?"rgba(29,78,216,.12)":"rgba(239,68,68,.12)",color:pr.lost.why==="tour"?"#1d4ed8":"#ef4444"}},pr.lost.why==="tour"?"tour":"absence"),
-          RE("span",{style:{color:"var(--txt3)"}},"→"),
-          pr.to
-            ?RE("span",null,RE("b",{style:{color:"var(--txt)"}},fmtD(pr.to)+" "+pr.to.sl),
-              RE("span",{style:{fontSize:9,marginLeft:6,padding:"1px 6px",borderRadius:5,fontWeight:800,
-                background:pr.type==="A"?"rgba(245,158,11,.2)":pr.type==="B"?"rgba(124,58,237,.12)":"rgba(239,68,68,.10)",color:pr.type==="A"?"#b45309":pr.type==="B"?"#7c3aed":"#ef4444"}},
-                pr.type==="A"?"date habituelle (blanche)":pr.type==="B"?"ouvrir un créneau (jour habituel)":"ouvrir un créneau (jour inhabituel)"))
-            :RE("span",{style:{color:"#ef4444",fontWeight:700}},"aucune place — 3-4 patients en semaine de tour")))),
+        analysis.weekPairs.map((wp,i)=>{
+          const f=wp.lost[0];const isT=wp.lost.some(L=>L.why==="tour");
+          return RE("div",{key:wp.wk,style:{padding:"7px 10px",borderTop:i>0?"1px solid var(--border2)":"none",fontSize:11}},
+            RE("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:3}},
+              RE("span",{style:{fontWeight:800,color:"var(--txt)"}},"Semaine du "+f.d+" "+MOIS[f.m].slice(0,4)),
+              RE("span",{style:{fontSize:9,padding:"1px 6px",borderRadius:5,fontWeight:800,background:isT?"rgba(29,78,216,.12)":"rgba(239,68,68,.12)",color:isT?"#1d4ed8":"#ef4444"}},isT?"tour":"absence"),
+              RE("span",{style:{color:"var(--txt3)"}},"→"),
+              wp.to
+                ?RE("span",{style:{fontWeight:800,color:"#16a34a"}},"semaine blanche du "+wp.to.days[0].d+" "+MOIS[wp.to.days[0].m].slice(0,4))
+                :RE("span",{style:{color:"#ef4444",fontWeight:800}},"pas de semaine blanche disponible")),
+            wp.to&&RE("div",{style:{fontSize:10,color:"var(--txt2)",lineHeight:1.7}},
+              wp.lost.map((L,k)=>{const a2=acteOf(L.acte);
+                return RE("span",{key:k,style:{marginRight:10,display:"inline-flex",alignItems:"center",gap:4}},
+                  a2&&RE("span",{style:{padding:"0 5px",borderRadius:4,fontSize:8,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a2.color,color:"#111"}},a2.short),
+                  fmtD(L)+" "+L.sl+" → "+fmtD(wp.dest[k])+" "+wp.dest[k].sl);})));
+        })),
+    Object.keys(analysis.noRepByActe).length>0&&RE("div",{style:{marginBottom:10}},
+      RE("div",{style:{fontSize:10,fontWeight:800,color:"#ef4444",textTransform:"uppercase",letterSpacing:.4,marginBottom:4}},"Sans report possible — par consultation"),
+      Object.keys(analysis.noRepByActe).map(aid=>{const a2=acteOf(aid),list2=analysis.noRepByActe[aid];
+        return RE("div",{key:aid,style:{fontSize:11,color:"var(--txt)",marginBottom:3,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}},
+          RE("span",{style:{padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a2?a2.color:"#ccc",color:"#111"}},a2?a2.short:aid),
+          RE("span",{style:{color:"var(--txt2)"}},list2.map(L=>fmtD(L)+" "+L.sl).join(" · ")));})),
     RE("div",{style:{fontSize:11,color:"var(--txt)",lineHeight:1.7,marginBottom:10}},
-      RE("b",null,"Places restantes après reports : "),
-      (analysis.restA.length+analysis.restB.length+analysis.restC.length)>0
-        ?analysis.restA.concat(analysis.restB).concat(analysis.restC).slice(0,20).map((o,i)=>RE("span",{key:i,style:{display:"inline-block",marginRight:6,fontSize:10,color:"var(--txt2)"}},fmtD(o)+" "+o.sl+(i<Math.min(analysis.restA.length+analysis.restB.length+analysis.restC.length,20)-1?" ·":"")))
-        :RE("span",{style:{color:"#b45309",fontWeight:700}},"aucun — pensez aux créneaux de 3-4 patients pendant vos semaines de tour."),
-      (analysis.restA.length+analysis.restB.length+analysis.restC.length)>0&&RE("span",{style:{color:"var(--txt3)",fontSize:10}}," → à réouvrir pour des consultations supplémentaires : d'abord vos dates habituelles en semaine blanche, puis les offs (nouveaux patients, urgences)")),
-    analysis.pairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"));
+      RE("b",null,"Places libres restantes : "),
+      (analysis.restHab.length+analysis.offHab.length+analysis.offAutre.length)===0&&RE("span",{style:{color:"#b45309",fontWeight:700}},"aucune — pensez aux créneaux de 3-4 patients pendant vos semaines de tour."),
+      analysis.restHab.length>0&&RE("div",{style:{fontSize:10,color:"var(--txt2)"}},RE("b",{style:{color:"#b45309"}},"Dates habituelles en semaine blanche (à réouvrir en priorité) : "),analysis.restHab.slice(0,16).map(o=>fmtD(o)+" "+o.sl).join(" · ")+(analysis.restHab.length>16?" …":"")),
+      analysis.offHab.length>0&&RE("div",{style:{fontSize:10,color:"var(--txt2)"}},RE("b",{style:{color:"#7c3aed"}},"Offs sur vos jours de consultation : "),analysis.offHab.slice(0,16).map(o=>fmtD(o)+" "+o.sl).join(" · ")+(analysis.offHab.length>16?" …":"")),
+      analysis.offAutre.length>0&&RE("div",{style:{fontSize:10,color:"var(--txt3)"}},RE("b",null,"Autres offs : "),analysis.offAutre.slice(0,16).map(o=>fmtD(o)+" "+o.sl).join(" · ")+(analysis.offAutre.length>16?" …":""))),
+    analysis.weekPairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"));
 }
 
 function CardioPlanning() {
