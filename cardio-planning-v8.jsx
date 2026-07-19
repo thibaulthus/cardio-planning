@@ -25,7 +25,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.6 — 18/07/2026";
+const APP_VERSION="v9.6.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -4934,7 +4934,8 @@ header::-webkit-scrollbar { display: none; }
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,color:"var(--txt)",fontSize:12}}>{a.label}</div>
                       {a.hasSalle&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.salles.join(", ")||"—"}</div>}
-                      {(a.medecinsAutorise&&a.medecinsAutorise.length)>0&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.medecinsAutorise.join(", ")}</div>}
+                      {a.id==="TP"&&<div style={{fontSize:9,color:"var(--txt3)"}}>{medecins.filter(m3=>m3.partTime===true).map(m3=>m3.init).join(", ")||"aucun médecin en temps partiel"}</div>}
+                      {a.id!=="TP"&&(a.medecinsAutorise&&a.medecinsAutorise.length)>0&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.medecinsAutorise.join(", ")}</div>}
                       {(a.id==="GARDE"||a.id==="REPOS_GARDE")&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Garde » de l'onglet Équipe</div>}
                       {a.id==="TP"&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Temps partiel » des fiches médecins</div>}
                       {a.csReport&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>📥 Proposée dans l'onglet Reports</div>}
@@ -6169,7 +6170,7 @@ header::-webkit-scrollbar { display: none; }
                 const groups=[["CHL",salleReg.filter(x=>inSite(x,"CHL")).map(x=>x.n)],
                               ["CHB",salleReg.filter(x=>inSite(x,"CHB")).map(x=>x.n)],
                               ["Autres",salleReg.filter(x=>!inSite(x,"CHL")&&!inSite(x,"CHB")).map(x=>x.n).concat(orph)]];
-                return groups.map(([g,list3])=>{
+                return groups.filter(([g0])=>mData.site==="CHL"?g0==="CHL":mData.site==="CHB"?g0==="CHB":true).map(([g,list3])=>{
                   const uniq=list3.filter((s,ix,arr)=>arr.indexOf(s)===ix).sort();
                   if(uniq.length===0)return null;
                   return <div key={g} style={{marginBottom:6}}>

@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.6 — 18/07/2026";
+var APP_VERSION = "v9.6.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -5518,7 +5518,8 @@ function CardioPlanning() {
                         React.createElement("div", { style: { flex: 1 } },
                             React.createElement("div", { style: { fontWeight: 700, color: "var(--txt)", fontSize: 12 } }, a.label),
                             a.hasSalle && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, a.salles.join(", ") || "—"),
-                            (a.medecinsAutorise && a.medecinsAutorise.length) > 0 && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, a.medecinsAutorise.join(", ")),
+                            a.id === "TP" && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, medecins.filter(function (m3) { return m3.partTime === true; }).map(function (m3) { return m3.init; }).join(", ") || "aucun m\u00E9decin en temps partiel"),
+                            a.id !== "TP" && (a.medecinsAutorise && a.medecinsAutorise.length) > 0 && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, a.medecinsAutorise.join(", ")),
                             (a.id === "GARDE" || a.id === "REPOS_GARDE") && React.createElement("div", { style: { fontSize: 9, color: "#16a34a", fontWeight: 700 } }, "\u2699 Synchronis\u00E9 avec la coche \u00AB Garde \u00BB de l'onglet \u00C9quipe"),
                             a.id === "TP" && React.createElement("div", { style: { fontSize: 9, color: "#16a34a", fontWeight: 700 } }, "\u2699 Synchronis\u00E9 avec la coche \u00AB Temps partiel \u00BB des fiches m\u00E9decins"),
                             a.csReport && React.createElement("div", { style: { fontSize: 9, color: "#7c3aed", fontWeight: 700 } }, "\uD83D\uDCE5 Propos\u00E9e dans l'onglet Reports")),
@@ -6846,7 +6847,7 @@ function CardioPlanning() {
                         var groups = [["CHL", salleReg.filter(function (x) { return inSite(x, "CHL"); }).map(function (x) { return x.n; })],
                             ["CHB", salleReg.filter(function (x) { return inSite(x, "CHB"); }).map(function (x) { return x.n; })],
                             ["Autres", salleReg.filter(function (x) { return !inSite(x, "CHL") && !inSite(x, "CHB"); }).map(function (x) { return x.n; }).concat(orph)]];
-                        return groups.map(function (_g) {
+                        return groups.filter(function (_g0) { var g0 = _g0[0]; return mData.site === "CHL" ? g0 === "CHL" : mData.site === "CHB" ? g0 === "CHB" : true; }).map(function (_g) {
                             var g = _g[0], list3 = _g[1];
                             var uniq = list3.filter(function (s, ix, arr) { return arr.indexOf(s) === ix; }).sort();
                             if (uniq.length === 0)
