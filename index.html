@@ -136,7 +136,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.8.1 — 18/07/2026";
+var APP_VERSION = "v9.8.2 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1942,6 +1942,7 @@ function PlanTypeGrid(_a) {
 }
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
 function PickMedActModal(_a) {
+    var _ao = _a.adminOnly, adminOnly = _ao === void 0 ? false : _ao;
     var mData = _a.mData, setMData = _a.setMData, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, isMedAvailable = _a.isMedAvailable, addEntry = _a.addEntry, removeEntry = _a.removeEntry, onClose = _a.onClose;
     var row = mData.row, d = mData.d, sl = mData.sl, y2 = mData.y, m2 = mData.m;
     var _b = useState(null), selMedId = _b[0], setSelMedId = _b[1];
@@ -1949,7 +1950,7 @@ function PickMedActModal(_a) {
     var rowActes = row.ids.map(function (id) { return actes.find(function (a) { return a.id === id; }); }).filter(Boolean);
     var allAuth = new Set(rowActes.flatMap(function (a) { return a.medecinsAutorise || []; }));
     var eligMeds = medecins.filter(function (m) { return allAuth.size === 0 || allAuth.has(m.init); });
-    var eligActesForMed = selMed ? rowActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); }) : [];
+    var eligActesForMed = (selMed ? rowActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); }) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
     var curOcc = [];
     row.ids.forEach(function (aid) {
         medecins.forEach(function (med) {
@@ -1986,7 +1987,7 @@ function PickMedActModal(_a) {
                         " ",
                         med.nom),
                     acte && React.createElement("span", { style: { padding: "2px 6px", borderRadius: 4, background: acte.bg, color: acte.color, fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" } }, acte.short),
-                    React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acteId); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7")));
+                    (!adminOnly || ((actes.find(function (a2) { return a2.id === acteId; }) || {}).adminOk === true)) && React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acteId); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7")));
             }))),
         !selMedId && (React.createElement(React.Fragment, null,
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Choisir un m\u00E9decin"),
@@ -2085,6 +2086,7 @@ function PickMedActModal(_a) {
 }
 /* ════ PICK MED SITE MODAL (CHL/CHB) ════ */
 function PickMedSiteModal(_a) {
+    var _ao2 = _a.adminOnly, adminOnly = _ao2 === void 0 ? false : _ao2;
     var mData = _a.mData, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, isMedAvailable = _a.isMedAvailable, addEntry = _a.addEntry, removeEntry = _a.removeEntry, onClose = _a.onClose;
     var salle = mData.salle, siteActes = mData.siteActes, d = mData.d, sl = mData.sl, y2 = mData.y, m2 = mData.m;
     var _b = useState("med"), step = _b[0], setStep = _b[1]; // med | acte | salle
@@ -2104,7 +2106,7 @@ function PickMedSiteModal(_a) {
     });
     var _d = useState(null), selBipSalle = _d[0], setSelBipSalle = _d[1];
     var bipActe = isBipCol ? actes.find(function (a) { return a.id === "BIP"; }) : null;
-    var eligActes = selMed ? (isBipCol ? [bipActe].filter(Boolean) : siteActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); })) : [];
+    var eligActes = (selMed ? (isBipCol ? [bipActe].filter(Boolean) : siteActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); })) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
     return (React.createElement(Ov, { onClose: onClose },
         React.createElement("div", { style: S.mHd },
             React.createElement("div", null,
@@ -2129,7 +2131,7 @@ function PickMedSiteModal(_a) {
                         " ",
                         med.nom),
                     React.createElement("span", { style: { fontSize: 10, color: acte.color, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" } }, acte.short),
-                    React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acte.id); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7")));
+                    (!adminOnly || acte.adminOk === true) && React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acte.id); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7")));
             }))),
         step === "med" && (React.createElement(React.Fragment, null,
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Choisir un m\u00E9decin"),
@@ -5584,12 +5586,12 @@ function CardioPlanning() {
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
-            tab === "chl" && React.createElement(SiteView, { site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "chl" && React.createElement(SiteView, { site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
-            tab === "chb" && React.createElement(SiteView, { site: "CHB", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "chb" && React.createElement(SiteView, { site: "CHB", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
                     var full = bip && ["CHB-1", "CHB-2", "CHB-3"].includes(salle) ? __spreadArray(__spreadArray([], siteActes.filter(function (a) { return a.id !== "BIP"; }), true), [bip], false) : siteActes;
@@ -5603,12 +5605,12 @@ function CardioPlanning() {
                     { label: "ETO", ids: ["ETO_CHL"], color: "#2dd4bf", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "Reveal", ids: ["REVEAL"], color: "#818cf8", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
                     { label: "EE CHL", ids: ["EE_CHL"], color: "#4ade80", salle: S_EE_CHL },
-                ].concat(actes.filter(function (a) { return acteRecapIn(a, "PLATEAU") && !a.isSystem; }).map(function (a) { return ((a.salles || []).length > 1 ? { label: a.label, ids: [a.id], color: a.color, salle: null, hasSalleChoice: true, sallesDisp: a.salles } : { label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null }); })), year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
+                ].concat(actes.filter(function (a) { return acteRecapIn(a, "PLATEAU") && !a.isSystem; }).map(function (a) { return ((a.salles || []).length > 1 ? { label: a.label, ids: [a.id], color: a.color, salle: null, hasSalleChoice: true, sallesDisp: a.salles } : { label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null }); })), year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit || isAdminEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "angio" && React.createElement(SiteView, { site: "ANGIO", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "angio" && React.createElement(SiteView, { site: "ANGIO", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
@@ -6981,8 +6983,8 @@ function CardioPlanning() {
                 }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
-        modal === "pickMedAct" && mData && React.createElement(PickMedActModal, { mData: mData, setMData: setMData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, onClose: function () { return setModal(null); } }),
-        modal === "pickMedSite" && mData && React.createElement(PickMedSiteModal, { mData: mData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, onClose: function () { return setModal(null); } }),
+        modal === "pickMedAct" && mData && React.createElement(PickMedActModal, { mData: mData, setMData: setMData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, onClose: function () { return setModal(null); } }),
+        modal === "pickMedSite" && mData && React.createElement(PickMedSiteModal, { mData: mData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, onClose: function () { return setModal(null); } }),
         modal === "editPT" && mData && React.createElement(EditPTModal, { mData: mData, setMData: setMData, medecins: medecins, actes: actes, planningType: planningType, setPlanningType: setPlanningType, onClose: function () { return setModal(null); } }),
         modal === "editActe" && mData && (React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement("div", { style: S.mHd },

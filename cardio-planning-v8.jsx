@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.8.1 — 18/07/2026";
+const APP_VERSION="v9.8.2 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -1771,14 +1771,14 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
 }
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
-function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose}){
+function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false}){
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
   const selMed=medecins.find(x=>x.id===selMedId);
   const rowActes=row.ids.map(id=>actes.find(a=>a.id===id)).filter(Boolean);
   const allAuth=new Set(rowActes.flatMap(a=>a.medecinsAutorise||[]));
   const eligMeds=medecins.filter(m=>allAuth.size===0||allAuth.has(m.init));
-  const eligActesForMed=selMed?rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)):[];
+  const eligActesForMed=(selMed?rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)):[]).filter(a=>!adminOnly||a.adminOk===true);
 
   const curOcc=[];
   row.ids.forEach(aid=>{
@@ -1811,7 +1811,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
               <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
               {acte&&<span style={{padding:"2px 6px",borderRadius:4,background:acte.bg,color:acte.color,fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>}
-              <button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>
+              {(!adminOnly||((actes.find(a2=>a2.id===acteId)||{}).adminOk===true))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
             </div>
           ))}
         </div>
@@ -1957,7 +1957,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
 }
 
 /* ════ PICK MED SITE MODAL (CHL/CHB) ════ */
-function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose}){
+function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false}){
   const {salle,siteActes,d,sl,y:y2,m:m2}=mData;
   const [step,setStep]=useState("med"); // med | acte | salle
   const [selMedId,setSelMedId]=useState(null);
@@ -1976,7 +1976,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
   });
   const [selBipSalle,setSelBipSalle]=useState(null);
   const bipActe=isBipCol?actes.find(a=>a.id==="BIP"):null;
-  const eligActes=selMed?(isBipCol?[bipActe].filter(Boolean):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init))):[];
+  const eligActes=(selMed?(isBipCol?[bipActe].filter(Boolean):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init))):[]).filter(a=>!adminOnly||a.adminOk===true);
 
   return(
     <Ov onClose={onClose}>
@@ -1995,7 +1995,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12}}>{med.prenom} {med.nom}</span>
               <span style={{fontSize:10,color:acte.color,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>
-              <button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>
+              {(!adminOnly||acte.adminOk===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
             </div>
           ))}
         </div>
@@ -4934,11 +4934,11 @@ header::-webkit-scrollbar { display: none; }
       {/* TOUR MÉDICAL */}
       {tab==="tourmedical"&&<TourTab tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
 
-      {tab==="chl"&&<SiteView site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} notes={notes}
+      {tab==="chl"&&<SiteView site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
-      {tab==="chb"&&<SiteView site="CHB" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
+      {tab==="chb"&&<SiteView site="CHB" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           const full=bip&&["CHB-1","CHB-2","CHB-3"].includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
@@ -4954,12 +4954,12 @@ header::-webkit-scrollbar { display: none; }
           {label:"EE CHL",ids:["EE_CHL"],color:"#4ade80",salle:S_EE_CHL},
         ].concat(actes.filter(a=>acteRecapIn(a,"PLATEAU")&&!a.isSystem).map(a=>((a.salles||[]).length>1?{label:a.label,ids:[a.id],color:a.color,salle:null,hasSalleChoice:true,sallesDisp:a.salles}:{label:a.label,ids:[a.id],color:a.color,salle:(a.salles&&a.salles[0])||null})))}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
-        getEntries={getEntries} allDays={allDays} isEdit={isEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} isEdit={isEdit||isAdminEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc}
-        allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} notes={notes}
+        allDays={allDays} isEdit={isEdit||isAdminEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
       {false&&null&&<ActTabView title="🔬 PT Angio" titleColor="#c084fc"
@@ -6247,8 +6247,8 @@ header::-webkit-scrollbar { display: none; }
   onApply={p=>{applyAbsence(p);setModal(null);}}
   onRemove={p=>{removeAbsence(p);setModal(null);}}
   onClose={()=>setModal(null)}/></Ov>}
-      {modal==="pickMedAct"&&mData&&<PickMedActModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} onClose={()=>setModal(null)}/>}
-      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} onClose={()=>setModal(null)}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
       {modal==="editActe"&&mData&&(
