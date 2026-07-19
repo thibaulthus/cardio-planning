@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.8 — 18/07/2026";
+const APP_VERSION="v9.8.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3648,6 +3648,7 @@ function CardioPlanning(){
   const [adminName,setAdminName]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
   const [adminAsk,setAdminAsk]=useState(false);
   const [adminNameInput,setAdminNameInput]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
+  const [showPins,setShowPins]=useState(false);
   const [editMedId,setEditMedId]=useState(null); // medecin logged in with personal PIN
   const [tab,setTab]=useState("planning");
   const [ym,setYM]=useState(()=>({year:new Date().getFullYear(),month:new Date().getMonth()}));
@@ -3665,7 +3666,9 @@ function CardioPlanning(){
   const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
   useEffect(()=>{ try{ localStorage.setItem("cp6_taborder",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
-  const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t=>t[0]===id)).filter(Boolean);
+  const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t=>t[0]===id)).filter(Boolean)
+    .filter(([tid])=>!(accessMode==="adminEdit"&&(tid==="partage"||tid==="equipe")));
+  useEffect(()=>{if(accessMode==="adminEdit"&&(tab==="partage"||tab==="equipe"))setTab("planning");},[accessMode,tab]);
 
   const [modal,setModal]=useState(null);
   const [mData,setMData]=useState(null);
@@ -4859,7 +4862,7 @@ header::-webkit-scrollbar { display: none; }
       <header style={S.hdr}>
         <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
           <span onClick={()=>setAccessMode("ask")} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
-          {isAnyEdit&&<div style={{display:"flex",gap:3}}>
+          {(isEdit||isMedEdit)&&<div style={{display:"flex",gap:3}}>
             <button onClick={doUndo} disabled={!canUndo} title="Annuler (retour arrière)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canUndo?"rgba(255,255,255,.1)":"transparent",color:canUndo?"#f0f6fc":"#484f58",cursor:canUndo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↶</button>
             <button onClick={doRedo} disabled={!canRedo} title="Rétablir (retour avant)"
@@ -4914,7 +4917,7 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
             </div>
           </div>
-          {isAnyEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
+          {(isEdit||isMedEdit)&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
             <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
           </div>}
           <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8,alignItems:"center"}}>
@@ -5046,7 +5049,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="equipe"&&(
+      {tab==="equipe"&&accessMode!=="adminEdit"&&(
         <div>
           <div style={S.bar}><h2 style={S.mTit}>👥 Équipe</h2><div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
       {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
@@ -5294,8 +5297,8 @@ header::-webkit-scrollbar { display: none; }
                           <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{d} <span style={{fontSize:9,fontWeight:600}}>{MOIS[m].slice(0,4)}</span></div>
                           <div style={{fontSize:9,color:we?"#92400e":isT?"var(--today-c)":"var(--txt3)",fontWeight:600}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]}</div>
                         </td>
-                        <td style={{...S.td,padding:4,cursor:isAnyEdit?"pointer":"default",...(hasExc?{outline:"2px solid #7c3aed",outlineOffset:-2}:{})}}
-                          onClick={isAnyEdit?()=>{setAstPickModal({dayKey:dk,wKey:wk,isWeek:false,label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]+" "+y});setAstSearch("");}:undefined}>
+                        <td style={{...S.td,padding:4,cursor:(isEdit||isMedEdit)?"pointer":"default",...(hasExc?{outline:"2px solid #7c3aed",outlineOffset:-2}:{})}}
+                          onClick={(isEdit||isMedEdit)?()=>{setAstPickModal({dayKey:dk,wKey:wk,isWeek:false,label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]+" "+y});setAstSearch("");}:undefined}>
                           {med?(<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:med.color+"22"}}>
                             <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{med.init}</div>
                             <span style={{fontSize:12,fontWeight:600,color:isAbsMed?"#ef4444":"var(--txt)"}}>{med.prenom} {med.nom}</span>
@@ -5402,7 +5405,7 @@ header::-webkit-scrollbar { display: none; }
       })()}
 
       {tab==="stats"&&isEdit&&<StatsTab medecins={medecins} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
-      {tab==="partage"&&(
+      {tab==="partage"&&accessMode!=="adminEdit"&&(
         <div style={{maxWidth:500}}>
           <h2 style={{...S.mTit,marginBottom:16}}>⚙️ Paramètres <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2>
 
@@ -5437,6 +5440,21 @@ header::-webkit-scrollbar { display: none; }
               {actes.filter(a=>a.adminOk===true).length===0&&<span style={{fontSize:11,color:"#b45309",fontWeight:700}}>aucune — cochez « ✏️ administratif » sur les activités concernées</span>}
             </div>
             <div style={{fontSize:9,color:"var(--txt3)"}}>⚙ Se gère dans l'onglet Activités (case « ✏️ Modifiable par le rôle administratif »).</div>
+          </div>}
+
+          {isEdit&&<div style={{...S.card,marginBottom:10}}>
+            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>👁 Récupération des codes PIN</div>
+            {!showPins
+              ?<button style={S.btnP} onClick={()=>{const v=window.prompt("Retapez le PIN éditeur pour afficher tous les codes :");if(v===editPin)setShowPins(true);else if(v!==null)toast("PIN incorrect","warn");}}>Afficher tous les codes</button>
+              :<div>
+                <div style={{fontSize:12,color:"var(--txt)",lineHeight:1.9}}>
+                  <div><b>Éditeur :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{editPin}</span></div>
+                  <div><b>Administratif :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{adminPin||"— non défini —"}</span></div>
+                  {Object.entries(medPins).filter(([,p2])=>p2&&p2.length>=3).map(([mid2,p2])=>{const m2=medecins.find(x=>String(x.id)===String(mid2));return <div key={mid2}><b>{m2?m2.init:mid2} :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{p2}</span></div>;})}
+                  {Object.entries(medPins).filter(([,p2])=>p2&&p2.length>=3).length===0&&<div style={{color:"var(--txt3)"}}>Aucun PIN médecin défini.</div>}
+                </div>
+                <button style={{...S.qBtn,marginTop:8}} onClick={()=>setShowPins(false)}>Masquer</button>
+              </div>}
           </div>}
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
@@ -5962,7 +5980,7 @@ header::-webkit-scrollbar { display: none; }
           // Check if medecin is authorized for this activity
           if((a.medecinsAutorise&&a.medecinsAutorise.length)>0&&!(med&&a.medecinsAutorise.includes(med.init)))return false;
           return true;
-        }).filter(a=>!isAdminEdit||a.adminOk===true); // rôle administratif : uniquement les activités cochées ✏️
+        }).filter(a=>!isAdminEdit||a.adminOk===true||a.id==="ABSENCE"||a.id==="FORMATION"); // rôle administratif : activités cochées ✏️ + absences/formations
 
         const doGarde=()=>{ applyGarde(medId,y2,m2,d2); setModal(null); };
         const doAdd=(acteId,salle=null)=>{
@@ -5996,7 +6014,7 @@ header::-webkit-scrollbar { display: none; }
                     return(
                       <div key={i} style={{display:"flex",alignItems:"center",gap:3}}>
                         <Badge a={a}/>
-                        {canEditThisMed&&(!isAdminEdit||a.adminOk===true)&&<button onClick={()=>{
+                        {canEditThisMed&&(!isAdminEdit||a.adminOk===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
                           if(e.acteId==="GARDE"){
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);
                             const dt=new Date(y2,m2,d2+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd3=dt.getDate();
@@ -6018,10 +6036,10 @@ header::-webkit-scrollbar { display: none; }
 
             {canEditThisMed&&(
               <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
-                {!isNight&&canEditThisMed&&!isAdminEdit&&<button style={S.qBtn} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_absMode:true});setModal("absence");}}>Pose et retrait Abs sur période</button>}
-                {canEditThisMed&&<button style={{...S.qBtn,borderColor:"#dc2626",background:"#fee2e2",color:"#991b1b"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_clearMode:true});setModal("clearPeriod");}}>🗑 Effacer activités sur période</button>}
+                {!isNight&&canEditThisMed&&<button style={S.qBtn} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_absMode:true});setModal("absence");}}>Pose et retrait Abs sur période</button>}
+                {canEditThisMed&&!isAdminEdit&&<button style={{...S.qBtn,borderColor:"#dc2626",background:"#fee2e2",color:"#991b1b"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_clearMode:true});setModal("clearPeriod");}}>🗑 Effacer activités sur période</button>}
                 {isEdit&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setModal(null);openPtModal(medId);}}>▶ PT {med&&med.init}</button>}
-                {canEditThisMed&&med&&(med.tourMed||med.garde)&&<button style={{...S.qBtn,borderColor:"#7c3aed",background:"#f3e8ff",color:"#6d28d9"}}
+                {canEditThisMed&&!isAdminEdit&&med&&(med.tourMed||med.garde)&&<button style={{...S.qBtn,borderColor:"#7c3aed",background:"#f3e8ff",color:"#6d28d9"}}
                   onClick={()=>{setModal("prefs");}}>
                   ⚙️ Préférences tour & garde…
                 </button>}

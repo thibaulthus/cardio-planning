@@ -136,7 +136,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.8 — 18/07/2026";
+var APP_VERSION = "v9.8.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3836,6 +3836,7 @@ function CardioPlanning() {
     var _anm = useState(function () { try { return localStorage.getItem("cp6_adminName") || ""; } catch (e) { return ""; } }), adminName = _anm[0], setAdminName = _anm[1];
     var _aa = useState(false), adminAsk = _aa[0], setAdminAsk = _aa[1];
     var _ani = useState(function () { try { return localStorage.getItem("cp6_adminName") || ""; } catch (e) { return ""; } }), adminNameInput = _ani[0], setAdminNameInput = _ani[1];
+    var _sp = useState(false), showPins = _sp[0], setShowPins = _sp[1];
     var _e = useState(null), editMedId = _e[0], setEditMedId = _e[1]; // medecin logged in with personal PIN
     var _f = useState("planning"), tab = _f[0], setTab = _f[1];
     var _g = useState(function () { return ({ year: new Date().getFullYear(), month: new Date().getMonth() }); }), ym = _g[0], setYM = _g[1];
@@ -3879,7 +3880,10 @@ function CardioPlanning() {
         localStorage.setItem("cp6_taborder", JSON.stringify(tabOrder));
     }
     catch (_a) { } }, [tabOrder]);
-    var orderedTabs = tabOrder.map(function (id) { return DEFAULT_TABS.find(function (t) { return t[0] === id; }); }).filter(Boolean);
+    var orderedTabs = tabOrder.map(function (id) { return DEFAULT_TABS.find(function (t) { return t[0] === id; }); }).filter(Boolean)
+        .filter(function (_t) { return !(accessMode === "adminEdit" && (_t[0] === "partage" || _t[0] === "equipe")); });
+    useEffect(function () { if (accessMode === "adminEdit" && (tab === "partage" || tab === "equipe"))
+        setTab("planning"); }, [accessMode, tab]);
     var _m = useState(null), modal = _m[0], setModal = _m[1];
     var _o = useState(null), mData = _o[0], setMData = _o[1];
     var _q = useState(null), notif = _q[0], setNotif = _q[1];
@@ -5527,7 +5531,7 @@ function CardioPlanning() {
         React.createElement("header", { style: S.hdr },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexShrink: 0 } },
                 React.createElement("span", { onClick: function () { return setAccessMode("ask"); }, title: "Retour \u00E0 l'accueil", style: { fontSize: 20, color: "#f85149", cursor: "pointer" } }, "\u2665"),
-                isAnyEdit && React.createElement("div", { style: { display: "flex", gap: 3 } },
+                (isEdit || isMedEdit) && React.createElement("div", { style: { display: "flex", gap: 3 } },
                     React.createElement("button", { onClick: doUndo, disabled: !canUndo, title: "Annuler (retour arri\u00E8re)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canUndo ? "rgba(255,255,255,.1)" : "transparent", color: canUndo ? "#f0f6fc" : "#484f58", cursor: canUndo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B6"),
                     React.createElement("button", { onClick: doRedo, disabled: !canRedo, title: "R\u00E9tablir (retour avant)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canRedo ? "rgba(255,255,255,.1)" : "transparent", color: canRedo ? "#f0f6fc" : "#484f58", cursor: canRedo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B7")),
                 React.createElement("div", null,
@@ -5570,7 +5574,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
-                isAnyEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 8 } },
+                (isEdit || isMedEdit) && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 8 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type")),
                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8, alignItems: "center" } },
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginRight: 4 } }, "Filtre:"),
@@ -5673,7 +5677,7 @@ function CardioPlanning() {
                             React.createElement("button", { style: __assign({}, S.icnBtn), onClick: function () { setMData(__assign(__assign({}, a), { _new: false, sallesStr: (a.salles || []).join(","), medStr: (a.medecinsAutorise || []).join(",") })); setModal("editActe"); } }, "\u270F\uFE0F"),
                             !a.isSystem && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#fff1f2", border: "1px solid #fecdd3", color: "#dc2626" }), onClick: function () { if (confirm("Supprimer \"".concat(a.label, "\" ?")))
                                     setActes(function (p) { return p.filter(function (x) { return x.id !== a.id; }); }); } }, "\uD83D\uDDD1\uFE0F")))); })))); }))),
-            tab === "equipe" && (React.createElement("div", null,
+            tab === "equipe" && accessMode !== "adminEdit" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit }, "\uD83D\uDC65 \u00C9quipe"),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
@@ -5962,7 +5966,7 @@ function CardioPlanning() {
                                             " ",
                                             React.createElement("span", { style: { fontSize: 9, fontWeight: 600 } }, MOIS[m].slice(0, 4))),
                                         React.createElement("div", { style: { fontSize: 9, color: we ? "#92400e" : isT ? "var(--today-c)" : "var(--txt3)", fontWeight: 600 } }, ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2])),
-                                    React.createElement("td", { style: __assign(__assign(__assign({}, S.td), { padding: 4, cursor: isAnyEdit ? "pointer" : "default" }), (hasExc ? { outline: "2px solid #7c3aed", outlineOffset: -2 } : {})), onClick: isAnyEdit ? function () { setAstPickModal({ dayKey: dk, wKey: wk, isWeek: false, label: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2] + " " + d + " " + MOIS[m] + " " + y }); setAstSearch(""); } : undefined }, med ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 6, background: med.color + "22" } },
+                                    React.createElement("td", { style: __assign(__assign(__assign({}, S.td), { padding: 4, cursor: (isEdit || isMedEdit) ? "pointer" : "default" }), (hasExc ? { outline: "2px solid #7c3aed", outlineOffset: -2 } : {})), onClick: (isEdit || isMedEdit) ? function () { setAstPickModal({ dayKey: dk, wKey: wk, isWeek: false, label: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2] + " " + d + " " + MOIS[m] + " " + y }); setAstSearch(""); } : undefined }, med ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 6, background: med.color + "22" } },
                                         React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, med.init),
                                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: isAbsMed ? "#ef4444" : "var(--txt)" } },
                                             med.prenom,
@@ -6071,7 +6075,7 @@ function CardioPlanning() {
                         !isWeek && dayKey && astreinte[dayKey] !== undefined && (React.createElement("button", { onClick: function () { setAstreinte(function (p) { var n = __assign({}, p); delete n[dayKey]; return n; }); setAstPickModal(null); }, style: { marginTop: 8, width: "100%", padding: "6px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", cursor: "pointer", color: "var(--txt3)", fontSize: 11 } }, "\u21BA Supprimer exception \u2014 revenir \u00E0 la semaine")))));
             })(),
             tab === "stats" && isEdit && React.createElement(StatsTab, { medecins: medecins, actes: actes, plan: plan, year: year, month: month, darkMode: darkMode, setDarkMode: setDarkMode, tourMed: tourMed }),
-            tab === "partage" && (React.createElement("div", { style: { maxWidth: 500 } },
+            tab === "partage" && accessMode !== "adminEdit" && (React.createElement("div", { style: { maxWidth: 500 } },
                 React.createElement("h2", { style: __assign(__assign({}, S.mTit), { marginBottom: 16 }) },
                     "\u2699\uFE0F Param\u00E8tres ",
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
@@ -6117,6 +6121,20 @@ function CardioPlanning() {
                         actes.filter(function (a) { return a.adminOk === true; }).map(function (a) { return React.createElement("span", { key: a.id, style: { padding: "1px 7px", borderRadius: 5, fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: a.color, color: "#111" } }, a.short); }),
                         actes.filter(function (a) { return a.adminOk === true; }).length === 0 && React.createElement("span", { style: { fontSize: 11, color: "#b45309", fontWeight: 700 } }, "aucune \u2014 cochez \u00AB \u270F\uFE0F administratif \u00BB sur les activit\u00E9s concern\u00E9es")),
                     React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "\u2699 Se g\u00E8re dans l'onglet Activit\u00E9s (case \u00AB \u270F\uFE0F Modifiable par le r\u00F4le administratif \u00BB).")),
+                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDC41 R\u00E9cup\u00E9ration des codes PIN"),
+                    !showPins
+                        ? React.createElement("button", { style: S.btnP, onClick: function () { var v = window.prompt("Retapez le PIN \u00E9diteur pour afficher tous les codes :"); if (v === editPin)
+                                setShowPins(true);
+                            else if (v !== null)
+                                toast("PIN incorrect", "warn"); } }, "Afficher tous les codes")
+                        : React.createElement("div", null,
+                            React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", lineHeight: 1.9 } },
+                                React.createElement("div", null, React.createElement("b", null, "\u00C9diteur : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, editPin)),
+                                React.createElement("div", null, React.createElement("b", null, "Administratif : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, adminPin || "\u2014 non d\u00E9fini \u2014")),
+                                Object.entries(medPins).filter(function (_p) { return _p[1] && _p[1].length >= 3; }).map(function (_p) { var m2 = medecins.find(function (x) { return String(x.id) === String(_p[0]); }); return React.createElement("div", { key: _p[0] }, React.createElement("b", null, (m2 ? m2.init : _p[0]) + " : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, _p[1])); }),
+                                Object.entries(medPins).filter(function (_p) { return _p[1] && _p[1].length >= 3; }).length === 0 && React.createElement("div", { style: { color: "var(--txt3)" } }, "Aucun PIN m\u00E9decin d\u00E9fini.")),
+                            React.createElement("button", { style: __assign(__assign({}, S.qBtn), { marginTop: 8 }), onClick: function () { return setShowPins(false); } }, "Masquer"))),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCC6 P\u00E9riode d'affichage"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Tous les onglets affichent le planning par blocs de cette dur\u00E9e, align\u00E9s sur le mois de d\u00E9part."),
@@ -6688,7 +6706,7 @@ function CardioPlanning() {
                 if ((a.medecinsAutorise && a.medecinsAutorise.length) > 0 && !(med && a.medecinsAutorise.includes(med.init)))
                     return false;
                 return true;
-            }).filter(function (a) { return !isAdminEdit || a.adminOk === true; }); // rôle administratif : uniquement les activités cochées ✏️
+            }).filter(function (a) { return !isAdminEdit || a.adminOk === true || a.id === "ABSENCE" || a.id === "FORMATION"; }); // rôle administratif : activités cochées ✏️ + absences/formations
             var doGarde = function () { applyGarde(medId, y2, m2, d2); setModal(null); };
             var doAdd = function (acteId, salle) {
                 if (salle === void 0) { salle = null; }
@@ -6734,7 +6752,7 @@ function CardioPlanning() {
                             return null;
                         return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 3 } },
                             React.createElement(Badge, { a: a }),
-                            canEditThisMed && (!isAdminEdit || a.adminOk === true) && React.createElement("button", { onClick: function () {
+                            canEditThisMed && (!isAdminEdit || a.adminOk === true || a.id === "ABSENCE" || a.id === "FORMATION") && React.createElement("button", { onClick: function () {
                                     if (e.acteId === "GARDE") {
                                         removeEntry(medId, y2, m2, d2, slot, e.acteId);
                                         var dt = new Date(y2, m2, d2 + 1);
@@ -6757,12 +6775,12 @@ function CardioPlanning() {
                     React.createElement("span", null, "\u26A0\uFE0F"),
                     React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } }, "Ce m\u00E9decin a d\u00E9j\u00E0 une activit\u00E9 sur ce cr\u00E9neau."))),
                 canEditThisMed && (React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } },
-                    !isNight && canEditThisMed && !isAdminEdit && React.createElement("button", { style: S.qBtn, onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _absMode: true }); setModal("absence"); } }, "Pose et retrait Abs sur p\u00E9riode"),
-                    canEditThisMed && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _clearMode: true }); setModal("clearPeriod"); } }, "\uD83D\uDDD1 Effacer activit\u00E9s sur p\u00E9riode"),
+                    !isNight && canEditThisMed && React.createElement("button", { style: S.qBtn, onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _absMode: true }); setModal("absence"); } }, "Pose et retrait Abs sur p\u00E9riode"),
+                    canEditThisMed && !isAdminEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _clearMode: true }); setModal("clearPeriod"); } }, "\uD83D\uDDD1 Effacer activit\u00E9s sur p\u00E9riode"),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setModal(null); openPtModal(medId); } },
                         "\u25B6 PT ",
                         med && med.init),
-                    canEditThisMed && med && (med.tourMed || med.garde) && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#7c3aed", background: "#f3e8ff", color: "#6d28d9" }), onClick: function () { setModal("prefs"); } }, "\u2699\uFE0F Pr\u00E9f\u00E9rences tour & garde\u2026"),
+                    canEditThisMed && !isAdminEdit && med && (med.tourMed || med.garde) && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#7c3aed", background: "#f3e8ff", color: "#6d28d9" }), onClick: function () { setModal("prefs"); } }, "\u2699\uFE0F Pr\u00E9f\u00E9rences tour & garde\u2026"),
                     canEditThisMed && med && (function () {
                         var wkC = wKey(y2, m2, d2), wmC = tourMed[wkC] || { HC: [], USIC: [] };
                         var isTourWk = __spreadArray(__spreadArray([], (wmC.HC || []), true), (wmC.USIC || []), true).includes(medId);
