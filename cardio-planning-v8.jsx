@@ -25,7 +25,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.3 — 18/07/2026";
+const APP_VERSION="v9.3.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3384,6 +3384,7 @@ function ReportsView(p){
     const e=(pt[dw]||{})[sl];if(e&&e[0]&&myActs.indexOf(e[0])>=0){if(!habCS[dw])habCS[dw]={};habCS[dw][sl]=e[0];}
   }));
   const habList=[];Object.keys(habCS).forEach(dw=>Object.keys(habCS[dw]).forEach(sl=>habList.push({dw:+dw,sl})));
+  const habDW=Object.keys(habCS).map(Number); // jours de la semaine avec consultation habituelle
   /* ── Analyse ── */
   const JR=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
   const fmtD=(o)=>JR[new Date(o.y,o.m,o.d).getDay()]+" "+o.d+" "+MOIS[o.m].slice(0,4);
@@ -3395,7 +3396,7 @@ function ReportsView(p){
     return "free";
   };
   const analysis=React.useMemo(()=>{
-    const lost=[],recvA=[],recvB=[],tourWeeks=[];
+    const lost=[],recvA=[],recvB=[],recvC=[],tourWeeks=[];
     weeks.forEach(w=>{
       const isTW=(()=>{const wm=tourMed[w.key]||{};return((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid));})();
       if(isTW){const nb=w.days.filter(o=>isBl(o.y,o.m,o.d)).length;tourWeeks.push({key:w.key,days:w.days,nbBl:nb});}
@@ -3409,27 +3410,28 @@ function ReportsView(p){
         const st=slotState(o.y,o.m,o.d,sl);
         if(hab&&!blanche&&(tour||st==="abs"))lost.push({y:o.y,m:o.m,d:o.d,sl,why:tour?"tour":"absence"});
         else if(blanche&&!tour&&st==="free"&&hab)recvA.push({y:o.y,m:o.m,d:o.d,sl,hab:true});
-        else if(!blanche&&!tour&&st==="free"&&!hab)recvB.push({y:o.y,m:o.m,d:o.d,sl});
+        else if(!blanche&&!tour&&st==="free"&&!hab)(habDW.indexOf(dw)>=0?recvB:recvC).push({y:o.y,m:o.m,d:o.d,sl});
       });
     });
     /* Appariement glouton chronologique : blanches d'abord, puis offs ; préférence après la date perdue */
     const score=(L,R)=>{const dl=new Date(L.y,L.m,L.d),dr=new Date(R.y,R.m,R.d);
       const diff=Math.round((dr-dl)/86400000);return diff>=0?diff:(-diff+45);};
-    const usedA=new Set(),usedB=new Set(),pairs=[];
+    const usedA=new Set(),usedB=new Set(),usedC=new Set(),pairs=[];
     lost.forEach(L=>{
       let best=null,bestS=1e9,bestT=null,bestI=-1;
       recvA.forEach((R,i)=>{if(usedA.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="A";bestI=i;}});
       if(!best)recvB.forEach((R,i)=>{if(usedB.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="B";bestI=i;}});
-      if(best){if(bestT==="A")usedA.add(bestI);else usedB.add(bestI);}
+      if(!best)recvC.forEach((R,i)=>{if(usedC.has(i))return;const s=score(L,R);if(s<bestS){bestS=s;best=R;bestT="C";bestI=i;}});
+      if(best){if(bestT==="A")usedA.add(bestI);else if(bestT==="B")usedB.add(bestI);else usedC.add(bestI);}
       pairs.push({lost:L,to:best,type:bestT});
     });
-    const restA=recvA.filter((_,i)=>!usedA.has(i)),restB=recvB.filter((_,i)=>!usedB.has(i));
-    return {lost,pairs,restA,restB,tourWeeks};
+    const restA=recvA.filter((_,i)=>!usedA.has(i)),restB=recvB.filter((_,i)=>!usedB.has(i)),restC=recvC.filter((_,i)=>!usedC.has(i));
+    return {lost,pairs,restA,restB,restC,tourWeeks};
   },[days,weeks,bl,tourMed,planningType,myActs.join(","),mid]);
   const exportCSVR=()=>{
     const rows=[["Consultation perdue","Cause","Proposition"]];
     analysis.pairs.forEach(pr=>rows.push([fmtD(pr.lost)+" "+pr.lost.sl,pr.lost.why==="tour"?"Semaine de tour":"Absence",
-      pr.to?(fmtD(pr.to)+" "+pr.to.sl+(pr.type==="A"?" (semaine blanche — date habituelle)":" (ouvrir un créneau)")):"3-4 patients en semaine de tour"]));
+      pr.to?(fmtD(pr.to)+" "+pr.to.sl+(pr.type==="A"?" (semaine blanche — date habituelle)":pr.type==="B"?" (ouvrir un créneau — jour habituel)":" (ouvrir un créneau — jour inhabituel)")):"3-4 patients en semaine de tour"]));
     const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\n");
     const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
     const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="reports-consultations.csv";a.click();
@@ -3519,15 +3521,15 @@ function ReportsView(p){
           pr.to
             ?RE("span",null,RE("b",{style:{color:"var(--txt)"}},fmtD(pr.to)+" "+pr.to.sl),
               RE("span",{style:{fontSize:9,marginLeft:6,padding:"1px 6px",borderRadius:5,fontWeight:800,
-                background:pr.type==="A"?"rgba(245,158,11,.2)":"rgba(124,58,237,.12)",color:pr.type==="A"?"#b45309":"#7c3aed"}},
-                pr.type==="A"?"date habituelle (blanche)":"ouvrir un créneau"))
+                background:pr.type==="A"?"rgba(245,158,11,.2)":pr.type==="B"?"rgba(124,58,237,.12)":"rgba(239,68,68,.10)",color:pr.type==="A"?"#b45309":pr.type==="B"?"#7c3aed":"#ef4444"}},
+                pr.type==="A"?"date habituelle (blanche)":pr.type==="B"?"ouvrir un créneau (jour habituel)":"ouvrir un créneau (jour inhabituel)"))
             :RE("span",{style:{color:"#ef4444",fontWeight:700}},"aucune place — 3-4 patients en semaine de tour")))),
     RE("div",{style:{fontSize:11,color:"var(--txt)",lineHeight:1.7,marginBottom:10}},
       RE("b",null,"Places restantes après reports : "),
-      (analysis.restA.length+analysis.restB.length)>0
-        ?analysis.restA.concat(analysis.restB).slice(0,20).map((o,i)=>RE("span",{key:i,style:{display:"inline-block",marginRight:6,fontSize:10,color:"var(--txt2)"}},fmtD(o)+" "+o.sl+(i<Math.min(analysis.restA.length+analysis.restB.length,20)-1?" ·":"")))
+      (analysis.restA.length+analysis.restB.length+analysis.restC.length)>0
+        ?analysis.restA.concat(analysis.restB).concat(analysis.restC).slice(0,20).map((o,i)=>RE("span",{key:i,style:{display:"inline-block",marginRight:6,fontSize:10,color:"var(--txt2)"}},fmtD(o)+" "+o.sl+(i<Math.min(analysis.restA.length+analysis.restB.length+analysis.restC.length,20)-1?" ·":"")))
         :RE("span",{style:{color:"#b45309",fontWeight:700}},"aucun — pensez aux créneaux de 3-4 patients pendant vos semaines de tour."),
-      (analysis.restA.length+analysis.restB.length)>0&&RE("span",{style:{color:"var(--txt3)",fontSize:10}}," → à réouvrir pour des consultations supplémentaires : d'abord vos dates habituelles en semaine blanche, puis les offs (nouveaux patients, urgences)")),
+      (analysis.restA.length+analysis.restB.length+analysis.restC.length)>0&&RE("span",{style:{color:"var(--txt3)",fontSize:10}}," → à réouvrir pour des consultations supplémentaires : d'abord vos dates habituelles en semaine blanche, puis les offs (nouveaux patients, urgences)")),
     analysis.pairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"));
 }
 
