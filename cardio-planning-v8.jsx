@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.7 — 18/07/2026";
+const APP_VERSION="v9.7.1 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -351,8 +351,18 @@ function GridH({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   const noteT=notes[nk(med.id,ghY,ghM,d,sl)];
                   const astIdH=getAstreinteForDay?getAstreinteForDay(ghY,ghM,d):null;
                   const isAstH=astIdH!==null&&String(astIdH)===String(med.id);
+                  let astShH=null;
+                  if(isAstH){
+                    const pdH=new Date(ghY,ghM,d-1),ndH=new Date(ghY,ghM,d+1);
+                    const paH=getAstreinteForDay(pdH.getFullYear(),pdH.getMonth(),pdH.getDate()),naH=getAstreinteForDay(ndH.getFullYear(),ndH.getMonth(),ndH.getDate());
+                    const contPrevH=paH!==null&&String(paH)===String(med.id),contNextH=naH!==null&&String(naH)===String(med.id);
+                    const partsH=["inset 0 1px 0 var(--ast-bord)","inset 0 -1px 0 var(--ast-bord)"];
+                    if(sl==="M"&&!contPrevH)partsH.push("inset 1px 0 0 var(--ast-bord)");
+                    if(sl==="N"&&!contNextH)partsH.push("inset -1px 0 0 var(--ast-bord)");
+                    astShH=partsH.join(", ");
+                  }
                   return <td key={d+sl+ghM+ghY} title={noteT||undefined}
-                    style={{...S.td,...(sl==="N"?S.tdN:{}),...(isAstH?{background:"var(--ast-bg)",boxShadow:"inset 0 0 0 1px var(--ast-bord)"}:{}),...(isTgh?{background:"var(--bg-td)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
+                    style={{...S.td,...(sl==="N"?S.tdN:{}),...(isAstH?{background:"var(--ast-bg)",boxShadow:astShH}:{}),...(isTgh?{background:"var(--bg-td)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
                     onClick={bl||!isEdit?undefined:()=>onCell(med.id,ghY,ghM,d,sl)}>
                     {!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
@@ -535,8 +545,18 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   const noteT=notes[nk(med.id,ey,em,d,sl)];
                   const astId=getAstreinteForDay?getAstreinteForDay(ey,em,d):null;
                   const isAst=astId!==null&&String(astId)===String(med.id);
+                  let astSh=null;
+                  if(isAst){
+                    const pdV=new Date(ey,em,d-1),ndV=new Date(ey,em,d+1);
+                    const paV=getAstreinteForDay(pdV.getFullYear(),pdV.getMonth(),pdV.getDate()),naV=getAstreinteForDay(ndV.getFullYear(),ndV.getMonth(),ndV.getDate());
+                    const contPrev=paV!==null&&String(paV)===String(med.id),contNext=naV!==null&&String(naV)===String(med.id);
+                    const parts=["inset 1px 0 0 var(--ast-bord)","inset -1px 0 0 var(--ast-bord)"];
+                    if(si===0&&!contPrev)parts.push("inset 0 1px 0 var(--ast-bord)");
+                    if(si===slots.length-1&&!contNext)parts.push("inset 0 -1px 0 var(--ast-bord)");
+                    astSh=parts.join(", ");
+                  }
                   return <td key={med.id} title={noteT||undefined}
-                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:"inset 0 0 0 1px var(--ast-bord)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
+                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
                     onClick={bl||!isEdit?undefined:()=>onCell(med.id,ey,em,d,sl)}>
                     {!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
