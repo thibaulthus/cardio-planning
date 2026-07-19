@@ -136,7 +136,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.8.2 — 18/07/2026";
+var APP_VERSION = "v9.9 — 19/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -550,8 +550,9 @@ function GridH(_a) {
                 }))); })))));
 }
 /* ════ GRID V ════ */
+var _gvLpT = null, _gvLpF = false;
 function GridV(_a) {
-    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _sg = _a.showGarde, showGarde = _sg === void 0 ? true : _sg, _gl = _a.gardeLocked, gardeLocked = _gl === void 0 ? false : _gl, getAstreinteForDay = _a.getAstreinteForDay;
+    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _sg = _a.showGarde, showGarde = _sg === void 0 ? true : _sg, _gl = _a.gardeLocked, gardeLocked = _gl === void 0 ? false : _gl, _och = _a.onCellHistory, onCellHistory = _och === void 0 ? null : _och, getAstreinteForDay = _a.getAstreinteForDay;
     var today = new Date();
     var C0 = 42, C1 = 24, CG = 44;
     // Find garde med for a given day (slot N)
@@ -752,7 +753,7 @@ function GridV(_a) {
                                     parts.push("inset 0 -1px 0 var(--ast-bord)");
                                 astSh = parts.join(", ");
                             }
-                            return React.createElement("td", { key: med.id, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onClick: bl || !isEdit ? undefined : function () { return onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
+                            return React.createElement("td", { key: med.id, title: noteT || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle" }), onContextMenu: onCellHistory ? function (e) { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onTouchMove: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onClick: bl || !isEdit ? undefined : function () { if (_gvLpF) { _gvLpF = false; return; } onCell(med.id, ey, em, d, sl); } }, !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, es.map(function (e, i) { var a = e.acteId ? acteById(e.acteId) : null; return a ? React.createElement(Badge, { key: i, a: a, salle: e.salle, hideSalle: true, hasNote: !!noteT }) : null; })));
                         }))); });
                 }))))));
 }
@@ -3496,6 +3497,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"PIN médecin")," — édition personnelle : uniquement sa propre ligne (voir la première tuile). Défini par un éditeur dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"."]}),
   HP({children:["• ",HE("b",null,"PIN administratif")," — pour les secrétaires et cadres : un code partagé (défini dans Paramètres) ; chacun saisit son prénom à la connexion. Il permet de poser, modifier ou retirer les activités cochées « ✏️ administratif » (consultations…) sur la ligne de n'importe quel médecin, et de remplir les semaines blanches de l'onglet Reports. Gardes, tours, astreintes et réglages restent hors de portée."]}),
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
+  HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case du Planning — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
 
  {id:"cellules",icon:"🔲",title:"Les cellules du planning",body:()=>HE("div",null,
@@ -3839,6 +3841,24 @@ function CardioPlanning() {
     var _aa = useState(false), adminAsk = _aa[0], setAdminAsk = _aa[1];
     var _ani = useState(function () { try { return localStorage.getItem("cp6_adminName") || ""; } catch (e) { return ""; } }), adminNameInput = _ani[0], setAdminNameInput = _ani[1];
     var _sp = useState(false), showPins = _sp[0], setShowPins = _sp[1];
+    var _hm = useState(null), histModal = _hm[0], setHistModal = _hm[1];
+    /* ── v9.9 : journal des cases — document Firestore séparé (planning/journal), jamais archivé ── */
+    var authorRef = useRef("?");
+    var logCell = useCallback(function (action, medId2, y2, m2, d2, sl2, acteId2) {
+        try {
+            if (!window.firebaseDB || !window.firebaseDoc)
+                return;
+            var jdoc = window.firebaseDoc(window.firebaseDB, "planning", "journal");
+            var eid = "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            var je = { t: Date.now(), k: sk(y2, m2, d2, sl2), md: medId2, x: action, act: acteId2 || null, a: authorRef.current };
+            var fb = function () { if (setDoc) { var o = { entries: {} }; o.entries[eid] = je; Promise.resolve(setDoc(jdoc, o, { merge: true })).catch(function () { }); } };
+            if (updatePaths)
+                Promise.resolve(updatePaths(jdoc, [[["entries", eid], je]])).catch(fb);
+            else
+                fb();
+        }
+        catch (e) { }
+    }, []);
     var _e = useState(null), editMedId = _e[0], setEditMedId = _e[1]; // medecin logged in with personal PIN
     var _f = useState("planning"), tab = _f[0], setTab = _f[1];
     var _g = useState(function () { return ({ year: new Date().getFullYear(), month: new Date().getMonth() }); }), ym = _g[0], setYM = _g[1];
@@ -4890,6 +4910,31 @@ function CardioPlanning() {
     // Returns true if current user can edit this specific medecin's data
     var canEdit = function (medId) { return isEdit || (isMedEdit && editMedId === medId) || isAdminEdit; };
     var isAnyEdit = isEdit || isMedEdit || isAdminEdit;
+    useEffect(function () { authorRef.current = isEdit ? "\u00C9diteur" : (isMedEdit ? (((medecins.find(function (m) { return m.id === editMedId; }) || {}).init) || "?") : (isAdminEdit ? ((adminName || "?") + " (administratif)") : "?")); }, [isEdit, isMedEdit, isAdminEdit, editMedId, adminName, medecins]);
+    useEffect(function () {
+        if (!isEdit || !window.firebaseDB)
+            return;
+        (function () {
+            window.firebaseDB.collection("planning").doc("journal").get().then(function (d3) {
+                var es = (d3.data() || {}).entries || {};
+                var ks = Object.keys(es);
+                if (ks.length > 1200) {
+                    var kept_1 = {};
+                    ks.map(function (k2) { return [k2, es[k2] && es[k2].t || 0]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 1000).forEach(function (_k) { kept_1[_k[0]] = es[_k[0]]; });
+                    window.firebaseDB.collection("planning").doc("journal").set({ entries: kept_1 }).catch(function () { });
+                }
+            }).catch(function () { });
+        })();
+    }, [isEdit]);
+    var openCellHistory = useCallback(function (medId2, y2, m2, d2, sl2) {
+        setHistModal({ medId: medId2, y: y2, m: m2, d: d2, sl: sl2, loading: true, list: [] });
+        window.firebaseDB.collection("planning").doc("journal").get().then(function (d3) {
+            var es = (d3.data() || {}).entries || {};
+            var key3 = sk(y2, m2, d2, sl2);
+            var list = Object.values(es).filter(function (e) { return e && e.k === key3 && String(e.md) === String(medId2); }).sort(function (a, b) { return (b.t || 0) - (a.t || 0); }).slice(0, 30);
+            setHistModal(function (hh) { return hh ? __assign(__assign({}, hh), { loading: false, list: list }) : hh; });
+        }).catch(function () { setHistModal(function (hh) { return hh ? __assign(__assign({}, hh), { loading: false, list: [] }) : hh; }); });
+    }, []);
     var nDays = dIM(year, month);
     var todayY = today.getFullYear(), todayM = today.getMonth(), todayD = today.getDate();
     var allDays = useMemo(function () {
@@ -4959,6 +5004,7 @@ function CardioPlanning() {
                 delete dm[medId];
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
+        logCell(entry ? "add" : "del", medId, y2, m2, d2, slot, entry ? entry.acteId : null);
     }, []);
     var addEntry = useCallback(function (medId, y2, m2, d2, slot, entry) {
         var key = sk(y2, m2, d2, slot);
@@ -4974,6 +5020,7 @@ function CardioPlanning() {
                 dm[medId] = [ex, entry];
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
+        logCell("add", medId, y2, m2, d2, slot, entry.acteId);
     }, []);
     var removeEntry = useCallback(function (medId, y2, m2, d2, slot, acteId) {
         var key = sk(y2, m2, d2, slot);
@@ -4994,11 +5041,13 @@ function CardioPlanning() {
                 delete dm[medId];
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
+        logCell("del", medId, y2, m2, d2, slot, acteId);
     }, []);
     /* ── applyGarde (atomic) ── */
     var applyGarde = useCallback(function (medId, y2, m2, d2) {
         if (accessMode === "adminEdit")
             return;
+        logCell("add", medId, y2, m2, d2, "N", "GARDE");
         var dw = dow(y2, m2, d2);
         var gardeSlot = (dw === 6 || dw === 0) ? "JOUR" : "N";
         var dt = new Date(y2, m2, d2 + 1);
@@ -5584,7 +5633,7 @@ function CardioPlanning() {
                     medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); })),
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
-                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, getAstreinteForDay: getAstreinteForDay }))),
+                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
@@ -5652,7 +5701,7 @@ function CardioPlanning() {
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type")),
                 orient === "H"
                     ? React.createElement(GridH, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, getAstreinteForDay: getAstreinteForDay })
-                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit, getAstreinteForDay: getAstreinteForDay }))),
+                    : React.createElement(GridV, { allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit },
@@ -6688,6 +6737,26 @@ function CardioPlanning() {
                 React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
                     React.createElement("button", { onClick: function () { return setPtModal(null); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
                     React.createElement("button", { onClick: runPtModal, style: __assign(__assign(__assign({}, S.btnP), { padding: "9px 18px" }), (ptModal.mode === "remove" ? { background: "#dc2626" } : {})) }, ptModal.mode === "remove" ? "🧹 Retirer" : "▶ Appliquer"))))),
+        histModal && (function () {
+            var med3 = medecins.find(function (x) { return x.id === histModal.medId; });
+            return (React.createElement(Ov, { onClose: function () { return setHistModal(null); } },
+                React.createElement("div", { style: S.mHd },
+                    React.createElement("div", null, React.createElement("div", { style: S.mTit2 }, "\uD83D\uDD58 Historique \u2014 " + (med3 ? med3.init : "") + " \u00B7 " + histModal.d + " " + MOIS[histModal.m] + " " + (SLOTL[histModal.sl] || histModal.sl))),
+                    React.createElement("button", { onClick: function () { return setHistModal(null); }, style: S.xBtn }, "\u00D7")),
+                histModal.loading && React.createElement("div", { style: { fontSize: 12, color: "var(--txt3)" } }, "Chargement\u2026"),
+                !histModal.loading && histModal.list.length === 0 && React.createElement("div", { style: { fontSize: 12, color: "var(--txt3)" } }, "Aucune modification enregistr\u00E9e pour cette case (le journal d\u00E9marre avec la v9.9 et ne couvre que les modifications manuelles de cases)."),
+                !histModal.loading && histModal.list.map(function (e, i) {
+                    var a3 = actes.find(function (x) { return x.id === e.act; });
+                    var dt = new Date(e.t);
+                    var p2 = function (n2) { return String(n2).padStart(2, "0"); };
+                    return React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border2)", fontSize: 12 } },
+                        React.createElement("span", { style: { color: "var(--txt3)", fontSize: 10, minWidth: 96 } }, p2(dt.getDate()) + "/" + p2(dt.getMonth() + 1) + "/" + dt.getFullYear() + " " + p2(dt.getHours()) + ":" + p2(dt.getMinutes())),
+                        React.createElement("span", { style: { fontWeight: 800, color: e.x === "add" ? "#16a34a" : "#dc2626" } }, e.x === "add" ? "+ Pos\u00E9" : "\u2212 Retir\u00E9"),
+                        a3 && React.createElement("span", { style: { padding: "0 6px", borderRadius: 4, fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: a3.color, color: "#111" } }, a3.short),
+                        !a3 && e.act && React.createElement("span", { style: { fontSize: 10, color: "var(--txt2)" } }, e.act),
+                        React.createElement("span", { style: { marginLeft: "auto", color: "var(--txt2)", fontSize: 11 } }, e.a));
+                })));
+        })(),
         modal === "cell" && mData && (function () {
             var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d, slot = mData.slot;
             var med = medecins.find(function (x) { return x.id === medId; });
