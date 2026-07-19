@@ -122,7 +122,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.5.1 — 18/07/2026";
+var APP_VERSION = "v9.6 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -932,7 +932,8 @@ function ActTabView(_a) {
                     React.createElement("div", { style: { width: 18, height: 18, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 7, fontWeight: 800, flexShrink: 0 } }, med.init),
                     monoActe
                         ? React.createElement("span", { style: { fontSize: 9, fontWeight: 600, color: "var(--txt)", whiteSpace: "nowrap" } }, med.nom)
-                        : React.createElement(Badge, { a: acte })));
+                        : React.createElement(Badge, { a: acte }),
+                    row.hasSalleChoice && salle && React.createElement("span", { style: { fontSize: 7, fontWeight: 700, color: "var(--txt3)", fontFamily: "'JetBrains Mono',monospace", border: "1px solid var(--border)", borderRadius: 4, padding: "0 3px", whiteSpace: "nowrap" } }, salle)));
             })),
             occ.length === 0 && React.createElement("div", { style: { color: "var(--border)", textAlign: "center", fontSize: 13 } }, "\u00B7")));
     }
@@ -3444,7 +3445,7 @@ const HELP_SECTIONS=[
   HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période."]}),
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
-  HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées 🎯, PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
+  HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
   HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase."]}),
   HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}),
   HTab({t:"📥 Reports",children:["outil individuel et facultatif : cochez vos semaines blanches, puis un tableau chronologique signale les semaines de tour reportées sur vos blanches (dates habituelles), celles sans report possible, celles déjà blanches, et les dates fermées à réouvrir ; suivi des offs par semaine. Les activités concernées se cochent « 📥 à reporter » dans l'onglet Activités. Export CSV."]}))},
@@ -4678,17 +4679,20 @@ function CardioPlanning() {
     // ── Source de vérité : coche "Garde" de l'onglet Équipe → médecins autorisés des activités GARDE et REPOS_GARDE ──
     useEffect(function () {
         var gInits = medecins.filter(function (m) { return m.garde === true; }).map(function (m) { return m.init; });
-        var key = gInits.slice().sort().join(",");
+        var tpInits = medecins.filter(function (m) { return m.partTime === true; }).map(function (m) { return m.init; });
+        var gKey = gInits.slice().sort().join(","), tpKey = tpInits.slice().sort().join(",");
         setActes(function (prev) {
             var changed = false;
             var next = prev.map(function (a) {
-                if (a.id !== "GARDE" && a.id !== "REPOS_GARDE")
+                var syncG = (a.id === "GARDE" || a.id === "REPOS_GARDE"), syncTP = a.id === "TP";
+                if (!syncG && !syncTP)
                     return a;
+                var target = syncG ? gInits : tpInits, key = syncG ? gKey : tpKey;
                 var cur = a.medecinsAutorise || [];
                 if (cur.slice().sort().join(",") === key)
                     return a;
                 changed = true;
-                return __assign(__assign({}, a), { medecinsAutorise: gInits });
+                return __assign(__assign({}, a), { medecinsAutorise: target });
             });
             return changed ? next : prev;
         });
@@ -5516,6 +5520,7 @@ function CardioPlanning() {
                             a.hasSalle && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, a.salles.join(", ") || "—"),
                             (a.medecinsAutorise && a.medecinsAutorise.length) > 0 && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, a.medecinsAutorise.join(", ")),
                             (a.id === "GARDE" || a.id === "REPOS_GARDE") && React.createElement("div", { style: { fontSize: 9, color: "#16a34a", fontWeight: 700 } }, "\u2699 Synchronis\u00E9 avec la coche \u00AB Garde \u00BB de l'onglet \u00C9quipe"),
+                            a.id === "TP" && React.createElement("div", { style: { fontSize: 9, color: "#16a34a", fontWeight: 700 } }, "\u2699 Synchronis\u00E9 avec la coche \u00AB Temps partiel \u00BB des fiches m\u00E9decins"),
                             a.csReport && React.createElement("div", { style: { fontSize: 9, color: "#7c3aed", fontWeight: 700 } }, "\uD83D\uDCE5 Propos\u00E9e dans l'onglet Reports")),
                         isEdit && React.createElement("div", { style: { display: "flex", gap: 4 } },
                             React.createElement("button", { style: __assign({}, S.icnBtn), onClick: function () { setMData(__assign(__assign({}, a), { _new: false, sallesStr: (a.salles || []).join(","), medStr: (a.medecinsAutorise || []).join(",") })); setModal("editActe"); } }, "\u270F\uFE0F"),
@@ -5557,7 +5562,6 @@ function CardioPlanning() {
                                 React.createElement("button", { style: __assign({}, S.icnBtn), onClick: function () { setMData(__assign(__assign({}, m), { _new: false })); setModal("editMed"); } }, "\u270F\uFE0F"),
                                 isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { background: "#fff1f2", border: "1px solid #fecdd3", color: "#dc2626" }), onClick: function () { if (confirm("Supprimer ".concat(m.nom, " ?")))
                                         setMedecins(function (p) { return p.filter(function (x) { return x.id !== m.id; }); }); } }, "\uD83D\uDDD1\uFE0F")),
-                            React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign({}, m)); setModal("editMedActivites"); } }, "\uD83C\uDFAF"),
                             isEdit && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { fontSize: 11, textAlign: "center" }), onClick: function () { setMData(__assign(__assign({}, m), { _pinMode: true })); setModal("editMedPin"); } }, "\uD83D\uDD11"),
                             isEdit && React.createElement("div", { style: { display: "flex", gap: 3 } },
                                 React.createElement("button", { title: "Avancer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, -1); } }, "\u25B2"),
@@ -6835,20 +6839,36 @@ function CardioPlanning() {
                     }))),
                 mData.hasSalle && React.createElement("div", { style: { gridColumn: "1/-1" } },
                     React.createElement("label", { style: S.fl }, "Salles"),
-                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 } }, salleReg.map(function (x) { return x.n; }).concat(actes.flatMap(function (a2) { return a2.salles || []; })).filter(function (s, ix, arr) { return arr.indexOf(s) === ix; }).sort().map(function (s) {
-                        var on = (mData.salles || []).includes(s);
-                        return React.createElement("button", { key: s, type: "button", onClick: function () { return setMData(function (p) { var cur = p.salles || []; var nx = on ? cur.filter(function (x) { return x !== s; }) : cur.concat([s]); return __assign(__assign({}, p), { salles: nx, sallesStr: nx.join(", ") }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid #388bfd" : "1px solid var(--border)", background: on ? "rgba(56,139,253,.15)" : "var(--bg2)", color: on ? "#388bfd" : "var(--txt2)" } }, s);
-                    })),
+                    (function () {
+                        var inSite = function (x, site3) { return Array.isArray(x.s) ? x.s.indexOf(site3) >= 0 : x.s === site3; };
+                        var regN = salleReg.map(function (x) { return x.n; });
+                        var orph = actes.flatMap(function (a2) { return a2.salles || []; }).filter(function (s) { return regN.indexOf(s) < 0; });
+                        var groups = [["CHL", salleReg.filter(function (x) { return inSite(x, "CHL"); }).map(function (x) { return x.n; })],
+                            ["CHB", salleReg.filter(function (x) { return inSite(x, "CHB"); }).map(function (x) { return x.n; })],
+                            ["Autres", salleReg.filter(function (x) { return !inSite(x, "CHL") && !inSite(x, "CHB"); }).map(function (x) { return x.n; }).concat(orph)]];
+                        return groups.map(function (_g) {
+                            var g = _g[0], list3 = _g[1];
+                            var uniq = list3.filter(function (s, ix, arr) { return arr.indexOf(s) === ix; }).sort();
+                            if (uniq.length === 0)
+                                return null;
+                            return React.createElement("div", { key: g, style: { marginBottom: 6 } },
+                                React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 3 } }, g),
+                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, uniq.map(function (s) {
+                                    var on = (mData.salles || []).includes(s);
+                                    return React.createElement("button", { key: s, type: "button", onClick: function () { return setMData(function (p) { var cur = p.salles || []; var nx = on ? cur.filter(function (x) { return x !== s; }) : cur.concat([s]); return __assign(__assign({}, p), { salles: nx, sallesStr: nx.join(", ") }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid #388bfd" : "1px solid var(--border)", background: on ? "rgba(56,139,253,.15)" : "var(--bg2)", color: on ? "#388bfd" : "var(--txt2)" } }, s);
+                                })));
+                        });
+                    })(),
                     React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "Cr\u00E9er/renommer une salle : Param\u00E8tres \u2192 \uD83C\uDFE5 Salles.")),
                 React.createElement("div", { style: { gridColumn: "1/-1" } },
-                    React.createElement("label", { style: S.fl }, (mData.id === "GARDE" || mData.id === "REPOS_GARDE") ? "M\u00E9decins autoris\u00E9s" : "M\u00E9decins autoris\u00E9s (vide = tous)"),
-                    (mData.id === "GARDE" || mData.id === "REPOS_GARDE") ? React.createElement("div", null,
-                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 } }, medecins.filter(function (m2) { return m2.garde === true; }).map(function (m2) {
+                    React.createElement("label", { style: S.fl }, (mData.id === "GARDE" || mData.id === "REPOS_GARDE" || mData.id === "TP") ? "M\u00E9decins autoris\u00E9s" : "M\u00E9decins autoris\u00E9s (vide = tous)"),
+                    (mData.id === "GARDE" || mData.id === "REPOS_GARDE" || mData.id === "TP") ? React.createElement("div", null,
+                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 } }, medecins.filter(function (m2) { return (mData.id === "TP" ? m2.partTime === true : m2.garde === true); }).map(function (m2) {
                             return React.createElement("span", { key: m2.id, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4, border: "1.5px solid " + m2.color, background: m2.color + "26", color: "var(--txt)" } },
                                 React.createElement("span", { style: { width: 12, height: 12, borderRadius: "50%", background: m2.color, display: "inline-block" } }),
                                 m2.init);
                         })),
-                        React.createElement("div", { style: { fontSize: 10, color: "#16a34a", fontWeight: 700 } }, "\u2699 Liste g\u00E9r\u00E9e par la coche \u00AB Garde \u00BB de l'onglet \u00C9quipe \u2014 modifiez-la l\u00E0-bas.")) : React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, maxHeight: 120, overflowY: "auto" } }, medecins.filter(function (m2) { return m2.role !== "ide"; }).map(function (m2) {
+                        React.createElement("div", { style: { fontSize: 10, color: "#16a34a", fontWeight: 700 } }, mData.id === "TP" ? "\u2699 Liste g\u00E9r\u00E9e par la coche \u00AB Temps partiel \u00BB des fiches m\u00E9decins (\u00C9quipe) \u2014 modifiez-la l\u00E0-bas." : "\u2699 Liste g\u00E9r\u00E9e par la coche \u00AB Garde \u00BB de l'onglet \u00C9quipe \u2014 modifiez-la l\u00E0-bas.")) : React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, maxHeight: 120, overflowY: "auto" } }, medecins.filter(function (m2) { return m2.role !== "ide"; }).map(function (m2) {
                         var on = (mData.medecinsAutorise || []).includes(m2.init);
                         return React.createElement("button", { key: m2.id, type: "button", onClick: function () { return setMData(function (p) { var cur = p.medecinsAutorise || []; var nx = on ? cur.filter(function (x) { return x !== m2.init; }) : cur.concat([m2.init]); return __assign(__assign({}, p), { medecinsAutorise: nx, medStr: nx.join(", ") }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4, border: on ? "1.5px solid " + m2.color : "1px solid var(--border)", background: on ? m2.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } },
                             React.createElement("span", { style: { width: 12, height: 12, borderRadius: "50%", background: m2.color, display: "inline-block" } }),
@@ -7035,6 +7055,39 @@ function CardioPlanning() {
                         return (React.createElement("button", { key: v, onClick: function () { return setMData(function (p) { return (__assign(__assign({}, p), { surSpec: p.surSpec === v ? null : v })); }); }, style: { padding: "5px 12px", borderRadius: 6, border: "1px solid " + c, cursor: "pointer", fontWeight: 700, fontSize: 12,
                                 background: mData.surSpec === v ? c : "var(--bg2)", color: mData.surSpec === v ? "#fff" : c } }, l));
                     })))),
+            (mData.role || "medecin") !== "ide" && React.createElement("div", { style: { gridColumn: "1/-1", borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 8, fontSize: 10, fontWeight: 800, color: "#388bfd", textTransform: "uppercase", letterSpacing: .5 } }, "\uD83C\uDFAF Activit\u00E9s autoris\u00E9es"),
+            (mData.role || "medecin") !== "ide" && React.createElement("div", { style: { gridColumn: "1/-1" } },
+                !mData.init
+                    ? React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Renseignez d'abord les initiales pour g\u00E9rer les activit\u00E9s.")
+                    : [["G\u00E9n\u00E9ral", function (a2) { return a2.site !== "CHL" && a2.site !== "CHB"; }], ["CHL", function (a2) { return a2.site === "CHL"; }], ["CHB", function (a2) { return a2.site === "CHB"; }]].map(function (_g) {
+                        var grp = _g[0], fil = _g[1];
+                        var glist = actes.filter(function (a2) { return !a2.isSystem && a2.id !== "TP" && fil(a2); });
+                        if (glist.length === 0)
+                            return null;
+                        return React.createElement("div", { key: grp, style: { marginBottom: 8 } },
+                            React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 3 } }, grp),
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, glist.map(function (a2) {
+                                var allowed = !(a2.medecinsAutorise && a2.medecinsAutorise.length) || a2.medecinsAutorise.includes(mData.init);
+                                return React.createElement("button", { key: a2.id, type: "button", onClick: function () {
+                                        setActes(function (prev) { return prev.map(function (act) {
+                                            if (act.id !== a2.id)
+                                                return act;
+                                            var cur = act.medecinsAutorise || [];
+                                            if (!allowed) {
+                                                if (cur.length === 0)
+                                                    return act;
+                                                return __assign(__assign({}, act), { medecinsAutorise: cur.concat([mData.init]) });
+                                            }
+                                            if (cur.length === 0) {
+                                                var all2 = medecins.map(function (m3) { return m3.init; }).filter(function (i2) { return i2 !== mData.init; });
+                                                return __assign(__assign({}, act), { medecinsAutorise: all2 });
+                                            }
+                                            return __assign(__assign({}, act), { medecinsAutorise: cur.filter(function (i2) { return i2 !== mData.init; }) });
+                                        }); });
+                                    }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 11, cursor: "pointer", fontWeight: 700, border: allowed ? "1.5px solid " + a2.color : "1px solid var(--border)", background: allowed ? a2.color + "33" : "var(--bg2)", color: allowed ? "var(--txt)" : "var(--txt3)" } }, a2.short);
+                            })));
+                    }),
+                React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "Modifications enregistr\u00E9es imm\u00E9diatement. \u00AB G\u00E9n\u00E9ral \u00BB = disponible sur toute l'application.")),
             React.createElement("button", { style: __assign(__assign({}, S.btnP), { width: "100%", marginTop: 10 }), onClick: function () {
                     if (!mData.nom || !mData.init)
                         return toast("Nom et initiales requis", "warn");
@@ -7046,53 +7099,7 @@ function CardioPlanning() {
                     setModal(null);
                     toast("Médecin enregistré");
                 } }, "Enregistrer"))),
-        modal === "editMedActivites" && mData && (React.createElement(Ov, { onClose: function () { return setModal(null); } },
-            React.createElement("div", { style: S.mHd },
-                React.createElement("div", null,
-                    React.createElement("div", { style: S.mTit2 },
-                        "\uD83C\uDFAF Activit\u00E9s \u2014 ",
-                        mData.prenom,
-                        " ",
-                        mData.nom),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 2 } }, "Cochez pour autoriser.")),
-                React.createElement("button", { onClick: function () { return setModal(null); }, style: S.xBtn }, "\u00D7")),
-            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 400, overflowY: "auto" } }, actes.filter(function (a) { return !a.isSystem; }).map(function (a) {
-                var allowed = !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(mData.init);
-                return (React.createElement("label", { key: a.id, style: { display: "flex", alignItems: "center", gap: 9, padding: "7px 10px", borderRadius: 7, background: allowed ? "var(--nav-act)" : "var(--bg2)", border: "1px solid var(--border)", cursor: "pointer" } },
-                    React.createElement("input", { type: "checkbox", checked: allowed, onChange: function (e) {
-                            setActes(function (prev) { return prev.map(function (act) {
-                                if (act.id !== a.id)
-                                    return act;
-                                var cur = act.medecinsAutorise || [];
-                                if (e.target.checked) {
-                                    if (cur.length === 0)
-                                        return act;
-                                    return __assign(__assign({}, act), { medecinsAutorise: __spreadArray(__spreadArray([], cur, true), [mData.init], false) });
-                                }
-                                else {
-                                    if (cur.length === 0) {
-                                        var all = medecins.map(function (m) { return m.init; }).filter(function (i) { return i !== mData.init; });
-                                        return __assign(__assign({}, act), { medecinsAutorise: all });
-                                    }
-                                    return __assign(__assign({}, act), { medecinsAutorise: cur.filter(function (i) { return i !== mData.init; }) });
-                                }
-                            }); });
-                        }, style: { width: 15, height: 15, cursor: "pointer" } }),
-                    React.createElement("div", { style: { padding: "2px 6px", borderRadius: 4,
-                            background: a.color,
-                            color: (function () { try {
-                                var r = parseInt(a.color.slice(1, 3), 16) / 255, g = parseInt(a.color.slice(3, 5), 16) / 255, b = parseInt(a.color.slice(5, 7), 16) / 255;
-                                var l = 0.2126 * (r <= 0.04045 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4)) + 0.7152 * (g <= 0.04045 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4)) + 0.0722 * (b <= 0.04045 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4));
-                                return l > 0.35 ? "#111" : "#fff";
-                            }
-                            catch (_a) {
-                                return "#fff";
-                            } })(),
-                            fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 } }, a.short),
-                    React.createElement("span", { style: { fontSize: 12, color: "var(--txt)", fontWeight: allowed ? 600 : 400, flex: 1 } }, a.label),
-                    !(a.medecinsAutorise && a.medecinsAutorise.length) && React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "tous")));
-            })),
-            React.createElement("button", { style: __assign(__assign({}, S.btnP), { width: "100%", marginTop: 10 }), onClick: function () { return setModal(null); } }, "Fermer")))));
+        null));
 }
 
 var domRoot=ReactDOM.createRoot(document.getElementById("root"));

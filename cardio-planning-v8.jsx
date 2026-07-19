@@ -25,7 +25,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.5.1 — 18/07/2026";
+const APP_VERSION="v9.6 — 18/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -767,6 +767,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
             {monoActe
               ?<span style={{fontSize:9,fontWeight:600,color:"var(--txt)",whiteSpace:"nowrap"}}>{med.nom}</span>
               :<Badge a={acte}/>}
+            {row.hasSalleChoice&&salle&&<span style={{fontSize:7,fontWeight:700,color:"var(--txt3)",fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",borderRadius:4,padding:"0 3px",whiteSpace:"nowrap"}}>{salle}</span>}
           </div>
         );})}
         </div>
@@ -3274,7 +3275,7 @@ const HELP_SECTIONS=[
   HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période."]}),
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
-  HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées 🎯, PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
+  HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
   HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase."]}),
   HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}),
   HTab({t:"📥 Reports",children:["outil individuel et facultatif : cochez vos semaines blanches, puis un tableau chronologique signale les semaines de tour reportées sur vos blanches (dates habituelles), celles sans report possible, celles déjà blanches, et les dates fermées à réouvrir ; suivi des offs par semaine. Les activités concernées se cochent « 📥 à reporter » dans l'onglet Activités. Export CSV."]}))},
@@ -4183,14 +4184,17 @@ function CardioPlanning(){
   // ── Source de vérité : coche "Garde" de l'onglet Équipe → médecins autorisés des activités GARDE et REPOS_GARDE ──
   useEffect(()=>{
     const gInits=medecins.filter(m=>m.garde===true).map(m=>m.init);
-    const key=[...gInits].sort().join(",");
+    const tpInits=medecins.filter(m=>m.partTime===true).map(m=>m.init);
+    const gKey=[...gInits].sort().join(","),tpKey=[...tpInits].sort().join(",");
     setActes(prev=>{
       let changed=false;
       const next=prev.map(a=>{
-        if(a.id!=="GARDE"&&a.id!=="REPOS_GARDE")return a;
+        const syncG=(a.id==="GARDE"||a.id==="REPOS_GARDE"),syncTP=a.id==="TP";
+        if(!syncG&&!syncTP)return a;
+        const target=syncG?gInits:tpInits,key=syncG?gKey:tpKey;
         const cur=a.medecinsAutorise||[];
         if([...cur].sort().join(",")===key)return a;
-        changed=true;return {...a,medecinsAutorise:gInits};
+        changed=true;return {...a,medecinsAutorise:target};
       });
       return changed?next:prev;
     });
@@ -4932,6 +4936,7 @@ header::-webkit-scrollbar { display: none; }
                       {a.hasSalle&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.salles.join(", ")||"—"}</div>}
                       {(a.medecinsAutorise&&a.medecinsAutorise.length)>0&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.medecinsAutorise.join(", ")}</div>}
                       {(a.id==="GARDE"||a.id==="REPOS_GARDE")&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Garde » de l'onglet Équipe</div>}
+                      {a.id==="TP"&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Temps partiel » des fiches médecins</div>}
                       {a.csReport&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>📥 Proposée dans l'onglet Reports</div>}
                     </div>
                     {isEdit&&<div style={{display:"flex",gap:4}}>
@@ -4980,7 +4985,6 @@ header::-webkit-scrollbar { display: none; }
                         <button style={{...S.icnBtn}} onClick={()=>{setMData({...m,_new:false});setModal("editMed");}}>✏️</button>
                         {isEdit&&<button style={{...S.icnBtn,background:"#fff1f2",border:"1px solid #fecdd3",color:"#dc2626"}} onClick={()=>{if(confirm(`Supprimer ${m.nom} ?`))setMedecins(p=>p.filter(x=>x.id!==m.id));}}>🗑️</button>}
                       </div>
-                      <button style={{...S.icnBtn,fontSize:11,textAlign:"center"}} onClick={()=>{setMData({...m});setModal("editMedActivites");}}>🎯</button>
                       {isEdit&&<button style={{...S.icnBtn,fontSize:11,textAlign:"center"}} onClick={()=>{setMData({...m,_pinMode:true});setModal("editMedPin");}}>🔑</button>}
                       {isEdit&&<div style={{display:"flex",gap:3}}>
                         <button title="Avancer dans l'ordre" style={{...S.icnBtn,fontSize:11,fontWeight:800}} onClick={()=>moveMed(m.id,-1)}>▲</button>
@@ -6158,25 +6162,40 @@ header::-webkit-scrollbar { display: none; }
               </div>
             </div>
             {mData.hasSalle&&<div style={{gridColumn:"1/-1"}}><label style={S.fl}>Salles</label>
-              <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:5}}>
-                {salleReg.map(x=>x.n).concat(actes.flatMap(a2=>a2.salles||[])).filter((s,ix,arr)=>arr.indexOf(s)===ix).sort().map(s=>{
-                  const on=(mData.salles||[]).includes(s);
-                  return <button key={s} type="button" onClick={()=>setMData(p=>{const cur=p.salles||[];const nx=on?cur.filter(x=>x!==s):cur.concat([s]);return {...p,salles:nx,sallesStr:nx.join(", ")};})}
-                    style={{fontSize:10,padding:"3px 8px",borderRadius:12,cursor:"pointer",fontWeight:700,border:on?"1.5px solid #388bfd":"1px solid var(--border)",background:on?"rgba(56,139,253,.15)":"var(--bg2)",color:on?"#388bfd":"var(--txt2)"}}>{s}</button>;
-                })}
-              </div>
+              {(()=>{
+                const inSite=(x,site3)=>Array.isArray(x.s)?x.s.indexOf(site3)>=0:x.s===site3;
+                const regN=salleReg.map(x=>x.n);
+                const orph=actes.flatMap(a2=>a2.salles||[]).filter(s=>regN.indexOf(s)<0);
+                const groups=[["CHL",salleReg.filter(x=>inSite(x,"CHL")).map(x=>x.n)],
+                              ["CHB",salleReg.filter(x=>inSite(x,"CHB")).map(x=>x.n)],
+                              ["Autres",salleReg.filter(x=>!inSite(x,"CHL")&&!inSite(x,"CHB")).map(x=>x.n).concat(orph)]];
+                return groups.map(([g,list3])=>{
+                  const uniq=list3.filter((s,ix,arr)=>arr.indexOf(s)===ix).sort();
+                  if(uniq.length===0)return null;
+                  return <div key={g} style={{marginBottom:6}}>
+                    <div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{g}</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {uniq.map(s=>{
+                        const on=(mData.salles||[]).includes(s);
+                        return <button key={s} type="button" onClick={()=>setMData(p=>{const cur=p.salles||[];const nx=on?cur.filter(x=>x!==s):cur.concat([s]);return {...p,salles:nx,sallesStr:nx.join(", ")};})}
+                          style={{fontSize:10,padding:"3px 8px",borderRadius:12,cursor:"pointer",fontWeight:700,border:on?"1.5px solid #388bfd":"1px solid var(--border)",background:on?"rgba(56,139,253,.15)":"var(--bg2)",color:on?"#388bfd":"var(--txt2)"}}>{s}</button>;
+                      })}
+                    </div>
+                  </div>;
+                });
+              })()}
               <div style={{fontSize:9,color:"var(--txt3)"}}>Créer/renommer une salle : Paramètres → 🏥 Salles.</div></div>}
-            <div style={{gridColumn:"1/-1"}}><label style={S.fl}>{(mData.id==="GARDE"||mData.id==="REPOS_GARDE")?"Médecins autorisés":"Médecins autorisés (vide = tous)"}</label>
-              {(mData.id==="GARDE"||mData.id==="REPOS_GARDE")?(
+            <div style={{gridColumn:"1/-1"}}><label style={S.fl}>{(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")?"Médecins autorisés":"Médecins autorisés (vide = tous)"}</label>
+              {(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")?(
                 <div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
-                    {medecins.filter(m2=>m2.garde===true).map(m2=>(
+                    {medecins.filter(m2=>(mData.id==="TP"?m2.partTime===true:m2.garde===true)).map(m2=>(
                       <span key={m2.id} style={{fontSize:10,padding:"3px 8px",borderRadius:12,fontWeight:700,display:"inline-flex",alignItems:"center",gap:4,border:"1.5px solid "+m2.color,background:m2.color+"26",color:"var(--txt)"}}>
                         <span style={{width:12,height:12,borderRadius:"50%",background:m2.color,display:"inline-block"}}/>{m2.init}
                       </span>
                     ))}
                   </div>
-                  <div style={{fontSize:10,color:"#16a34a",fontWeight:700}}>⚙ Liste gérée par la coche « Garde » de l'onglet Équipe — modifiez-la là-bas.</div>
+                  <div style={{fontSize:10,color:"#16a34a",fontWeight:700}}>{mData.id==="TP"?"⚙ Liste gérée par la coche « Temps partiel » des fiches médecins (Équipe) — modifiez-la là-bas.":"⚙ Liste gérée par la coche « Garde » de l'onglet Équipe — modifiez-la là-bas."}</div>
                 </div>
               ):(
               <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:120,overflowY:"auto"}}>
@@ -6349,6 +6368,33 @@ header::-webkit-scrollbar { display: none; }
                 ))}
               </div>
             </div>}
+            {(mData.role||"medecin")!=="ide"&&<div style={{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,fontSize:10,fontWeight:800,color:"#388bfd",textTransform:"uppercase",letterSpacing:.5}}>🎯 Activités autorisées</div>}
+            {(mData.role||"medecin")!=="ide"&&<div style={{gridColumn:"1/-1"}}>
+              {!mData.init
+                ?<div style={{fontSize:11,color:"var(--txt3)"}}>Renseignez d'abord les initiales pour gérer les activités.</div>
+                :[["Général",a2=>a2.site!=="CHL"&&a2.site!=="CHB"],["CHL",a2=>a2.site==="CHL"],["CHB",a2=>a2.site==="CHB"]].map(([grp,fil])=>{
+                  const glist=actes.filter(a2=>!a2.isSystem&&a2.id!=="TP"&&fil(a2));
+                  if(glist.length===0)return null;
+                  return <div key={grp} style={{marginBottom:8}}>
+                    <div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{grp}</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {glist.map(a2=>{
+                        const allowed=!(a2.medecinsAutorise&&a2.medecinsAutorise.length)||a2.medecinsAutorise.includes(mData.init);
+                        return <button key={a2.id} type="button" onClick={()=>{
+                          setActes(prev=>prev.map(act=>{
+                            if(act.id!==a2.id)return act;
+                            const cur=act.medecinsAutorise||[];
+                            if(!allowed){if(cur.length===0)return act;return{...act,medecinsAutorise:[...cur,mData.init]};}
+                            if(cur.length===0){const all2=medecins.map(m3=>m3.init).filter(i2=>i2!==mData.init);return{...act,medecinsAutorise:all2};}
+                            return{...act,medecinsAutorise:cur.filter(i2=>i2!==mData.init)};
+                          }));
+                        }} style={{fontSize:10,padding:"3px 8px",borderRadius:11,cursor:"pointer",fontWeight:700,border:allowed?"1.5px solid "+a2.color:"1px solid var(--border)",background:allowed?a2.color+"33":"var(--bg2)",color:allowed?"var(--txt)":"var(--txt3)"}}>{a2.short}</button>;
+                      })}
+                    </div>
+                  </div>;
+                })}
+              <div style={{fontSize:9,color:"var(--txt3)"}}>Modifications enregistrées immédiatement. « Général » = disponible sur toute l'application.</div>
+            </div>}
           </div>
           <button style={{...S.btnP,width:"100%",marginTop:10}} onClick={()=>{
             if(!mData.nom||!mData.init)return toast("Nom et initiales requis","warn");
@@ -6359,35 +6405,7 @@ header::-webkit-scrollbar { display: none; }
         </Ov>
       )}
 
-      {modal==="editMedActivites"&&mData&&(
-        <Ov onClose={()=>setModal(null)}>
-          <div style={S.mHd}><div><div style={S.mTit2}>🎯 Activités — {mData.prenom} {mData.nom}</div><div style={{fontSize:11,color:"var(--txt3)",marginTop:2}}>Cochez pour autoriser.</div></div><button onClick={()=>setModal(null)} style={S.xBtn}>×</button></div>
-          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:400,overflowY:"auto"}}>
-            {actes.filter(a=>!a.isSystem).map(a=>{
-              const allowed=!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(mData.init);
-              return(
-                <label key={a.id} style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",borderRadius:7,background:allowed?"var(--nav-act)":"var(--bg2)",border:"1px solid var(--border)",cursor:"pointer"}}>
-                  <input type="checkbox" checked={allowed} onChange={e=>{
-                    setActes(prev=>prev.map(act=>{
-                      if(act.id!==a.id)return act;
-                      const cur=act.medecinsAutorise||[];
-                      if(e.target.checked){if(cur.length===0)return act;return{...act,medecinsAutorise:[...cur,mData.init]};}
-                      else{if(cur.length===0){const all=medecins.map(m=>m.init).filter(i=>i!==mData.init);return{...act,medecinsAutorise:all};}return{...act,medecinsAutorise:cur.filter(i=>i!==mData.init)};}
-                    }));
-                  }} style={{width:15,height:15,cursor:"pointer"}}/>
-                  <div style={{padding:"2px 6px",borderRadius:4,
-                  background:a.color,
-                  color:(()=>{try{const r=parseInt(a.color.slice(1,3),16)/255,g=parseInt(a.color.slice(3,5),16)/255,b=parseInt(a.color.slice(5,7),16)/255;const l=0.2126*(r<=0.04045?r/12.92:Math.pow((r+0.055)/1.055,2.4))+0.7152*(g<=0.04045?g/12.92:Math.pow((g+0.055)/1.055,2.4))+0.0722*(b<=0.04045?b/12.92:Math.pow((b+0.055)/1.055,2.4));return l>0.35?"#111":"#fff";}catch{return"#fff";}})(),
-                  fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{a.short}</div>
-                  <span style={{fontSize:12,color:"var(--txt)",fontWeight:allowed?600:400,flex:1}}>{a.label}</span>
-                  {!(a.medecinsAutorise&&a.medecinsAutorise.length)&&<span style={{fontSize:9,color:"var(--txt3)"}}>tous</span>}
-                </label>
-              );
-            })}
-          </div>
-          <button style={{...S.btnP,width:"100%",marginTop:10}} onClick={()=>setModal(null)}>Fermer</button>
-        </Ov>
-      )}
+
 
     </div>
   );
