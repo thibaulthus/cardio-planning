@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.9 — 19/07/2026";
+const APP_VERSION="v9.10 — 19/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3312,6 +3312,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"PIN médecin")," — édition personnelle : uniquement sa propre ligne (voir la première tuile). Défini par un éditeur dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"."]}),
   HP({children:["• ",HE("b",null,"PIN administratif")," — pour les secrétaires et cadres : un code partagé (défini dans Paramètres) ; chacun saisit son prénom à la connexion. Il permet de poser, modifier ou retirer les activités cochées « ✏️ administratif » (consultations…) sur la ligne de n'importe quel médecin, et de remplir les semaines blanches de l'onglet Reports. Gardes, tours, astreintes et réglages restent hors de portée."]}),
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
+  HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
   HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case du Planning — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
 
@@ -3655,6 +3656,13 @@ function CardioPlanning(){
   const [adminAsk,setAdminAsk]=useState(false);
   const [adminNameInput,setAdminNameInput]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
   const [showPins,setShowPins]=useState(false);
+  /* ── v9.10 : mode hors ligne (lecture seule) ── */
+  const [netOff,setNetOff]=useState(()=>typeof navigator!=="undefined"&&navigator.onLine===false);
+  useEffect(()=>{
+    const on=()=>setNetOff(false),off=()=>setNetOff(true);
+    window.addEventListener("online",on);window.addEventListener("offline",off);
+    return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
+  },[]);
   const [histModal,setHistModal]=useState(null);
   /* ── v9.9 : journal des cases — document Firestore séparé (planning/journal), jamais archivé ── */
   const authorRef=useRef("?");
@@ -4307,7 +4315,7 @@ function CardioPlanning(){
   useEffect(()=>{ applyTheme(darkMode); },[darkMode]);
   const toast=(msg,type="ok")=>{ setNotif({msg,type}); setTimeout(()=>setNotif(null),3500); };
   const acteById=useCallback(id=>actes.find(a=>a.id===id),[actes]);
-  const isEdit=accessMode==="edit";
+  const isEdit=accessMode==="edit"&&!netOff; // hors ligne : lecture seule
   // ─── Undo/Redo history (edit mode) ───
   const histRef=useRef({stack:[],idx:-1,restoring:false});
   const [histVer,setHistVer]=useState(0);
@@ -4345,8 +4353,8 @@ function CardioPlanning(){
     applySnapshot(h.stack[h.idx]);
     setHistVer(v=>v+1);
   };
-  const isMedEdit=accessMode==="medecinEdit";
-  const isAdminEdit=accessMode==="adminEdit";
+  const isMedEdit=accessMode==="medecinEdit"&&!netOff;
+  const isAdminEdit=accessMode==="adminEdit"&&!netOff;
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
@@ -4896,6 +4904,9 @@ header::-webkit-scrollbar { display: none; }
 `}</style>
 
       {notif&&<div style={{...S.notif,background:"var(--bg-td)",borderColor:"#4ade80"}}>{notif.msg}</div>}
+      {netOff&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
+        📴 Hors ligne — dernier planning reçu · lecture seule
+      </div>}
       {isMedEdit&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         ✏️ Mode édition restreinte — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
       </div>}
@@ -4918,8 +4929,8 @@ header::-webkit-scrollbar { display: none; }
             <div style={{fontSize:8,color:"#484f58",display:"flex",alignItems:"center",gap:4}}>
               CHL & CHB{!isEdit&&<span style={{color:"#e3b341",marginLeft:5}}>👁</span>}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
-                background:fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
-                title={fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
+                background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
+                title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
             </div>
           </div>
         </div>
@@ -5774,7 +5785,7 @@ header::-webkit-scrollbar { display: none; }
           <div style={S.card}>
             <div style={{fontWeight:700,color:"var(--txt2)",fontSize:13,marginBottom:6}}>☁️ Synchronisation Firebase</div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:10,height:10,borderRadius:"50%",flexShrink:0,background:fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}/>
+              <div style={{width:10,height:10,borderRadius:"50%",flexShrink:0,background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}/>
               <span style={{fontSize:12,color:"var(--txt2)"}}>
                 {fbStatus==="ok"?"Connecté — données sauvegardées automatiquement":
                  fbStatus==="error"?"Erreur de connexion — vérifiez votre réseau":

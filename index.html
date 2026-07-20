@@ -21,6 +21,8 @@
 <script>
 firebase.initializeApp({apiKey:"AIzaSyCTyQVUAvsZta9RISMBmqmRKOlqFHoa4wI",authDomain:"planning-cardio-chl-et-chb.firebaseapp.com",projectId:"planning-cardio-chl-et-chb",storageBucket:"planning-cardio-chl-et-chb.firebasestorage.app",messagingSenderId:"628915396436",appId:"1:628915396436:web:30f0e67a527d89b58a32c1"});
 const _db=firebase.firestore();window.firebaseDB=_db;
+try{_db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){} /* v9.10 : cache local des données (mode hors ligne) */
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
 window.firebaseDoc=function(db,col,id){return db.collection(col).doc(id);};
 window.firebaseSetDoc=function(ref,data,opts){return opts&&opts.merge?ref.set(data,{merge:true}):ref.set(data);};
 window.firebaseOnSnapshot=function(ref,onNext,onErr){return ref.onSnapshot(onNext,onErr);};
@@ -136,7 +138,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.9 — 19/07/2026";
+var APP_VERSION = "v9.10 — 19/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3497,6 +3499,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"PIN médecin")," — édition personnelle : uniquement sa propre ligne (voir la première tuile). Défini par un éditeur dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"."]}),
   HP({children:["• ",HE("b",null,"PIN administratif")," — pour les secrétaires et cadres : un code partagé (défini dans Paramètres) ; chacun saisit son prénom à la connexion. Il permet de poser, modifier ou retirer les activités cochées « ✏️ administratif » (consultations…) sur la ligne de n'importe quel médecin, et de remplir les semaines blanches de l'onglet Reports. Gardes, tours, astreintes et réglages restent hors de portée."]}),
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
+  HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
   HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case du Planning — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
 
@@ -3841,6 +3844,14 @@ function CardioPlanning() {
     var _aa = useState(false), adminAsk = _aa[0], setAdminAsk = _aa[1];
     var _ani = useState(function () { try { return localStorage.getItem("cp6_adminName") || ""; } catch (e) { return ""; } }), adminNameInput = _ani[0], setAdminNameInput = _ani[1];
     var _sp = useState(false), showPins = _sp[0], setShowPins = _sp[1];
+    /* ── v9.10 : mode hors ligne (lecture seule) ── */
+    var _no = useState(function () { return typeof navigator !== "undefined" && navigator.onLine === false; }), netOff = _no[0], setNetOff = _no[1];
+    useEffect(function () {
+        var on = function () { return setNetOff(false); }, off = function () { return setNetOff(true); };
+        window.addEventListener("online", on);
+        window.addEventListener("offline", off);
+        return function () { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+    }, []);
     var _hm = useState(null), histModal = _hm[0], setHistModal = _hm[1];
     /* ── v9.9 : journal des cases — document Firestore séparé (planning/journal), jamais archivé ── */
     var authorRef = useRef("?");
@@ -4857,7 +4868,7 @@ function CardioPlanning() {
         setTimeout(function () { return setNotif(null); }, 3500);
     };
     var acteById = useCallback(function (id) { return actes.find(function (a) { return a.id === id; }); }, [actes]);
-    var isEdit = accessMode === "edit";
+    var isEdit = accessMode === "edit" && !netOff; // hors ligne : lecture seule
     // ─── Undo/Redo history (edit mode) ───
     var histRef = useRef({ stack: [], idx: -1, restoring: false });
     var _32 = useState(0), histVer = _32[0], setHistVer = _32[1];
@@ -4905,8 +4916,8 @@ function CardioPlanning() {
         applySnapshot(h.stack[h.idx]);
         setHistVer(function (v) { return v + 1; });
     };
-    var isMedEdit = accessMode === "medecinEdit";
-    var isAdminEdit = accessMode === "adminEdit";
+    var isMedEdit = accessMode === "medecinEdit" && !netOff;
+    var isAdminEdit = accessMode === "adminEdit" && !netOff;
     // Returns true if current user can edit this specific medecin's data
     var canEdit = function (medId) { return isEdit || (isMedEdit && editMedId === medId) || isAdminEdit; };
     var isAnyEdit = isEdit || isMedEdit || isAdminEdit;
@@ -5569,6 +5580,7 @@ function CardioPlanning() {
     return (React.createElement("div", { style: S.app },
         React.createElement("style", null, "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav::-webkit-scrollbar { display: none; }\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
         notif && React.createElement("div", { style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", borderColor: "#4ade80" }) }, notif.msg),
+        netOff && React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, "\uD83D\uDCF4 Hors ligne \u2014 dernier planning re\u00E7u \u00B7 lecture seule"),
         isMedEdit && React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1d4ed8", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
             "\u270F\uFE0F Mode \u00E9dition restreinte \u2014 Dr. ",
             (medecins.find(function (m) { return m.id === editMedId; }) || { nom: "" }).nom,
@@ -5591,7 +5603,7 @@ function CardioPlanning() {
                         "CHL & CHB",
                         !isEdit && React.createElement("span", { style: { color: "#e3b341", marginLeft: 5 } }, "\uD83D\uDC41"),
                         React.createElement("span", { style: { marginLeft: 4, width: 6, height: 6, borderRadius: "50%", display: "inline-block",
-                                background: fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
+                                background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: netOff ? "Hors ligne — lecture seule" : fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
             React.createElement("nav", { style: S.nav }, orderedTabs.map(function (_a) {
                 var v = _a[0], l = _a[1];
                 return (React.createElement("button", { key: v, draggable: true, onDragStart: function () { return setDragTab(v); }, onDragOver: function (e) { e.preventDefault(); }, onDrop: function (e) { e.preventDefault(); if (dragTab && dragTab !== v) {
@@ -6510,7 +6522,7 @@ function CardioPlanning() {
                 React.createElement("div", { style: S.card },
                     React.createElement("div", { style: { fontWeight: 700, color: "var(--txt2)", fontSize: 13, marginBottom: 6 } }, "\u2601\uFE0F Synchronisation Firebase"),
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-                        React.createElement("div", { style: { width: 10, height: 10, borderRadius: "50%", flexShrink: 0, background: fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" } }),
+                        React.createElement("div", { style: { width: 10, height: 10, borderRadius: "50%", flexShrink: 0, background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" } }),
                         React.createElement("span", { style: { fontSize: 12, color: "var(--txt2)" } }, fbStatus === "ok" ? "Connecté — données sauvegardées automatiquement" :
                             fbStatus === "error" ? "Erreur de connexion — vérifiez votre réseau" :
                                 fbStatus === "offline" ? "Mode local — sans sauvegarde automatique" :
