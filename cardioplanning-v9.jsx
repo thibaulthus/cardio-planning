@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.12 — 20/07/2026";
+const APP_VERSION="v9.14 — 20/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3378,6 +3378,18 @@ function ReportsView(p){
   const mid=medSel.id;
   const editable=isEdit||(accessMode==="medecinEdit"&&editMedId===mid)||p.adminReports===true;
   const dk3=(y,m,d)=>y+"-"+m+"-"+d;
+  /* ── v9.14 : registre des reports (persisté, partagé avec les secrétaires) ── */
+  const repAll=(p.csRep&&p.csRep[mid])||{};
+  const repDone=repAll.done||{};
+  const repTo=repAll.to||{};
+  const lostK=(o)=>dk3(o.y,o.m,o.d)+"|"+o.sl;
+  const setRep=(fn)=>{if(!p.setCsRep)return;p.setCsRep(pr=>{const cur=pr[mid]||{};const nx={done:{...(cur.done||{})},to:{...(cur.to||{})}};fn(nx);const out={...pr};out[mid]=nx;return out;});};
+  const toggleDone=(wk)=>setRep(c=>{if(c.done[wk])delete c.done[wk];else c.done[wk]=true;});
+  const setReport=(o,dest,note)=>setRep(c=>{c.to[lostK(o)]={d:dk3(dest.y,dest.m,dest.d),sl:dest.sl,n:note||""};});
+  const clrReport=(o)=>setRep(c=>{delete c.to[lostK(o)];});
+  const setRepNote=(o,txt)=>setRep(c=>{const k=lostK(o);if(c.to[k])c.to[k]={...c.to[k],n:txt};});
+  const [repModal,setRepModal]=React.useState(null);
+  const dkParse=(s)=>{const q=String(s).split("-");return {y:+q[0],m:+q[1],d:+q[2]};};
   const wkOf=(y,m,d)=>{const dt=new Date(y,m,d);const dw=dt.getDay();const diff=dw===0?-6:1-dw;const mn=new Date(y,m,d+diff);return dk3(mn.getFullYear(),mn.getMonth(),mn.getDate());};
   /* ── Période : sélecteur local, défaut = période suivante (outil de préparation) ── */
   const [repPer,setRepPer]=React.useState(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
@@ -3524,6 +3536,7 @@ function ReportsView(p){
     const F=freeModal;if(!F||!p.addEntry)return;
     p.addEntry(mid,F.y,F.m,F.d,F.sl,{acteId:a.id,salle:salle||null});
     if(lost&&p.setNotes)p.setNotes(pn=>{const nn={...pn};nn[nk(mid,F.y,F.m,F.d,F.sl)]="Report de la "+(a.short||a.label)+" du "+fmtD(lost)+" "+lost.sl;return nn;});
+    if(lost)setReport(lost,{y:F.y,m:F.m,d:F.d,sl:F.sl},"posé depuis les salles libres");
     setFreeModal(null);setFreeStep(null);
     if(toast)toast("Ajouté"+(salle?" — "+salle:""));
   };
@@ -3612,12 +3625,38 @@ function ReportsView(p){
       :RE("div",{style:{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden",marginBottom:12}},
         analysis.weekItems.map((it,i)=>{
           const f=it.days[0];
+          const done=it.kind==="open"&&!!repDone[it.wk];
           const badge=(txt,bgc,cl)=>RE("span",{style:{fontSize:9,padding:"1px 6px",borderRadius:5,fontWeight:800,background:bgc,color:cl}},txt);
-          const line=(a2,txt,k)=>RE("span",{key:k,style:{marginRight:10,display:"inline-flex",alignItems:"center",gap:4}},
-            a2&&RE("span",{style:{padding:"0 5px",borderRadius:4,fontSize:8,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a2.site==="CHB"?"#b4a7d6":"#c9daf8",color:"#111"}},a2.short),txt);
-          return RE("div",{key:it.wk,style:{padding:"7px 10px",borderTop:i>0?"1px solid var(--border2)":"none",fontSize:11}},
+          const pill=(a2)=>a2&&RE("span",{style:{padding:"0 5px",borderRadius:4,fontSize:8,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a2.site==="CHB"?"#b4a7d6":"#c9daf8",color:"#111"}},a2.short);
+          const line=(a2,txt,k)=>RE("span",{key:k,style:{marginRight:10,display:"inline-flex",alignItems:"center",gap:4}},pill(a2),txt);
+          const miniBtn=(txt,col,fn)=>RE("button",{onClick:fn,style:{fontSize:9,padding:"1px 7px",borderRadius:5,cursor:"pointer",fontWeight:800,border:"1px solid "+col,background:"transparent",color:col}},txt);
+          const lostLine=(L,k,prop)=>{
+            const a2=acteOf(L.acte),r=repTo[lostK(L)];
+            return RE("div",{key:k,style:{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",padding:"2px 0"}},
+              pill(a2),
+              RE("span",{style:{color:r?"#16a34a":"var(--txt2)",fontWeight:r?700:400,textDecoration:r?"line-through":"none"}},fmtD(L)+" "+L.sl),
+              r&&RE("span",{style:{color:"#16a34a",fontWeight:800}},"→ reporté au "+fmtD(dkParse(r.d))+" "+r.sl),
+              r&&RE("input",{value:r.n||"",placeholder:"note…",readOnly:!editable,onChange:e=>setRepNote(L,e.target.value),
+                style:{fontSize:9,padding:"1px 5px",borderRadius:4,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",width:120}}),
+              !r&&prop&&RE("span",{style:{color:"var(--txt3)"}},"→ "+fmtD(prop)+" "+prop.sl),
+              editable&&r&&miniBtn("annuler","var(--txt3)",()=>clrReport(L)),
+              editable&&!r&&prop&&miniBtn("✓ noter","#16a34a",()=>setReport(L,prop,"")),
+              editable&&!r&&miniBtn("reporter…","#7c3aed",()=>setRepModal({L})));
+          };
+          const weekReport=()=>{
+            const src=new Date(it.lost[0].y,it.lost[0].m,it.lost[0].d);
+            const cand=weeks.filter(w=>w.key!==it.wk&&w.days.some(x=>isBl(x.y,x.m,x.d)))
+              .sort((a,b)=>Math.abs(new Date(a.days[0].y,a.days[0].m,a.days[0].d)-src)-Math.abs(new Date(b.days[0].y,b.days[0].m,b.days[0].d)-src));
+            const w=cand[0];
+            if(!w){if(toast)toast("Aucune semaine blanche sur la période","warn");return;}
+            setRep(c=>{it.lost.forEach(L=>{const dwL=new Date(L.y,L.m,L.d).getDay();const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===dwL);if(o)c.to[lostK(L)]={d:dk3(o.y,o.m,o.d),sl:L.sl,n:""};});});
+            if(toast)toast("Reporté sur la semaine du "+w.days[0].d+" "+MOIS[w.days[0].m].slice(0,4));
+          };
+          return RE("div",{key:it.wk,style:{padding:"7px 10px",borderTop:i>0?"1px solid var(--border2)":"none",fontSize:11,background:done?"rgba(22,163,74,.10)":"transparent"}},
             RE("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:it.kind==="ok"?0:3}},
-              RE("span",{style:{fontWeight:800,color:"var(--txt)"}},(it.kind==="open"?"Semaine blanche du ":"Semaine du ")+f.d+" "+MOIS[f.m].slice(0,4)),
+              it.kind==="open"&&RE("input",{type:"checkbox",checked:done,disabled:!editable,onChange:()=>toggleDone(it.wk),
+                title:"Consultations rouvertes",style:{width:14,height:14,cursor:editable?"pointer":"default"}}),
+              RE("span",{style:{fontWeight:800,color:done?"#16a34a":"var(--txt)",textDecoration:done?"line-through":"none"}},(it.kind==="open"?"Semaine blanche du ":"Semaine du ")+f.d+" "+MOIS[f.m].slice(0,4)),
               it.kind==="ok"&&badge("tour","rgba(29,78,216,.12)","#1d4ed8"),
               (it.kind==="report"||it.kind==="norep")&&badge(it.why,it.why==="tour"?"rgba(29,78,216,.12)":"rgba(239,68,68,.12)",it.why==="tour"?"#1d4ed8":"#ef4444"),
               it.kind==="open"&&badge("dispo","rgba(245,158,11,.2)","#b45309"),
@@ -3627,9 +3666,10 @@ function ReportsView(p){
               it.kind==="ok"&&RE("span",{style:{fontWeight:800,color:"#16a34a"}},"✓ semaine blanche — pas de report nécessaire"),
               it.kind==="open"&&RE("span",{style:{fontWeight:800,color:"#b45309"}},"consultations fermées à réouvrir")),
             it.kind==="report"&&RE("div",{style:{fontSize:10,color:"var(--txt2)",lineHeight:1.7}},
-              it.lost.map((L,k)=>line(acteOf(L.acte),fmtD(L)+" "+L.sl+" → "+fmtD(it.dest[k])+" "+it.dest[k].sl,k))),
+              it.lost.map((L,k)=>lostLine(L,k,it.dest[k]))),
             it.kind==="norep"&&RE("div",{style:{fontSize:10,color:"var(--txt2)",lineHeight:1.7}},
-              it.lost.map((L,k)=>line(acteOf(L.acte),fmtD(L)+" "+L.sl,k))),
+              it.lost.map((L,k)=>lostLine(L,k,null)),
+              editable&&RE("button",{onClick:weekReport,style:{marginTop:3,fontSize:10,padding:"3px 9px",borderRadius:6,cursor:"pointer",fontWeight:800,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed"}},"⇄ Reporter la semaine sur la blanche la plus proche")),
             it.kind==="open"&&RE("div",{style:{fontSize:10,color:"var(--txt2)",lineHeight:1.7}},
               it.dates.map((o,k)=>{const dw=new Date(o.y,o.m,o.d).getDay();const aid=habCS[dw]&&habCS[dw][o.sl];
                 return line(aid?acteOf(aid):null,fmtD(o)+" "+o.sl,k);})));
@@ -3662,6 +3702,22 @@ function ReportsView(p){
       RE("span",{style:{color:"#7c3aed",fontWeight:700}},"violet")," = vos jours habituels de consultation · ",
       RE("span",{style:{color:"#16a34a",fontWeight:700}},"vert")," = une salle est libre ce créneau",editable?" — touchez la case pour poser une activité":""),
     analysis.weekPairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"),
+    repModal&&(()=>{
+      const L=repModal.L,dwL=new Date(L.y,L.m,L.d).getDay(),src=new Date(L.y,L.m,L.d);
+      const cands=days.filter(x=>new Date(x.y,x.m,x.d).getDay()===dwL&&isBl(x.y,x.m,x.d)&&!isFerie(x.y,x.m,x.d))
+        .sort((a,b)=>Math.abs(new Date(a.y,a.m,a.d)-src)-Math.abs(new Date(b.y,b.m,b.d)-src)).slice(0,10);
+      return RE("div",{onClick:()=>setRepModal(null),
+        style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.55)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:12}},
+        RE("div",{onClick:e=>e.stopPropagation(),style:{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:12,padding:14,width:"100%",maxWidth:400,maxHeight:"80vh",overflowY:"auto"}},
+          RE("div",{style:{fontWeight:800,fontSize:13,color:"var(--txt)",marginBottom:4}},"⇄ Reporter "+fmtD(L)+" "+L.sl),
+          RE("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:9}},"Dates blanches du même jour de la semaine, de la plus proche à la plus lointaine :"),
+          cands.length===0
+            ?RE("div",{style:{fontSize:11,color:"#ef4444",fontWeight:700}},"Aucune date blanche ce jour-là sur la période.")
+            :RE("div",{style:{display:"flex",flexWrap:"wrap",gap:5}},
+              cands.map((o,k)=>RE("button",{key:k,onClick:()=>{setReport(L,{y:o.y,m:o.m,d:o.d,sl:L.sl},"");setRepModal(null);},
+                style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"}},fmtD(o)+" "+L.sl))),
+          RE("button",{onClick:()=>setRepModal(null),style:{marginTop:10,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",cursor:"pointer",fontWeight:700}},"Fermer")));
+    })(),
     freeModal&&RE("div",{onClick:()=>{setFreeModal(null);setFreeStep(null);},
       style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.55)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:12}},
       RE("div",{onClick:e=>e.stopPropagation(),style:{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:12,padding:14,width:"100%",maxWidth:430,maxHeight:"82vh",overflowY:"auto"}},
@@ -3763,9 +3819,6 @@ function CardioPlanning(){
   const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
   useEffect(()=>{ try{ localStorage.setItem("cp6_taborder",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
-  const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t=>t[0]===id)).filter(Boolean)
-    .filter(([tid])=>!((accessMode==="adminEdit"||isInterEdit)&&(tid==="partage"||tid==="equipe")));
-  useEffect(()=>{if((accessMode==="adminEdit"||isInterEdit)&&(tab==="partage"||tab==="equipe"))setTab("planning");},[accessMode,tab,isInterEdit]);
 
   const [modal,setModal]=useState(null);
   const [mData,setMData]=useState(null);
@@ -3792,6 +3845,7 @@ function CardioPlanning(){
   const [gardeAvoid,setGardeAvoid]=useState({}); // {dateKey:{medId:true}} préfère pas de garde ce jour
   const [gardeWish,setGardeWish]=useState({});   // {dateKey:{medId:true}} souhaite la garde ce jour
   const [csBlanches,setCsBlanches]=useState({}); // {medId:{"y-m-d":true}} jours sans consultation (logiciel métier)
+  const [csRep,setCsRep]=useState({}); // v9.14 {medId:{done:{wk:true},to:{"dKey|sl":{d,sl,n}}}}
   const [csActsSel,setCsActsSel]=useState({});   // {medId:[acteIds]} activités comptées comme consultation
   const [csActsGlobal,setCsActsGlobal]=useState(["CS_CHL","CS_CHB","DOBU","DOBU_CHB","ETO_CHL","PM_CS","DEFIB_CS","RYTHMO_CHB"]); // activités proposables dans l'onglet Reports (réglé dans Paramètres)
   const [tourDerog,setTourDerog]=useState({});   // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
@@ -3976,6 +4030,7 @@ function CardioPlanning(){
           if(data.gardeAvoid)setGardeAvoid(JSON.parse(data.gardeAvoid));
           if(data.gardeWish)setGardeWish(JSON.parse(data.gardeWish));
           if(data.csBlanches)setCsBlanches(JSON.parse(data.csBlanches));
+          if(data.csRep)setCsRep(JSON.parse(data.csRep));
           if(data.csActsSel)setCsActsSel(JSON.parse(data.csActsSel));
           if(data.csActsGlobal)setCsActsGlobal(JSON.parse(data.csActsGlobal));
           if(data.tourDerog)setTourDerog(JSON.parse(data.tourDerog));
@@ -4326,6 +4381,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({gardeAvoid:JSON.stringify(gardeAvoid)});},[gardeAvoid]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({gardeWish:JSON.stringify(gardeWish)});},[gardeWish]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csBlanches:JSON.stringify(csBlanches)});},[csBlanches]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csRep:JSON.stringify(csRep)});},[csRep]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsSel:JSON.stringify(csActsSel)});},[csActsSel]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsGlobal:JSON.stringify(csActsGlobal)});},[csActsGlobal]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourDerog:JSON.stringify(tourDerog)});},[tourDerog]);
@@ -4427,6 +4483,10 @@ function CardioPlanning(){
   const medLvl=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic"):null;
   const isMedEdit=accessMode==="medecinEdit"&&medLvl!=="editeur"&&!netOff;
   const isInterEdit=accessMode==="medecinEdit"&&medLvl==="inter"&&!netOff;
+  /* v9.13 : calculé ICI (après les niveaux) — Paramètres et Équipe masqués à tout médecin non-éditeur et à l'administratif */
+  const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
+    .filter(([tid])=>!((accessMode==="adminEdit"||isMedEdit)&&(tid==="partage"||tid==="equipe")));
+  useEffect(()=>{if((accessMode==="adminEdit"||isMedEdit)&&(tab==="partage"||tab==="equipe"))setTab("planning");},[accessMode,tab,isMedEdit]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
@@ -5124,7 +5184,7 @@ header::-webkit-scrollbar { display: none; }
             <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}} onClick={()=>openPtModal(null,"remove")}>🗑 Retirer</button>
           </div>}
           <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Semaine type par médecin. Le bouton ▶ PT l'applique aux mois de la période affichée (choix des mois et du point de départ dans la fenêtre). TM exclus automatiquement. Clic sur une case pour définir.</div>
-          <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit} orient={orient} acteById={acteById} setMData={setMData} setModal={setModal}/>
+          <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit||isInterEdit} orient={orient} acteById={acteById} setMData={setMData} setModal={setModal}/>
         </div>
       )}
 
@@ -5178,7 +5238,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="equipe"&&accessMode!=="adminEdit"&&!isInterEdit&&(
+      {tab==="equipe"&&accessMode!=="adminEdit"&&!isMedEdit&&(
         <div>
           <div style={S.bar}><h2 style={S.mTit}>👥 Équipe</h2><div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
       {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
@@ -5226,7 +5286,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} year={year} month={month} toast={toast}/>}
+      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} year={year} month={month} toast={toast}/>}
       {tab==="aide"&&<HelpView/>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -5426,8 +5486,8 @@ header::-webkit-scrollbar { display: none; }
                           <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{d} <span style={{fontSize:9,fontWeight:600}}>{MOIS[m].slice(0,4)}</span></div>
                           <div style={{fontSize:9,color:we?"#92400e":isT?"var(--today-c)":"var(--txt3)",fontWeight:600}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]}</div>
                         </td>
-                        <td style={{...S.td,padding:4,cursor:(isEdit||isMedEdit)?"pointer":"default",...(hasExc?{outline:"2px solid #7c3aed",outlineOffset:-2}:{})}}
-                          onClick={(isEdit||isMedEdit)?()=>{setAstPickModal({dayKey:dk,wKey:wk,isWeek:false,label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]+" "+y});setAstSearch("");}:undefined}>
+                        <td style={{...S.td,padding:4,cursor:isEdit?"pointer":"default",...(hasExc?{outline:"2px solid #7c3aed",outlineOffset:-2}:{})}}
+                          onClick={isEdit?()=>{setAstPickModal({dayKey:dk,wKey:wk,isWeek:false,label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]+" "+y});setAstSearch("");}:undefined}>
                           {med?(<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:med.color+"22"}}>
                             <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{med.init}</div>
                             <span style={{fontSize:12,fontWeight:600,color:isAbsMed?"#ef4444":"var(--txt)"}}>{med.prenom} {med.nom}</span>
@@ -5533,8 +5593,8 @@ header::-webkit-scrollbar { display: none; }
         );
       })()}
 
-      {tab==="stats"&&isEdit&&<StatsTab medecins={medecins} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
-      {tab==="partage"&&accessMode!=="adminEdit"&&!isInterEdit&&(
+      {tab==="stats"&&(isEdit||isInterEdit)&&<StatsTab medecins={medecins} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
+      {tab==="partage"&&accessMode!=="adminEdit"&&!isMedEdit&&(
         <div style={{maxWidth:500}}>
           <h2 style={{...S.mTit,marginBottom:16}}>⚙️ Paramètres <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2>
 
