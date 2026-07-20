@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.11 — 20/07/2026";
+const APP_VERSION="v9.12 — 20/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3510,6 +3510,23 @@ function ReportsView(p){
     const offWeeks=weeks.filter(w=>offByWk[w.key]).map(w=>({key:w.key,days:w.days,slots:offByWk[w.key]}));
     return {weekPairs,weekItems,offWeeks};
   },[days,weeks,bl,tourMed,planningType,myActs.join(","),mid]);
+  /* ── v9.12 : salles libres sur les demi-journées off ── */
+  const [freeModal,setFreeModal]=React.useState(null);
+  const [freeStep,setFreeStep]=React.useState(null);
+  const myActesAll=actes.filter(a=>!a.isSystem&&a.id!=="TP"
+    &&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.indexOf(medSel.init)>=0)
+    &&(!p.adminReports||a.adminOk===true));
+  const occSalles=(yy,mm,dd,ss)=>{const s={};medecins.forEach(mb=>getEntries(mb.id,yy,mm,dd,ss).forEach(e=>{if(e&&e.salle)s[e.salle]=true;}));return s;};
+  const freeFor=(a,occ)=>(a.salles||[]).filter(s=>!occ[s]);
+  const hasFreeRoom=(yy,mm,dd,ss)=>{const occ=occSalles(yy,mm,dd,ss);return myActesAll.some(a=>a.hasSalle&&freeFor(a,occ).length>0);};
+  const dayOf=(w,dw)=>w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===dw);
+  const poseFree=(a,salle,lost)=>{
+    const F=freeModal;if(!F||!p.addEntry)return;
+    p.addEntry(mid,F.y,F.m,F.d,F.sl,{acteId:a.id,salle:salle||null});
+    if(lost&&p.setNotes)p.setNotes(pn=>{const nn={...pn};nn[nk(mid,F.y,F.m,F.d,F.sl)]="Report de la "+(a.short||a.label)+" du "+fmtD(lost)+" "+lost.sl;return nn;});
+    setFreeModal(null);setFreeStep(null);
+    if(toast)toast("Ajouté"+(salle?" — "+salle:""));
+  };
   const exportCSVR=()=>{
     const rows=[["Consultation perdue","Activité","Cause","Report proposé"]];
     analysis.weekPairs.forEach(wp=>wp.lost.forEach((L,i)=>{
@@ -3631,15 +3648,67 @@ function ReportsView(p){
               RE("td",{style:{padding:"3px 8px",fontSize:10,fontWeight:700,color:"var(--txt)",whiteSpace:"nowrap"}},f.d+" "+MOIS[f.m].slice(0,4)),
               [1,2,3,4,5].map(dw=>{
                 const sls=w.slots[dw]||[];
-                return RE("td",{key:dw,style:{padding:"4px 2px",textAlign:"center",fontSize:9,fontWeight:800,border:"1px solid var(--border2)",
-                  color:sls.length?(habDW.indexOf(dw)>=0?"#7c3aed":"var(--txt2)"):"var(--txt3)",
-                  background:sls.length?(habDW.indexOf(dw)>=0?"rgba(124,58,237,.10)":"var(--bg2)"):"transparent"}},
+                const o=dayOf(w,dw);
+                const green=sls.length>0&&o&&sls.some(s2=>hasFreeRoom(o.y,o.m,o.d,s2));
+                return RE("td",{key:dw,onClick:(sls.length&&editable&&o)?()=>{setFreeStep(null);setFreeModal({y:o.y,m:o.m,d:o.d,sl:sls[0],slots:sls});}:undefined,
+                  style:{padding:"4px 2px",textAlign:"center",fontSize:9,fontWeight:800,border:"1px solid var(--border2)",
+                  cursor:(sls.length&&editable)?"pointer":"default",
+                  color:!sls.length?"var(--txt3)":green?"#16a34a":(habDW.indexOf(dw)>=0?"#7c3aed":"var(--txt2)"),
+                  background:!sls.length?"transparent":green?"rgba(22,163,74,.16)":(habDW.indexOf(dw)>=0?"rgba(124,58,237,.10)":"var(--bg2)")}},
                   sls.length?sls.join("·"):"");
               }));
           })))),
     analysis.offWeeks.length>0&&RE("div",{style:{fontSize:9,color:"var(--txt3)",marginBottom:10}},
-      RE("span",{style:{color:"#7c3aed",fontWeight:700}},"violet")," = vos jours habituels de consultation"),
-    analysis.weekPairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"));
+      RE("span",{style:{color:"#7c3aed",fontWeight:700}},"violet")," = vos jours habituels de consultation · ",
+      RE("span",{style:{color:"#16a34a",fontWeight:700}},"vert")," = une salle est libre ce créneau",editable?" — touchez la case pour poser une activité":""),
+    analysis.weekPairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"),
+    freeModal&&RE("div",{onClick:()=>{setFreeModal(null);setFreeStep(null);},
+      style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.55)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:12}},
+      RE("div",{onClick:e=>e.stopPropagation(),style:{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:12,padding:14,width:"100%",maxWidth:430,maxHeight:"82vh",overflowY:"auto"}},
+        RE("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:8}},
+          RE("div",{style:{fontWeight:800,fontSize:13,color:"var(--txt)"}},"🟢 "+fmtD(freeModal)+" "+(SLOTL[freeModal.sl]||freeModal.sl)),
+          RE("button",{onClick:()=>{setFreeModal(null);setFreeStep(null);},style:{marginLeft:"auto",background:"none",border:"none",color:"var(--txt2)",fontSize:20,cursor:"pointer",lineHeight:1}},"×")),
+        (freeModal.slots||[]).length>1&&RE("div",{style:{display:"flex",gap:5,marginBottom:9}},
+          (freeModal.slots||[]).map(s2=>RE("button",{key:s2,onClick:()=>{setFreeStep(null);setFreeModal(f=>({...f,sl:s2}));},
+            style:{fontSize:11,padding:"3px 11px",borderRadius:11,cursor:"pointer",fontWeight:800,
+              border:freeModal.sl===s2?"1.5px solid #16a34a":"1px solid var(--border)",
+              background:freeModal.sl===s2?"rgba(22,163,74,.12)":"var(--bg)",color:freeModal.sl===s2?"#16a34a":"var(--txt3)"}},SLOTL[s2]||s2))),
+        (()=>{
+          const occ=occSalles(freeModal.y,freeModal.m,freeModal.d,freeModal.sl);
+          if(freeStep){
+            const fs=freeFor(freeStep.a,occ);
+            return RE("div",null,
+              RE("div",{style:{fontSize:11,color:"var(--txt2)",marginBottom:6}},"Salle pour ",RE("b",null,freeStep.a.label)," :"),
+              RE("div",{style:{display:"flex",flexWrap:"wrap",gap:5}},
+                fs.map(s=>RE("button",{key:s,onClick:()=>poseFree(freeStep.a,s,freeStep.lost),
+                  style:{fontSize:12,padding:"6px 12px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"}},s))),
+              RE("button",{onClick:()=>setFreeStep(null),style:{marginTop:9,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",cursor:"pointer",fontWeight:700}},"‹ Retour"));
+          }
+          const pinned=[];
+          analysis.weekPairs.forEach(wp=>{if(!wp.to)wp.lost.forEach(L=>{
+            const a=myActesAll.find(x=>x.id===L.acte);
+            if(a&&(!a.hasSalle||freeFor(a,occ).length>0))pinned.push({a,lost:L});
+          });});
+          const withRoom=myActesAll.filter(a=>a.hasSalle&&freeFor(a,occ).length>0);
+          const noRoom=myActesAll.filter(a=>!a.hasSalle);
+          const full=myActesAll.filter(a=>a.hasSalle&&freeFor(a,occ).length===0);
+          const go=(a,lost)=>{const fs=freeFor(a,occ);if(!a.hasSalle)return poseFree(a,null,lost);if(fs.length===1)return poseFree(a,fs[0],lost);setFreeStep({a,lost});};
+          const grp=(titre,col,items,render)=>items.length===0?null:RE("div",{key:titre,style:{marginBottom:9}},
+            RE("div",{style:{fontSize:9,fontWeight:800,color:col,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}},titre),
+            RE("div",{style:{display:"flex",flexWrap:"wrap",gap:5}},items.map(render)));
+          return RE("div",null,
+            grp("📥 À reporter","#b45309",pinned,(it,i)=>RE("button",{key:"p"+i,onClick:()=>go(it.a,it.lost),
+              style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #b45309",background:"rgba(245,158,11,.12)",color:"#b45309",textAlign:"left"}},
+              (it.a.short||it.a.label)+" — report du "+fmtD(it.lost)+" "+it.lost.sl)),
+            grp("Salle libre","#16a34a",withRoom,a=>RE("button",{key:a.id,onClick:()=>go(a,null),
+              style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"}},
+              (a.short||a.label)+" · "+freeFor(a,occ).length+(freeFor(a,occ).length>1?" salles":" salle"))),
+            grp("Sans salle","var(--txt2)",noRoom,a=>RE("button",{key:a.id,onClick:()=>go(a,null),
+              style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)"}},a.short||a.label)),
+            grp("Toutes salles occupées","var(--txt3)",full,a=>RE("span",{key:a.id,
+              style:{fontSize:11,padding:"5px 10px",borderRadius:8,fontWeight:700,border:"1px dashed var(--border)",background:"transparent",color:"var(--txt3)"}},a.short||a.label)),
+            (pinned.length+withRoom.length+noRoom.length+full.length)===0&&RE("div",{style:{fontSize:11,color:"var(--txt3)"}},"Aucune activité disponible pour vous sur ce créneau."));
+        })())));
 }
 
 function CardioPlanning(){
@@ -5157,7 +5226,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csActsSel={csActsSel} setCsActsSel={setCsActsSel} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} year={year} month={month} toast={toast}/>}
+      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} year={year} month={month} toast={toast}/>}
       {tab==="aide"&&<HelpView/>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
