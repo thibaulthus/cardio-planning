@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.10 — 19/07/2026";
+const APP_VERSION="v9.11 — 20/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -1776,13 +1776,13 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
 }
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
-function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false}){
+function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null}){
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
   const selMed=medecins.find(x=>x.id===selMedId);
   const rowActes=row.ids.map(id=>actes.find(a=>a.id===id)).filter(Boolean);
   const allAuth=new Set(rowActes.flatMap(a=>a.medecinsAutorise||[]));
-  const eligMeds=medecins.filter(m=>allAuth.size===0||allAuth.has(m.init));
+  const eligMeds=medecins.filter(m=>allAuth.size===0||allAuth.has(m.init)).filter(m=>!selfOnly||m.id===selfOnly);
   const eligActesForMed=(selMed?rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)):[]).filter(a=>!adminOnly||a.adminOk===true);
 
   const curOcc=[];
@@ -1962,7 +1962,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
 }
 
 /* ════ PICK MED SITE MODAL (CHL/CHB) ════ */
-function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false}){
+function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null}){
   const {salle,siteActes,d,sl,y:y2,m:m2}=mData;
   const [step,setStep]=useState("med"); // med | acte | salle
   const [selMedId,setSelMedId]=useState(null);
@@ -2009,7 +2009,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
-            {medecins.filter(med=>{
+            {medecins.filter(med=>!selfOnly||med.id===selfOnly).filter(med=>{
               // Only show medecins who have at least one eligible acte in this salle
               const elig=siteActes.filter(a=>!a.medecinsAutorise||!a.medecinsAutorise.length||a.medecinsAutorise.includes(med.init));
               return elig.length>0;
@@ -3312,6 +3312,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"PIN médecin")," — édition personnelle : uniquement sa propre ligne (voir la première tuile). Défini par un éditeur dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"."]}),
   HP({children:["• ",HE("b",null,"PIN administratif")," — pour les secrétaires et cadres : un code partagé (défini dans Paramètres) ; chacun saisit son prénom à la connexion. Il permet de poser, modifier ou retirer les activités cochées « ✏️ administratif » (consultations…) sur la ligne de n'importe quel médecin, et de remplir les semaines blanches de l'onglet Reports. Gardes, tours, astreintes et réglages restent hors de portée."]}),
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
+  HP({children:["🔐 ",HE("b",null,"Niveaux de droits")," : chaque médecin a un niveau dans sa fiche ✏️ (onglet Équipe), qui s'applique quand il se connecte avec son PIN personnel. ",HE("b",null,"Basique")," = sa propre ligne, plus ses activités dans CHL, CHB et les plateaux. ",HE("b",null,"Intermédiaire")," = le planning de tous les médecins, gardes et échanges, semaines de tour, planning type et attachés — sans Paramètres, Équipe ni Activités. ",HE("b",null,"Éditeur")," = accès complet. Récapitulatif dans Paramètres."]}),
   HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
   HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case du Planning — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
@@ -3694,8 +3695,8 @@ function CardioPlanning(){
   const [dragTab,setDragTab]=useState(null);
   useEffect(()=>{ try{ localStorage.setItem("cp6_taborder",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t=>t[0]===id)).filter(Boolean)
-    .filter(([tid])=>!(accessMode==="adminEdit"&&(tid==="partage"||tid==="equipe")));
-  useEffect(()=>{if(accessMode==="adminEdit"&&(tab==="partage"||tab==="equipe"))setTab("planning");},[accessMode,tab]);
+    .filter(([tid])=>!((accessMode==="adminEdit"||isInterEdit)&&(tid==="partage"||tid==="equipe")));
+  useEffect(()=>{if((accessMode==="adminEdit"||isInterEdit)&&(tab==="partage"||tab==="equipe"))setTab("planning");},[accessMode,tab,isInterEdit]);
 
   const [modal,setModal]=useState(null);
   const [mData,setMData]=useState(null);
@@ -4315,7 +4316,7 @@ function CardioPlanning(){
   useEffect(()=>{ applyTheme(darkMode); },[darkMode]);
   const toast=(msg,type="ok")=>{ setNotif({msg,type}); setTimeout(()=>setNotif(null),3500); };
   const acteById=useCallback(id=>actes.find(a=>a.id===id),[actes]);
-  const isEdit=accessMode==="edit"&&!netOff; // hors ligne : lecture seule
+  const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"))&&!netOff; // hors ligne : lecture seule
   // ─── Undo/Redo history (edit mode) ───
   const histRef=useRef({stack:[],idx:-1,restoring:false});
   const [histVer,setHistVer]=useState(0);
@@ -4353,10 +4354,13 @@ function CardioPlanning(){
     applySnapshot(h.stack[h.idx]);
     setHistVer(v=>v+1);
   };
-  const isMedEdit=accessMode==="medecinEdit"&&!netOff;
+  /* ── v9.11 : niveaux de droits (basic | inter | editeur) portés par la fiche médecin ── */
+  const medLvl=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic"):null;
+  const isMedEdit=accessMode==="medecinEdit"&&medLvl!=="editeur"&&!netOff;
+  const isInterEdit=accessMode==="medecinEdit"&&medLvl==="inter"&&!netOff;
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
   // Returns true if current user can edit this specific medecin's data
-  const canEdit=(medId)=>isEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
+  const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
   useEffect(()=>{authorRef.current=isEdit?"Éditeur":(isMedEdit?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+" (administratif)"):"?"));},[isEdit,isMedEdit,isAdminEdit,editMedId,adminName,medecins]);
   useEffect(()=>{ // purge du journal au-delà de 1200 entrées (éditeur uniquement, garde les 1000 plus récentes)
@@ -4908,7 +4912,7 @@ header::-webkit-scrollbar { display: none; }
         📴 Hors ligne — dernier planning reçu · lecture seule
       </div>}
       {isMedEdit&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
-        ✏️ Mode édition restreinte — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
+        ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
       </div>}
       {isAdminEdit&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         🗝 Édition administrative — {adminName||"?"} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
@@ -4988,13 +4992,13 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {/* TOUR MÉDICAL */}
-      {tab==="tourmedical"&&<TourTab tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
+      {tab==="tourmedical"&&<TourTab tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
 
-      {tab==="chl"&&<SiteView site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit} orient={orient} setOrient={setOrient} notes={notes}
+      {tab==="chl"&&<SiteView site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
-      {tab==="chb"&&<SiteView site="CHB" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
+      {tab==="chb"&&<SiteView site="CHB" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           const full=bip&&["CHB-1","CHB-2","CHB-3"].includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
@@ -5010,12 +5014,12 @@ header::-webkit-scrollbar { display: none; }
           {label:"EE CHL",ids:["EE_CHL"],color:"#4ade80",salle:S_EE_CHL},
         ].concat(actes.filter(a=>acteRecapIn(a,"PLATEAU")&&!a.isSystem).map(a=>((a.salles||[]).length>1?{label:a.label,ids:[a.id],color:a.color,salle:null,hasSalleChoice:true,sallesDisp:a.salles}:{label:a.label,ids:[a.id],color:a.color,salle:(a.salles&&a.salles[0])||null})))}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
-        getEntries={getEntries} allDays={allDays} isEdit={isEdit||isAdminEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc}
-        allDays={allDays} isEdit={isEdit||isAdminEdit} orient={orient} setOrient={setOrient} notes={notes}
+        allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
       {false&&null&&<ActTabView title="🔬 PT Angio" titleColor="#c084fc"
@@ -5105,7 +5109,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="equipe"&&accessMode!=="adminEdit"&&(
+      {tab==="equipe"&&accessMode!=="adminEdit"&&!isInterEdit&&(
         <div>
           <div style={S.bar}><h2 style={S.mTit}>👥 Équipe</h2><div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
       {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
@@ -5461,7 +5465,7 @@ header::-webkit-scrollbar { display: none; }
       })()}
 
       {tab==="stats"&&isEdit&&<StatsTab medecins={medecins} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
-      {tab==="partage"&&accessMode!=="adminEdit"&&(
+      {tab==="partage"&&accessMode!=="adminEdit"&&!isInterEdit&&(
         <div style={{maxWidth:500}}>
           <h2 style={{...S.mTit,marginBottom:16}}>⚙️ Paramètres <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2>
 
@@ -5499,9 +5503,27 @@ header::-webkit-scrollbar { display: none; }
           </div>}
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
+            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔐 Niveaux de droits des médecins</div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Se règle dans chaque fiche ✏️ de l'onglet Équipe. Le niveau s'applique quand la personne se connecte avec son PIN personnel.<br/><b>Intermédiaire</b> : planning de tous les médecins, gardes et échanges, semaines de tour, planning type, attachés — sans Paramètres, Équipe ni Activités.</div>
+            {["editeur","inter","basic"].map(lv=>{
+              const list=medecins.filter(m=>((m.niveau)||"basic")===lv);
+              if(list.length===0)return null;
+              const lab=lv==="editeur"?"Éditeur":lv==="inter"?"Intermédiaire":"Basique";
+              const col=lv==="editeur"?"#dc2626":lv==="inter"?"#b45309":"var(--txt3)";
+              return <div key={lv} style={{marginBottom:5}}>
+                <div style={{fontSize:9,fontWeight:800,color:col,textTransform:"uppercase",letterSpacing:.4,marginBottom:2}}>{lab}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  {list.map(m=><span key={m.id} style={{padding:"1px 7px",borderRadius:5,fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--txt2)"}}>{m.init}{(medPins[String(m.id)]||"").length>=3?"":" ⚠"}</span>)}
+                </div>
+              </div>;
+            })}
+            <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>⚠ = pas encore de PIN personnel : le niveau ne s'appliquera qu'une fois le code défini.</div>
+          </div>}
+
+          {isEdit&&<div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>👁 Récupération des codes PIN</div>
             {!showPins
-              ?<button style={S.btnP} onClick={()=>{const v=window.prompt("Retapez le PIN éditeur pour afficher tous les codes :");if(v===editPin)setShowPins(true);else if(v!==null)toast("PIN incorrect","warn");}}>Afficher tous les codes</button>
+              ?<button style={S.btnP} onClick={()=>{const v=window.prompt("Retapez le PIN éditeur (ou votre PIN personnel si vous êtes éditeur) :");const okEd=medecins.some(m=>((m.niveau)||"basic")==="editeur"&&(medPins[String(m.id)]||"").length>=3&&medPins[String(m.id)]===v);if(v===editPin||okEd)setShowPins(true);else if(v!==null)toast("PIN incorrect","warn");}}>Afficher tous les codes</button>
               :<div>
                 <div style={{fontSize:12,color:"var(--txt)",lineHeight:1.9}}>
                   <div><b>Éditeur :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{editPin}</span></div>
@@ -6327,8 +6349,8 @@ header::-webkit-scrollbar { display: none; }
   onApply={p=>{applyAbsence(p);setModal(null);}}
   onRemove={p=>{removeAbsence(p);setModal(null);}}
   onClose={()=>setModal(null)}/></Ov>}
-      {modal==="pickMedAct"&&mData&&<PickMedActModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} onClose={()=>setModal(null)}/>}
-      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
       {modal==="editActe"&&mData&&(
@@ -6582,6 +6604,20 @@ header::-webkit-scrollbar { display: none; }
                 ))}
               </div>
             </div>}
+            <div style={{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,fontSize:10,fontWeight:800,color:"#e3b341",textTransform:"uppercase",letterSpacing:.5}}>🔐 Niveau de droits (avec son PIN personnel)</div>
+            <div style={{gridColumn:"1/-1"}}>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {[["basic","Basique","Sa ligne uniquement"],["inter","Intermédiaire","Tous les médecins, sans le paramétrage"],["editeur","Éditeur","Accès complet"]].map(([v,lab,desc])=>{
+                  const on=((mData.niveau)||"basic")===v;
+                  return <button key={v} type="button" onClick={()=>setMData(p=>({...p,niveau:v}))} title={desc}
+                    style={{fontSize:11,padding:"4px 10px",borderRadius:11,cursor:"pointer",fontWeight:800,
+                      border:on?"1.5px solid "+(v==="editeur"?"#dc2626":v==="inter"?"#e3b341":"#94a3b8"):"1px solid var(--border)",
+                      background:on?(v==="editeur"?"rgba(220,38,38,.12)":v==="inter"?"rgba(227,179,65,.15)":"var(--bg2)"):"var(--bg2)",
+                      color:on?(v==="editeur"?"#dc2626":v==="inter"?"#b45309":"var(--txt)"):"var(--txt3)"}}>{lab}</button>;
+                })}
+              </div>
+              <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>{((mData.niveau)||"basic")==="editeur"?"Accès complet, y compris Paramètres, Équipe, Activités et la récupération des codes PIN.":((mData.niveau)||"basic")==="inter"?"Planning de tous les médecins, gardes et échanges, semaines de tour, planning type, attachés. Pas de Paramètres, Équipe ni Activités.":"Ne modifie que sa propre ligne (+ ses activités dans CHL, CHB et les plateaux)."}</div>
+            </div>
             {(mData.role||"medecin")!=="ide"&&<div style={{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,fontSize:10,fontWeight:800,color:"#388bfd",textTransform:"uppercase",letterSpacing:.5}}>🎯 Activités autorisées</div>}
             {(mData.role||"medecin")!=="ide"&&<div style={{gridColumn:"1/-1"}}>
               {!mData.init
