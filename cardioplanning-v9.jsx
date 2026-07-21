@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.14 — 20/07/2026";
+const APP_VERSION="v9.16 — 20/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3860,6 +3860,7 @@ function CardioPlanning(){
   const [astreinte,setAstreinte]=useState({}); // {wKey: medId}
   const [astDayModal,setAstDayModal]=useState(null); // legacy
   const [astPickModal,setAstPickModal]=useState(null); // {dayKey,wKey,isWeek,label}
+  const [bipModal,setBipModal]=useState(null); // v9.16 répartition du Bip
   const [astSearch,setAstSearch]=useState("");
   const [ast4M,setAst4M]=useState(false);
   // Get astreinte medId for a given day
@@ -4483,10 +4484,13 @@ function CardioPlanning(){
   const medLvl=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic"):null;
   const isMedEdit=accessMode==="medecinEdit"&&medLvl!=="editeur"&&!netOff;
   const isInterEdit=accessMode==="medecinEdit"&&medLvl==="inter"&&!netOff;
-  /* v9.13 : calculé ICI (après les niveaux) — Paramètres et Équipe masqués à tout médecin non-éditeur et à l'administratif */
+  /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
+  const hideTabs=accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte"]
+    :isMedEdit?["activites","equipe","partage"]:[];
+  const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
-    .filter(([tid])=>!((accessMode==="adminEdit"||isMedEdit)&&(tid==="partage"||tid==="equipe")));
-  useEffect(()=>{if((accessMode==="adminEdit"||isMedEdit)&&(tab==="partage"||tab==="equipe"))setTab("planning");},[accessMode,tab,isMedEdit]);
+    .filter(([tid])=>hideTabs.indexOf(tid)<0);
+  useEffect(()=>{if(hideTabs.indexOf(tab)>=0)setTab("planning");},[accessMode,tab,isMedEdit]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
@@ -4583,6 +4587,85 @@ function CardioPlanning(){
   },[]);
 
   /* ── applyGarde (atomic) ── */
+  /* ── v9.16 : répartition automatique du Bip (CHB) — dernière étape, après le planning type ── */
+  const bipScan=()=>{
+    const acteB=actes.find(a=>a.id==="BIP");
+    const auth=(acteB&&acteB.medecinsAutorise)||[];
+    const elig=medecins.filter(m=>m.role!=="ide"&&(auth.length===0||auth.indexOf(m.init)>=0));
+    const chb={},bipN={},offN={};
+    elig.forEach(m=>{chb[m.id]=0;bipN[m.id]=0;offN[m.id]=0;});
+    const jours=allDays4.filter(o=>{const dw=new Date(o.y,o.m,o.d).getDay();return dw>=1&&dw<=5&&!isFerie(o.y,o.m,o.d);});
+    jours.forEach(o=>["M","AM"].forEach(sl=>{
+      elig.forEach(m=>{
+        const es=getEntries(m.id,o.y,o.m,o.d,sl)||[];
+        if(es.length===0){offN[m.id]++;return;}
+        let hasCHB=false;
+        es.forEach(e=>{const a=acteById(e.acteId);if(a&&a.site==="CHB")hasCHB=true;if(e.acteId==="BIP")bipN[m.id]++;});
+        if(hasCHB)chb[m.id]++;
+      });
+    }));
+    return {acteB:acteB,elig:elig,chb:chb,bipN:bipN,offN:offN,jours:jours};
+  };
+  const bipStats=(S)=>S.elig.map(m=>({id:m.id,init:m.init,bip:S.bipN[m.id],chb:S.chb[m.id],off:S.offN[m.id]})).sort((a,b)=>b.chb-a.chb||b.bip-a.bip);
+  const bipOpen=()=>{const S=bipScan();setBipModal({posed:null,fails:[],stats:bipStats(S)});};
+  const bipRun=()=>{
+    const S=bipScan();
+    if(!S.acteB){toast("Activité BIP introuvable","warn");return;}
+    const elig=S.elig,chb=S.chb,bipN=S.bipN,offN=S.offN,jours=S.jours,salles=S.acteB.salles||[];
+    const fails2=[];let posed=0;
+    jours.forEach(o=>{
+      let deja=false;
+      ["M","AM"].forEach(sl=>elig.forEach(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.acteId==="BIP")deja=true;})));
+      if(deja)return;
+      let done=false;
+      ["AM","M"].forEach(sl=>{
+        if(done)return;
+        const libres=elig.filter(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).length===0);
+        if(libres.length===0)return;
+        libres.sort((a,b)=>(chb[a.id]-chb[b.id])||(offN[b.id]-offN[a.id])||(bipN[a.id]-bipN[b.id])||String(a.init).localeCompare(String(b.init)));
+        const m=libres[0];
+        const occ={};elig.forEach(x=>(getEntries(x.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.salle)occ[e.salle]=true;}));
+        const salle=salles.filter(s=>!occ[s])[0]||null;
+        addEntry(m.id,o.y,o.m,o.d,sl,{acteId:"BIP",salle:salle});
+        chb[m.id]++;bipN[m.id]++;offN[m.id]--;posed++;done=true;
+      });
+      if(!done)fails2.push({y:o.y,m:o.m,d:o.d});
+    });
+    setBipModal({posed:posed,fails:fails2,stats:bipStats({elig:elig,chb:chb,bipN:bipN,offN:offN})});
+    toast(posed+" bip"+(posed>1?"s":"")+" posé"+(posed>1?"s":"")+(fails2.length?" · "+fails2.length+" jour(s) sans solution":""));
+  };
+  const bipClear=()=>{
+    const S=bipScan();let n=0;
+    S.jours.forEach(o=>["M","AM"].forEach(sl=>S.elig.forEach(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.acteId==="BIP"){removeEntry(m.id,o.y,o.m,o.d,sl,"BIP");n++;}}))));
+    toast(n+" bip(s) retiré(s) sur la période");setBipModal(null);
+  };
+  const bipModalUI=()=>{
+    const B=bipModal;const RE2=React.createElement;
+    const th=(x,w)=>RE2("th",{key:x,style:{padding:"3px 6px",fontSize:9,color:"var(--txt3)",textAlign:w||"center",background:"var(--th)"}},x);
+    return RE2("div",{onClick:()=>setBipModal(null),style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.55)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:12}},
+      RE2("div",{onClick:e=>e.stopPropagation(),style:{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:12,padding:14,width:"100%",maxWidth:480,maxHeight:"84vh",overflowY:"auto"}},
+        RE2("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}},
+          RE2("div",{style:{fontWeight:800,fontSize:14,color:"var(--txt)"}},"📟 Répartition du Bip — CHB"),
+          RE2("button",{onClick:()=>setBipModal(null),style:{marginLeft:"auto",background:"none",border:"none",color:"var(--txt2)",fontSize:20,cursor:"pointer",lineHeight:1}},"×")),
+        RE2("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:9}},"Un bip par jour ouvré sur toute la période affichée, l'après-midi de préférence. Priorité au médecin qui a le moins de demi-journées à Béthune, puis à celui qui a le plus de demi-journées libres. Les bips déjà posés ne sont jamais déplacés."),
+        B.posed!==null&&RE2("div",{style:{fontSize:12,fontWeight:800,color:B.fails.length?"#b45309":"#16a34a",marginBottom:6}},
+          "✓ "+B.posed+" bip"+(B.posed>1?"s":"")+" posé"+(B.posed>1?"s":"")+(B.fails.length?" · "+B.fails.length+" jour(s) sans solution":" · aucun jour sans solution")),
+        B.fails.length>0&&RE2("div",{style:{fontSize:10,color:"#ef4444",marginBottom:9,lineHeight:1.7}},
+          RE2("b",null,"Jours non pourvus (aucun médecin libre) : "),
+          B.fails.slice(0,40).map(o=>o.d+"/"+(o.m+1)).join(" · ")+(B.fails.length>40?" …":"")),
+        RE2("div",{style:{fontSize:10,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:4}},"Équité sur la période"),
+        RE2("div",{style:{overflowX:"auto",border:"1px solid var(--border)",borderRadius:8,marginBottom:10}},
+          RE2("table",{style:{borderCollapse:"collapse",width:"100%"}},
+            RE2("thead",null,RE2("tr",null,th("Médecin","left"),th("Bips"),th("½ j. CHB"),th("½ j. libres"))),
+            RE2("tbody",null,B.stats.map(s=>RE2("tr",{key:s.id,style:{borderTop:"1px solid var(--border2)"}},
+              RE2("td",{style:{padding:"3px 6px",fontSize:11,fontWeight:700,color:"var(--txt)"}},s.init),
+              RE2("td",{style:{padding:"3px 6px",fontSize:11,textAlign:"center",color:"#46bdc6",fontWeight:800}},s.bip),
+              RE2("td",{style:{padding:"3px 6px",fontSize:11,textAlign:"center",color:"var(--txt2)",fontWeight:700}},s.chb),
+              RE2("td",{style:{padding:"3px 6px",fontSize:11,textAlign:"center",color:"var(--txt3)"}},s.off)))))),
+        RE2("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+          RE2("button",{onClick:bipRun,style:{fontSize:12,padding:"6px 13px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.12)",color:"#46bdc6"}},"▶ Répartir les bips manquants"),
+          RE2("button",{onClick:bipClear,style:{fontSize:12,padding:"6px 13px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.10)",color:"#dc2626"}},"🗑 Effacer les bips de la période"))));
+  };
   const applyGarde=useCallback((medId,y2,m2,d2)=>{
     if(accessMode==="adminEdit")return;
     logCell("add",medId,y2,m2,d2,"N","GARDE");
@@ -5108,6 +5191,7 @@ header::-webkit-scrollbar { display: none; }
           </div>
           {(isEdit||isMedEdit)&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
             <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
+            {isEdit&&<button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}} onClick={bipOpen}>📟 Bip CHB</button>}
           </div>}
           <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8,alignItems:"center"}}>
             <span style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginRight:4}}>Filtre:</span>
@@ -5486,8 +5570,8 @@ header::-webkit-scrollbar { display: none; }
                           <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{d} <span style={{fontSize:9,fontWeight:600}}>{MOIS[m].slice(0,4)}</span></div>
                           <div style={{fontSize:9,color:we?"#92400e":isT?"var(--today-c)":"var(--txt3)",fontWeight:600}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]}</div>
                         </td>
-                        <td style={{...S.td,padding:4,cursor:isEdit?"pointer":"default",...(hasExc?{outline:"2px solid #7c3aed",outlineOffset:-2}:{})}}
-                          onClick={isEdit?()=>{setAstPickModal({dayKey:dk,wKey:wk,isWeek:false,label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]+" "+y});setAstSearch("");}:undefined}>
+                        <td style={{...S.td,padding:4,cursor:canAst?"pointer":"default",...(hasExc?{outline:"2px solid #7c3aed",outlineOffset:-2}:{})}}
+                          onClick={canAst?()=>{setAstPickModal({dayKey:dk,wKey:wk,isWeek:false,label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]+" "+y});setAstSearch("");}:undefined}>
                           {med?(<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:med.color+"22"}}>
                             <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{med.init}</div>
                             <span style={{fontSize:12,fontWeight:600,color:isAbsMed?"#ef4444":"var(--txt)"}}>{med.prenom} {med.nom}</span>
@@ -6170,6 +6254,7 @@ header::-webkit-scrollbar { display: none; }
         </Ov>
       )}
 
+      {bipModal&&bipModalUI()}
       {histModal&&(()=>{
         const med3=medecins.find(x=>x.id===histModal.medId);
         return(
