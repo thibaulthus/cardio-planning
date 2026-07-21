@@ -138,7 +138,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.17 — 21/07/2026";
+var APP_VERSION = "v9.18 — 21/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4022,9 +4022,9 @@ function CardioPlanning() {
         localStorage.setItem("cp6_theme", nv ? "dark" : "light");
     }
     catch (e) { } return nv; }); };
-    var DEFAULT_TABS = [["planning", "📅 Planning"], ["tourmedical", "🔄 Tour"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["plantype", "📋 Type"], ["attache", "👔 Attachés"], ["activites", "⚙️ Activités"], ["equipe", "👥 Équipe"], ["partage", "⚙️ Paramètres"], ["stats", "📊 Stats"], ["reports", "📥 Reports"], ["aide", "❓ Aide"]];
+    var DEFAULT_TABS = [["planning", "📅 Planning"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["tourmedical", "🔄 Tour"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["reports", "📥 Reports"], ["attache", "👔 Attachés"], ["plantype", "📋 Type"], ["equipe", "👥 Équipe"], ["activites", "⚙️ Activités"], ["stats", "📊 Stats"], ["aide", "❓ Aide"], ["partage", "⚙️ Paramètres"]];
     var _k = useState(function () { try {
-        var v = localStorage.getItem("cp6_taborder");
+        var v = localStorage.getItem("cp6_taborder_v2");
         if (v) {
             var saved_1 = JSON.parse(v);
             var all_1 = DEFAULT_TABS.map(function (t) { return t[0]; });
@@ -4038,7 +4038,7 @@ function CardioPlanning() {
     } }), tabOrder = _k[0], setTabOrder = _k[1];
     var _l = useState(null), dragTab = _l[0], setDragTab = _l[1];
     useEffect(function () { try {
-        localStorage.setItem("cp6_taborder", JSON.stringify(tabOrder));
+        localStorage.setItem("cp6_taborder_v2", JSON.stringify(tabOrder));
     }
     catch (_a) { } }, [tabOrder]);
     var _m = useState(null), modal = _m[0], setModal = _m[1];

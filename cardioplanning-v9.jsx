@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.17 — 21/07/2026";
+const APP_VERSION="v9.18 — 21/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3815,10 +3815,10 @@ function CardioPlanning(){
     const h=new Date().getHours();return h>=20||h<7; // auto : nuit de 20h à 7h
   });
   const setDarkMode=(fn)=>{setDarkModeRaw(prev=>{const nv=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("cp6_theme",nv?"dark":"light");}catch(e){}return nv;});};
-  const DEFAULT_TABS=[["planning","📅 Planning"],["tourmedical","🔄 Tour"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["plantype","📋 Type"],["attache","👔 Attachés"],["activites","⚙️ Activités"],["equipe","👥 Équipe"],["partage","⚙️ Paramètres"],["stats","📊 Stats"],["reports","📥 Reports"],["aide","❓ Aide"]];
-  const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
+  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
+  const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder_v2"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
-  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
+  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v2",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
 
   const [modal,setModal]=useState(null);
   const [mData,setMData]=useState(null);
