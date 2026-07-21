@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.16 — 20/07/2026";
+const APP_VERSION="v9.17 — 21/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -4592,7 +4592,7 @@ function CardioPlanning(){
     const acteB=actes.find(a=>a.id==="BIP");
     const auth=(acteB&&acteB.medecinsAutorise)||[];
     const elig=medecins.filter(m=>m.role!=="ide"&&(auth.length===0||auth.indexOf(m.init)>=0));
-    const chb={},bipN={},offN={};
+    const chb={},bipN={},offN={},wkN={};
     elig.forEach(m=>{chb[m.id]=0;bipN[m.id]=0;offN[m.id]=0;});
     const jours=allDays4.filter(o=>{const dw=new Date(o.y,o.m,o.d).getDay();return dw>=1&&dw<=5&&!isFerie(o.y,o.m,o.d);});
     jours.forEach(o=>["M","AM"].forEach(sl=>{
@@ -4600,38 +4600,43 @@ function CardioPlanning(){
         const es=getEntries(m.id,o.y,o.m,o.d,sl)||[];
         if(es.length===0){offN[m.id]++;return;}
         let hasCHB=false;
-        es.forEach(e=>{const a=acteById(e.acteId);if(a&&a.site==="CHB")hasCHB=true;if(e.acteId==="BIP")bipN[m.id]++;});
+        es.forEach(e=>{const a=acteById(e.acteId);if(a&&a.site==="CHB")hasCHB=true;if(e.acteId==="BIP"){bipN[m.id]++;const kw=m.id+"|"+wKey(o.y,o.m,o.d);wkN[kw]=(wkN[kw]||0)+1;}});
         if(hasCHB)chb[m.id]++;
       });
     }));
-    return {acteB:acteB,elig:elig,chb:chb,bipN:bipN,offN:offN,jours:jours};
+    return {acteB:acteB,elig:elig,chb:chb,bipN:bipN,offN:offN,wkN:wkN,jours:jours};
   };
   const bipStats=(S)=>S.elig.map(m=>({id:m.id,init:m.init,bip:S.bipN[m.id],chb:S.chb[m.id],off:S.offN[m.id]})).sort((a,b)=>b.chb-a.chb||b.bip-a.bip);
   const bipOpen=()=>{const S=bipScan();setBipModal({posed:null,fails:[],stats:bipStats(S)});};
   const bipRun=()=>{
     const S=bipScan();
     if(!S.acteB){toast("Activité BIP introuvable","warn");return;}
-    const elig=S.elig,chb=S.chb,bipN=S.bipN,offN=S.offN,jours=S.jours,salles=S.acteB.salles||[];
+    const elig=S.elig,chb=S.chb,bipN=S.bipN,offN=S.offN,wkN=S.wkN,jours=S.jours,salles=S.acteB.salles||[];
+    const BIP_MAX_SEM=2;
     const fails2=[];let posed=0;
     jours.forEach(o=>{
       let deja=false;
       ["M","AM"].forEach(sl=>elig.forEach(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.acteId==="BIP")deja=true;})));
       if(deja)return;
-      let done=false;
+      let done=false,capped=false;
+      const wk=wKey(o.y,o.m,o.d);
       ["AM","M"].forEach(sl=>{
         if(done)return;
-        const libres=elig.filter(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).length===0);
+        const dispo=elig.filter(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).length===0);
+        const libres=dispo.filter(m=>(wkN[m.id+"|"+wk]||0)<BIP_MAX_SEM);
+        if(dispo.length>0&&libres.length===0)capped=true;
         if(libres.length===0)return;
         libres.sort((a,b)=>(chb[a.id]-chb[b.id])||(offN[b.id]-offN[a.id])||(bipN[a.id]-bipN[b.id])||String(a.init).localeCompare(String(b.init)));
         const m=libres[0];
         const occ={};elig.forEach(x=>(getEntries(x.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.salle)occ[e.salle]=true;}));
         const salle=salles.filter(s=>!occ[s])[0]||null;
         addEntry(m.id,o.y,o.m,o.d,sl,{acteId:"BIP",salle:salle});
-        chb[m.id]++;bipN[m.id]++;offN[m.id]--;posed++;done=true;
+        chb[m.id]++;bipN[m.id]++;offN[m.id]--;wkN[m.id+"|"+wk]=(wkN[m.id+"|"+wk]||0)+1;posed++;done=true;
       });
-      if(!done)fails2.push({y:o.y,m:o.m,d:o.d});
+      if(!done)fails2.push({y:o.y,m:o.m,d:o.d,cap:capped});
     });
     setBipModal({posed:posed,fails:fails2,stats:bipStats({elig:elig,chb:chb,bipN:bipN,offN:offN})});
+    /* ⚑ dans la liste des jours non pourvus = plafond de 2 bips/semaine atteint par tous les disponibles */
     toast(posed+" bip"+(posed>1?"s":"")+" posé"+(posed>1?"s":"")+(fails2.length?" · "+fails2.length+" jour(s) sans solution":""));
   };
   const bipClear=()=>{
@@ -4647,12 +4652,13 @@ function CardioPlanning(){
         RE2("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}},
           RE2("div",{style:{fontWeight:800,fontSize:14,color:"var(--txt)"}},"📟 Répartition du Bip — CHB"),
           RE2("button",{onClick:()=>setBipModal(null),style:{marginLeft:"auto",background:"none",border:"none",color:"var(--txt2)",fontSize:20,cursor:"pointer",lineHeight:1}},"×")),
-        RE2("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:9}},"Un bip par jour ouvré sur toute la période affichée, l'après-midi de préférence. Priorité au médecin qui a le moins de demi-journées à Béthune, puis à celui qui a le plus de demi-journées libres. Les bips déjà posés ne sont jamais déplacés."),
+        RE2("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:9}},"Un bip par jour ouvré sur toute la période affichée, l'après-midi de préférence, avec un plafond de 2 bips par semaine et par médecin. Priorité au médecin qui a le moins de demi-journées à Béthune, puis à celui qui a le plus de demi-journées libres. Les bips déjà posés ne sont jamais déplacés."),
         B.posed!==null&&RE2("div",{style:{fontSize:12,fontWeight:800,color:B.fails.length?"#b45309":"#16a34a",marginBottom:6}},
           "✓ "+B.posed+" bip"+(B.posed>1?"s":"")+" posé"+(B.posed>1?"s":"")+(B.fails.length?" · "+B.fails.length+" jour(s) sans solution":" · aucun jour sans solution")),
         B.fails.length>0&&RE2("div",{style:{fontSize:10,color:"#ef4444",marginBottom:9,lineHeight:1.7}},
-          RE2("b",null,"Jours non pourvus (aucun médecin libre) : "),
-          B.fails.slice(0,40).map(o=>o.d+"/"+(o.m+1)).join(" · ")+(B.fails.length>40?" …":"")),
+          RE2("b",null,"Jours non pourvus : "),
+          B.fails.slice(0,40).map(o=>o.d+"/"+(o.m+1)+(o.cap?" ⚑":"")).join(" · ")+(B.fails.length>40?" …":""),
+          RE2("div",{style:{color:"var(--txt3)",marginTop:2}},"⚑ = des médecins étaient libres mais avaient déjà 2 bips cette semaine-là")),
         RE2("div",{style:{fontSize:10,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:4}},"Équité sur la période"),
         RE2("div",{style:{overflowX:"auto",border:"1px solid var(--border)",borderRadius:8,marginBottom:10}},
           RE2("table",{style:{borderCollapse:"collapse",width:"100%"}},
@@ -5191,7 +5197,6 @@ header::-webkit-scrollbar { display: none; }
           </div>
           {(isEdit||isMedEdit)&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
             <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
-            {isEdit&&<button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}} onClick={bipOpen}>📟 Bip CHB</button>}
           </div>}
           <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8,alignItems:"center"}}>
             <span style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginRight:4}}>Filtre:</span>
@@ -5211,11 +5216,13 @@ header::-webkit-scrollbar { display: none; }
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
-      {tab==="chb"&&<SiteView site="CHB" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
+      {tab==="chb"&&<div>
+        {isEdit&&<div style={{marginBottom:6}}><button style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}} onClick={bipOpen}>📟 Répartition du Bip</button></div>}
+        <SiteView site="CHB" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           const full=bip&&["CHB-1","CHB-2","CHB-3"].includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
-          setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
+          setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
       {tab==="plateau"&&<ActTabView title="❤️ PT Cardio" titleColor="#e3b341"
         rows={[
