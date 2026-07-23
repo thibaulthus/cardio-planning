@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.22 — 23/07/2026";
+const APP_VERSION="v9.23 — 23/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3812,9 +3812,16 @@ function CardioPlanning(){
   const [orient,setOrient]=useState("V"); // H/V toggle removed - V only
   const [darkMode,setDarkModeRaw]=useState(()=>{
     try{const v=localStorage.getItem("cp6_theme");if(v==="dark")return true;if(v==="light")return false;}catch(e){}
-    const h=new Date().getHours();return h>=20||h<7; // auto : nuit de 20h à 7h
+    try{return window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;}catch(e){return false;} // auto : reglage clair/sombre du telephone
   });
   const setDarkMode=(fn)=>{setDarkModeRaw(prev=>{const nv=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("cp6_theme",nv?"dark":"light");}catch(e){}return nv;});};
+  useEffect(()=>{
+    if(!window.matchMedia)return;
+    const mq=window.matchMedia("(prefers-color-scheme: dark)");
+    const onChg=(e)=>{try{if(localStorage.getItem("cp6_theme"))return;}catch(err){}setDarkModeRaw(e.matches);};
+    if(mq.addEventListener)mq.addEventListener("change",onChg);else if(mq.addListener)mq.addListener(onChg);
+    return ()=>{if(mq.removeEventListener)mq.removeEventListener("change",onChg);else if(mq.removeListener)mq.removeListener(onChg);};
+  },[]);
   const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
   const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder_v2"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
@@ -5938,12 +5945,12 @@ header::-webkit-scrollbar { display: none; }
             <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
               <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🌓 Thème</div>
               <div style={{display:"flex",gap:6}}>
-                <button onClick={()=>{try{localStorage.removeItem("cp6_theme");}catch(e){};const h=new Date().getHours();setDarkModeRaw(h>=20||h<7);}}
-                  style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>🕐 Auto (20h–7h)</button>
+                <button onClick={()=>{try{localStorage.removeItem("cp6_theme");}catch(e){};const mm=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");setDarkModeRaw(!!(mm&&mm.matches));}}
+                  style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>📱 Auto (téléphone)</button>
                 <button onClick={()=>setDarkMode(false)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:!darkMode?"var(--nav-act)":"var(--bg2)",color:!darkMode?"var(--nav-act-c)":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>☀️ Jour</button>
                 <button onClick={()=>setDarkMode(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:darkMode?"var(--nav-act)":"var(--bg2)",color:darkMode?"var(--nav-act-c)":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>🌓 Nuit</button>
               </div>
-              <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit l'heure de l'appareil à l'ouverture. Jour/Nuit : choix mémorisé sur cet appareil (le bouton 🌓 des onglets fait pareil).</div>
+              <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil (le bouton 🌓 des onglets fait pareil).</div>
             </div>
             {docSize!==null&&(()=>{
               const LIMIT=1048576;

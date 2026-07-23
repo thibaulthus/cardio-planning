@@ -139,7 +139,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.22 — 23/07/2026";
+var APP_VERSION = "v9.23 — 23/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4016,13 +4016,35 @@ function CardioPlanning() {
                 return false;
         }
         catch (e) { }
-        var h = new Date().getHours();
-        return h >= 20 || h < 7; // auto : nuit de 20h à 7h
+        try {
+            return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; // auto : reglage clair/sombre du telephone
+        }
+        catch (e) {
+            return false;
+        }
     }), darkMode = _j[0], setDarkModeRaw = _j[1];
     var setDarkMode = function (fn) { setDarkModeRaw(function (prev) { var nv = typeof fn === "function" ? fn(prev) : fn; try {
         localStorage.setItem("cp6_theme", nv ? "dark" : "light");
     }
     catch (e) { } return nv; }); };
+    useEffect(function () {
+        if (!window.matchMedia)
+            return;
+        var mq = window.matchMedia("(prefers-color-scheme: dark)");
+        var onChg = function (e) { try {
+            if (localStorage.getItem("cp6_theme"))
+                return; // choix manuel : on ne touche pas
+        }
+        catch (err) { } setDarkModeRaw(e.matches); };
+        if (mq.addEventListener)
+            mq.addEventListener("change", onChg);
+        else if (mq.addListener)
+            mq.addListener(onChg);
+        return function () { if (mq.removeEventListener)
+            mq.removeEventListener("change", onChg);
+        else if (mq.removeListener)
+            mq.removeListener(onChg); };
+    }, []);
     var DEFAULT_TABS = [["planning", "📅 Planning"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["tourmedical", "🔄 Tour"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["reports", "📥 Reports"], ["attache", "👔 Attachés"], ["plantype", "📋 Type"], ["equipe", "👥 Équipe"], ["activites", "⚙️ Activités"], ["stats", "📊 Stats"], ["aide", "❓ Aide"], ["partage", "⚙️ Paramètres"]];
     var _k = useState(function () { try {
         var v = localStorage.getItem("cp6_taborder_v2");
@@ -6678,10 +6700,10 @@ function CardioPlanning() {
                             React.createElement("button", { onClick: function () { try {
                                     localStorage.removeItem("cp6_theme");
                                 }
-                                catch (e) { } ; var h = new Date().getHours(); setDarkModeRaw(h >= 20 || h < 7); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDD50 Auto (20h\u20137h)"),
+                                catch (e) { } ; var mm = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)"); setDarkModeRaw(!!(mm && mm.matches)); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCF1 Auto (t\u00e9l\u00e9phone)"),
                             React.createElement("button", { onClick: function () { return setDarkMode(false); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: !darkMode ? "var(--nav-act)" : "var(--bg2)", color: !darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\u2600\uFE0F Jour"),
                             React.createElement("button", { onClick: function () { return setDarkMode(true); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: darkMode ? "var(--nav-act)" : "var(--bg2)", color: darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\uD83C\uDF13 Nuit")),
-                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit l'heure de l'appareil \u00E0 l'ouverture. Jour/Nuit : choix m\u00E9moris\u00E9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil).")),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit le r\u00e9glage clair/sombre du t\u00e9l\u00e9phone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix m\u00e9moris\u00e9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil).")),
                     docSize !== null && (function () {
                         var LIMIT = 1048576;
                         var pct = Math.min(100, Math.round(docSize / LIMIT * 100));
