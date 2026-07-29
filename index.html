@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.24 — 29/07/2026";
+var APP_VERSION = "v9.25 — 29/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3526,6 +3526,7 @@ const HELP_SECTIONS=[
   HP({children:["Fiches Équipe : ",HChip({txt:"Garde",bg:"#16a34a"})," / ",HChip({txt:"Sans garde",bg:"#dc2626"})," · ",HChip({txt:"TM",bg:"#1d4ed8"})," / ",HChip({txt:"Sans TM",bg:"#d97706"}),"."]}),
   HP({children:["Sur-spécialités : ",HE("span",{style:{color:"#76a5af",fontWeight:800}},"Coro")," · ",HE("span",{style:{color:"#e3b341",fontWeight:800}},"Pace")," · ",HE("span",{style:{color:"#8b5cf6",fontWeight:800}},"EEP")," · ",HE("span",{style:{color:"#ec4899",fontWeight:800}},"ETT"),"."]}),
   HP({children:["⭐ souhaite (garde ou tour) · 🚫 préfère éviter · ⇄ échange · ✂ temps partiel · 📝 note sur la case."]}),
+  HP({children:["👁 en haut de l'écran : mode consultation (lecture seule) · pastille ",HE("span",{style:{display:"inline-block",width:9,height:9,borderRadius:"50%",background:"#3fb950",margin:"0 2px"}})," verte en haut : synchronisation Firebase active (grise = hors ligne)."]}),
   HP({last:true,children:["Fonds : jaune pâle = week-end · bleuté = aujourd'hui · vert clair + contour vert = astreinte de la semaine · contour violet = exception d'astreinte posée sur un jour précis."]}))},
 
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
@@ -5079,7 +5080,8 @@ function CardioPlanning() {
     var isInterEdit = accessMode === "medecinEdit" && medLvl === "inter" && !netOff;
     /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
     var hideTabs = accessMode === "adminEdit" ? ["activites", "equipe", "partage", "plantype", "stats", "astreinte"]
-        : isMedEdit ? ["activites", "equipe", "partage"] : [];
+        : isMedEdit ? ["activites", "equipe", "partage"]
+            : accessMode === "view" ? ["tourmedical", "bip", "activites", "equipe", "reports", "stats", "partage"] : [];
     var canAst = isEdit || (accessMode === "medecinEdit" && !netOff && ((medecins.find(function (m) { return m.id === editMedId; }) || {}).astreinte === true));
     var orderedTabs = tabOrder.map(function (id) { return DEFAULT_TABS.find(function (t2) { return t2[0] === id; }); }).filter(Boolean)
         .filter(function (_t) { return hideTabs.indexOf(_t[0]) < 0; });
@@ -6400,22 +6402,81 @@ function CardioPlanning() {
                 React.createElement("h2", { style: __assign(__assign({}, S.mTit), { marginBottom: 16 }) },
                     "\u2699\uFE0F Param\u00E8tres ",
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
-                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#3fb950", fontSize: 13, marginBottom: 6 } },
-                        "\uD83D\uDC41 Lecture seule",
-                        React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                            React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Partagez l'URL directement. Sans PIN, le planning est consultable mais non modifiable.")),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD10 Code PIN \u00E9diteur"),
-                    React.createElement("div", { style: { display: "flex", gap: 8 } },
-                        React.createElement("input", { type: "password", id: "np", placeholder: "Nouveau PIN", style: __assign(__assign({}, S.fi), { flex: 1, textAlign: "center", letterSpacing: 4 }) }),
-                        React.createElement("button", { style: S.btnP, onClick: function () { var v = document.getElementById("np").value; if (v.length >= 4) {
-                                setEditPin(v);
-                                toast("PIN mis à jour");
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+                        React.createElement("input", { type: "password", id: "pinOld", placeholder: "Ancien PIN", style: __assign(__assign({}, S.fi), { textAlign: "center", letterSpacing: 4 }) }),
+                        React.createElement("input", { type: "password", id: "pinN1", placeholder: "Nouveau PIN (min 4 car.)", style: __assign(__assign({}, S.fi), { textAlign: "center", letterSpacing: 4 }) }),
+                        React.createElement("input", { type: "password", id: "pinN2", placeholder: "Confirmer le nouveau PIN", style: __assign(__assign({}, S.fi), { textAlign: "center", letterSpacing: 4 }) }),
+                        React.createElement("button", { style: S.btnP, onClick: function () { var o = document.getElementById("pinOld").value; var a = document.getElementById("pinN1").value; var b = document.getElementById("pinN2").value; if (o !== editPin) {
+                                toast("Ancien PIN incorrect", "warn");
                             }
-                            else
-                                toast("Min 4 car.", "warn"); } }, "OK"))),
+                            else if (a.length < 4) {
+                                toast("Min 4 car.", "warn");
+                            }
+                            else if (a !== b) {
+                                toast("Les deux nouveaux PIN ne correspondent pas", "warn");
+                            }
+                            else {
+                                setEditPin(a);
+                                ["pinOld", "pinN1", "pinN2"].forEach(function (x) { document.getElementById(x).value = ""; });
+                                toast("PIN mis \u00E0 jour");
+                            } } }, "Changer le PIN"))),
+                React.createElement("div", { style: { marginBottom: 20, padding: "14px 16px", background: "var(--bg)", borderRadius: 10, border: "1px solid var(--border)" } },
+                        React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "var(--txt)", marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
+                        React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, "Les jours de vacances apparaissent avec un fond gris\u00E9 dans tous les calendriers."),
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
+                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt2)" } }, "Zone :"),
+                            React.createElement("div", { style: { display: "flex", gap: 6 } }, ["A", "B", "C"].map(function (z) { return (React.createElement("button", { key: z, onClick: function () { setVacZone(z); try {
+                                    localStorage.setItem("cp6_vaczone", z);
+                                }
+                                catch (_a) { } }, style: { padding: "6px 16px", borderRadius: 7, border: "1px solid ".concat(vacZone === z ? "#1d4ed8" : "var(--border)"),
+                                    background: vacZone === z ? "#1d4ed8" : "var(--bg2)", color: vacZone === z ? "#fff" : "var(--txt2)",
+                                    fontWeight: 700, fontSize: 13, cursor: "pointer" } },
+                                "Zone ",
+                                z)); })),
+                            React.createElement("span", { style: { fontSize: 11, color: vacDates.size > 0 ? "#16a34a" : "#f59e0b", fontWeight: 600 } }, vacDates.size > 0 ? "\u2713 ".concat(vacDates.size, " jours charg\u00E9s") : "⏳ Chargement..."),
+                            vacSource && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 3 } },
+                                "Source : ",
+                                vacSource))),
+                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCC6 P\u00E9riode d'affichage"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Tous les onglets affichent le planning par blocs de cette dur\u00E9e, align\u00E9s sur le mois de d\u00E9part."),
+                    React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" } },
+                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
+                            "Dur\u00E9e",
+                            React.createElement("select", { value: periodCfg.len, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { len: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, [1, 2, 3, 4, 6, 12].map(function (v) { return React.createElement("option", { key: v, value: v },
+                                v,
+                                " mois"); }))),
+                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
+                            "Mois de d\u00E9part",
+                            React.createElement("select", { value: periodCfg.startM, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { startM: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, MOIS.map(function (mn, mi) { return React.createElement("option", { key: mi, value: mi }, mn); })))),
+                    React.createElement("div", { style: { marginTop: 8, fontSize: 10, color: "var(--txt3)" } },
+                        "Actuellement : blocs de ",
+                        periodCfg.len,
+                        " mois \u00E0 partir de ",
+                        MOIS[periodCfg.startM],
+                        " (ex. ",
+                        MOIS[periodCfg.startM],
+                        " \u2014 ",
+                        MOIS[(periodCfg.startM + periodCfg.len - 1) % 12],
+                        ").")),
+                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDC41 R\u00E9cup\u00E9ration des codes PIN"),
+                    !showPins
+                        ? (!pinsAsk
+                            ? React.createElement("button", { style: S.btnP, onClick: function () { setPinsTry(""); setPinsAsk(true); } }, "Afficher tous les codes")
+                            : React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
+                                React.createElement("input", { autoFocus: true, type: "password", value: pinsTry, onChange: function (e) { return setPinsTry(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") validatePins(); }, placeholder: "PIN éditeur", style: __assign(__assign({}, S.fi), { width: 140, textAlign: "center", letterSpacing: 4 }) }),
+                                React.createElement("button", { style: S.btnP, onClick: function () { validatePins(); } }, "Valider"),
+                                React.createElement("button", { style: { fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer" }, onClick: function () { setPinsAsk(false); setPinsTry(""); } }, "Annuler")))
+                        : React.createElement("div", null,
+                            React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", lineHeight: 1.9 } },
+                                React.createElement("div", null, React.createElement("b", null, "\u00C9diteur : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, editPin)),
+                                React.createElement("div", null, React.createElement("b", null, "Administratif : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, adminPin || "\u2014 non d\u00E9fini \u2014")),
+                                Object.entries(medPins).filter(function (_p) { return _p[1] && _p[1].length >= 3; }).map(function (_p) { var m2 = medecins.find(function (x) { return String(x.id) === String(_p[0]); }); return React.createElement("div", { key: _p[0] }, React.createElement("b", null, (m2 ? m2.init : _p[0]) + " : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, _p[1])); }),
+                                Object.entries(medPins).filter(function (_p) { return _p[1] && _p[1].length >= 3; }).length === 0 && React.createElement("div", { style: { color: "var(--txt3)" } }, "Aucun PIN m\u00E9decin d\u00E9fini.")),
+                            React.createElement("button", { style: __assign(__assign({}, S.qBtn), { marginTop: 8 }), onClick: function () { return setShowPins(false); } }, "Masquer"))),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#7c3aed", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDDDD R\u00F4le administratif (secr\u00E9taires, cadres)"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Un PIN partag\u00E9 : \u00E0 la connexion, chaque personne saisit son pr\u00E9nom (m\u00E9moris\u00E9 sur son appareil). Le r\u00F4le peut poser, modifier et retirer les activit\u00E9s coch\u00E9es \u00AB \u270F\uFE0F administratif \u00BB sur la ligne de n'importe quel m\u00E9decin."),
@@ -6461,44 +6522,6 @@ function CardioPlanning() {
                     }),
                     React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "\u26A0 = pas encore de PIN personnel : le niveau ne s'appliquera qu'une fois le code d\u00E9fini.")),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDC41 R\u00E9cup\u00E9ration des codes PIN"),
-                    !showPins
-                        ? (!pinsAsk
-                            ? React.createElement("button", { style: S.btnP, onClick: function () { setPinsTry(""); setPinsAsk(true); } }, "Afficher tous les codes")
-                            : React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
-                                React.createElement("input", { autoFocus: true, type: "password", value: pinsTry, onChange: function (e) { return setPinsTry(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") validatePins(); }, placeholder: "PIN éditeur", style: __assign(__assign({}, S.fi), { width: 140, textAlign: "center", letterSpacing: 4 }) }),
-                                React.createElement("button", { style: S.btnP, onClick: function () { validatePins(); } }, "Valider"),
-                                React.createElement("button", { style: { fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer" }, onClick: function () { setPinsAsk(false); setPinsTry(""); } }, "Annuler")))
-                        : React.createElement("div", null,
-                            React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", lineHeight: 1.9 } },
-                                React.createElement("div", null, React.createElement("b", null, "\u00C9diteur : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, editPin)),
-                                React.createElement("div", null, React.createElement("b", null, "Administratif : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, adminPin || "\u2014 non d\u00E9fini \u2014")),
-                                Object.entries(medPins).filter(function (_p) { return _p[1] && _p[1].length >= 3; }).map(function (_p) { var m2 = medecins.find(function (x) { return String(x.id) === String(_p[0]); }); return React.createElement("div", { key: _p[0] }, React.createElement("b", null, (m2 ? m2.init : _p[0]) + " : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, _p[1])); }),
-                                Object.entries(medPins).filter(function (_p) { return _p[1] && _p[1].length >= 3; }).length === 0 && React.createElement("div", { style: { color: "var(--txt3)" } }, "Aucun PIN m\u00E9decin d\u00E9fini.")),
-                            React.createElement("button", { style: __assign(__assign({}, S.qBtn), { marginTop: 8 }), onClick: function () { return setShowPins(false); } }, "Masquer"))),
-                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCC6 P\u00E9riode d'affichage"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Tous les onglets affichent le planning par blocs de cette dur\u00E9e, align\u00E9s sur le mois de d\u00E9part."),
-                    React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" } },
-                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
-                            "Dur\u00E9e",
-                            React.createElement("select", { value: periodCfg.len, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { len: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, [1, 2, 3, 4, 6, 12].map(function (v) { return React.createElement("option", { key: v, value: v },
-                                v,
-                                " mois"); }))),
-                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
-                            "Mois de d\u00E9part",
-                            React.createElement("select", { value: periodCfg.startM, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { startM: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, MOIS.map(function (mn, mi) { return React.createElement("option", { key: mi, value: mi }, mn); })))),
-                    React.createElement("div", { style: { marginTop: 8, fontSize: 10, color: "var(--txt3)" } },
-                        "Actuellement : blocs de ",
-                        periodCfg.len,
-                        " mois \u00E0 partir de ",
-                        MOIS[periodCfg.startM],
-                        " (ex. ",
-                        MOIS[periodCfg.startM],
-                        " \u2014 ",
-                        MOIS[(periodCfg.startM + periodCfg.len - 1) % 12],
-                        ").")),
-                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#a371f7", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD04 Tour m\u00E9dical \u2014 minimums par sursp\u00E9cialit\u00E9"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } },
                         "S\u00E9niors devant rester disponibles chaque semaine (hors tour, hors absents). L'algorithme vise l'",
@@ -6529,25 +6552,130 @@ function CardioPlanning() {
                                             var _a;
                                             return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
                                         }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); }))))),
+                React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDFE5 Salles"),
+                        ["CHL", "CHB", "ANGIO", "PLATEAU"].map(function (site2) {
+                            var list = salleReg.filter(function (s) { return Array.isArray(s.s) ? s.s.indexOf(site2) >= 0 : s.s === site2; });
+                            var lbl = { CHL: "CHL", CHB: "CHB", ANGIO: "PT Angio", PLATEAU: "PT Cardio" }[site2];
+                            return React.createElement("div", { key: site2, style: { marginBottom: 6 } },
+                                React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, lbl),
+                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
+                                    list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: salleEdit === s.n ? "1.5px solid #388bfd" : "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
+                                        React.createElement("span", { onClick: function () { setMData(__assign(__assign({}, s), { _origN: s.n })); setModal("salleCfg"); }, style: { cursor: "pointer", textDecoration: "underline dotted", padding: "2px 2px" } }, s.n),
+                                        React.createElement("button", { onClick: function () {
+                                                if (!window.confirm("Supprimer la salle " + s.n + " du registre ?\n(Elle sera aussi retirée des activités ; les cases déjà posées gardent leur salle.)"))
+                                                    return;
+                                                setSalleReg(function (p) { return p.filter(function (x) { return x.n !== s.n; }); });
+                                                setActes(function (p) { return p.map(function (a) { return (__assign(__assign({}, a), { salles: (a.salles || []).filter(function (sx) { return sx !== s.n; }) })); }); });
+                                            }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 13, padding: "0 3px", color: "#dc2626", fontWeight: 900 } }, "\u00D7"))); }),
+                                    list.length === 0 && React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "\u2014")));
+                        }),
+                        salleEdit && (function () {
+                            var inSalle = actes.filter(function (a) { return (a.salles || []).includes(salleEdit); });
+                            return (React.createElement("div", { style: { marginTop: 6, marginBottom: 6, padding: 8, borderRadius: 7, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.05)" } },
+                                React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#388bfd", marginBottom: 5 } },
+                                    "Activit\u00E9s possibles dans ",
+                                    salleEdit,
+                                    " ",
+                                    React.createElement("span", { style: { color: "var(--txt3)", fontWeight: 600 } },
+                                        "(",
+                                        inSalle.length,
+                                        ")")),
+                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, actes.filter(function (a) { return a.hasSalle && !a.isSystem; }).map(function (a) {
+                                    var on = (a.salles || []).includes(salleEdit);
+                                    return React.createElement("button", { key: a.id, type: "button", onClick: function () { return setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== salleEdit; }) : (x.salles || []).concat([salleEdit]) }); }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
+                                })),
+                                React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Un clic ajoute/retire la salle de l'activit\u00E9 \u2014 c'est la m\u00EAme donn\u00E9e que les pastilles de l'\u00E9diteur d'activit\u00E9.")));
+                        })(),
+                        React.createElement("button", { onClick: function () { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
+                        React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { marginBottom: 20, padding: "14px 16px", background: "var(--bg)", borderRadius: 10, border: "1px solid var(--border)" } },
-                        React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "var(--txt)", marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
-                        React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, "Les jours de vacances apparaissent avec un fond gris\u00E9 dans tous les calendriers."),
-                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
-                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt2)" } }, "Zone :"),
-                            React.createElement("div", { style: { display: "flex", gap: 6 } }, ["A", "B", "C"].map(function (z) { return (React.createElement("button", { key: z, onClick: function () { setVacZone(z); try {
-                                    localStorage.setItem("cp6_vaczone", z);
-                                }
-                                catch (_a) { } }, style: { padding: "6px 16px", borderRadius: 7, border: "1px solid ".concat(vacZone === z ? "#1d4ed8" : "var(--border)"),
-                                    background: vacZone === z ? "#1d4ed8" : "var(--bg2)", color: vacZone === z ? "#fff" : "var(--txt2)",
-                                    fontWeight: 700, fontSize: 13, cursor: "pointer" } },
-                                "Zone ",
-                                z)); })),
-                            React.createElement("span", { style: { fontSize: 11, color: vacDates.size > 0 ? "#16a34a" : "#f59e0b", fontWeight: 600 } }, vacDates.size > 0 ? "\u2713 ".concat(vacDates.size, " jours charg\u00E9s") : "⏳ Chargement..."),
-                            vacSource && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 3 } },
-                                "Source : ",
-                                vacSource))),
-                    isEdit && (function () {
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde des donn\u00E9es"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "T\u00E9l\u00E9chargez une copie de toutes vos donn\u00E9es. En cas de probl\u00E8me, importez ce fichier pour tout restaurer."),
+                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } }, "\uD83D\uDD50 Sauvegardes automatiques (toutes les 72 h, 10 conserv\u00E9es)"),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "Restaurer \u00E9crase les donn\u00E9es actuelles par celles de la sauvegarde choisie."),
+                        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 } },
+                            backupList.length === 0 && React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune sauvegarde pour l'instant."),
+                            backupList.map(function (b) { return (React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--txt)" } },
+                                React.createElement("span", { style: { flex: 1 } }, new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })),
+                                React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #388bfd", background: "var(--bg2)", color: "#388bfd", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { return previewBackup(b.id, b.ts); } }, "\uD83D\uDC41 Aper\u00E7u"),
+                                React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(b.ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?"))
+                                        restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
+                        React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
+                    React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+                        React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#e3b341", color: "#111" }), onClick: function () {
+                                var data = { plan: plan, tourMed: tourMed, planningType: planningType, notes: notes, medecins: medecins, actes: actes, editPin: editPin, adminPin: adminPin, adminEnabled: adminEnabled, adminCanReports: adminCanReports, adminCanNotes: adminCanNotes, exportDate: new Date().toISOString(), version: "v6" };
+                                var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                                var url = URL.createObjectURL(blob);
+                                var a = document.createElement("a");
+                                var today = new Date();
+                                var ds = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+                                a.href = url;
+                                a.download = "cardio-backup-" + ds + ".json";
+                                a.click();
+                                URL.revokeObjectURL(url);
+                                toast("Sauvegarde téléchargée");
+                            } }, "\uD83D\uDCBE Sauvegarder"),
+                        isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#7c3aed" }), onClick: function () {
+                                var input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = ".json";
+                                input.onchange = function (e) {
+                                    var file = e.target.files[0];
+                                    if (!file)
+                                        return;
+                                    var reader = new FileReader();
+                                    reader.onload = function (ev) {
+                                        try {
+                                            var data = JSON.parse(ev.target.result);
+                                            if (!data.version)
+                                                throw new Error("Fichier invalide");
+                                            var d = new Date(data.exportDate).toLocaleDateString("fr-FR");
+                                            if (!confirm("Restaurer la sauvegarde du " + d + " ?\nToutes les données actuelles seront remplacées."))
+                                                return;
+                                            if (data.plan)
+                                                setPlan(data.plan);
+                                            if (data.tourMed)
+                                                setTourMed(data.tourMed);
+                                            if (data.planningType)
+                                                setPlanningType(data.planningType);
+                                            if (data.notes)
+                                                setNotes(data.notes);
+                                            if (data.medecins)
+                                                setMedecins(data.medecins);
+                                            if (data.actes)
+                                                setActes(data.actes);
+                                            toast("Sauvegarde restaurée");
+                                        }
+                                        catch (err) {
+                                            toast("Fichier invalide", "warn");
+                                        }
+                                    };
+                                    reader.readAsText(file);
+                                };
+                                input.click();
+                            } }, "\uD83D\uDCC2 Importer"))),
+                docSize !== null && (function () {
+                        var LIMIT = 1048576;
+                        var pct = Math.min(100, Math.round(docSize / LIMIT * 100));
+                        var col = pct < 60 ? "#16a34a" : pct < 85 ? "#f59e0b" : "#dc2626";
+                        return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 5 } },
+                                "\uD83D\uDCE6 Poids des donn\u00E9es : ",
+                                (docSize / 1024).toFixed(0),
+                                " Ko / 1024 Ko ",
+                                React.createElement("span", { style: { color: col, fontWeight: 800 } },
+                                    "(",
+                                    pct,
+                                    "%)")),
+                            React.createElement("div", { style: { height: 8, borderRadius: 4, background: "var(--border2)", overflow: "hidden" } },
+                                React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 4 } })),
+                            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } },
+                                "Limite Firebase : 1 Mo par document. ",
+                                pct < 60 ? "Large marge." : pct < 85 ? "À surveiller — un archivage des anciens mois sera à prévoir." : "⚠ Proche de la limite : archivez les anciens mois rapidement.")));
+                    })(),
+                isEdit && (function () {
                         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
                         var perStartDate = new Date(sy, sm, 1);
                         var monthsInPlan = Object.keys(plan).map(function (k) { return k.slice(0, 7); }).filter(function (v, i2, a2) { return a2.indexOf(v) === i2; })
@@ -6665,44 +6793,7 @@ function CardioPlanning() {
                                             });
                                         }); }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 10, padding: 0, color: "#16a34a", fontWeight: 900 } }, "\u21A9"))); })))));
                     })(),
-                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDFE5 Salles"),
-                        ["CHL", "CHB", "ANGIO", "PLATEAU"].map(function (site2) {
-                            var list = salleReg.filter(function (s) { return Array.isArray(s.s) ? s.s.indexOf(site2) >= 0 : s.s === site2; });
-                            var lbl = { CHL: "CHL", CHB: "CHB", ANGIO: "PT Angio", PLATEAU: "PT Cardio" }[site2];
-                            return React.createElement("div", { key: site2, style: { marginBottom: 6 } },
-                                React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, lbl),
-                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
-                                    list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: salleEdit === s.n ? "1.5px solid #388bfd" : "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
-                                        React.createElement("span", { onClick: function () { setMData(__assign(__assign({}, s), { _origN: s.n })); setModal("salleCfg"); }, style: { cursor: "pointer", textDecoration: "underline dotted", padding: "2px 2px" } }, s.n),
-                                        React.createElement("button", { onClick: function () {
-                                                if (!window.confirm("Supprimer la salle " + s.n + " du registre ?\n(Elle sera aussi retirée des activités ; les cases déjà posées gardent leur salle.)"))
-                                                    return;
-                                                setSalleReg(function (p) { return p.filter(function (x) { return x.n !== s.n; }); });
-                                                setActes(function (p) { return p.map(function (a) { return (__assign(__assign({}, a), { salles: (a.salles || []).filter(function (sx) { return sx !== s.n; }) })); }); });
-                                            }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 13, padding: "0 3px", color: "#dc2626", fontWeight: 900 } }, "\u00D7"))); }),
-                                    list.length === 0 && React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "\u2014")));
-                        }),
-                        salleEdit && (function () {
-                            var inSalle = actes.filter(function (a) { return (a.salles || []).includes(salleEdit); });
-                            return (React.createElement("div", { style: { marginTop: 6, marginBottom: 6, padding: 8, borderRadius: 7, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.05)" } },
-                                React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#388bfd", marginBottom: 5 } },
-                                    "Activit\u00E9s possibles dans ",
-                                    salleEdit,
-                                    " ",
-                                    React.createElement("span", { style: { color: "var(--txt3)", fontWeight: 600 } },
-                                        "(",
-                                        inSalle.length,
-                                        ")")),
-                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, actes.filter(function (a) { return a.hasSalle && !a.isSystem; }).map(function (a) {
-                                    var on = (a.salles || []).includes(salleEdit);
-                                    return React.createElement("button", { key: a.id, type: "button", onClick: function () { return setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== salleEdit; }) : (x.salles || []).concat([salleEdit]) }); }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
-                                })),
-                                React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Un clic ajoute/retire la salle de l'activit\u00E9 \u2014 c'est la m\u00EAme donn\u00E9e que les pastilles de l'\u00E9diteur d'activit\u00E9.")));
-                        })(),
-                        React.createElement("button", { onClick: function () { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
-                        React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
-                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDF13 Th\u00E8me"),
                         React.createElement("div", { style: { display: "flex", gap: 6 } },
                             React.createElement("button", { onClick: function () { try {
@@ -6711,100 +6802,7 @@ function CardioPlanning() {
                                 catch (e) { } ; var mm = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)"); setDarkModeRaw(!!(mm && mm.matches)); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCF1 Auto (t\u00e9l\u00e9phone)"),
                             React.createElement("button", { onClick: function () { return setDarkMode(false); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: !darkMode ? "var(--nav-act)" : "var(--bg2)", color: !darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\u2600\uFE0F Jour"),
                             React.createElement("button", { onClick: function () { return setDarkMode(true); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: darkMode ? "var(--nav-act)" : "var(--bg2)", color: darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\uD83C\uDF13 Nuit")),
-                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit le r\u00e9glage clair/sombre du t\u00e9l\u00e9phone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix m\u00e9moris\u00e9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil).")),
-                    docSize !== null && (function () {
-                        var LIMIT = 1048576;
-                        var pct = Math.min(100, Math.round(docSize / LIMIT * 100));
-                        var col = pct < 60 ? "#16a34a" : pct < 85 ? "#f59e0b" : "#dc2626";
-                        return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 5 } },
-                                "\uD83D\uDCE6 Poids des donn\u00E9es : ",
-                                (docSize / 1024).toFixed(0),
-                                " Ko / 1024 Ko ",
-                                React.createElement("span", { style: { color: col, fontWeight: 800 } },
-                                    "(",
-                                    pct,
-                                    "%)")),
-                            React.createElement("div", { style: { height: 8, borderRadius: 4, background: "var(--border2)", overflow: "hidden" } },
-                                React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 4 } })),
-                            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } },
-                                "Limite Firebase : 1 Mo par document. ",
-                                pct < 60 ? "Large marge." : pct < 85 ? "À surveiller — un archivage des anciens mois sera à prévoir." : "⚠ Proche de la limite : archivez les anciens mois rapidement.")));
-                    })(),
-                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde des donn\u00E9es"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "T\u00E9l\u00E9chargez une copie de toutes vos donn\u00E9es. En cas de probl\u00E8me, importez ce fichier pour tout restaurer."),
-                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } }, "\uD83D\uDD50 Sauvegardes automatiques (toutes les 72 h, 10 conserv\u00E9es)"),
-                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "Restaurer \u00E9crase les donn\u00E9es actuelles par celles de la sauvegarde choisie."),
-                        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 } },
-                            backupList.length === 0 && React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune sauvegarde pour l'instant."),
-                            backupList.map(function (b) { return (React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--txt)" } },
-                                React.createElement("span", { style: { flex: 1 } }, new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })),
-                                React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #388bfd", background: "var(--bg2)", color: "#388bfd", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { return previewBackup(b.id, b.ts); } }, "\uD83D\uDC41 Aper\u00E7u"),
-                                React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(b.ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?"))
-                                        restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
-                        React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
-                    React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-                        React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#e3b341", color: "#111" }), onClick: function () {
-                                var data = { plan: plan, tourMed: tourMed, planningType: planningType, notes: notes, medecins: medecins, actes: actes, editPin: editPin, adminPin: adminPin, adminEnabled: adminEnabled, adminCanReports: adminCanReports, adminCanNotes: adminCanNotes, exportDate: new Date().toISOString(), version: "v6" };
-                                var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-                                var url = URL.createObjectURL(blob);
-                                var a = document.createElement("a");
-                                var today = new Date();
-                                var ds = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
-                                a.href = url;
-                                a.download = "cardio-backup-" + ds + ".json";
-                                a.click();
-                                URL.revokeObjectURL(url);
-                                toast("Sauvegarde téléchargée");
-                            } }, "\uD83D\uDCBE Sauvegarder"),
-                        isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#7c3aed" }), onClick: function () {
-                                var input = document.createElement("input");
-                                input.type = "file";
-                                input.accept = ".json";
-                                input.onchange = function (e) {
-                                    var file = e.target.files[0];
-                                    if (!file)
-                                        return;
-                                    var reader = new FileReader();
-                                    reader.onload = function (ev) {
-                                        try {
-                                            var data = JSON.parse(ev.target.result);
-                                            if (!data.version)
-                                                throw new Error("Fichier invalide");
-                                            var d = new Date(data.exportDate).toLocaleDateString("fr-FR");
-                                            if (!confirm("Restaurer la sauvegarde du " + d + " ?\nToutes les données actuelles seront remplacées."))
-                                                return;
-                                            if (data.plan)
-                                                setPlan(data.plan);
-                                            if (data.tourMed)
-                                                setTourMed(data.tourMed);
-                                            if (data.planningType)
-                                                setPlanningType(data.planningType);
-                                            if (data.notes)
-                                                setNotes(data.notes);
-                                            if (data.medecins)
-                                                setMedecins(data.medecins);
-                                            if (data.actes)
-                                                setActes(data.actes);
-                                            toast("Sauvegarde restaurée");
-                                        }
-                                        catch (err) {
-                                            toast("Fichier invalide", "warn");
-                                        }
-                                    };
-                                    reader.readAsText(file);
-                                };
-                                input.click();
-                            } }, "\uD83D\uDCC2 Importer"))),
-                React.createElement("div", { style: S.card },
-                    React.createElement("div", { style: { fontWeight: 700, color: "var(--txt2)", fontSize: 13, marginBottom: 6 } }, "\u2601\uFE0F Synchronisation Firebase"),
-                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-                        React.createElement("div", { style: { width: 10, height: 10, borderRadius: "50%", flexShrink: 0, background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" } }),
-                        React.createElement("span", { style: { fontSize: 12, color: "var(--txt2)" } }, fbStatus === "ok" ? "Connecté — données sauvegardées automatiquement" :
-                            fbStatus === "error" ? "Erreur de connexion — vérifiez votre réseau" :
-                                fbStatus === "offline" ? "Mode local — sans sauvegarde automatique" :
-                                    "Connexion en cours...")))))),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit le r\u00e9glage clair/sombre du t\u00e9l\u00e9phone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix m\u00e9moris\u00e9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil)."))))),
         bkPreview && (function () {
             var ts = bkPreview.ts, b = bkPreview.b, cc = bkPreview.c, added = bkPreview.added, removed = bkPreview.removed, changed = bkPreview.changed;
             var months = Object.keys(b.byMonth || {}).concat(Object.keys(cc.byMonth || {})).filter(function (v, i, arr) { return arr.indexOf(v) === i; }).sort();
