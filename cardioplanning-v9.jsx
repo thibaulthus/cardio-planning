@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.23 — 23/07/2026";
+const APP_VERSION="v9.24 — 29/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -214,7 +214,7 @@ const S={
   td:{padding:"0",textAlign:"center",verticalAlign:"top",minWidth:30,borderRight:"1px solid var(--border2)",background:"var(--bg2)",position:"relative"},
   tdWE:{background:"var(--bg-we)",height:28,maxHeight:28,overflow:"hidden"},tdN:{background:"var(--bg-n)"},
   tdConfl:{background:"#fee2e2",outline:"1px solid #ef4444"},
-  av:{width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0},
+  av:{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0},
   avT:{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800},
   card:{background:"var(--card)",border:"1px solid var(--border)",borderRadius:9,padding:"10px 12px"},
   ov:{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"none"},
@@ -431,7 +431,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
       <div style={{minWidth:280}}>
         <div style={S.mHd}><div style={S.mTit2}>🌙 Garde — {(()=>{const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const dw=dow(pgf.y,pgf.m,pgf.d);return ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw]+" "+pgf.d+" "+MOIS[pgf.m]+" "+pgf.y;})()}</div><button onClick={()=>setPickGardeDay(null)} style={S.xBtn}>×</button></div>
         {(()=>{const pgf2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const cgm=getGardeMed2(pgf2.y,pgf2.m,pgf2.d);return cgm?(<div style={{marginBottom:10,display:"flex",alignItems:"center",gap:6,padding:"6px 10px",background:"var(--garde-bg)",borderRadius:7,border:"1px solid #86efac"}}>
-          <div style={{width:22,height:22,borderRadius:"50%",background:cgm.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{cgm.init}</div>
+          <div style={{width:26,height:26,borderRadius:"50%",background:cgm.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{cgm.init}</div>
           <span style={{fontSize:12,fontWeight:600}}>Garde actuelle : {cgm.prenom} {cgm.nom}</span>
           <button onClick={()=>setGardeSwapOpen(v=>!v)} style={{marginLeft:"auto",fontSize:11,padding:"3px 8px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}}>⇄ Échanger</button>
           <button onClick={()=>{const pgf3=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const dwB=dow(pgf3.y,pgf3.m,pgf3.d);onCell(cgm.id,pgf3.y,pgf3.m,pgf3.d,(dwB===6||dwB===0)?"JOUR":"N");setPickGardeDay(null);}} style={{...S.btnP,fontSize:11,padding:"3px 8px"}}>Modifier</button>
@@ -463,7 +463,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   }}
                   style={{display:"flex",alignItems:"center",gap:7,padding:"6px 9px",borderRadius:7,marginBottom:4,cursor:o.reason?"not-allowed":"pointer",opacity:o.reason?.45:1,border:"1px solid var(--border2)",background:"var(--bg2)"}}>
                   <span style={{fontSize:11,fontWeight:700,color:"var(--txt)",width:92}}>{JG[dow(o.y,o.m,o.d)]} {o.d} {MOIS[o.m].slice(0,4)}</span>
-                  <span style={{width:20,height:20,borderRadius:"50%",background:o.mB.color,color:"#fff",fontSize:8,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{o.mB.init}</span>
+                  <span style={{width:26,height:26,borderRadius:"50%",background:o.mB.color,color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{o.mB.init}</span>
                   <span style={{fontSize:11,fontWeight:600,color:"var(--txt)",flex:1}}>{o.mB.nom}</span>
                   {o.reason?<span style={{fontSize:9,color:"#f85149",fontWeight:600}}>{o.reason}</span>:<span style={{fontSize:11,color:"#388bfd",fontWeight:800}}>⇄</span>}
                 </div>
@@ -494,7 +494,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
             return <button key={m.id}
               style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,border:`1px solid ${isOn?"#16a34a":"var(--border)"}`,background:isOn?"#f0fdf4":"var(--bg2)",cursor:"pointer"}}
               onClick={()=>{const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};applyGarde(m.id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}}>
-              <div style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{m.init}</div>
+              <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
               <span style={{fontSize:12,fontWeight:600,color:"var(--txt)"}}>{m.prenom} {m.nom}</span>
               {isOn&&<span style={{marginLeft:"auto",color:"#16a34a",fontSize:12}}>✓ De garde</span>}
             </button>;
@@ -537,7 +537,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                   background:we?"var(--bg-we)":gardeMed?"var(--garde-bg)":"var(--td-fix)"}}
                   onClick={()=>{ if(!isEdit||gardeLocked)return; setGardeSearch(""); setPickGardeDayFull({d,y:ey,m:em}); }}>
                   {gardeMed&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                    <div style={{width:20,height:20,borderRadius:"50%",background:gardeMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{gardeMed.init}</div>
+                    <div style={{width:26,height:26,borderRadius:"50%",background:gardeMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{gardeMed.init}</div>
                   </div>}
                 </td>}
                 {meds.map(med=>{
@@ -629,7 +629,7 @@ function SiteView({site,year,month,prevM,nextM,actes,medecins,getEntries,salleOc
           onClick={()=>isEdit&&onPickSite({salle,siteActes:[bipActe],d,sl,y:year,m:month})}>
           {bipOcc2.map(({med,acte,rs},i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
-              <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{med.init}</div>
+              <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
               <span style={{fontSize:10,fontWeight:600,color:"var(--txt)",whiteSpace:"nowrap"}}>{med.nom}</span>
             </div>
           ))}
@@ -651,7 +651,7 @@ function SiteView({site,year,month,prevM,nextM,actes,medecins,getEntries,salleOc
         <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:2}}>
         {occ.map(({med,acte},i)=>(
           <div key={i} style={{display:"flex",alignItems:"center",gap:1}}>
-            <div style={{width:18,height:18,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:7,fontWeight:800,flexShrink:0}}>{med.init}</div>
+            <div style={{width:24,height:24,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{med.init}</div>
             <Badge a={acte} hasNote={!!notes[nk(med.id,year,month,d,sl)]}/>
           </div>
         ))}
@@ -789,7 +789,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           const monoActe=(row.ids||[]).length===1&&!row.multiActe;
           return(
           <div key={i} style={{display:"flex",alignItems:"center",gap:2}}>
-            <div style={{width:18,height:18,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:7,fontWeight:800,flexShrink:0}}>{med.init}</div>
+            <div style={{width:24,height:24,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{med.init}</div>
             {monoActe
               ?<span style={{fontSize:9,fontWeight:600,color:"var(--txt)",whiteSpace:"nowrap"}}>{med.nom}</span>
               :<Badge a={acte}/>}
@@ -1140,7 +1140,7 @@ function GardeView({year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orie
       <td key={"g"+d+rgy+rgm} style={{...S.td,...(we?S.tdWE:{}),padding:2,cursor:isEdit?"pointer":"default"}}
         onClick={isEdit?()=>setPickerDay({d,y:rgy,m:rgm}):undefined}>
         {gMed?(<div style={{display:"flex",alignItems:"center",gap:3,margin:"1px",padding:"1px 3px",borderRadius:4,background:"#1a0000",border:"1px solid #f8514944"}}>
-          <div style={{width:18,height:18,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{gMed.init}</div>
+          <div style={{width:24,height:24,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{gMed.init}</div>
           <span style={{fontSize:9,fontWeight:700,color:gMed.color}}>{gMed.prenom} {gMed.nom}</span>
         </div>):null}
       </td>
@@ -1171,7 +1171,7 @@ function GardeView({year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orie
                 </td>
                 <td style={{...S.td,padding:4,cursor:isEdit?"pointer":"default"}} onClick={isEdit?()=>setPickerDay({d,y:gvY,m:gvM}):undefined}>
                   {gMed?(<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:gMed.color+"22"}}>
-                    <div style={{width:22,height:22,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{gMed.init}</div>
+                    <div style={{width:26,height:26,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{gMed.init}</div>
                     <span style={{fontSize:12,fontWeight:600,color:"var(--txt)"}}>{gMed.prenom} {gMed.nom}</span>
                   </div>):(<span style={{color:"var(--txt3)",fontSize:11}}>—</span>)}
                 </td>
@@ -1391,7 +1391,7 @@ function GardeView({year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orie
                   return(
                   <tr key={m2.id} style={{borderBottom:"1px solid var(--border2)"}}>
                     <td style={{padding:"3px 8px",fontSize:11,fontWeight:700,color:"var(--txt)"}}>
-                      <span style={{display:"inline-flex",width:16,height:16,borderRadius:"50%",background:m2.color,color:"#fff",fontSize:7,fontWeight:800,alignItems:"center",justifyContent:"center",marginRight:5,verticalAlign:"middle"}}>{m2.init}</span>
+                      <span style={{display:"inline-flex",width:22,height:22,borderRadius:"50%",background:m2.color,color:"#fff",fontSize:8,fontWeight:800,alignItems:"center",justifyContent:"center",marginRight:5,verticalAlign:"middle"}}>{m2.init}</span>
                       {m2.nom}
                     </td>
                     <td style={{textAlign:"center",padding:"3px 6px",fontSize:12,fontWeight:800,color:"#f85149"}}>{totR}</td>
@@ -1429,7 +1429,7 @@ function GardeView({year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orie
               <div style={{marginBottom:12,padding:"8px 10px",background:"var(--bg-td)",borderRadius:7,border:"1px solid var(--today-c)44"}}>
                 <div style={{fontSize:10,color:"var(--today-c)",fontWeight:700,marginBottom:5}}>✓ Garde assignée</div>
                 <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
-                  <div style={{width:24,height:24,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{gMed.init}</div>
+                  <div style={{width:28,height:28,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{gMed.init}</div>
                   <span style={{color:"var(--txt)",fontSize:13,fontWeight:700}}>{gMed.prenom} {gMed.nom}</span>
                 </div>
                 <button onClick={()=>setGvSwapOpen(v=>!v)} style={{width:"100%",padding:"6px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,fontSize:12,cursor:"pointer",marginBottom:6}}>⇄ Échanger cette garde…</button>
@@ -1458,7 +1458,7 @@ function GardeView({year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orie
                           }}
                           style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:6,marginBottom:3,cursor:o.reason?"not-allowed":"pointer",opacity:o.reason?.45:1,border:"1px solid var(--border2)",background:"var(--bg2)"}}>
                           <span style={{fontSize:10,fontWeight:700,color:"var(--txt)",width:86}}>{JOURSC[dow(o.y,o.m,o.d)]} {o.d} {MOIS[o.m].slice(0,4)}</span>
-                          <span style={{width:18,height:18,borderRadius:"50%",background:o.mB.color,color:"#fff",fontSize:7,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{o.mB.init}</span>
+                          <span style={{width:24,height:24,borderRadius:"50%",background:o.mB.color,color:"#fff",fontSize:9,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{o.mB.init}</span>
                           <span style={{fontSize:10,fontWeight:600,color:"var(--txt)",flex:1}}>{o.mB.nom}</span>
                           {o.reason?<span style={{fontSize:8,color:"#f85149",fontWeight:600}}>{o.reason}</span>:<span style={{fontSize:10,color:"#388bfd",fontWeight:800}}>⇄</span>}
                         </div>
@@ -1486,7 +1486,7 @@ function GardeView({year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orie
                       background:isG?"var(--bg-td)":avail==="blocked"?"var(--bg)":"var(--bg2)",
                       opacity:avail==="blocked"?.3:1}}
                     onClick={()=>{ if(avail==="blocked")return; applyGarde(m.id,pd.y,pd.m,pd.d); setPickerDay(null); }}>
-                    <div style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{m.init}</div>
+                    <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
                     <div style={{textAlign:"left",flex:1}}>
                       <div style={{fontSize:12,fontWeight:700,color:isG?"var(--today-c)":"var(--txt)"}}>{m.prenom} {m.nom}</div>
                       <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":"var(--txt3)"}}>{avail==="blocked"?"Absent / repos":"Disponible"}</div>
@@ -1537,7 +1537,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
         onClick={isEdit?()=>openBipPicker({d,sl}):undefined}>
         {occ.map(({med,salle},i)=>(
           <div key={i} style={{display:"flex",alignItems:"center",gap:2,margin:"1px 0"}}>
-            <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{med.init}</div>
+            <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
             <span style={{fontSize:10,color:"#111",fontWeight:700}}>{salle}</span>
           </div>
         ))}
@@ -1644,7 +1644,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
                           border:"1px solid var(--border)",cursor:avail!=="blocked"&&!already?"pointer":"default",
                           background:avail==="warning"&&!already?"#1a1000":"var(--bg2)",opacity:avail==="blocked"||already?.35:1}}
                         onClick={()=>{ if(avail==="blocked"||already)return; setSelMedId(m.id); }}>
-                        <div style={{width:22,height:22,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{m.init}</div>
+                        <div style={{width:26,height:26,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
                         <div style={{textAlign:"left",flex:1}}>
                           <div style={{fontSize:11,fontWeight:700,color:"var(--txt)"}}>{m.prenom} {m.nom}</div>
                           <div style={{fontSize:9,color:already?"#fb923c":avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>
@@ -1660,7 +1660,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
             {selMedId&&selMed&&(
               <>
                 <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10,padding:"6px 9px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)"}}>
-                  <div style={{width:20,height:20,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{selMed.init}</div>
+                  <div style={{width:26,height:26,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{selMed.init}</div>
                   <span style={{fontSize:12,fontWeight:700,color:"var(--txt)",flex:1}}>{selMed.prenom} {selMed.nom}</span>
                   <button onClick={()=>setSelMedId(null)} style={{background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:13}}>←</button>
                 </div>
@@ -1813,7 +1813,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Assignés</div>
           {curOcc.map(({med,acte,acteId},i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
-              <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{med.init}</div>
+              <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
               {acte&&<span style={{padding:"2px 6px",borderRadius:4,background:acte.bg,color:acte.color,fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>}
               {(!adminOnly||((actes.find(a2=>a2.id===acteId)||{}).adminOk===true))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
@@ -1860,7 +1860,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                       setSelMedId(med.id);
                     }
                   }}>
-                  <div style={{width:24,height:24,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{med.init}</div>
+                  <div style={{width:28,height:28,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
                   <div style={{textAlign:"left",flex:1}}>
                     <div style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{med.prenom} {med.nom}</div>
                     <div style={{fontSize:9,color:statusCol}}>{statusTxt}</div>
@@ -1881,7 +1881,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
               <button onClick={()=>setSelMedId(null)} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 9px",cursor:"pointer",color:"var(--txt2)",fontSize:12}}>← Retour</button>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:22,height:22,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{selMed.init}</div>
+                <div style={{width:26,height:26,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{selMed.init}</div>
                 <span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>{selMed.prenom} {selMed.nom}</span>
               </div>
             </div>
@@ -1997,7 +1997,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Occupants</div>
           {curOcc.map(({med,acte},i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
-              <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{med.init}</div>
+              <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12}}>{med.prenom} {med.nom}</span>
               <span style={{fontSize:10,color:acte.color,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>
               {(!adminOnly||acte.adminOk===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
@@ -2020,7 +2020,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
                   style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px solid ${avail==="warning"?"#f59e0b44":"var(--border)"}`,
                     cursor:avail!=="blocked"?"pointer":"default",background:avail==="warning"?"#1a1000":"var(--bg2)",opacity:avail==="blocked"?.35:1}}
                   onClick={()=>{ if(avail==="blocked")return; setSelMedId(med.id); setStep("acte"); }}>
-                  <div style={{width:24,height:24,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{med.init}</div>
+                  <div style={{width:28,height:28,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
                   <div style={{textAlign:"left"}}>
                     <div style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{med.prenom} {med.nom}</div>
                     <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent/repos":avail==="warning"?"⚠ Déjà une activité":"Disponible"}</div>
@@ -2037,7 +2037,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
             <button onClick={()=>setStep("med")} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 9px",cursor:"pointer",color:"var(--txt2)",fontSize:12}}>← Retour</button>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{width:22,height:22,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{selMed.init}</div>
+              <div style={{width:26,height:26,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{selMed.init}</div>
               <span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>{selMed.prenom} {selMed.nom}</span>
             </div>
           </div>
@@ -2070,7 +2070,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
             <button onClick={()=>setStep("acte")} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 9px",cursor:"pointer",color:"var(--txt2)",fontSize:12}}>← Retour</button>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{width:22,height:22,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{selMed.init}</div>
+              <div style={{width:26,height:26,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{selMed.init}</div>
               <span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>{selMed.prenom} {selMed.nom}</span>
             </div>
           </div>
@@ -2926,7 +2926,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
                   const md=medecins.find(m2=>m2.id===mid);if(!md)return null;
                   const sel=swapSrcMed===mid;
                   return(<div key={mid} onClick={()=>setSwapSrcMed(mid)} style={{display:"flex",alignItems:"center",gap:7,padding:"7px 9px",borderRadius:7,marginBottom:5,cursor:"pointer",border:"2px solid "+(sel?"#388bfd":"var(--border2)"),background:sel?"rgba(56,139,253,.14)":"var(--bg)"}}>
-                    <span style={{width:20,height:20,borderRadius:"50%",background:md.color,color:"#fff",fontSize:8,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{md.init}</span>
+                    <span style={{width:26,height:26,borderRadius:"50%",background:md.color,color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{md.init}</span>
                     <span style={{fontSize:12,fontWeight:700,color:"var(--txt)",flex:1}}>{md.nom}</span>
                     <span style={{fontSize:10,fontWeight:800,color:u2==="HC"?"#388bfd":"#a371f7"}}>{u2}</span>
                   </div>);
@@ -2945,7 +2945,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
                   const sel=swapDstMed===mid;
                   const same=mid===swapSrcMed;
                   return(<div key={mid} onClick={()=>{if(!same)setSwapDstMed(mid);}} style={{display:"flex",alignItems:"center",gap:7,padding:"7px 9px",borderRadius:7,marginBottom:5,cursor:same?"not-allowed":"pointer",opacity:same?.35:1,border:"2px solid "+(sel?"#388bfd":"var(--border2)"),background:sel?"rgba(56,139,253,.14)":"var(--bg)"}}>
-                    <span style={{width:20,height:20,borderRadius:"50%",background:md.color,color:"#fff",fontSize:8,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{md.init}</span>
+                    <span style={{width:26,height:26,borderRadius:"50%",background:md.color,color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{md.init}</span>
                     <span style={{fontSize:12,fontWeight:700,color:"var(--txt)",flex:1}}>{md.nom}</span>
                     <span style={{fontSize:10,fontWeight:800,color:u2==="HC"?"#388bfd":"#a371f7"}}>{u2}</span>
                   </div>);
@@ -3040,7 +3040,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
                     <tr key={m.id} style={{borderBottom:"1px solid var(--border2)",opacity:cfgExcl[m.id]?.45:1}}>
                       <td style={{padding:"5px 8px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          <div style={{width:20,height:20,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800}}>{m.init}</div>
+                          <div style={{width:26,height:26,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
                           <span style={{fontSize:11,fontWeight:600,color:"var(--txt)",textDecoration:cfgExcl[m.id]?"line-through":"none"}}>{m.prenom} {m.nom}</span>
                         </div>
                       </td>
@@ -3226,7 +3226,7 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
                 <tr key={m.id} style={{background:ri%2===0?"var(--bg2)":"var(--bg)",borderBottom:"1px solid var(--border2)"}}>
                   <td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,padding:"5px 10px",fontWeight:700,color:m.color,minWidth:120}}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <div style={{width:20,height:20,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:800,flexShrink:0}}>{m.init}</div>
+                      <div style={{width:26,height:26,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{m.init}</div>
                       {m.prenom} {m.nom}
                     </div>
                   </td>
@@ -3263,7 +3263,7 @@ function HChip(p){return HE("span",{style:{display:"inline-block",padding:"1px 7
 function HP(p){return HE("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.65,marginBottom:p.last?0:8}},p.children);}
 function HT(p){return HE("div",{style:{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,margin:"12px 0 4px"}},p.children);}
 function HStep(p){return HE("div",{style:{display:"flex",gap:8,marginBottom:7,alignItems:"flex-start"}},
-  HE("span",{style:{flexShrink:0,width:20,height:20,borderRadius:"50%",background:"#1d4ed8",color:"#fff",fontSize:11,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}},p.n),
+  HE("span",{style:{flexShrink:0,width:26,height:26,borderRadius:"50%",background:"#1d4ed8",color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}},p.n),
   HE("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.6}},p.children));}
 function HTab(p){return HE("div",{style:{marginBottom:7}},
   HE("span",{style:{fontWeight:800,fontSize:12,color:"var(--txt)"}},p.t+" — "),
@@ -3782,6 +3782,9 @@ function CardioPlanning(){
   const [adminAsk,setAdminAsk]=useState(false);
   const [adminNameInput,setAdminNameInput]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
   const [showPins,setShowPins]=useState(false);
+  const [pinsAsk,setPinsAsk]=useState(false);
+  const [pinsTry,setPinsTry]=useState("");
+  const validatePins=()=>{const v=pinsTry;const okEd=medecins.some(m=>((m.niveau)||"basic")==="editeur"&&(medPins[String(m.id)]||"").length>=3&&medPins[String(m.id)]===v);if(v===editPin||okEd){setShowPins(true);setPinsAsk(false);setPinsTry("");}else toast("PIN incorrect","warn");};
   /* ── v9.10 : mode hors ligne (lecture seule) ── */
   const [netOff,setNetOff]=useState(()=>typeof navigator!=="undefined"&&navigator.onLine===false);
   useEffect(()=>{
@@ -5146,7 +5149,7 @@ header::-webkit-scrollbar { display: none; }
       {/* HEADER */}
       <header style={S.hdr}>
         <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
-          <span onClick={()=>setAccessMode("ask")} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
+          <span onClick={()=>{setPinInput("");setPinError(false);setAccessMode("ask");}} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
           {(isEdit||isMedEdit)&&<div style={{display:"flex",gap:3}}>
             <button onClick={doUndo} disabled={!canUndo} title="Annuler (retour arrière)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canUndo?"rgba(255,255,255,.1)":"transparent",color:canUndo?"#f0f6fc":"#484f58",cursor:canUndo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↶</button>
@@ -5225,7 +5228,7 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="chb"&&<div>
         {isEdit&&<div style={{marginBottom:6}}><button style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}} onClick={bipOpen}>📟 Répartition du Bip</button></div>}
-        <SiteView site="CHB" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
+        <SiteView site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           const full=bip&&["CHB-1","CHB-2","CHB-3"].includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
@@ -5384,8 +5387,8 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} year={year} month={month} toast={toast}/>}
-      {tab==="aide"&&<HelpView/>}
+      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} year={year} month={month} toast={toast}/></div>}
+      {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
         const astToday=new Date();
@@ -5523,6 +5526,7 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={prevP} style={S.arr}>‹</button>
               <h2 style={{...S.mTit,margin:0}}><span style={{color:"#7c3aed"}}>📞</span> {pLabel}</h2>
               <button onClick={nextP} style={S.arr}>›</button>
+                <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30,marginLeft:"auto"}}>{darkMode?"☀️":"🌓"}</button>
               </div>
             <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
               {isEdit&&<button onClick={runAstAuto} style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>⚙️ Répartition auto</button>}
@@ -5548,7 +5552,7 @@ header::-webkit-scrollbar { display: none; }
                   {astMeds.slice().sort((a,b)=>(stats[b.id]||0)-(stats[a.id]||0)).map(m=>(
                     <tr key={m.id} style={{borderBottom:"1px solid var(--border2)"}}>
                       <td style={{padding:"3px 8px",fontSize:11,fontWeight:700,color:"var(--txt)"}}>
-                        <span style={{display:"inline-flex",width:16,height:16,borderRadius:"50%",background:m.color,color:"#fff",fontSize:7,fontWeight:800,alignItems:"center",justifyContent:"center",marginRight:5,verticalAlign:"middle"}}>{m.init}</span>
+                        <span style={{display:"inline-flex",width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",fontSize:8,fontWeight:800,alignItems:"center",justifyContent:"center",marginRight:5,verticalAlign:"middle"}}>{m.init}</span>
                         {m.nom}
                       </td>
                       <td style={{textAlign:"center",padding:"3px 6px",fontSize:12,fontWeight:800,color:(stats[m.id]||0)>0?"#f85149":"var(--txt3)"}}>{stats[m.id]||0}</td>
@@ -5587,7 +5591,7 @@ header::-webkit-scrollbar { display: none; }
                         <td style={{...S.td,padding:4,cursor:canAst?"pointer":"default",...(hasExc?{outline:"2px solid #7c3aed",outlineOffset:-2}:{})}}
                           onClick={canAst?()=>{setAstPickModal({dayKey:dk,wKey:wk,isWeek:false,label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]+" "+y});setAstSearch("");}:undefined}>
                           {med?(<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:med.color+"22"}}>
-                            <div style={{width:22,height:22,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{med.init}</div>
+                            <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
                             <span style={{fontSize:12,fontWeight:600,color:isAbsMed?"#ef4444":"var(--txt)"}}>{med.prenom} {med.nom}</span>
                             {isAbsMed&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>⚠ abs</span>}
                             {hasExc&&!isAbsMed&&<span style={{fontSize:9,color:"#7c3aed",marginLeft:"auto",fontWeight:700}}>exc.</span>}
@@ -5669,7 +5673,7 @@ header::-webkit-scrollbar { display: none; }
                         border:"1px solid "+(on?"#7c3aed":hasAbs?"#fca5a5":"var(--border)"),
                         background:on?"#f5f3ff":hasAbs?"#fff8f8":"var(--bg2)",
                         cursor:(!isWeek&&absent)?"not-allowed":"pointer"}}>
-                      <div style={{width:26,height:26,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{m.init}</div>
+                      <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
                       <div style={{flex:1}}>
                         <div style={{fontSize:12,fontWeight:600,color:"var(--txt)"}}>{m.prenom} {m.nom}</div>
                         {isWeek&&absDays.length>0&&<div style={{fontSize:9,color:"#ef4444",marginTop:1}}>Absent: {absDays.join(", ")}</div>}
@@ -5694,6 +5698,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="stats"&&(isEdit||isInterEdit)&&<StatsTab medecins={medecins} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
       {tab==="partage"&&accessMode!=="adminEdit"&&!isMedEdit&&(
         <div style={{maxWidth:500}}>
+          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
           <h2 style={{...S.mTit,marginBottom:16}}>⚙️ Paramètres <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2>
 
           <div style={{...S.card,marginBottom:10}}>
@@ -5750,7 +5755,13 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>👁 Récupération des codes PIN</div>
             {!showPins
-              ?<button style={S.btnP} onClick={()=>{const v=window.prompt("Retapez le PIN éditeur (ou votre PIN personnel si vous êtes éditeur) :");const okEd=medecins.some(m=>((m.niveau)||"basic")==="editeur"&&(medPins[String(m.id)]||"").length>=3&&medPins[String(m.id)]===v);if(v===editPin||okEd)setShowPins(true);else if(v!==null)toast("PIN incorrect","warn");}}>Afficher tous les codes</button>
+              ?(!pinsAsk
+                ?<button style={S.btnP} onClick={()=>{setPinsTry("");setPinsAsk(true);}}>Afficher tous les codes</button>
+                :<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                  <input autoFocus type="password" value={pinsTry} onChange={e=>setPinsTry(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")validatePins();}} placeholder="PIN éditeur" style={{...S.fi,width:140,textAlign:"center",letterSpacing:4}}/>
+                  <button style={S.btnP} onClick={()=>validatePins()}>Valider</button>
+                  <button style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer"}} onClick={()=>{setPinsAsk(false);setPinsTry("");}}>Annuler</button>
+                </div>)
               :<div>
                 <div style={{fontSize:12,color:"var(--txt)",lineHeight:1.9}}>
                   <div><b>Éditeur :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{editPin}</span></div>
@@ -6173,7 +6184,7 @@ header::-webkit-scrollbar { display: none; }
                   style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,marginBottom:5,
                     cursor:blocked?"not-allowed":"pointer",opacity:blocked?.45:1,
                     border:"1px solid var(--border2)",background:"var(--bg2)"}}>
-                  <span style={{width:22,height:22,borderRadius:"50%",background:m2.color,color:"#fff",fontSize:8,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{m2.init}</span>
+                  <span style={{width:26,height:26,borderRadius:"50%",background:m2.color,color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{m2.init}</span>
                   <span style={{fontSize:12,fontWeight:700,color:"var(--txt)",flex:1}}>{m2.nom} {m2.statut==="junior"?<span style={{fontSize:9,color:"#8b5cf6"}}>junior</span>:null}</span>
                   {blocked&&<span style={{fontSize:10,color:"#f85149",fontWeight:600}}>{reason}</span>}
                   {!blocked&&<span style={{fontSize:11,color:"#388bfd",fontWeight:800}}>⇄</span>}

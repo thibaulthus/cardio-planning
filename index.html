@@ -12,7 +12,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="CardioPlanning"/>
 <meta name="theme-color" content="#3AC4A4"/>
-<style>body{margin:0;background:#f1f5f9}#loading{display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#3AC4A4;color:#fff;font-size:20px;letter-spacing:.01em}tr{max-height:28px}</style>
+<style>body{margin:0;background:#f1f5f9}#loading{display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#3AC4A4;color:#fff;font-size:20px;letter-spacing:.01em}tr{max-height:28px}@media (min-width: 1100px){ body{ zoom: 1.12; } }
+</style>
 </head><body>
 <div id="root"><div id="loading">&#9829; CardioPlanning</div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -139,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.23 — 23/07/2026";
+var APP_VERSION = "v9.24 — 29/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -376,7 +377,7 @@ var S = {
     td: { padding: "0", textAlign: "center", verticalAlign: "top", minWidth: 30, borderRight: "1px solid var(--border2)", background: "var(--bg2)", position: "relative" },
     tdWE: { background: "var(--bg-we)", height: 28, maxHeight: 28, overflow: "hidden" }, tdN: { background: "var(--bg-n)" },
     tdConfl: { background: "#fee2e2", outline: "1px solid #ef4444" },
-    av: { width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 },
+    av: { width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0 },
     avT: { width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 },
     card: { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 9, padding: "10px 12px" },
     ov: { position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "none" },
@@ -628,7 +629,7 @@ function GridV(_a) {
                     var pgf2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
                     var cgm = getGardeMed2(pgf2.y, pgf2.m, pgf2.d);
                     return cgm ? (React.createElement("div", { style: { marginBottom: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "var(--garde-bg)", borderRadius: 7, border: "1px solid #86efac" } },
-                        React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: cgm.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, cgm.init),
+                        React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: cgm.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, cgm.init),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600 } },
                             "Garde actuelle : ",
                             cgm.prenom,
@@ -682,7 +683,7 @@ function GridV(_a) {
                                     o.d,
                                     " ",
                                     MOIS[o.m].slice(0, 4)),
-                                React.createElement("span", { style: { width: 20, height: 20, borderRadius: "50%", background: o.mB.color, color: "#fff", fontSize: 8, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, o.mB.init),
+                                React.createElement("span", { style: { width: 26, height: 26, borderRadius: "50%", background: o.mB.color, color: "#fff", fontSize: 10, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, o.mB.init),
                                 React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: "var(--txt)", flex: 1 } }, o.mB.nom),
                                 o.reason ? React.createElement("span", { style: { fontSize: 9, color: "#f85149", fontWeight: 600 } }, o.reason) : React.createElement("span", { style: { fontSize: 11, color: "#388bfd", fontWeight: 800 } }, "\u21C4"))); }),
                             others.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune autre garde attribu\u00E9e sur la p\u00E9riode affich\u00E9e.")),
@@ -703,7 +704,7 @@ function GridV(_a) {
                             var gm = getGardeMed2(pgfCur.y, pgfCur.m, pgfCur.d);
                             var isOn = gm && gm.id === m.id;
                             return React.createElement("button", { key: m.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid ".concat(isOn ? "#16a34a" : "var(--border)"), background: isOn ? "#f0fdf4" : "var(--bg2)", cursor: "pointer" }, onClick: function () { var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(m.id, pgf.y, pgf.m, pgf.d); setPickGardeDayFull(null); } },
-                                React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, m.init),
+                                React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
                                 React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
                                     m.prenom,
                                     " ",
@@ -737,7 +738,7 @@ function GridV(_a) {
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, SLOTS[sl]),
                         si === 0 && showGarde && React.createElement("td", { rowSpan: slots.length, style: __assign(__assign({}, S.tdFix), { borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "var(--garde-bg)" : "var(--td-fix)" }), onClick: function () { if (!isEdit || gardeLocked)
                                 return; setGardeSearch(""); setPickGardeDayFull({ d: d, y: ey, m: em }); } }, gardeMed && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2 } },
-                            React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: gardeMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, gardeMed.init))),
+                            React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: gardeMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, gardeMed.init))),
                         meds.map(function (med) {
                             var es = getEntries(med.id, ey, em, d, sl);
                             var bl = es[0] && es[0]._blocked;
@@ -820,7 +821,7 @@ function SiteView(_a) {
             return (React.createElement("td", { key: "bip" + d + sl, style: __assign(__assign({}, S.td), { borderLeft: "3px solid var(--border)", cursor: isEdit ? "pointer" : "default", padding: 2, verticalAlign: "middle", textAlign: "center" }), onClick: function () { return isEdit && onPickSite({ salle: salle, siteActes: [bipActe_1], d: d, sl: sl, y: year, m: month }); } }, bipOcc2.map(function (_a, i) {
                 var med = _a.med, acte = _a.acte, rs = _a.rs;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 3, margin: "1px 0" } },
-                    React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, med.init),
+                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, med.init),
                     React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: "var(--txt)", whiteSpace: "nowrap" } }, med.nom)));
             })));
         }
@@ -840,7 +841,7 @@ function SiteView(_a) {
             React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 2 } }, occ.map(function (_a, i) {
                 var med = _a.med, acte = _a.acte;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 1 } },
-                    React.createElement("div", { style: { width: 18, height: 18, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 7, fontWeight: 800, flexShrink: 0 } }, med.init),
+                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, med.init),
                     React.createElement(Badge, { a: acte, hasNote: !!notes[nk(med.id, year, month, d, sl)] })));
             }))));
     }
@@ -971,7 +972,7 @@ function ActTabView(_a) {
                 var med = _a.med, acte = _a.acte, salle = _a.salle;
                 var monoActe = (row.ids || []).length === 1 && !row.multiActe;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 2 } },
-                    React.createElement("div", { style: { width: 18, height: 18, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 7, fontWeight: 800, flexShrink: 0 } }, med.init),
+                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, med.init),
                     monoActe
                         ? React.createElement("span", { style: { fontSize: 9, fontWeight: 600, color: "var(--txt)", whiteSpace: "nowrap" } }, med.nom)
                         : React.createElement(Badge, { a: acte }),
@@ -1404,7 +1405,7 @@ function GardeView(_a) {
         var we = isWE(rgy, rgm, d);
         var gMed = getGardeMed2(rgy, rgm, d);
         return (React.createElement("td", { key: "g" + d + rgy + rgm, style: __assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return setPickerDay({ d: d, y: rgy, m: rgm }); } : undefined }, gMed ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3, margin: "1px", padding: "1px 3px", borderRadius: 4, background: "#1a0000", border: "1px solid #f8514944" } },
-            React.createElement("div", { style: { width: 18, height: 18, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, gMed.init),
+            React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, gMed.init),
             React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: gMed.color } },
                 gMed.prenom,
                 " ",
@@ -1430,7 +1431,7 @@ function GardeView(_a) {
                             React.createElement("span", { style: { fontSize: 9, fontWeight: 600 } }, MOIS[gvM].slice(0, 4))),
                         React.createElement("div", { style: { fontSize: 9, color: we ? "#92400e" : isT ? "var(--today-c)" : "var(--txt3)", fontWeight: 600 } }, ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2])),
                     React.createElement("td", { style: __assign(__assign({}, S.td), { padding: 4, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return setPickerDay({ d: d, y: gvY, m: gvM }); } : undefined }, gMed ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 6, background: gMed.color + "22" } },
-                        React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, gMed.init),
+                        React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, gMed.init),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
                             gMed.prenom,
                             " ",
@@ -1648,7 +1649,7 @@ function GardeView(_a) {
                         var totR = cn.sem + cn.jeu + cn.ven + cn.sam + cn.dim;
                         return (React.createElement("tr", { key: m2.id, style: { borderBottom: "1px solid var(--border2)" } },
                             React.createElement("td", { style: { padding: "3px 8px", fontSize: 11, fontWeight: 700, color: "var(--txt)" } },
-                                React.createElement("span", { style: { display: "inline-flex", width: 16, height: 16, borderRadius: "50%", background: m2.color, color: "#fff", fontSize: 7, fontWeight: 800, alignItems: "center", justifyContent: "center", marginRight: 5, verticalAlign: "middle" } }, m2.init),
+                                React.createElement("span", { style: { display: "inline-flex", width: 22, height: 22, borderRadius: "50%", background: m2.color, color: "#fff", fontSize: 8, fontWeight: 800, alignItems: "center", justifyContent: "center", marginRight: 5, verticalAlign: "middle" } }, m2.init),
                                 m2.nom),
                             React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 12, fontWeight: 800, color: "#f85149" } }, totR),
                             React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, cn.sem),
@@ -1679,7 +1680,7 @@ function GardeView(_a) {
                 gMed && (React.createElement("div", { style: { marginBottom: 12, padding: "8px 10px", background: "var(--bg-td)", borderRadius: 7, border: "1px solid var(--today-c)44" } },
                     React.createElement("div", { style: { fontSize: 10, color: "var(--today-c)", fontWeight: 700, marginBottom: 5 } }, "\u2713 Garde assign\u00E9e"),
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 8 } },
-                        React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, gMed.init),
+                        React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, gMed.init),
                         React.createElement("span", { style: { color: "var(--txt)", fontSize: 13, fontWeight: 700 } },
                             gMed.prenom,
                             " ",
@@ -1717,7 +1718,7 @@ function GardeView(_a) {
                                         o.d,
                                         " ",
                                         MOIS[o.m].slice(0, 4)),
-                                    React.createElement("span", { style: { width: 18, height: 18, borderRadius: "50%", background: o.mB.color, color: "#fff", fontSize: 7, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, o.mB.init),
+                                    React.createElement("span", { style: { width: 24, height: 24, borderRadius: "50%", background: o.mB.color, color: "#fff", fontSize: 9, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, o.mB.init),
                                     React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: "var(--txt)", flex: 1 } }, o.mB.nom),
                                     o.reason ? React.createElement("span", { style: { fontSize: 8, color: "#f85149", fontWeight: 600 } }, o.reason) : React.createElement("span", { style: { fontSize: 10, color: "#388bfd", fontWeight: 800 } }, "\u21C4"))); }),
                                 others.length === 0 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Aucune autre garde attribu\u00E9e sur la p\u00E9riode affich\u00E9e."))));
@@ -1733,7 +1734,7 @@ function GardeView(_a) {
                             background: isG ? "var(--bg-td)" : avail === "blocked" ? "var(--bg)" : "var(--bg2)",
                             opacity: avail === "blocked" ? .3 : 1 }, onClick: function () { if (avail === "blocked")
                             return; applyGarde(m.id, pd.y, pd.m, pd.d); setPickerDay(null); } },
-                        React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, m.init),
+                        React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
                         React.createElement("div", { style: { textAlign: "left", flex: 1 } },
                             React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: isG ? "var(--today-c)" : "var(--txt)" } },
                                 m.prenom,
@@ -1776,7 +1777,7 @@ function BipTab(_a) {
             occ.map(function (_a, i) {
                 var med = _a.med, salle = _a.salle;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 2, margin: "1px 0" } },
-                    React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, med.init),
+                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, med.init),
                     React.createElement("span", { style: { fontSize: 10, color: "#111", fontWeight: 700 } }, salle)));
             }),
             occ.length === 0 && React.createElement("div", { style: { color: "var(--border)", textAlign: "center", fontSize: 13 } }, "\u00B7")));
@@ -1864,7 +1865,7 @@ function BipTab(_a) {
                                 border: "1px solid var(--border)", cursor: avail !== "blocked" && !already ? "pointer" : "default",
                                 background: avail === "warning" && !already ? "#1a1000" : "var(--bg2)", opacity: avail === "blocked" || already ? .35 : 1 }, onClick: function () { if (avail === "blocked" || already)
                                 return; setSelMedId(m.id); } },
-                            React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, m.init),
+                            React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
                             React.createElement("div", { style: { textAlign: "left", flex: 1 } },
                                 React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt)" } },
                                     m.prenom,
@@ -1874,7 +1875,7 @@ function BipTab(_a) {
                     })))),
                 selMedId && selMed && (React.createElement(React.Fragment, null,
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 10, padding: "6px 9px", borderRadius: 7, background: "var(--bg2)", border: "1px solid var(--border)" } },
-                        React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: selMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, selMed.init),
+                        React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: selMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, selMed.init),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)", flex: 1 } },
                             selMed.prenom,
                             " ",
@@ -1986,7 +1987,7 @@ function PickMedActModal(_a) {
             curOcc.map(function (_a, i) {
                 var med = _a.med, acte = _a.acte, acteId = _a.acteId;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 7, background: "var(--bg2)", border: "1px solid var(--border)", marginBottom: 4 } },
-                    React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, med.init),
+                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, med.init),
                     React.createElement("span", { style: { flex: 1, color: "var(--txt)", fontSize: 12, fontWeight: 700 } },
                         med.prenom,
                         " ",
@@ -2027,7 +2028,7 @@ function PickMedActModal(_a) {
                             setSelMedId(med.id);
                         }
                     } },
-                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, med.init),
+                    React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, med.init),
                     React.createElement("div", { style: { textAlign: "left", flex: 1 } },
                         React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)" } },
                             med.prenom,
@@ -2043,7 +2044,7 @@ function PickMedActModal(_a) {
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
                     React.createElement("button", { onClick: function () { return setSelMedId(null); }, style: { background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 9px", cursor: "pointer", color: "var(--txt2)", fontSize: 12 } }, "\u2190 Retour"),
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                        React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: selMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, selMed.init),
+                        React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: selMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, selMed.init),
                         React.createElement("span", { style: { color: "var(--txt)", fontSize: 12, fontWeight: 700 } },
                             selMed.prenom,
                             " ",
@@ -2131,7 +2132,7 @@ function PickMedSiteModal(_a) {
             curOcc.map(function (_a, i) {
                 var med = _a.med, acte = _a.acte;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 7, background: "var(--bg2)", border: "1px solid var(--border)", marginBottom: 4 } },
-                    React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, med.init),
+                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, med.init),
                     React.createElement("span", { style: { flex: 1, color: "var(--txt)", fontSize: 12 } },
                         med.prenom,
                         " ",
@@ -2150,7 +2151,7 @@ function PickMedSiteModal(_a) {
                 return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(avail === "warning" ? "#f59e0b44" : "var(--border)"),
                         cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "warning" ? "#1a1000" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: function () { if (avail === "blocked")
                         return; setSelMedId(med.id); setStep("acte"); } },
-                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, med.init),
+                    React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, med.init),
                     React.createElement("div", { style: { textAlign: "left" } },
                         React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)" } },
                             med.prenom,
@@ -2163,7 +2164,7 @@ function PickMedSiteModal(_a) {
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
                 React.createElement("button", { onClick: function () { return setStep("med"); }, style: { background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 9px", cursor: "pointer", color: "var(--txt2)", fontSize: 12 } }, "\u2190 Retour"),
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                    React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: selMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, selMed.init),
+                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: selMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, selMed.init),
                     React.createElement("span", { style: { color: "var(--txt)", fontSize: 12, fontWeight: 700 } },
                         selMed.prenom,
                         " ",
@@ -2195,7 +2196,7 @@ function PickMedSiteModal(_a) {
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
                 React.createElement("button", { onClick: function () { return setStep("acte"); }, style: { background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 9px", cursor: "pointer", color: "var(--txt2)", fontSize: 12 } }, "\u2190 Retour"),
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                    React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: selMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, selMed.init),
+                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: selMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, selMed.init),
                     React.createElement("span", { style: { color: "var(--txt)", fontSize: 12, fontWeight: 700 } },
                         selMed.prenom,
                         " ",
@@ -3146,7 +3147,7 @@ function TourTab(_a) {
                                 return null;
                             var sel = swapSrcMed === mid;
                             return (React.createElement("div", { key: mid, onClick: function () { return setSwapSrcMed(mid); }, style: { display: "flex", alignItems: "center", gap: 7, padding: "7px 9px", borderRadius: 7, marginBottom: 5, cursor: "pointer", border: "2px solid " + (sel ? "#388bfd" : "var(--border2)"), background: sel ? "rgba(56,139,253,.14)" : "var(--bg)" } },
-                                React.createElement("span", { style: { width: 20, height: 20, borderRadius: "50%", background: md.color, color: "#fff", fontSize: 8, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, md.init),
+                                React.createElement("span", { style: { width: 26, height: 26, borderRadius: "50%", background: md.color, color: "#fff", fontSize: 10, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, md.init),
                                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)", flex: 1 } }, md.nom),
                                 React.createElement("span", { style: { fontSize: 10, fontWeight: 800, color: u2 === "HC" ? "#388bfd" : "#a371f7" } }, u2)));
                         }); }),
@@ -3166,7 +3167,7 @@ function TourTab(_a) {
                             var same = mid === swapSrcMed;
                             return (React.createElement("div", { key: mid, onClick: function () { if (!same)
                                     setSwapDstMed(mid); }, style: { display: "flex", alignItems: "center", gap: 7, padding: "7px 9px", borderRadius: 7, marginBottom: 5, cursor: same ? "not-allowed" : "pointer", opacity: same ? .35 : 1, border: "2px solid " + (sel ? "#388bfd" : "var(--border2)"), background: sel ? "rgba(56,139,253,.14)" : "var(--bg)" } },
-                                React.createElement("span", { style: { width: 20, height: 20, borderRadius: "50%", background: md.color, color: "#fff", fontSize: 8, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, md.init),
+                                React.createElement("span", { style: { width: 26, height: 26, borderRadius: "50%", background: md.color, color: "#fff", fontSize: 10, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, md.init),
                                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)", flex: 1 } }, md.nom),
                                 React.createElement("span", { style: { fontSize: 10, fontWeight: 800, color: u2 === "HC" ? "#388bfd" : "#a371f7" } }, u2)));
                         }); }))),
@@ -3270,7 +3271,7 @@ function TourTab(_a) {
                         React.createElement("tbody", null, tourMeds.map(function (m) { return (React.createElement("tr", { key: m.id, style: { borderBottom: "1px solid var(--border2)", opacity: cfgExcl[m.id] ? .45 : 1 } },
                             React.createElement("td", { style: { padding: "5px 8px" } },
                                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                                    React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800 } }, m.init),
+                                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
                                     React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: "var(--txt)", textDecoration: cfgExcl[m.id] ? "line-through" : "none" } },
                                         m.prenom,
                                         " ",
@@ -3426,7 +3427,7 @@ function StatsTab(_a) {
                     return (React.createElement("tr", { key: m.id, style: { background: ri % 2 === 0 ? "var(--bg2)" : "var(--bg)", borderBottom: "1px solid var(--border2)" } },
                         React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, padding: "5px 10px", fontWeight: 700, color: m.color, minWidth: 120 }) },
                             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                                React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 800, flexShrink: 0 } }, m.init),
+                                React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, m.init),
                                 m.prenom,
                                 " ",
                                 m.nom)),
@@ -3973,6 +3974,9 @@ function CardioPlanning() {
     var _aa = useState(false), adminAsk = _aa[0], setAdminAsk = _aa[1];
     var _ani = useState(function () { try { return localStorage.getItem("cp6_adminName") || ""; } catch (e) { return ""; } }), adminNameInput = _ani[0], setAdminNameInput = _ani[1];
     var _sp = useState(false), showPins = _sp[0], setShowPins = _sp[1];
+    var _spa = useState(false), pinsAsk = _spa[0], setPinsAsk = _spa[1];
+    var _spv = useState(""), pinsTry = _spv[0], setPinsTry = _spv[1];
+    var validatePins = function () { var v = pinsTry; var okEd = medecins.some(function (m) { return ((m.niveau) || "basic") === "editeur" && (medPins[String(m.id)] || "").length >= 3 && medPins[String(m.id)] === v; }); if (v === editPin || okEd) { setShowPins(true); setPinsAsk(false); setPinsTry(""); } else toast("PIN incorrect", "warn"); };
     /* ── v9.10 : mode hors ligne (lecture seule) ── */
     var _no = useState(function () { return typeof navigator !== "undefined" && navigator.onLine === false; }), netOff = _no[0], setNetOff = _no[1];
     useEffect(function () {
@@ -5842,7 +5846,7 @@ function CardioPlanning() {
             React.createElement("button", { onClick: function () { return setAccessMode("view"); }, style: { background: "none", border: "1px solid rgba(255,255,255,.5)", borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 11, padding: "1px 7px", marginLeft: 8 } }, "Quitter")),
         React.createElement("header", { style: S.hdr },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexShrink: 0 } },
-                React.createElement("span", { onClick: function () { return setAccessMode("ask"); }, title: "Retour \u00E0 l'accueil", style: { fontSize: 20, color: "#f85149", cursor: "pointer" } }, "\u2665"),
+                React.createElement("span", { onClick: function () { setPinInput(""); setPinError(false); setAccessMode("ask"); }, title: "Retour \u00E0 l'accueil", style: { fontSize: 20, color: "#f85149", cursor: "pointer" } }, "\u2665"),
                 (isEdit || isMedEdit) && React.createElement("div", { style: { display: "flex", gap: 3 } },
                     React.createElement("button", { onClick: doUndo, disabled: !canUndo, title: "Annuler (retour arri\u00E8re)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canUndo ? "rgba(255,255,255,.1)" : "transparent", color: canUndo ? "#f0f6fc" : "#484f58", cursor: canUndo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B6"),
                     React.createElement("button", { onClick: doRedo, disabled: !canRedo, title: "R\u00E9tablir (retour avant)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canRedo ? "rgba(255,255,255,.1)" : "transparent", color: canRedo ? "#f0f6fc" : "#484f58", cursor: canRedo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B7")),
@@ -5904,7 +5908,7 @@ function CardioPlanning() {
             tab === "chb" && React.createElement("div", null,
                 isEdit && React.createElement("div", { style: { marginBottom: 6 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #46bdc6", background: "rgba(70,189,198,.10)", color: "#46bdc6", fontWeight: 800, cursor: "pointer" }, onClick: bipOpen }, "\uD83D\uDCDF R\u00E9partition du Bip")),
-                React.createElement(SiteView, { site: "CHB", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+                React.createElement(SiteView, { site: "CHB", darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
                     var full = bip && ["CHB-1", "CHB-2", "CHB-3"].includes(salle) ? __spreadArray(__spreadArray([], siteActes.filter(function (a) { return a.id !== "BIP"; }), true), [bip], false) : siteActes;
@@ -6032,8 +6036,8 @@ function CardioPlanning() {
                             isEdit && React.createElement("div", { style: { display: "flex", gap: 3 } },
                                 React.createElement("button", { title: "Avancer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, -1); } }, "\u25B2"),
                                 React.createElement("button", { title: "Reculer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, 1); } }, "\u25BC"))))); })))); }))),
-            tab === "reports" && React.createElement(ReportsView, { medecins: medecins, actes: actes, getEntries: getEntries, tourMed: tourMed, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminReports: isAdminEdit && adminCanReports, year: year, month: month, toast: toast }),
-            tab === "aide" && React.createElement(HelpView, null),
+            tab === "reports" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(ReportsView, { medecins: medecins, actes: actes, getEntries: getEntries, tourMed: tourMed, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminReports: isAdminEdit && adminCanReports, year: year, month: month, toast: toast })),
+            tab === "aide" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(HelpView, null)),
             tab === "astreinte" && (function () {
                 var astMeds = medecins.filter(function (m) { return m.astreinte === true; });
                 var astToday = new Date();
@@ -6229,7 +6233,8 @@ function CardioPlanning() {
                             React.createElement("span", { style: { color: "#7c3aed" } }, "\uD83D\uDCDE"),
                             " ",
                             pLabel),
-                        React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A")),
+                        React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A"),
+                        React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30, marginLeft: "auto" }) }, darkMode ? "☀️" : "🌓")),
                     React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
                         isEdit && React.createElement("button", { onClick: runAstAuto, style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
                         isEdit && React.createElement("button", { onClick: clearAstPeriod, style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer"),
@@ -6249,7 +6254,7 @@ function CardioPlanning() {
                                     React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Semaines \u00E9quiv."))),
                             React.createElement("tbody", null, astMeds.slice().sort(function (a, b) { return (stats[b.id] || 0) - (stats[a.id] || 0); }).map(function (m) { return (React.createElement("tr", { key: m.id, style: { borderBottom: "1px solid var(--border2)" } },
                                 React.createElement("td", { style: { padding: "3px 8px", fontSize: 11, fontWeight: 700, color: "var(--txt)" } },
-                                    React.createElement("span", { style: { display: "inline-flex", width: 16, height: 16, borderRadius: "50%", background: m.color, color: "#fff", fontSize: 7, fontWeight: 800, alignItems: "center", justifyContent: "center", marginRight: 5, verticalAlign: "middle" } }, m.init),
+                                    React.createElement("span", { style: { display: "inline-flex", width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", fontSize: 8, fontWeight: 800, alignItems: "center", justifyContent: "center", marginRight: 5, verticalAlign: "middle" } }, m.init),
                                     m.nom),
                                 React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 12, fontWeight: 800, color: (stats[m.id] || 0) > 0 ? "#f85149" : "var(--txt3)" } }, stats[m.id] || 0),
                                 React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, ((stats[m.id] || 0) / 7).toFixed(1)))); }))),
@@ -6282,7 +6287,7 @@ function CardioPlanning() {
                                             React.createElement("span", { style: { fontSize: 9, fontWeight: 600 } }, MOIS[m].slice(0, 4))),
                                         React.createElement("div", { style: { fontSize: 9, color: we ? "#92400e" : isT ? "var(--today-c)" : "var(--txt3)", fontWeight: 600 } }, ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2])),
                                     React.createElement("td", { style: __assign(__assign(__assign({}, S.td), { padding: 4, cursor: canAst ? "pointer" : "default" }), (hasExc ? { outline: "2px solid #7c3aed", outlineOffset: -2 } : {})), onClick: canAst ? function () { setAstPickModal({ dayKey: dk, wKey: wk, isWeek: false, label: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2] + " " + d + " " + MOIS[m] + " " + y }); setAstSearch(""); } : undefined }, med ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 6, background: med.color + "22" } },
-                                        React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, med.init),
+                                        React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, med.init),
                                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: isAbsMed ? "#ef4444" : "var(--txt)" } },
                                             med.prenom,
                                             " ",
@@ -6375,7 +6380,7 @@ function CardioPlanning() {
                                     border: "1px solid " + (on ? "#7c3aed" : hasAbs ? "#fca5a5" : "var(--border)"),
                                     background: on ? "#f5f3ff" : hasAbs ? "#fff8f8" : "var(--bg2)",
                                     cursor: (!isWeek && absent) ? "not-allowed" : "pointer" } },
-                                React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, m.init),
+                                React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
                                 React.createElement("div", { style: { flex: 1 } },
                                     React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
                                         m.prenom,
@@ -6391,6 +6396,7 @@ function CardioPlanning() {
             })(),
             tab === "stats" && (isEdit || isInterEdit) && React.createElement(StatsTab, { medecins: medecins, actes: actes, plan: plan, year: year, month: month, darkMode: darkMode, setDarkMode: setDarkMode, tourMed: tourMed }),
             tab === "partage" && accessMode !== "adminEdit" && !isMedEdit && (React.createElement("div", { style: { maxWidth: 500 } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                 React.createElement("h2", { style: __assign(__assign({}, S.mTit), { marginBottom: 16 }) },
                     "\u2699\uFE0F Param\u00E8tres ",
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
@@ -6457,10 +6463,12 @@ function CardioPlanning() {
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDC41 R\u00E9cup\u00E9ration des codes PIN"),
                     !showPins
-                        ? React.createElement("button", { style: S.btnP, onClick: function () { var v = window.prompt("Retapez le PIN \u00E9diteur (ou votre PIN personnel si vous \u00EAtes \u00E9diteur) :"); var okEd = medecins.some(function (m) { return ((m.niveau) || "basic") === "editeur" && (medPins[String(m.id)] || "").length >= 3 && medPins[String(m.id)] === v; }); if (v === editPin || okEd)
-                                setShowPins(true);
-                            else if (v !== null)
-                                toast("PIN incorrect", "warn"); } }, "Afficher tous les codes")
+                        ? (!pinsAsk
+                            ? React.createElement("button", { style: S.btnP, onClick: function () { setPinsTry(""); setPinsAsk(true); } }, "Afficher tous les codes")
+                            : React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
+                                React.createElement("input", { autoFocus: true, type: "password", value: pinsTry, onChange: function (e) { return setPinsTry(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") validatePins(); }, placeholder: "PIN éditeur", style: __assign(__assign({}, S.fi), { width: 140, textAlign: "center", letterSpacing: 4 }) }),
+                                React.createElement("button", { style: S.btnP, onClick: function () { validatePins(); } }, "Valider"),
+                                React.createElement("button", { style: { fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer" }, onClick: function () { setPinsAsk(false); setPinsTry(""); } }, "Annuler")))
                         : React.createElement("div", null,
                             React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", lineHeight: 1.9 } },
                                 React.createElement("div", null, React.createElement("b", null, "\u00C9diteur : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, editPin)),
@@ -6933,7 +6941,7 @@ function CardioPlanning() {
                                     doDaySwap(m2.id); }, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, marginBottom: 5,
                                     cursor: blocked ? "not-allowed" : "pointer", opacity: blocked ? .45 : 1,
                                     border: "1px solid var(--border2)", background: "var(--bg2)" } },
-                                React.createElement("span", { style: { width: 22, height: 22, borderRadius: "50%", background: m2.color, color: "#fff", fontSize: 8, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, m2.init),
+                                React.createElement("span", { style: { width: 26, height: 26, borderRadius: "50%", background: m2.color, color: "#fff", fontSize: 10, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, m2.init),
                                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)", flex: 1 } },
                                     m2.nom,
                                     " ",
