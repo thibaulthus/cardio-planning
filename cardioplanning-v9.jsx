@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.34 — 30/07/2026";
+const APP_VERSION="v9.35 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -747,7 +747,7 @@ function SiteView({site,year,month,prevM,nextM,actes,medecins,getEntries,salleOc
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,orient,setOrient,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod}){
+function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,orient,setOrient,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -774,6 +774,69 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     return occ;
   }
 
+  /* ── v9.35 : volet IDE (PT Cardio) ── */
+  const [idePanel,setIdePanel]=useState(false);
+  const [ideEdit,setIdeEdit]=useState(null);
+  const ideDef=(ideCfg&&ideCfg.def)||{};
+  const ideOv=(ideCfg&&ideCfg.ov)||{};
+  const ideDispo=(y3,m3,d3,sl)=>{const o=ideOv[sk(y3,m3,d3,sl)];if(o!==undefined&&o!==null)return o;const v=ideDef[dow(y3,m3,d3)+"|"+sl];return (v===undefined||v===null)?0:v;};
+  const ideActive=!!(ideFeature&&ideOn);
+  const ideMap=useMemo(()=>{
+    if(!ideActive)return {};
+    const M={};
+    wdays.forEach(({y:wY,m:wM,d})=>{
+      if(isWE(wY,wM,d))return;
+      ["M","AM"].forEach(sl=>{
+        let tot=0;
+        rows.forEach(row=>{
+          const seen={};let n=0;
+          getOcc(row,d,sl,wY,wM).forEach(o=>{
+            const k2=o.acte.id+"|"+(o.salle||row.salle||"");
+            if(seen[k2])return;seen[k2]=1;n+=(o.acte.ideN||0);
+          });
+          if(n>0)M[row.label+"|"+wY+"-"+wM+"-"+d+"|"+sl]=n;
+          tot+=n;
+        });
+        M["#|"+wY+"-"+wM+"-"+d+"|"+sl]=tot;
+      });
+    });
+    return M;
+  },[ideActive,wdays,rows,medecins,actes,getEntries]);
+  const ideCell=(row,d,sl,ry,rm)=>ideActive?(ideMap[row.label+"|"+ry+"-"+rm+"-"+d+"|"+sl]||0):0;
+  const setIdeDefV=(dw3,sl,v)=>{if(setIdeCfg)setIdeCfg(p=>{const q={...(p||{})};q.def={...(q.def||{})};q.def[dw3+"|"+sl]=v;return q;});};
+  const setIdeOvV=(y3,m3,d3,sl,v)=>{if(setIdeCfg)setIdeCfg(p=>{const q={...(p||{})};q.ov={...(q.ov||{})};const k=sk(y3,m3,d3,sl);if(v===null)delete q.ov[k];else q.ov[k]=v;return q;});};
+  const idePill=(y3,m3,d3,sl)=>{
+    const need=ideMap["#|"+y3+"-"+m3+"-"+d3+"|"+sl]||0;
+    const dispo=ideDispo(y3,m3,d3,sl);
+    const ovv=ideOv[sk(y3,m3,d3,sl)];
+    const isOv=(ovv!==undefined&&ovv!==null);
+    const ok=need<=dispo;
+    return <span title={(isOv?"Effectif corrigé pour ce jour":"Effectif par défaut")+" — besoin "+need+", disponible "+dispo} onClick={canIde?(e=>{e.stopPropagation();setIdeEdit({y:y3,m:m3,d:d3,sl});}):undefined} style={{display:"inline-block",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:6,padding:"1px 4px",whiteSpace:"nowrap",cursor:canIde?"pointer":"default",background:need===0?"transparent":(ok?"rgba(63,185,80,.15)":"rgba(248,81,73,.15)"),color:need===0?"var(--txt3)":(ok?"#3fb950":"#f85149"),border:isOv?"1px dashed var(--txt3)":"1px solid transparent"}}>{need+"/"+dispo}</span>;
+  };
+  const ideExtra=(ideActive?<div>
+    {canIde&&idePanel&&<div style={{...S.card,marginBottom:8}}>
+      <div style={{fontSize:12,fontWeight:800,marginBottom:6,color:"#3fb950"}}>🩺 IDE disponibles — valeurs par défaut</div>
+      <div style={{display:"grid",gridTemplateColumns:"auto 1fr 1fr",gap:4,maxWidth:280,alignItems:"center"}}>
+        <div/><div style={{...S.fl,textAlign:"center",marginBottom:0}}>Matin</div><div style={{...S.fl,textAlign:"center",marginBottom:0}}>Après-midi</div>
+        {[1,2,3,4,5].map(dw3=><React.Fragment key={dw3}>
+          <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)"}}>{JOURSC[dw3]}</div>
+          {["M","AM"].map(sl=><input key={sl} type="number" min={0} max={99} value={ideDef[dw3+"|"+sl]===undefined?0:ideDef[dw3+"|"+sl]} onChange={e=>setIdeDefV(dw3,sl,Math.max(0,Math.min(99,parseInt(e.target.value||"0",10)||0)))} style={{...S.fi,width:"100%",textAlign:"center",padding:"4px 2px",fontSize:12}}/>)}
+        </React.Fragment>)}
+      </div>
+      <div style={{fontSize:9,color:"var(--txt3)",marginTop:6}}>Ces valeurs valent pour toutes les semaines. Pour un jour particulier, touchez sa pastille dans le tableau.</div>
+    </div>}
+    {ideEdit&&<div style={S.ov} onClick={()=>setIdeEdit(null)}>
+      <div style={{...S.mb,width:300}} onClick={e=>e.stopPropagation()}>
+        <div style={S.mHd}><div style={S.mTit2}>{"🩺 IDE — "+JOURSC[dow(ideEdit.y,ideEdit.m,ideEdit.d)]+" "+ideEdit.d+" "+MOIS[ideEdit.m]+" — "+SLOTS[ideEdit.sl]}</div><button style={S.xBtn} onClick={()=>setIdeEdit(null)}>×</button></div>
+        <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>{"Besoin calculé : "+(ideMap["#|"+ideEdit.y+"-"+ideEdit.m+"-"+ideEdit.d+"|"+ideEdit.sl]||0)+" IDE. Défaut du "+JOURSL[dow(ideEdit.y,ideEdit.m,ideEdit.d)].toLowerCase()+" : "+(ideDef[dow(ideEdit.y,ideEdit.m,ideEdit.d)+"|"+ideEdit.sl]||0)+"."}</div>
+        <input type="number" min={0} max={99} value={ideDispo(ideEdit.y,ideEdit.m,ideEdit.d,ideEdit.sl)} onChange={e=>setIdeOvV(ideEdit.y,ideEdit.m,ideEdit.d,ideEdit.sl,Math.max(0,Math.min(99,parseInt(e.target.value||"0",10)||0)))} style={{...S.fi,width:"100%",textAlign:"center",fontSize:18,fontWeight:800}}/>
+        <div style={{display:"flex",gap:6,marginTop:10}}>
+          <button style={{...S.icnBtn,flex:1}} onClick={()=>{setIdeOvV(ideEdit.y,ideEdit.m,ideEdit.d,ideEdit.sl,null);setIdeEdit(null);}}>↩ Revenir au défaut</button>
+          <button style={{...S.btnP,flex:1}} onClick={()=>setIdeEdit(null)}>OK</button>
+        </div>
+      </div>
+    </div>}
+  </div>:null);
   function renderActCell(row,d,sl,ry,rm){
     if(!ry)ry=year;
     if(!rm&&rm!==0)rm=month;
@@ -796,13 +859,14 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
             {row.hasSalleChoice&&salle&&<span style={{fontSize:7,fontWeight:700,color:"var(--txt3)",fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",borderRadius:4,padding:"0 3px",whiteSpace:"nowrap"}}>{salle}</span>}
           </div>
         );})}
+        {ideActive&&ideCell(row,d,sl,ry,rm)>0&&<span title="IDE nécessaires pour cette activité" style={{fontSize:8,fontWeight:800,color:"#3fb950",fontFamily:"'JetBrains Mono',monospace",border:"1px solid rgba(63,185,80,.5)",borderRadius:5,padding:"0 3px",whiteSpace:"nowrap",marginLeft:2}}>{"🩺"+ideCell(row,d,sl,ry,rm)}</span>}
         </div>
         {occ.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
       </td>
     );
   }
 
-  const hdr=(
+  let hdr=(
     <div style={S.bar}>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <button onClick={prevM} style={S.arr}>‹</button>
@@ -810,12 +874,14 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
         <button onClick={nextM} style={S.arr}>›</button>
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-        
+        {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
+        {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
       </div>
     </div>
   );
+  hdr=<React.Fragment>{hdr}{ideExtra}</React.Fragment>;
 
   if(orient==="H")return(
     <div>{hdr}
@@ -832,6 +898,10 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
             </tr>
           </thead>
           <tbody>
+            {ideActive&&<tr style={{borderBottom:"2px solid var(--border)"}}>
+              <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5}}><div style={{fontWeight:800,fontSize:11,color:"#3fb950"}}>🩺 IDE</div></td>
+              {wdays.map(({y:wY,m:wM,d})=>isWE(wY,wM,d)?<td key={"ide"+d+wM+wY} style={{...S.td,...S.tdWE,padding:2}}/>:["M","AM"].map(sl=><td key={"ide"+wY+"-"+wM+"-"+d+sl} style={{...S.td,padding:2,textAlign:"center"}}>{idePill(wY,wM,d,sl)}</td>))}
+            </tr>}
             {rows.map(row=>(
               <tr key={row.label} style={{borderBottom:"1px solid var(--border2)"}}>
                 <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5}}>
@@ -875,7 +945,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
                     <div style={{fontWeight:800,color:isT?"var(--today-c)":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600,lineHeight:1}}>{MOIS[wM]}</div>}</div>
                     <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dAT]}</div>
                   </td>}
-                  <td style={{...S.tdFix,position:"sticky",left:42,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--td-fix)",borderRight:"2px solid var(--border)",minWidth:24,padding:"2px"}}>{SLOTS[sl]}</td>
+                  <td style={{...S.tdFix,position:"sticky",left:42,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--td-fix)",borderRight:"2px solid var(--border)",minWidth:ideActive?38:24,padding:"2px"}}>{SLOTS[sl]}{ideActive&&<div style={{marginTop:2}}>{idePill(wY,wM,d,sl)}</div>}</td>
                   {rows.map(row=>renderActCell(row,d,sl,wY,wM))}
                 </tr>
               ));
@@ -3867,6 +3937,10 @@ function CardioPlanning(){
   const [adminPin,setAdminPin]=useState("");
   const [cadrePin,setCadrePin]=useState("");
   const [isCadre,setIsCadre]=useState(false);
+  /* ── v9.35 : effectifs IDE ── */
+  const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
+  const [ideOn,setIdeOn]=useState(()=>{try{return localStorage.getItem("cp6_ide_on")==="1";}catch{return false;}});
+  useEffect(()=>{try{localStorage.setItem("cp6_ide_on",ideOn?"1":"0");}catch{}},[ideOn]);
   const [adminEnabled,setAdminEnabled]=useState(true);
   const [adminCanReports,setAdminCanReports]=useState(true);
   const [adminCanNotes,setAdminCanNotes]=useState(false);
@@ -4116,6 +4190,7 @@ function CardioPlanning(){
             if(data.editPin)setEditPin(data.editPin);
             if(data.adminPin!==undefined)setAdminPin(data.adminPin);
           if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
+          if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
             if(data.adminEnabled!==undefined)setAdminEnabled(data.adminEnabled);
             if(data.adminCanReports!==undefined)setAdminCanReports(data.adminCanReports);
             if(data.adminCanNotes!==undefined)setAdminCanNotes(data.adminCanNotes);
@@ -4539,6 +4614,7 @@ function CardioPlanning(){
   },[medecins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({editPin});},[editPin]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astreinte:JSON.stringify(astreinte)});},[astreinte]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medPins:JSON.stringify(medPins)});},[medPins]);
 
@@ -5366,7 +5442,7 @@ header::-webkit-scrollbar { display: none; }
           {label:"EE CHL",ids:["EE_CHL"],color:"#4ade80",salle:S_EE_CHL},
         ].concat(actes.filter(a=>acteRecapIn(a,"PLATEAU")&&!a.isSystem).map(a=>((a.salles||[]).length>1?{label:a.label,ids:[a.id],color:a.color,salle:null,hasSalleChoice:true,sallesDisp:a.salles}:{label:a.label,ids:[a.id],color:a.color,salle:(a.salles&&a.salles[0])||null})))}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
-        getEntries={getEntries} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
