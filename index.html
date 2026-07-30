@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.27 — 30/07/2026";
+var APP_VERSION = "v9.28 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -458,7 +458,7 @@ function MedBtn(_a) {
     var med = _a.med, avail = _a.avail, onClick = _a.onClick, extra = _a.extra;
     var blocked = avail === "blocked", warn = avail === "warning";
     return (React.createElement("button", { disabled: blocked, onClick: onClick, style: { display: "flex", alignItems: "center", gap: 7, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(warn ? "#f59e0b44" : "var(--border)"),
-            cursor: blocked ? "default" : "pointer", background: warn ? "#1a1000" : "var(--bg2)", opacity: blocked ? .35 : 1, width: "100%" } },
+            cursor: blocked ? "default" : "pointer", background: warn ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: blocked ? .35 : 1, width: "100%" } },
         React.createElement("div", { style: __assign(__assign({}, S.av), { background: med.color, width: 24, height: 24 }) }, med.init),
         React.createElement("div", { style: { textAlign: "left", flex: 1 } },
             React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt)" } },
@@ -1847,7 +1847,7 @@ function BipTab(_a) {
                     React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Assign\u00E9s"),
                     existing.map(function (_a) {
                         var med = _a.med, salle = _a.salle;
-                        return (React.createElement("div", { key: med.id, style: { display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 7, background: "#1a0800", border: "1px solid #fb923c44", marginBottom: 4 } },
+                        return (React.createElement("div", { key: med.id, style: { display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 7, background: "rgba(251,146,60,.15)", border: "1px solid #fb923c44", marginBottom: 4 } },
                             React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, med.init),
                             React.createElement("span", { style: { flex: 1, color: "var(--txt)", fontSize: 12, fontWeight: 700 } },
                                 med.prenom,
@@ -1863,7 +1863,7 @@ function BipTab(_a) {
                         var already = existing.find(function (e) { return e.med.id === m.id; });
                         return (React.createElement("button", { key: m.id, disabled: avail === "blocked" || !!already, style: { display: "flex", alignItems: "center", gap: 7, padding: "6px 9px", borderRadius: 7,
                                 border: "1px solid var(--border)", cursor: avail !== "blocked" && !already ? "pointer" : "default",
-                                background: avail === "warning" && !already ? "#1a1000" : "var(--bg2)", opacity: avail === "blocked" || already ? .35 : 1 }, onClick: function () { if (avail === "blocked" || already)
+                                background: avail === "warning" && !already ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" || already ? .35 : 1 }, onClick: function () { if (avail === "blocked" || already)
                                 return; setSelMedId(m.id); } },
                             React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
                             React.createElement("div", { style: { textAlign: "left", flex: 1 } },
@@ -2042,7 +2042,7 @@ function PickMedActModal(_a) {
             }))),
         !selMedId && (React.createElement(React.Fragment, null,
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Choisir un m\u00E9decin"),
-            row.salle && curOcc.length > 0 && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "#1a1000", border: "1px solid #f59e0b44", marginBottom: 8 } },
+            row.salle && curOcc.length > 0 && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 8 } },
                 React.createElement("span", null, "\u26A0\uFE0F"),
                 React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } },
                     row.salle,
@@ -2054,7 +2054,7 @@ function PickMedActModal(_a) {
                 // Extra warning if this med would be in an already-occupied fixed salle
                 var salleOccupied = row.salle && curOcc.length > 0 && !curOcc.find(function (x) { return x.med.id === med.id; });
                 var borderCol = avail === "warning" || salleOccupied ? "#f59e0b44" : "var(--border)";
-                var bgCol = avail === "warning" || salleOccupied ? "#1a1000" : "var(--bg2)";
+                var bgCol = avail === "warning" || salleOccupied ? "rgba(245,158,11,.15)" : "var(--bg2)";
                 var statusTxt = avail === "blocked" ? "Absent/repos" : salleOccupied ? "\u26A0 ".concat(row.salle, " d\u00E9j\u00E0 occup\u00E9e") : avail === "warning" ? "⚠ Déjà une activité" : "Disponible";
                 var statusCol = avail === "blocked" ? "#ef4444" : salleOccupied || avail === "warning" ? "#f59e0b" : "var(--txt3)";
                 return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(borderCol),
@@ -2122,12 +2122,12 @@ function PickMedActModal(_a) {
                     return (React.createElement(React.Fragment, null,
                         libre.length > 0 && (React.createElement(React.Fragment, null,
                             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Salles libres"),
-                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 } }, libre.map(function (s) { return (React.createElement("button", { key: s, style: { padding: "5px 9px", borderRadius: 5, border: "1px solid #3fb95088", cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: "#052e16", color: "#3fb950" }, onClick: function () { addEntry(selMed.id, y2, m2, d, sl, { acteId: acteId, salle: s }); onClose(); } },
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 } }, libre.map(function (s) { return (React.createElement("button", { key: s, style: { padding: "5px 9px", borderRadius: 5, border: "1px solid #3fb95088", cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: "rgba(63,185,80,.15)", color: "#3fb950" }, onClick: function () { addEntry(selMed.id, y2, m2, d, sl, { acteId: acteId, salle: s }); onClose(); } },
                                 s,
                                 " \u2713")); })))),
                         occupee.length > 0 && (React.createElement(React.Fragment, null,
                             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Salles occup\u00E9es"),
-                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, occupee.map(function (s) { return (React.createElement("button", { key: s, style: { padding: "5px 9px", borderRadius: 5, border: "1px solid #f59e0b44", cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: "#1a1000", color: "#f59e0b" }, title: "Occup\u00E9e par ".concat(occ[s].map(function (m) { return m.init; }).join(", "), " \u2014 clic pour ajouter quand m\u00EAme"), onClick: function () { addEntry(selMed.id, y2, m2, d, sl, { acteId: acteId, salle: s }); onClose(); } },
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, occupee.map(function (s) { return (React.createElement("button", { key: s, style: { padding: "5px 9px", borderRadius: 5, border: "1px solid #f59e0b44", cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: "rgba(245,158,11,.15)", color: "#f59e0b" }, title: "Occup\u00E9e par ".concat(occ[s].map(function (m) { return m.init; }).join(", "), " \u2014 clic pour ajouter quand m\u00EAme"), onClick: function () { addEntry(selMed.id, y2, m2, d, sl, { acteId: acteId, salle: s }); onClose(); } },
                                 s,
                                 " \u26A0 ",
                                 occ[s].map(function (m) { return m.init; }).join(","))); })))),
@@ -2194,7 +2194,7 @@ function PickMedSiteModal(_a) {
             }).map(function (med) {
                 var avail = isMedAvailable(med, y2, m2, d, sl);
                 return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(avail === "warning" ? "#f59e0b44" : "var(--border)"),
-                        cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "warning" ? "#1a1000" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: function () { if (avail === "blocked")
+                        cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: function () { if (avail === "blocked")
                         return; setSelMedId(med.id); setStep("acte"); } },
                     React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, med.init),
                     React.createElement("div", { style: { textAlign: "left" } },
@@ -2214,7 +2214,7 @@ function PickMedSiteModal(_a) {
                         selMed.prenom,
                         " ",
                         selMed.nom))),
-            curOcc.length > 0 && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "#1a1000", border: "1px solid #f59e0b44", marginBottom: 10 } },
+            curOcc.length > 0 && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 10 } },
                 React.createElement("span", null, "\u26A0\uFE0F"),
                 React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } },
                     "Cette salle a d\u00E9j\u00E0 ",
@@ -2324,7 +2324,7 @@ function EditPTModal(_a) {
                             return oe[1] === s; // salle occupée quelle que soit l'activité
                         });
                         var usedActe = usedBy ? (actes.find(function (x) { return x.id === (((planningType[usedBy.id] || {})[dayOfWeek] || {})[slot] || [])[0]; }) || {}).short : null;
-                        return (React.createElement("button", { key: s, title: usedBy ? "\u26A0 Occup\u00E9e par Dr. ".concat(usedBy.nom).concat(usedActe ? " (" + usedActe + ")" : "") : "", style: { padding: "5px 9px", borderRadius: 5, border: "1px solid ".concat(usedBy ? "#f59e0b" : "var(--border)"), cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: curSalle === s ? a.color : usedBy ? "#1a1000" : "var(--bg2)", color: curSalle === s ? "#fff" : usedBy ? "#f59e0b" : "var(--txt2)" }, onClick: function () { setPT(a.id, s); onClose(); } },
+                        return (React.createElement("button", { key: s, title: usedBy ? "\u26A0 Occup\u00E9e par Dr. ".concat(usedBy.nom).concat(usedActe ? " (" + usedActe + ")" : "") : "", style: { padding: "5px 9px", borderRadius: 5, border: "1px solid ".concat(usedBy ? "#f59e0b" : "var(--border)"), cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: curSalle === s ? a.color : usedBy ? "rgba(245,158,11,.15)" : "var(--bg2)", color: curSalle === s ? "#fff" : usedBy ? "#f59e0b" : "var(--txt2)" }, onClick: function () { setPT(a.id, s); onClose(); } },
                             s,
                             usedBy ? " ⚠" : ""));
                     }))));
@@ -3139,8 +3139,8 @@ function TourTab(_a) {
                         var avoidW = !!((tourAvoid || {})[w.key] || {})[m.id];
                         var wishW = !!((tourWish || {})[w.key] || {})[m.id];
                         return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "3px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 44,
-                                background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", opacity: dis ? .3 : 1,
-                                outline: on ? "2px solid " + m.color : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
+                                background: on ? (({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec] || "#388bfd") + "26") : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt2)", fontWeight: on ? 800 : 600, opacity: dis ? .3 : 1,
+                                outline: on ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec] || "#388bfd") : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
                                 if (dis || !isEdit)
                                     return;
                                 var wasOn = on;
@@ -7177,7 +7177,7 @@ function CardioPlanning() {
                                         removeEntry(medId, y2, m2, d2, slot, e.acteId);
                                 }, style: { background: "#fee2e2", border: "1px solid #fca5a5", cursor: "pointer", color: "#dc2626", fontSize: 11, padding: "1px 5px", borderRadius: 4, fontWeight: 900 } }, "\u00D7")));
                     })))),
-                hasOther && canEditThisMed && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "#1a1000", border: "1px solid #f59e0b44", marginBottom: 10 } },
+                hasOther && canEditThisMed && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 10 } },
                     React.createElement("span", null, "\u26A0\uFE0F"),
                     React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } }, "Ce m\u00E9decin a d\u00E9j\u00E0 une activit\u00E9 sur ce cr\u00E9neau."))),
                 canEditThisMed && (React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } },

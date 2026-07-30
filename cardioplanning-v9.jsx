@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.27 — 30/07/2026";
+const APP_VERSION="v9.28 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -283,7 +283,7 @@ function MedBtn({med,avail,onClick,extra}){
   return(
     <button disabled={blocked} onClick={onClick}
       style={{display:"flex",alignItems:"center",gap:7,padding:"6px 9px",borderRadius:7,border:`1px solid ${warn?"#f59e0b44":"var(--border)"}`,
-        cursor:blocked?"default":"pointer",background:warn?"#1a1000":"var(--bg2)",opacity:blocked?.35:1,width:"100%"}}>
+        cursor:blocked?"default":"pointer",background:warn?"rgba(245,158,11,.15)":"var(--bg2)",opacity:blocked?.35:1,width:"100%"}}>
       <div style={{...S.av,background:med.color,width:24,height:24}}>{med.init}</div>
       <div style={{textAlign:"left",flex:1}}>
         <div style={{fontSize:11,fontWeight:700,color:"var(--txt)"}}>{med.prenom} {med.nom}</div>
@@ -1622,7 +1622,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
               <div style={{marginBottom:12}}>
                 <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Assignés</div>
                 {existing.map(({med,salle})=>(
-                  <div key={med.id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"#1a0800",border:"1px solid #fb923c44",marginBottom:4}}>
+                  <div key={med.id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"rgba(251,146,60,.15)",border:"1px solid #fb923c44",marginBottom:4}}>
                     <div style={{width:28,height:28,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
                     <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
                     <span style={{color:"#fb923c",fontSize:10,fontFamily:"'JetBrains Mono',monospace",fontWeight:800}}>{salle}</span>
@@ -1642,7 +1642,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
                       <button key={m.id} disabled={avail==="blocked"||!!already}
                         style={{display:"flex",alignItems:"center",gap:7,padding:"6px 9px",borderRadius:7,
                           border:"1px solid var(--border)",cursor:avail!=="blocked"&&!already?"pointer":"default",
-                          background:avail==="warning"&&!already?"#1a1000":"var(--bg2)",opacity:avail==="blocked"||already?.35:1}}
+                          background:avail==="warning"&&!already?"rgba(245,158,11,.15)":"var(--bg2)",opacity:avail==="blocked"||already?.35:1}}
                         onClick={()=>{ if(avail==="blocked"||already)return; setSelMedId(m.id); }}>
                         <div style={{width:26,height:26,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
                         <div style={{textAlign:"left",flex:1}}>
@@ -1882,7 +1882,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
           {/* Salle occupancy warning for fixed-salle rows (Stim/EEP) */}
           {row.salle&&curOcc.length>0&&(
-            <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"#1a1000",border:"1px solid #f59e0b44",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:8}}>
               <span>⚠️</span>
               <span style={{fontSize:11,color:"#f59e0b"}}>
                 {row.salle} déjà occupée par {curOcc.map(x=>x.med.init).join(", ")} — vous pouvez quand même ajouter un second médecin.
@@ -1895,7 +1895,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
               // Extra warning if this med would be in an already-occupied fixed salle
               const salleOccupied=row.salle&&curOcc.length>0&&!curOcc.find(x=>x.med.id===med.id);
               const borderCol=avail==="warning"||salleOccupied?"#f59e0b44":"var(--border)";
-              const bgCol=avail==="warning"||salleOccupied?"#1a1000":"var(--bg2)";
+              const bgCol=avail==="warning"||salleOccupied?"rgba(245,158,11,.15)":"var(--bg2)";
               const statusTxt=avail==="blocked"?"Absent/repos":salleOccupied?`⚠ ${row.salle} déjà occupée`:avail==="warning"?"⚠ Déjà une activité":"Disponible";
               const statusCol=avail==="blocked"?"#ef4444":salleOccupied||avail==="warning"?"#f59e0b":"var(--txt3)";
               return(
@@ -1987,7 +1987,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                       <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Salles libres</div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
                         {libre.map(s=>(
-                          <button key={s} style={{padding:"5px 9px",borderRadius:5,border:"1px solid #3fb95088",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:"#052e16",color:"#3fb950"}}
+                          <button key={s} style={{padding:"5px 9px",borderRadius:5,border:"1px solid #3fb95088",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:"rgba(63,185,80,.15)",color:"#3fb950"}}
                             onClick={()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId,salle:s}); onClose(); }}>{s} ✓</button>
                         ))}
                       </div>
@@ -1998,7 +1998,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                       <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Salles occupées</div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
                         {occupee.map(s=>(
-                          <button key={s} style={{padding:"5px 9px",borderRadius:5,border:"1px solid #f59e0b44",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:"#1a1000",color:"#f59e0b"}}
+                          <button key={s} style={{padding:"5px 9px",borderRadius:5,border:"1px solid #f59e0b44",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:"rgba(245,158,11,.15)",color:"#f59e0b"}}
                             title={`Occupée par ${occ[s].map(m=>m.init).join(", ")} — clic pour ajouter quand même`}
                             onClick={()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId,salle:s}); onClose(); }}>{s} ⚠ {occ[s].map(m=>m.init).join(",")}</button>
                         ))}
@@ -2073,7 +2073,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               return(
                 <button key={med.id} disabled={avail==="blocked"}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px solid ${avail==="warning"?"#f59e0b44":"var(--border)"}`,
-                    cursor:avail!=="blocked"?"pointer":"default",background:avail==="warning"?"#1a1000":"var(--bg2)",opacity:avail==="blocked"?.35:1}}
+                    cursor:avail!=="blocked"?"pointer":"default",background:avail==="warning"?"rgba(245,158,11,.15)":"var(--bg2)",opacity:avail==="blocked"?.35:1}}
                   onClick={()=>{ if(avail==="blocked")return; setSelMedId(med.id); setStep("acte"); }}>
                   <div style={{width:28,height:28,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
                   <div style={{textAlign:"left"}}>
@@ -2096,7 +2096,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               <span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>{selMed.prenom} {selMed.nom}</span>
             </div>
           </div>
-          {curOcc.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"#1a1000",border:"1px solid #f59e0b44",marginBottom:10}}>
+          {curOcc.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:10}}>
             <span>⚠️</span><span style={{fontSize:11,color:"#f59e0b"}}>Cette salle a déjà {curOcc.length} praticien(s) assigné(s). Confirmer quand même ?</span>
           </div>}
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Activité dans {salle}</div>
@@ -2220,7 +2220,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
                 const usedActe=usedBy?(actes.find(x=>x.id===(((planningType[usedBy.id]||{})[dayOfWeek]||{})[slot]||[])[0])||{}).short:null;
                 return(
                   <button key={s} title={usedBy?`⚠ Occupée par Dr. ${usedBy.nom}${usedActe?" ("+usedActe+")":""}`:""}
-                    style={{padding:"5px 9px",borderRadius:5,border:`1px solid ${usedBy?"#f59e0b":"var(--border)"}`,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:curSalle===s?a.color:usedBy?"#1a1000":"var(--bg2)",color:curSalle===s?"#fff":usedBy?"#f59e0b":"var(--txt2)"}}
+                    style={{padding:"5px 9px",borderRadius:5,border:`1px solid ${usedBy?"#f59e0b":"var(--border)"}`,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:curSalle===s?a.color:usedBy?"rgba(245,158,11,.15)":"var(--bg2)",color:curSalle===s?"#fff":usedBy?"#f59e0b":"var(--txt2)"}}
                     onClick={()=>{ setPT(a.id,s); onClose(); }}>{s}{usedBy?" ⚠":""}</button>
                 );
               })}
@@ -2936,8 +2936,8 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
                     return(
                       <button key={m.id} disabled={dis||!isEdit}
                         style={{padding:"3px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:44,
-                          background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",opacity:dis?.3:1,
-                          outline:on?"2px solid "+m.color:m.surSpec&&!blocked?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
+                          background:on?(({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"#388bfd")+"26"):"var(--bg2)",color:on?"var(--txt)":"var(--txt2)",fontWeight:on?800:600,opacity:dis?.3:1,
+                           outline:on?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"#388bfd"):m.surSpec&&!blocked?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
                         onClick={()=>{if(dis||!isEdit)return;
                         const wasOn=on;
                         setTourMed(p=>{const cur={...(p[w.key]||{HC:[],USIC:[]})};const l=cur[unit]||[];if(!wasOn&&l.length>=2){toast("Maximum 2 médecins par unité","info");return p;}cur[unit]=wasOn?l.filter(x=>x!==m.id):[...l,m.id];return{...p,[w.key]:cur};});
@@ -6430,7 +6430,7 @@ header::-webkit-scrollbar { display: none; }
             )}
 
             {hasOther&&canEditThisMed&&(
-              <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"#1a1000",border:"1px solid #f59e0b44",marginBottom:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:10}}>
                 <span>⚠️</span><span style={{fontSize:11,color:"#f59e0b"}}>Ce médecin a déjà une activité sur ce créneau.</span>
               </div>
             )}
