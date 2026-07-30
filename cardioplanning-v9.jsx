@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.24 — 29/07/2026";
+const APP_VERSION="v9.26 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -626,7 +626,7 @@ function SiteView({site,year,month,prevM,nextM,actes,medecins,getEntries,salleOc
       });
       return(
         <td key={"bip"+d+sl} style={{...S.td,borderLeft:"3px solid var(--border)",cursor:isEdit?"pointer":"default",padding:2,verticalAlign:"middle",textAlign:"center"}}
-          onClick={()=>isEdit&&onPickSite({salle,siteActes:[bipActe],d,sl,y:year,m:month})}>
+          onClick={()=>isEdit&&onPickSite({salle,siteActes:[bipActe],d,sl,y:ry,m:rm})}>
           {bipOcc2.map(({med,acte,rs},i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
               <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
@@ -643,16 +643,16 @@ function SiteView({site,year,month,prevM,nextM,actes,medecins,getEntries,salleOc
       (o[salle]||[]).forEach(med=>{if(!occ.find(x=>x.med.id===med.id))occ.push({med,acte});});
     });
     const conflict=occ.length>1;
-    const noteTips=occ.map(({med})=>notes[nk(med.id,year,month,d,sl)]).filter(Boolean).join(" | ");
+    const noteTips=occ.map(({med})=>notes[nk(med.id,ry,rm,d,sl)]).filter(Boolean).join(" | ");
     return(
       <td key={`${salle}-${d}-${sl}`} title={noteTips||undefined}
         style={{...S.td,...(conflict?S.tdConfl:{}),...(isTdRC?{background:"var(--bg-td)"}:{}),padding:2,cursor:isEdit?"pointer":"default"}}
-        onClick={isEdit?()=>onPickSite({salle,siteActes:salleActes,d,sl,y:year,m:month}):undefined}>
+        onClick={isEdit?()=>onPickSite({salle,siteActes:salleActes,d,sl,y:ry,m:rm}):undefined}>
         <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:2}}>
         {occ.map(({med,acte},i)=>(
           <div key={i} style={{display:"flex",alignItems:"center",gap:1}}>
             <div style={{width:24,height:24,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{med.init}</div>
-            <Badge a={acte} hasNote={!!notes[nk(med.id,year,month,d,sl)]}/>
+            <Badge a={acte} hasNote={!!notes[nk(med.id,ry,rm,d,sl)]}/>
           </div>
         ))}
         </div>
@@ -3335,6 +3335,7 @@ const HELP_SECTIONS=[
   HP({children:["Fiches Équipe : ",HChip({txt:"Garde",bg:"#16a34a"})," / ",HChip({txt:"Sans garde",bg:"#dc2626"})," · ",HChip({txt:"TM",bg:"#1d4ed8"})," / ",HChip({txt:"Sans TM",bg:"#d97706"}),"."]}),
   HP({children:["Sur-spécialités : ",HE("span",{style:{color:"#76a5af",fontWeight:800}},"Coro")," · ",HE("span",{style:{color:"#e3b341",fontWeight:800}},"Pace")," · ",HE("span",{style:{color:"#8b5cf6",fontWeight:800}},"EEP")," · ",HE("span",{style:{color:"#ec4899",fontWeight:800}},"ETT"),"."]}),
   HP({children:["⭐ souhaite (garde ou tour) · 🚫 préfère éviter · ⇄ échange · ✂ temps partiel · 📝 note sur la case."]}),
+  HP({children:["👁 en haut de l'écran : mode consultation (lecture seule) · pastille ",HE("span",{style:{display:"inline-block",width:9,height:9,borderRadius:"50%",background:"#3fb950",margin:"0 2px"}})," verte en haut : synchronisation Firebase active (grise = hors ligne)."]}),
   HP({last:true,children:["Fonds : jaune pâle = week-end · bleuté = aujourd'hui · vert clair + contour vert = astreinte de la semaine · contour violet = exception d'astreinte posée sur un jour précis."]}))},
 
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
@@ -4496,7 +4497,8 @@ function CardioPlanning(){
   const isInterEdit=accessMode==="medecinEdit"&&medLvl==="inter"&&!netOff;
   /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
   const hideTabs=accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte"]
-    :isMedEdit?["activites","equipe","partage"]:[];
+    :isMedEdit?["activites","equipe","partage"]
+    :accessMode==="view"?["tourmedical","bip","activites","equipe","reports","stats","partage"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
     .filter(([tid])=>hideTabs.indexOf(tid)<0);
@@ -5708,9 +5710,11 @@ header::-webkit-scrollbar { display: none; }
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>🔐 Code PIN éditeur</div>
-            <div style={{display:"flex",gap:8}}>
-              <input type="password" id="np" placeholder="Nouveau PIN" style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
-              <button style={S.btnP} onClick={()=>{const v=document.getElementById("np").value;if(v.length>=4){setEditPin(v);toast("PIN mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <input type="password" id="pinOld" placeholder="Ancien PIN" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
+              <input type="password" id="pinN1" placeholder="Nouveau PIN (min 4 car.)" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
+              <input type="password" id="pinN2" placeholder="Confirmer le nouveau PIN" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
+              <button style={S.btnP} onClick={()=>{const o=document.getElementById("pinOld").value;const a=document.getElementById("pinN1").value;const b=document.getElementById("pinN2").value;if(o!==editPin){toast("Ancien PIN incorrect","warn");}else if(a.length<4){toast("Min 4 car.","warn");}else if(a!==b){toast("Les deux nouveaux PIN ne correspondent pas","warn");}else{setEditPin(a);["pinOld","pinN1","pinN2"].forEach(x=>{document.getElementById(x).value="";});toast("PIN mis à jour");}}}>Changer le PIN</button>
             </div>
           </div>}
 

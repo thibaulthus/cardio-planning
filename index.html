@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.25 — 29/07/2026";
+var APP_VERSION = "v9.26 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -818,7 +818,7 @@ function SiteView(_a) {
                 var es = getEntries(med.id, ry, rm, d, sl);
                 return es.filter(function (e) { return e.acteId === _rId_1; }).map(function (e) { return ({ med: med, acte: bipActe_1, rs: e.salle }); });
             });
-            return (React.createElement("td", { key: "bip" + d + sl, style: __assign(__assign({}, S.td), { borderLeft: "3px solid var(--border)", cursor: isEdit ? "pointer" : "default", padding: 2, verticalAlign: "middle", textAlign: "center" }), onClick: function () { return isEdit && onPickSite({ salle: salle, siteActes: [bipActe_1], d: d, sl: sl, y: year, m: month }); } }, bipOcc2.map(function (_a, i) {
+            return (React.createElement("td", { key: "bip" + d + sl, style: __assign(__assign({}, S.td), { borderLeft: "3px solid var(--border)", cursor: isEdit ? "pointer" : "default", padding: 2, verticalAlign: "middle", textAlign: "center" }), onClick: function () { return isEdit && onPickSite({ salle: salle, siteActes: [bipActe_1], d: d, sl: sl, y: ry, m: rm }); } }, bipOcc2.map(function (_a, i) {
                 var med = _a.med, acte = _a.acte, rs = _a.rs;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 3, margin: "1px 0" } },
                     React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, med.init),
@@ -835,14 +835,14 @@ function SiteView(_a) {
         var conflict = occ.length > 1;
         var noteTips = occ.map(function (_a) {
             var med = _a.med;
-            return notes[nk(med.id, year, month, d, sl)];
+            return notes[nk(med.id, ry, rm, d, sl)];
         }).filter(Boolean).join(" | ");
-        return (React.createElement("td", { key: "".concat(salle, "-").concat(d, "-").concat(sl), title: noteTips || undefined, style: __assign(__assign(__assign(__assign({}, S.td), (conflict ? S.tdConfl : {})), (isTdRC ? { background: "var(--bg-td)" } : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return onPickSite({ salle: salle, siteActes: salleActes, d: d, sl: sl, y: year, m: month }); } : undefined },
+        return (React.createElement("td", { key: "".concat(salle, "-").concat(d, "-").concat(sl), title: noteTips || undefined, style: __assign(__assign(__assign(__assign({}, S.td), (conflict ? S.tdConfl : {})), (isTdRC ? { background: "var(--bg-td)" } : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return onPickSite({ salle: salle, siteActes: salleActes, d: d, sl: sl, y: ry, m: rm }); } : undefined },
             React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 2 } }, occ.map(function (_a, i) {
                 var med = _a.med, acte = _a.acte;
                 return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 1 } },
                     React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, med.init),
-                    React.createElement(Badge, { a: acte, hasNote: !!notes[nk(med.id, year, month, d, sl)] })));
+                    React.createElement(Badge, { a: acte, hasNote: !!notes[nk(med.id, ry, rm, d, sl)] })));
             }))));
     }
     var hdr = (React.createElement("div", { style: S.bar },
