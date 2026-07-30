@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.28 — 30/07/2026";
+const APP_VERSION="v9.30 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -295,7 +295,7 @@ function MedBtn({med,avail,onClick,extra}){
 }
 
 /* ════ GRID H ════ */
-function GridH({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,getAstreinteForDay}){ 
+function GridH({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,getAstreinteForDay}){ 
   const today=new Date();
   const ghEffDays=useMemo(()=>{
     if(viewPeriod){
@@ -348,7 +348,7 @@ function GridH({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                 return["M","AM","N"].map(sl=>{
                   const es=getEntries(med.id,year,month,d,sl);
                   const bl=es[0]&&es[0]._blocked;
-                  const noteT=notes[nk(med.id,ghY,ghM,d,sl)];
+                  const noteT=notes[nk(med.id,ghY,ghM,d,sl)];const issueT=planIssues[med.id+"|"+ghY+"|"+ghM+"|"+d+"|"+sl];
                   const astIdH=getAstreinteForDay?getAstreinteForDay(ghY,ghM,d):null;
                   const isAstH=astIdH!==null&&String(astIdH)===String(med.id);
                   let astShH=null;
@@ -361,10 +361,10 @@ function GridH({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                     if(sl==="N"&&!contNextH)partsH.push("inset -1px 0 0 var(--ast-bord)");
                     astShH=partsH.join(", ");
                   }
-                  return <td key={d+sl+ghM+ghY} title={noteT||undefined}
-                    style={{...S.td,...(sl==="N"?S.tdN:{}),...(isAstH?{background:"var(--ast-bg)",boxShadow:astShH}:{}),...(isTgh?{background:"var(--bg-td)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
+                  return <td key={d+sl+ghM+ghY} title={(issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined}
+                    style={{...S.td,...(sl==="N"?S.tdN:{}),...(isAstH?{background:"var(--ast-bg)",boxShadow:astShH}:{}),...(isTgh?{background:"var(--bg-td)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle",position:"relative"}}
                     onClick={bl||!isEdit?undefined:()=>onCell(med.id,ghY,ghM,d,sl)}>
-                    {!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
+                    {issueT&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}{!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
                     </div>}
                   </td>;
@@ -380,7 +380,7 @@ function GridH({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
 
 /* ════ GRID V ════ */
 let _gvLpT=null,_gvLpF=false;
-function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay}){
+function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay}){
   const today=new Date();
   const C0=42,C1=24,CG=44;
   // Find garde med for a given day (slot N)
@@ -543,7 +543,7 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                 {meds.map(med=>{
                   const es=getEntries(med.id,ey,em,d,sl);
                   const bl=es[0]&&es[0]._blocked;
-                  const noteT=notes[nk(med.id,ey,em,d,sl)];
+                  const noteT=notes[nk(med.id,ey,em,d,sl)];const issueT=planIssues[med.id+"|"+ey+"|"+em+"|"+d+"|"+sl];
                   const astId=getAstreinteForDay?getAstreinteForDay(ey,em,d):null;
                   const isAst=astId!==null&&String(astId)===String(med.id);
                   let astSh=null;
@@ -556,14 +556,14 @@ function GridV({allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes=
                     if(si===slots.length-1&&!contNext)parts.push("inset 0 -1px 0 var(--ast-bord)");
                     astSh=parts.join(", ");
                   }
-                  return <td key={med.id} title={noteT||undefined}
-                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle"}}
+                  return <td key={med.id} title={(issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined}
+                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle",position:"relative"}}
                     onContextMenu={onCellHistory?e=>{e.preventDefault();onCellHistory(med.id,ey,em,d,sl);}:undefined}
                     onTouchStart={onCellHistory?()=>{_gvLpF=false;clearTimeout(_gvLpT);_gvLpT=setTimeout(()=>{_gvLpF=true;onCellHistory(med.id,ey,em,d,sl);},600);}:undefined}
                     onTouchEnd={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
                     onTouchMove={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
                     onClick={bl||!isEdit?undefined:()=>{if(_gvLpF){_gvLpF=false;return;}onCell(med.id,ey,em,d,sl);}}>
-                    {!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
+                    {issueT&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}{!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
                     </div>}
                   </td>;
@@ -1699,7 +1699,7 @@ function PTOccRooms({medecins,planningType,actes,acteById,salleReg}){
     {key:"CHB",titre:"🏥 CHB — occupation type des salles",color:"#3fb950",salles:uniq(["CHB-1","CHB-2","CHB-3","CHB-VASC","EE-CHB","Rythmo-CHB"].concat(reg("CHB"))).filter(s=>s!=="CHB-BIP")},
     {key:"ANGIO",titre:"🩸 PT Angio — occupation type des salles",color:"#76a5af",salles:angioAll.length?angioAll:["Angio-1","Angio-2","Angio-3"]}
   ];
-  const occ=(dw,sl,salle)=>medecins.filter(m=>{const e=((planningType[m.id]||{})[dw]||{})[sl];return e&&e[0]&&e[1]===salle;});
+  const occ=(dw,sl,salle)=>medecins.filter(m=>{const e=((planningType[m.id]||{})[dw]||{})[sl];return e&&((e[0]&&e[1]===salle)||(e[2]&&e[3]===salle));});
   return(
     <div style={{marginTop:26}}>
       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:2}}>Occupation théorique des salles si tout le monde est présent — reflète uniquement le planning type ci-dessus, jamais le planning réel.</div>
@@ -1724,7 +1724,7 @@ function PTOccRooms({medecins,planningType,actes,acteById,salleReg}){
                         <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:2}}>
                           {ms.map(m=>{
                             const e=((planningType[m.id]||{})[dw]||{})[sl]||[null,null];
-                            const acte=e[0]?acteById(e[0]):null;
+                            const aidC=(e[1]===salle&&e[0])?e[0]:e[2];const acte=aidC?acteById(aidC):null;
                             return(<div key={m.id} style={{display:"flex",alignItems:"center",gap:2}}>
                               <div style={{...S.av,background:m.color}}>{m.init}</div>
                               {acte?<Badge a={acte}/>:null}
@@ -1775,12 +1775,12 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
                   </div>
                 </td>
                 {[1,2,3,4,5].map(dw=>["M","AM"].map(sl=>{
-                  const [acteId,salle]=(pt[dw]||{})[sl]||[null,null];
+                  const [acteId,salle,acteId2,salle2]=(pt[dw]||{})[sl]||[null,null];const acte2=acteId2?acteById(acteId2):null;
                   const acte=acteId?acteById(acteId):null;
                   return(
                     <td key={dw+sl} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default"}}
                       onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>
-                      {acte&&<Badge a={acte} salle={salle}/>}
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>{acte&&<Badge a={acte} salle={salle}/>}{acte2&&<Badge a={acte2} salle={salle2}/>}</div>
                     </td>
                   );
                 }))}
@@ -1813,12 +1813,12 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
               <td style={{...S.tdFix,position:"sticky",left:48,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--th)",borderRight:"2px solid var(--border)",minWidth:26,padding:"2px"}}>{sl}</td>
               {medecins.map(med=>{
                 const pt=planningType[med.id]||{};
-                const [acteId,salle]=(pt[dw]||{})[sl]||[null,null];
+                const [acteId,salle,acteId2,salle2]=(pt[dw]||{})[sl]||[null,null];const acte2=acteId2?acteById(acteId2):null;
                 const acte=acteId?acteById(acteId):null;
                 return(
                   <td key={med.id} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default"}}
                     onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>
-                    {acte&&<Badge a={acte} salle={salle}/>}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>{acte&&<Badge a={acte} salle={salle}/>}{acte2&&<Badge a={acte2} salle={salle2}/>}</div>
                   </td>
                 );
               })}
@@ -2165,9 +2165,11 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
   const {medId,dayOfWeek,slot}=mData;
   const med=medecins.find(x=>x.id===medId);
   const pt=planningType[medId]||{};
-  const [acteId,curSalle]=((pt[dayOfWeek]||{})[slot])||[null,null];
+  const [acteId,curSalle,acteId2=null,curSalle2=null]=((pt[dayOfWeek]||{})[slot])||[null,null];
+  const second=!!(mData&&mData._ptSecond);
   const jours=["","Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
-  const setPT=(aId,salle)=>setPlanningType(p=>({...p,[medId]:{...p[medId],[dayOfWeek]:{...((p[medId]||{})[dayOfWeek]||{}),[slot]:[aId,salle]}}}));
+  const writePT=(arr)=>setPlanningType(p=>({...p,[medId]:{...p[medId],[dayOfWeek]:{...((p[medId]||{})[dayOfWeek]||{}),[slot]:arr}}}));
+  const setPT=(aId,salle)=>writePT(second?[acteId,curSalle,aId,salle]:(acteId2?[aId,salle,acteId2,curSalle2]:[aId,salle]));
   const eligActes=actes.filter(a=>!SYS.includes(a.id)&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes((med&&med.init))));
 
   return(
@@ -2184,12 +2186,21 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
           <span style={{fontSize:11,color:"var(--txt3)",fontWeight:600}}>Activité actuelle :</span>
           <Badge a={cur}/>
           {curSalle&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle}</span>}
-          <button onClick={()=>{setPT(null,null);onClose();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
+          <button onClick={()=>{writePT(acteId2?[acteId2,curSalle2]:[null,null]);onClose();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
         </div>
       ):null;})()}
+      {acteId2&&(()=>{const cur2=actes.find(x=>x.id===acteId2);return cur2?(
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 10px",background:"var(--bg)",borderRadius:8,border:"1px solid var(--border)"}}>
+          <span style={{fontSize:11,color:"var(--txt3)",fontWeight:600}}>2e activité :</span>
+          <Badge a={cur2}/>
+          {curSalle2&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle2}</span>}
+          <button onClick={()=>{writePT([acteId,curSalle]);onClose();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
+        </div>):null;})()}
+      {acteId&&!acteId2&&!second&&<button style={{marginBottom:10,padding:"5px 11px",borderRadius:6,border:"1.5px dashed var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer",fontSize:11,fontWeight:700}} onClick={()=>setMData(p=>({...p,_ptSecond:true}))}>+ Ajouter une 2e activité</button>}
+      {second&&<div style={{marginBottom:8,fontSize:11,color:"#e3b341",fontWeight:700}}>⚡ Choisissez la 2e activité ci-dessous</div>}
       <div style={S.actGrd}>
 {eligActes.map(a=>{
-          const on=acteId===a.id;
+          const on=(second?acteId2:acteId)===a.id;
           return(
             <button key={a.id} style={{...S.actTog,
               background:a.color,color:"#111",
@@ -2215,9 +2226,9 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
                 const usedBy=medecins.filter(o=>o.id!==medId).find(o=>{
                   const op=planningType[o.id]||{};
                   const oe=((op[dayOfWeek]||{})[slot])||[];
-                  return oe[1]===s; // salle occupée quelle que soit l'activité
+                  return oe[1]===s||oe[3]===s; // salle occupée quelle que soit l'activité
                 });
-                const usedActe=usedBy?(actes.find(x=>x.id===(((planningType[usedBy.id]||{})[dayOfWeek]||{})[slot]||[])[0])||{}).short:null;
+                const usedActe=usedBy?(()=>{const oe2=((planningType[usedBy.id]||{})[dayOfWeek]||{})[slot]||[];const aid2=oe2[1]===s?oe2[0]:oe2[2];return(actes.find(x=>x.id===aid2)||{}).short;})():null;
                 return(
                   <button key={s} title={usedBy?`⚠ Occupée par Dr. ${usedBy.nom}${usedActe?" ("+usedActe+")":""}`:""}
                     style={{padding:"5px 9px",borderRadius:5,border:`1px solid ${usedBy?"#f59e0b":"var(--border)"}`,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:curSalle===s?a.color:usedBy?"rgba(245,158,11,.15)":"var(--bg2)",color:curSalle===s?"#fff":usedBy?"#f59e0b":"var(--txt2)"}}
@@ -2458,10 +2469,10 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
               const ex=(next[k]||{})[mid];
               const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
               if(PROT.includes(exA))return;
-              const[acteId,salle]=(pt[dw2][sl])||[null,null];
+              const[acteId,salle,a2x=null,s2x=null]=(pt[dw2][sl])||[null,null];
               if(!acteId)return;
               if(!next[k])next[k]={};
-              next[k]={...next[k],[mid]:{acteId,salle:salle||null}};
+              next[k]={...next[k],[mid]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
             });
           });
         });
@@ -2936,7 +2947,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
                     return(
                       <button key={m.id} disabled={dis||!isEdit}
                         style={{padding:"3px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:44,
-                          background:on?(({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"#388bfd")+"26"):"var(--bg2)",color:on?"var(--txt)":"var(--txt2)",fontWeight:on?800:600,opacity:dis?.3:1,
+                          background:on?({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"#388bfd"):"var(--bg2)",color:on?"#fff":"var(--txt2)",fontWeight:on?800:600,opacity:dis?.3:1,
                            outline:on?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"#388bfd"):m.surSpec&&!blocked?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
                         onClick={()=>{if(dis||!isEdit)return;
                         const wasOn=on;
@@ -4328,10 +4339,10 @@ function CardioPlanning(){
             return;
           }
           if(!pt||!pt[dw2])return;
-          const[acteId,salle]=(pt[dw2][sl])||[null,null];
+          const[acteId,salle,a2x=null,s2x=null]=(pt[dw2][sl])||[null,null];
           if(!acteId)return;
           if(!next[k])next[k]={};
-          next[k]={...next[k],[medId]:{acteId,salle:salle||null}};
+          next[k]={...next[k],[medId]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
         });
       }
       return next;
@@ -4821,6 +4832,25 @@ function CardioPlanning(){
   },[]);
 
   /* ── applyPlanningType ── */
+  const [plIssOpen,setPlIssOpen]=useState(false);
+  const planIssues=useMemo(()=>{
+    const IGN=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORMATION","TP"];
+    const ABSL=["ABSENCE","FORMATION","REPOS_GARDE"];
+    const JRS=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+    const map={},list=[],counts={salle:0,double:0,abs:0};
+    (allDays4||[]).forEach(dd=>{medecins.forEach(med=>{["M","AM"].forEach(sl=>{
+      const all=[];[sl,"JOUR"].forEach(s2=>getEntries(med.id,dd.y,dd.m,dd.d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)all.push(e);}));
+      if(!all.length)return;
+      const msgs=[];
+      all.forEach(e=>{const a=acteById(e.acteId);if(a&&a.hasSalle&&!e.salle){msgs.push((a.short||e.acteId)+" sans salle");counts.salle++;}});
+      const met=all.filter(e=>IGN.indexOf(e.acteId)<0);
+      if(met.length>=2){msgs.push("double activité : "+met.map(e=>{const a=acteById(e.acteId);return a?a.short:e.acteId;}).join(" + "));counts.double++;}
+      const ab=all.filter(e=>ABSL.indexOf(e.acteId)>=0);
+      if(met.length>=1&&ab.length>=1){const a0=acteById(ab[0].acteId);msgs.push("activité sur "+(a0?a0.label:ab[0].acteId));counts.abs++;}
+      if(msgs.length){map[med.id+"|"+dd.y+"|"+dd.m+"|"+dd.d+"|"+sl]="⚠ "+msgs.join(" · ");list.push({y:dd.y,m:dd.m,d:dd.d,sl,med,label:msgs.join(" · "),dw:JRS[new Date(dd.y,dd.m,dd.d).getDay()]});}
+    });});});
+    return {map,list,counts};
+  },[getEntries,medecins,acteById,allDays4,actes]);
   /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
   const applyPTFlex=useCallback((medId,monthsList,fromToday)=>{
     const tod=new Date();tod.setHours(0,0,0,0);
@@ -4854,9 +4884,9 @@ function CardioPlanning(){
               const k=sk(ay,am,d,sl),ex=(next[k]||{})[med.id];
               const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
               if(["ABSENCE","GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","TP"].includes(exA))return;
-              const [acteId,salle]=(pt[dw][sl])||[null,null];if(!acteId)return;
+              const [acteId,salle,a2x=null,s2x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
               if(!next[k])next[k]={};
-              next[k]={...next[k],[med.id]:{acteId,salle:salle||null}};
+              next[k]={...next[k],[med.id]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
               nApplied++;
             });
           });
@@ -4936,9 +4966,9 @@ function CardioPlanning(){
             const k=sk(year,month,d,sl),ex=(next[k]||{})[med.id];
             const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
             if(["ABSENCE","GARDE","REPOS_GARDE"].includes(exA))return;
-            const [acteId,salle]=(pt[dw][sl])||[null,null];if(!acteId)return;
+            const [acteId,salle,a2x=null,s2x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
             if(!next[k])next[k]={};
-            next[k]={...next[k],[med.id]:{acteId,salle:salle||null}};
+            next[k]={...next[k],[med.id]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
           });
         });
       });
@@ -4964,9 +4994,9 @@ function CardioPlanning(){
           const k=sk(year,month,d,sl),ex=(next[k]||{})[medId];
           const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
           if(["ABSENCE","GARDE","REPOS_GARDE"].includes(exA))return;
-          const [acteId,salle]=(pt[dw][sl])||[null,null];if(!acteId)return;
+          const [acteId,salle,a2x=null,s2x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
           if(!next[k])next[k]={};
-          next[k]={...next[k],[medId]:{acteId,salle:salle||null}};
+          next[k]={...next[k],[medId]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
         });
       });
       return next;
@@ -5251,6 +5281,15 @@ header::-webkit-scrollbar { display: none; }
       {/* PLANNING */}
       {tab==="planning"&&(
         <div>
+          {isEdit&&planIssues.list.length>0&&<div style={{background:"rgba(248,81,73,.12)",border:"1px solid #f85149",borderRadius:8,padding:"7px 11px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setPlIssOpen(v=>!v)}>
+              <span style={{color:"#f85149",fontWeight:800,fontSize:12}}>{"⚠ "+planIssues.list.length+" problème"+(planIssues.list.length>1?"s":"")+" — "+planIssues.counts.salle+" sans salle · "+planIssues.counts.double+" double(s) · "+planIssues.counts.abs+" sur absence/repos"}</span>
+              <span style={{marginLeft:"auto",color:"#f85149",fontSize:11,fontWeight:700}}>{plIssOpen?"▲ replier":"▼ détail"}</span>
+            </div>
+            {plIssOpen&&<div style={{marginTop:6,display:"flex",flexDirection:"column",gap:3}}>{planIssues.list.map((it,i)=>(
+              <div key={i} style={{fontSize:11,color:"var(--txt)"}}><b>{it.dw+" "+String(it.d).padStart(2,"0")+"/"+String(it.m+1).padStart(2,"0")+" "+it.sl}</b>{" — "}<b>{it.med.init}</b>{" — "+it.label}</div>
+            ))}</div>}
+          </div>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <button onClick={prevM} style={S.arr}>‹</button>
@@ -5271,8 +5310,8 @@ header::-webkit-scrollbar { display: none; }
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
           </div>
           {orient==="H"
-            ?<GridH allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+            ?<GridH planIssues={planIssues.map} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>
+            :<GridV planIssues={planIssues.map} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
