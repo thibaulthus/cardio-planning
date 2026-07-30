@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.30 — 30/07/2026";
+const APP_VERSION="v9.32 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -889,6 +889,20 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
 
 /* ════ GARDE VIEW ════ */
 function GardeView({year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orient,setOrient,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
+  const removeGarde=(d3,y3,m3)=>{
+    setPlan(p=>{
+      let next={...p};const gIds=[];
+      ["N","JOUR"].forEach(sl=>{const k=sk(y3,m3,d3,sl);const dm={...(next[k]||{})};let ch=false;
+        Object.keys(dm).forEach(mid=>{const e=Array.isArray(dm[mid])?dm[mid][0]:dm[mid];if(e&&e.acteId==="GARDE"){gIds.push(mid);delete dm[mid];ch=true;}});
+        if(ch)next={...next,[k]:dm};});
+      const dt=new Date(y3,m3,d3+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd=dt.getDate();
+      ["JOUR","M","AM"].forEach(sl=>{const k=sk(ny,nm,nd,sl);const dm={...(next[k]||{})};let ch=false;
+        gIds.forEach(mid=>{const e=dm[mid];const a=Array.isArray(e)?(e[0]&&e[0].acteId):(e&&e.acteId);if(a==="REPOS_GARDE"){delete dm[mid];ch=true;}});
+        if(ch)next={...next,[k]:dm};});
+      return next;
+    });
+    toast("Garde et repos retir\u00e9s","info");
+  };
   const today=new Date();
   // Période globale pour les gardes
   const {sy:gvSy,sm:gvSm}=perStart(year,month);
@@ -1244,7 +1258,15 @@ function GardeView({year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orie
                   if(changed)next[k]=dm;
                 });
               });
-              return next;
+              if(gvAllDays.length){
+                      const last=gvAllDays[gvAllDays.length-1];
+                      const dtN=new Date(last.y,last.m,last.d+1);
+                      const nyN=dtN.getFullYear(),nmN=dtN.getMonth(),ndN=dtN.getDate();
+                      ["JOUR","M","AM"].forEach(sl=>{const k=sk(nyN,nmN,ndN,sl);if(!next[k])return;const dm={...next[k]};let changed=false;
+                        Object.keys(dm).forEach(mid=>{const e=Array.isArray(dm[mid])?dm[mid][0]:dm[mid];if((e&&e.acteId)==="REPOS_GARDE"){delete dm[mid];changed=true;}});
+                        if(changed)next[k]=dm;});
+                    }
+                    return next;
             });
             toast("Gardes et repos retirés sur la période","info");
           }}>🗑 Retirer</button>}
@@ -1715,7 +1737,7 @@ function PTOccRooms({medecins,planningType,actes,acteById,salleReg}){
               </tr></thead>
               <tbody>
                 {[1,2,3,4,5].map(dw=>["M","AM"].map(sl=>(
-                  <tr key={dw+sl} style={sl==="AM"?{borderBottom:"2px solid var(--border)"}:undefined}>
+                  <tr key={dw+sl} style={sl==="AM"?{borderBottom:"2px solid var(--border)"}:{borderBottom:"1px solid var(--border2)"}}>
                     {sl==="M"&&<td rowSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:5,fontWeight:700,fontSize:11,textAlign:"center"}}>{jours[dw]}</td>}
                     <td style={{...S.td,fontSize:9,color:"var(--txt3)",textAlign:"center",padding:"2px 1px"}}>{sl}</td>
                     {sec.salles.map(salle=>{
@@ -1775,11 +1797,11 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
                   </div>
                 </td>
                 {[1,2,3,4,5].map(dw=>["M","AM"].map(sl=>{
-                  const [acteId,salle,acteId2,salle2]=(pt[dw]||{})[sl]||[null,null];const acte2=acteId2?acteById(acteId2):null;
+                  const [acteId,salle,acteId2,salle2]=(pt[dw]||{})[sl]||[null,null];const acte2=acteId2?acteById(acteId2):null;const ptIss=(acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2);
                   const acte=acteId?acteById(acteId):null;
                   return(
-                    <td key={dw+sl} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default"}}
-                      onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>
+                    <td key={dw+sl} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative"}} title={ptIss?"⚠ salle non attribuée":undefined}
+                      onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>{ptIss&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}
                       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>{acte&&<Badge a={acte} salle={salle}/>}{acte2&&<Badge a={acte2} salle={salle2}/>}</div>
                     </td>
                   );
@@ -1813,11 +1835,11 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
               <td style={{...S.tdFix,position:"sticky",left:48,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--th)",borderRight:"2px solid var(--border)",minWidth:26,padding:"2px"}}>{sl}</td>
               {medecins.map(med=>{
                 const pt=planningType[med.id]||{};
-                const [acteId,salle,acteId2,salle2]=(pt[dw]||{})[sl]||[null,null];const acte2=acteId2?acteById(acteId2):null;
+                const [acteId,salle,acteId2,salle2]=(pt[dw]||{})[sl]||[null,null];const acte2=acteId2?acteById(acteId2):null;const ptIss=(acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2);
                 const acte=acteId?acteById(acteId):null;
                 return(
-                  <td key={med.id} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default"}}
-                    onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>
+                  <td key={med.id} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative"}} title={ptIss?"⚠ salle non attribuée":undefined}
+                    onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>{ptIss&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}
                     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>{acte&&<Badge a={acte} salle={salle}/>}{acte2&&<Badge a={acte2} salle={salle2}/>}</div>
                   </td>
                 );
@@ -2170,6 +2192,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
   const jours=["","Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
   const writePT=(arr)=>setPlanningType(p=>({...p,[medId]:{...p[medId],[dayOfWeek]:{...((p[medId]||{})[dayOfWeek]||{}),[slot]:arr}}}));
   const setPT=(aId,salle)=>writePT(second?[acteId,curSalle,aId,salle]:(acteId2?[aId,salle,acteId2,curSalle2]:[aId,salle]));
+  const afterPick=()=>setMData(p=>({...p,_ptPickSalle:null,_ptSecond:false}));
   const eligActes=actes.filter(a=>!SYS.includes(a.id)&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes((med&&med.init))));
 
   return(
@@ -2186,7 +2209,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
           <span style={{fontSize:11,color:"var(--txt3)",fontWeight:600}}>Activité actuelle :</span>
           <Badge a={cur}/>
           {curSalle&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle}</span>}
-          <button onClick={()=>{writePT(acteId2?[acteId2,curSalle2]:[null,null]);onClose();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
+          <button onClick={()=>{writePT(acteId2?[acteId2,curSalle2]:[null,null]);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
         </div>
       ):null;})()}
       {acteId2&&(()=>{const cur2=actes.find(x=>x.id===acteId2);return cur2?(
@@ -2194,19 +2217,19 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
           <span style={{fontSize:11,color:"var(--txt3)",fontWeight:600}}>2e activité :</span>
           <Badge a={cur2}/>
           {curSalle2&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle2}</span>}
-          <button onClick={()=>{writePT([acteId,curSalle]);onClose();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
+          <button onClick={()=>{writePT([acteId,curSalle]);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
         </div>):null;})()}
       {acteId&&!acteId2&&!second&&<button style={{marginBottom:10,padding:"5px 11px",borderRadius:6,border:"1.5px dashed var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer",fontSize:11,fontWeight:700}} onClick={()=>setMData(p=>({...p,_ptSecond:true}))}>+ Ajouter une 2e activité</button>}
       {second&&<div style={{marginBottom:8,fontSize:11,color:"#e3b341",fontWeight:700}}>⚡ Choisissez la 2e activité ci-dessous</div>}
       <div style={S.actGrd}>
 {eligActes.map(a=>{
-          const on=(second?acteId2:acteId)===a.id;
+          const on=(second?acteId2:acteId)===a.id;const locked=!!(second?acteId2:acteId)&&!on;
           return(
             <button key={a.id} style={{...S.actTog,
               background:a.color,color:"#111",
               border:`2px solid ${on?"#1d4ed8":a.color}`,
-              fontWeight:900,opacity:on?1:0.8}}
-              onClick={()=>{ if(a.hasSalle) setMData(p=>({...p,_ptPickSalle:a.id})); else{ setPT(a.id,null); onClose(); } }}>
+              fontWeight:900,opacity:on?1:(locked?0.22:0.8),pointerEvents:locked?"none":"auto",filter:locked?"grayscale(.7)":"none"}}
+              onClick={()=>{ if(a.hasSalle) setMData(p=>({...p,_ptPickSalle:a.id})); else{ setPT(a.id,null); afterPick(); } }}>
               <span style={{fontWeight:800,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>{a.short}</span>
               <span style={{fontSize:10}}>{a.label}</span>
             </button>
@@ -2221,7 +2244,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
             <div style={{fontSize:10,color:a.color,fontWeight:700,marginBottom:7}}>{a.label} — Salle attitrée</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
               <button style={{padding:"5px 9px",borderRadius:5,border:"1px solid var(--border)",cursor:"pointer",background:"var(--bg2)",color:"var(--txt2)",fontSize:11,fontWeight:700}}
-                onClick={()=>{ setPT(a.id,null); onClose(); }}>Sans salle</button>
+                onClick={()=>{ setPT(a.id,null); afterPick(); }}>Sans salle</button>
               {(a.salles||[]).map(s=>{
                 const usedBy=medecins.filter(o=>o.id!==medId).find(o=>{
                   const op=planningType[o.id]||{};
@@ -2232,7 +2255,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
                 return(
                   <button key={s} title={usedBy?`⚠ Occupée par Dr. ${usedBy.nom}${usedActe?" ("+usedActe+")":""}`:""}
                     style={{padding:"5px 9px",borderRadius:5,border:`1px solid ${usedBy?"#f59e0b":"var(--border)"}`,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:curSalle===s?a.color:usedBy?"rgba(245,158,11,.15)":"var(--bg2)",color:curSalle===s?"#fff":usedBy?"#f59e0b":"var(--txt2)"}}
-                    onClick={()=>{ setPT(a.id,s); onClose(); }}>{s}{usedBy?" ⚠":""}</button>
+                    onClick={()=>{ setPT(a.id,s); afterPick(); }}>{s}{usedBy?" ⚠":""}</button>
                 );
               })}
             </div>
@@ -5388,6 +5411,15 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="attache"&&(
         <div>
+          {isEdit&&planIssues.list.length>0&&<div style={{background:"rgba(248,81,73,.12)",border:"1px solid #f85149",borderRadius:8,padding:"7px 11px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setPlIssOpen(v=>!v)}>
+              <span style={{color:"#f85149",fontWeight:800,fontSize:12}}>{"⚠ "+planIssues.list.length+" problème"+(planIssues.list.length>1?"s":"")+" — "+planIssues.counts.salle+" sans salle · "+planIssues.counts.double+" double(s) · "+planIssues.counts.abs+" sur absence/repos"}</span>
+              <span style={{marginLeft:"auto",color:"#f85149",fontSize:11,fontWeight:700}}>{plIssOpen?"▲ replier":"▼ détail"}</span>
+            </div>
+            {plIssOpen&&<div style={{marginTop:6,display:"flex",flexDirection:"column",gap:3}}>{planIssues.list.map((it,i)=>(
+              <div key={i} style={{fontSize:11,color:"var(--txt)"}}><b>{it.dw+" "+String(it.d).padStart(2,"0")+"/"+String(it.m+1).padStart(2,"0")+" "+it.sl}</b>{" — "}<b>{it.med.init}</b>{" — "+it.label}</div>
+            ))}</div>}
+          </div>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}><button onClick={prevM} style={S.arr}>‹</button><h2 style={S.mTit}>{"👔 Attachés — "+(MOIS[perStart(year,month).sm]+" — "+MOIS[(perStart(year,month).sm+PCFG.len-1)%12]+" "+perStart(year,month).sy)}</h2><button onClick={nextM} style={S.arr}>›</button></div>
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button><button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button></div>
@@ -5396,8 +5428,8 @@ header::-webkit-scrollbar { display: none; }
              <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
            </div>}
           {orient==="H"
-            ?<GridH allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+            ?<GridH planIssues={planIssues.map} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
+            :<GridV planIssues={planIssues.map} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
