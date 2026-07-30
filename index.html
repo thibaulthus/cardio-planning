@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.26 — 30/07/2026";
+var APP_VERSION = "v9.27 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1893,6 +1893,51 @@ function BipTab(_a) {
                             isFull ? React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "Occup\u00E9e") : React.createElement("span", { style: { fontSize: 10, color: "#fb923c" } }, "Libre \u2192")));
                     })))));
         })()));
+}
+function PTOccRooms(_a) {
+    var medecins = _a.medecins, planningType = _a.planningType, actes = _a.actes, acteById = _a.acteById, salleReg = _a.salleReg;
+    var jours = ["", "Lun", "Mar", "Mer", "Jeu", "Ven"];
+    var reg = function (site) { return (salleReg || []).filter(function (x) { return Array.isArray(x.s) ? x.s.indexOf(site) >= 0 : x.s === site; }).map(function (x) { return x.n; }); };
+    var uniq = function (arr) { return arr.filter(function (s, i2, a2) { return s && a2.indexOf(s) === i2; }); };
+    var angioAll = uniq(actes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).indexOf("Angio") === 0; }).concat(reg("ANGIO")));
+    var SECTIONS = [
+        { key: "CHL", titre: "\uD83C\uDFE5 CHL \u2014 occupation type des salles", color: "#388bfd", salles: uniq(["CHL-1", "CHL-2", "CHL-3", "CHL-4", "CHL-5", "CHL-6", "CHL-7", "Holter", "HC-Exam"].concat(reg("CHL"))) },
+        { key: "CHB", titre: "\uD83C\uDFE5 CHB \u2014 occupation type des salles", color: "#3fb950", salles: uniq(["CHB-1", "CHB-2", "CHB-3", "CHB-VASC", "EE-CHB", "Rythmo-CHB"].concat(reg("CHB"))).filter(function (s) { return s !== "CHB-BIP"; }) },
+        { key: "ANGIO", titre: "\uD83E\uDE78 PT Angio \u2014 occupation type des salles", color: "#76a5af", salles: angioAll.length ? angioAll : ["Angio-1", "Angio-2", "Angio-3"] }
+    ];
+    var occ = function (dw, sl, salle) { return medecins.filter(function (m) { var e = ((planningType[m.id] || {})[dw] || {})[sl]; return e && e[0] && e[1] === salle; }); };
+    var renderSection = function (sec) {
+        var head = React.createElement("thead", null, React.createElement("tr", null,
+            React.createElement("th", { key: "j", style: __assign(__assign({}, S.thFix), { position: "sticky", left: 0, zIndex: 20, minWidth: 46 }) }, "JOUR"),
+            React.createElement("th", { key: "sl", style: __assign(__assign({}, S.th), { minWidth: 28, fontSize: 9 }) }, "SL"),
+            sec.salles.map(function (s) { return React.createElement("th", { key: s, style: __assign(__assign({}, S.th), { minWidth: 64, fontSize: 10 }) }, s); })));
+        var rows = [];
+        [1, 2, 3, 4, 5].forEach(function (dw) { ["M", "AM"].forEach(function (sl) {
+            var tds = [];
+            if (sl === "M")
+                tds.push(React.createElement("td", { key: "j", rowSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, fontWeight: 700, fontSize: 11, textAlign: "center" }) }, jours[dw]));
+            tds.push(React.createElement("td", { key: "sl", style: __assign(__assign({}, S.td), { fontSize: 9, color: "var(--txt3)", textAlign: "center", padding: "2px 1px" }) }, sl));
+            sec.salles.forEach(function (salle) {
+                var ms = occ(dw, sl, salle);
+                tds.push(React.createElement("td", { key: salle, style: __assign(__assign({}, S.td), { padding: 2, verticalAlign: "middle", textAlign: "center" }) },
+                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 2 } }, ms.map(function (m) {
+                        var e = ((planningType[m.id] || {})[dw] || {})[sl] || [null, null];
+                        var acte = e[0] ? acteById(e[0]) : null;
+                        return React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 2 } },
+                            React.createElement("div", { style: __assign(__assign({}, S.av), { background: m.color }) }, m.init),
+                            acte ? React.createElement(Badge, { a: acte }) : null);
+                    }))));
+            });
+            rows.push(React.createElement("tr", { key: dw + sl, style: sl === "AM" ? { borderBottom: "2px solid var(--border)" } : undefined }, tds));
+        }); });
+        return React.createElement("div", { key: sec.key, style: { marginTop: 20, paddingTop: 16, borderTop: "2px solid var(--border)" } },
+            React.createElement("div", { style: { fontWeight: 800, fontSize: 13, color: sec.color, marginBottom: 8 } }, sec.titre),
+            React.createElement("div", { style: { overflowX: "auto", borderRadius: 8, border: "1px solid var(--border)" } },
+                React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } }, head, React.createElement("tbody", null, rows))));
+    };
+    return React.createElement("div", { style: { marginTop: 26 } },
+        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 2 } }, "Occupation th\u00E9orique des salles si tout le monde est pr\u00E9sent \u2014 refl\u00E8te uniquement le planning type ci-dessus, jamais le planning r\u00E9el."),
+        SECTIONS.map(renderSection));
 }
 function PlanTypeGrid(_a) {
     var medecins = _a.medecins, actes = _a.actes, planningType = _a.planningType, setPlanningType = _a.setPlanningType, isEdit = _a.isEdit, orient = _a.orient, acteById = _a.acteById, setMData = _a.setMData, setModal = _a.setModal;
@@ -5957,7 +6002,8 @@ function CardioPlanning() {
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type"),
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: function () { return openPtModal(null, "remove"); } }, "\uD83D\uDDD1 Retirer")),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Semaine type par m\u00E9decin. Le bouton \u25B6 PT l'applique aux mois de la p\u00E9riode affich\u00E9e (choix des mois et du point de d\u00E9part dans la fen\u00EAtre). TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
-                React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit || isInterEdit, orient: orient, acteById: acteById, setMData: setMData, setModal: setModal }))),
+                React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit || isInterEdit, orient: orient, acteById: acteById, setMData: setMData, setModal: setModal }),
+                React.createElement(PTOccRooms, { medecins: medecins, planningType: planningType, actes: actes, acteById: acteById, salleReg: salleReg }))),
             tab === "attache" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },

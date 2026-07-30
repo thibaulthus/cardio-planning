@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.26 — 30/07/2026";
+const APP_VERSION="v9.27 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -1688,6 +1688,61 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
   );
 }
 
+
+function PTOccRooms({medecins,planningType,actes,acteById,salleReg}){
+  const jours=["","Lun","Mar","Mer","Jeu","Ven"];
+  const reg=site=>(salleReg||[]).filter(x=>Array.isArray(x.s)?x.s.indexOf(site)>=0:x.s===site).map(x=>x.n);
+  const uniq=arr=>arr.filter((s,i2,a2)=>s&&a2.indexOf(s)===i2);
+  const angioAll=uniq(actes.flatMap(a=>a.salles||[]).filter(s=>String(s).indexOf("Angio")===0).concat(reg("ANGIO")));
+  const SECTIONS=[
+    {key:"CHL",titre:"🏥 CHL — occupation type des salles",color:"#388bfd",salles:uniq(["CHL-1","CHL-2","CHL-3","CHL-4","CHL-5","CHL-6","CHL-7","Holter","HC-Exam"].concat(reg("CHL")))},
+    {key:"CHB",titre:"🏥 CHB — occupation type des salles",color:"#3fb950",salles:uniq(["CHB-1","CHB-2","CHB-3","CHB-VASC","EE-CHB","Rythmo-CHB"].concat(reg("CHB"))).filter(s=>s!=="CHB-BIP")},
+    {key:"ANGIO",titre:"🩸 PT Angio — occupation type des salles",color:"#76a5af",salles:angioAll.length?angioAll:["Angio-1","Angio-2","Angio-3"]}
+  ];
+  const occ=(dw,sl,salle)=>medecins.filter(m=>{const e=((planningType[m.id]||{})[dw]||{})[sl];return e&&e[0]&&e[1]===salle;});
+  return(
+    <div style={{marginTop:26}}>
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:2}}>Occupation théorique des salles si tout le monde est présent — reflète uniquement le planning type ci-dessus, jamais le planning réel.</div>
+      {SECTIONS.map(sec=>(
+        <div key={sec.key} style={{marginTop:20,paddingTop:16,borderTop:"2px solid var(--border)"}}>
+          <div style={{fontWeight:800,fontSize:13,color:sec.color,marginBottom:8}}>{sec.titre}</div>
+          <div style={{overflowX:"auto",borderRadius:8,border:"1px solid var(--border)"}}>
+            <table style={{borderCollapse:"collapse",width:"100%"}}>
+              <thead><tr>
+                <th style={{...S.thFix,position:"sticky",left:0,zIndex:20,minWidth:46}}>JOUR</th>
+                <th style={{...S.th,minWidth:28,fontSize:9}}>SL</th>
+                {sec.salles.map(s=><th key={s} style={{...S.th,minWidth:64,fontSize:10}}>{s}</th>)}
+              </tr></thead>
+              <tbody>
+                {[1,2,3,4,5].map(dw=>["M","AM"].map(sl=>(
+                  <tr key={dw+sl} style={sl==="AM"?{borderBottom:"2px solid var(--border)"}:undefined}>
+                    {sl==="M"&&<td rowSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:5,fontWeight:700,fontSize:11,textAlign:"center"}}>{jours[dw]}</td>}
+                    <td style={{...S.td,fontSize:9,color:"var(--txt3)",textAlign:"center",padding:"2px 1px"}}>{sl}</td>
+                    {sec.salles.map(salle=>{
+                      const ms=occ(dw,sl,salle);
+                      return(<td key={salle} style={{...S.td,padding:2,verticalAlign:"middle",textAlign:"center"}}>
+                        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:2}}>
+                          {ms.map(m=>{
+                            const e=((planningType[m.id]||{})[dw]||{})[sl]||[null,null];
+                            const acte=e[0]?acteById(e[0]):null;
+                            return(<div key={m.id} style={{display:"flex",alignItems:"center",gap:2}}>
+                              <div style={{...S.av,background:m.color}}>{m.init}</div>
+                              {acte?<Badge a={acte}/>:null}
+                            </div>);
+                          })}
+                        </div>
+                      </td>);
+                    })}
+                  </tr>
+                )))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient,acteById,setMData,setModal}){
   const jours=["","Lun","Mar","Mer","Jeu","Ven"];
@@ -5288,6 +5343,7 @@ header::-webkit-scrollbar { display: none; }
           </div>}
           <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Semaine type par médecin. Le bouton ▶ PT l'applique aux mois de la période affichée (choix des mois et du point de départ dans la fenêtre). TM exclus automatiquement. Clic sur une case pour définir.</div>
           <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit||isInterEdit} orient={orient} acteById={acteById} setMData={setMData} setModal={setModal}/>
+          <PTOccRooms medecins={medecins} planningType={planningType} actes={actes} acteById={acteById} salleReg={salleReg}/>
         </div>
       )}
 
