@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.32 — 30/07/2026";
+const APP_VERSION="v9.34 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3865,6 +3865,8 @@ function CardioPlanning(){
   const [editPin,setEditPin]=useState(EDIT_PIN_DEFAULT);
   /* ── v9.8 : rôle Administratif (secrétaires + cadres) ── */
   const [adminPin,setAdminPin]=useState("");
+  const [cadrePin,setCadrePin]=useState("");
+  const [isCadre,setIsCadre]=useState(false);
   const [adminEnabled,setAdminEnabled]=useState(true);
   const [adminCanReports,setAdminCanReports]=useState(true);
   const [adminCanNotes,setAdminCanNotes]=useState(false);
@@ -4113,6 +4115,7 @@ function CardioPlanning(){
           }
             if(data.editPin)setEditPin(data.editPin);
             if(data.adminPin!==undefined)setAdminPin(data.adminPin);
+          if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
             if(data.adminEnabled!==undefined)setAdminEnabled(data.adminEnabled);
             if(data.adminCanReports!==undefined)setAdminCanReports(data.adminCanReports);
             if(data.adminCanNotes!==undefined)setAdminCanNotes(data.adminCanNotes);
@@ -4535,7 +4538,7 @@ function CardioPlanning(){
     });
   },[medecins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({editPin});},[editPin]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,adminEnabled,adminCanReports,adminCanNotes]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astreinte:JSON.stringify(astreinte)});},[astreinte]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medPins:JSON.stringify(medPins)});},[medPins]);
 
@@ -5140,7 +5143,7 @@ function CardioPlanning(){
     if(pinInput===editPin){setAccessMode("edit");setPinError(false);return;}
     const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3);
     if(medEntry){setEditMedId(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);}
-    else if(adminEnabled&&adminPin&&adminPin.length>=3&&pinInput===adminPin){setAdminAsk(true);setPinError(false);}
+    else if(adminEnabled&&(()=>{const okA=adminPin&&adminPin.length>=3&&pinInput===adminPin;const okC=cadrePin&&cadrePin.length>=3&&pinInput===cadrePin;if(okA||okC)setIsCadre(!!okC&&!okA);return okA||okC;})()){setAdminAsk(true);setPinError(false);}
     else setPinError(true);
   }}}
           type="password" placeholder="PIN" style={{...S.fi,width:"100%",textAlign:"center",letterSpacing:6,fontSize:16,marginBottom:8}}/>
@@ -5154,7 +5157,7 @@ function CardioPlanning(){
               setEditMedId(parseInt(medEntry[0]));
               setAccessMode("medecinEdit");
               setPinError(false);
-            } else if(adminEnabled&&adminPin&&adminPin.length>=3&&pinInput===adminPin){
+            } else if(adminEnabled&&(()=>{const okA=adminPin&&adminPin.length>=3&&pinInput===adminPin;const okC=cadrePin&&cadrePin.length>=3&&pinInput===cadrePin;if(okA||okC)setIsCadre(!!okC&&!okA);return okA||okC;})()){
               setAdminAsk(true);setPinError(false);
             } else {
               setPinError(true);
@@ -5259,7 +5262,7 @@ header::-webkit-scrollbar { display: none; }
       {/* HEADER */}
       <header style={S.hdr}>
         <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
-          <span onClick={()=>{setPinInput("");setPinError(false);setAccessMode("ask");}} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
+          <span onClick={()=>{setPinInput("");setPinError(false);setIsCadre(false);setAccessMode("ask");}} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
           {(isEdit||isMedEdit)&&<div style={{display:"flex",gap:3}}>
             <button onClick={doUndo} disabled={!canUndo} title="Annuler (retour arrière)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canUndo?"rgba(255,255,255,.1)":"transparent",color:canUndo?"#f0f6fc":"#484f58",cursor:canUndo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↶</button>
@@ -5450,8 +5453,9 @@ header::-webkit-scrollbar { display: none; }
                       <div style={{fontWeight:700,color:"var(--txt)",fontSize:12}}>{a.label}</div>
                       {a.hasSalle&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.salles.join(", ")||"—"}</div>}
                       {a.id==="TP"&&<div style={{fontSize:9,color:"var(--txt3)"}}>{medecins.filter(m3=>m3.partTime===true).map(m3=>m3.init).join(", ")||"aucun médecin en temps partiel"}</div>}
-                      {a.id!=="TP"&&(a.medecinsAutorise&&a.medecinsAutorise.length)>0&&<div style={{fontSize:9,color:"var(--txt3)"}}>{a.medecinsAutorise.join(", ")}</div>}
-                      {(a.id==="GARDE"||a.id==="REPOS_GARDE")&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Garde » de l'onglet Équipe</div>}
+                      {a.id!=="TP"&&(a.medecinsAutorise&&a.medecinsAutorise.length)>0&&<div style={{fontSize:9,color:"var(--txt3)"}}>{(a.medecinsAutorise.includes("__AUCUN__")?"🚫 Aucun médecin":a.medecinsAutorise.join(", "))}</div>}
+                      {(a.ideN>0)&&<div style={{fontSize:9,color:"#3fb950",fontWeight:700}}>{"🩺 "+a.ideN+" IDE nécessaire"+(a.ideN>1?"s":"")}</div>}
+                {(a.id==="GARDE"||a.id==="REPOS_GARDE")&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Garde » de l'onglet Équipe</div>}
                       {a.id==="TP"&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Temps partiel » des fiches médecins</div>}
                       {a.csReport&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>📥 Proposée dans l'onglet Reports</div>}
                       {a.adminOk&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>✏️ Modifiable par le rôle administratif</div>}
@@ -5851,6 +5855,11 @@ header::-webkit-scrollbar { display: none; }
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <input type="password" id="nap" placeholder={adminPin?"PIN défini — nouveau PIN":"Définir le PIN"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
               <button style={S.btnP} onClick={()=>{const v=document.getElementById("nap").value;if(v.length>=4){setAdminPin(v);toast("PIN administratif mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
+            </div>
+            <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 4px"}}>PIN cadre : mêmes droits que l'administratif + gestion du planning IDE (PT cardio).</div>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <input type="password" id="ncp" placeholder={cadrePin?"PIN cadre défini — nouveau PIN":"Définir le PIN cadre"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
+              <button style={S.btnP} onClick={()=>{const v=document.getElementById("ncp").value;if(v.length>=4){if(v===adminPin||v===editPin){toast("Ce PIN est déjà utilisé par un autre rôle","warn");return;}setCadrePin(v);toast("PIN cadre mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:8}}>
               <label style={{display:"flex",gap:8,alignItems:"center",fontSize:12,color:"var(--txt2)",cursor:"pointer"}}><input type="checkbox" checked={adminEnabled} onChange={e=>setAdminEnabled(e.target.checked)} style={{width:14,height:14}}/>Rôle activé (décocher suspend l'accès sans changer le PIN)</label>
@@ -6791,12 +6800,17 @@ header::-webkit-scrollbar { display: none; }
                 });
               })()}
               <div style={{fontSize:9,color:"var(--txt3)"}}>Créer/renommer une salle : Paramètres → 🏥 Salles.</div></div>}
+            <div style={{gridColumn:"1 / -1",display:"flex",alignItems:"center",gap:8,margin:"2px 0"}}>
+              <label style={{...S.fl,margin:0}}>🩺 IDE nécessaires</label>
+              <input type="number" min={0} max={9} value={mData.ideN||0} onChange={e=>{const v=Math.max(0,Math.min(9,parseInt(e.target.value||"0",10)||0));setMData(p=>({...p,ideN:v}));}} style={{...S.fi,width:64,textAlign:"center"}}/>
+              <span style={{fontSize:10,color:"var(--txt3)"}}>0 = aucune IDE requise</span>
+            </div>
             <div style={{gridColumn:"1/-1"}}><label style={S.fl}>{(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")?"Médecins autorisés":"Médecins autorisés (vide = tous)"}</label>
               {(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")?(
                 <div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
                     {medecins.filter(m2=>(mData.id==="TP"?m2.partTime===true:m2.garde===true)).map(m2=>(
-                      <span key={m2.id} style={{fontSize:10,padding:"3px 8px",borderRadius:12,fontWeight:700,display:"inline-flex",alignItems:"center",gap:4,border:"1.5px solid "+m2.color,background:m2.color+"26",color:"var(--txt)"}}>
+                      <span key={m2.id} title={((m2.prenom||"")+" "+(m2.nom||"")).trim()} style={{fontSize:10,padding:"3px 8px",borderRadius:12,fontWeight:700,display:"inline-flex",alignItems:"center",gap:4,border:"1.5px solid "+m2.color,background:m2.color+"26",color:"var(--txt)"}}>
                         <span style={{width:12,height:12,borderRadius:"50%",background:m2.color,display:"inline-block"}}/>{m2.init}
                       </span>
                     ))}
@@ -6805,10 +6819,11 @@ header::-webkit-scrollbar { display: none; }
                 </div>
               ):(
               <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:120,overflowY:"auto"}}>
+                {(()=>{const aucun=(mData.medecinsAutorise||[]).includes("__AUCUN__");return <button type="button" onClick={()=>setMData(p=>{const nx=aucun?[]:["__AUCUN__"];return {...p,medecinsAutorise:nx,medStr:aucun?"":"Aucun"};})} style={{fontSize:10,padding:"3px 8px",borderRadius:12,cursor:"pointer",fontWeight:800,border:aucun?"1.5px solid #f85149":"1px solid var(--border)",background:aucun?"rgba(248,81,73,.15)":"var(--bg2)",color:aucun?"#f85149":"var(--txt3)"}}>🚫 Aucun médecin</button>;})()}
                 {medecins.filter(m2=>m2.role!=="ide").map(m2=>{
                   const on=(mData.medecinsAutorise||[]).includes(m2.init);
-                  return <button key={m2.id} type="button" onClick={()=>setMData(p=>{const cur=p.medecinsAutorise||[];const nx=on?cur.filter(x=>x!==m2.init):cur.concat([m2.init]);return {...p,medecinsAutorise:nx,medStr:nx.join(", ")};})}
-                    style={{fontSize:10,padding:"3px 8px",borderRadius:12,cursor:"pointer",fontWeight:700,display:"inline-flex",alignItems:"center",gap:4,border:on?"1.5px solid "+m2.color:"1px solid var(--border)",background:on?m2.color+"26":"var(--bg2)",color:on?"var(--txt)":"var(--txt3)"}}>
+                  return <button key={m2.id} type="button" title={((m2.prenom||"")+" "+(m2.nom||"")).trim()} onClick={()=>setMData(p=>{const cur=(p.medecinsAutorise||[]).filter(x=>x!=="__AUCUN__");const nx=on?cur.filter(x=>x!==m2.init):cur.concat([m2.init]);return {...p,medecinsAutorise:nx,medStr:nx.join(", ")};})}
+                    style={{fontSize:10,padding:"3px 8px",borderRadius:12,cursor:"pointer",fontWeight:700,opacity:(mData.medecinsAutorise||[]).includes("__AUCUN__")?.3:1,pointerEvents:(mData.medecinsAutorise||[]).includes("__AUCUN__")?"none":"auto",display:"inline-flex",alignItems:"center",gap:4,border:on?"1.5px solid "+m2.color:"1px solid var(--border)",background:on?m2.color+"26":"var(--bg2)",color:on?"var(--txt)":"var(--txt3)"}}>
                     <span style={{width:12,height:12,borderRadius:"50%",background:m2.color,display:"inline-block"}}/>{m2.init}</button>;
                 })}
               </div>)}</div>
