@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.38 — 30/07/2026";
+const APP_VERSION="v9.40 — 31/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -198,6 +198,26 @@ document.documentElement.style.fontSize="120%";
    uniquement de clé de rangement dans le plan, ce qui fait hériter ces activités
    de la synchro delta, du journal et des sauvegardes sans code supplémentaire. */
 const IDE_MED={id:"__IDE__",init:"🩺",nom:"IDE",prenom:"",color:"#3fb950"};
+
+/* ── v9.40 : impression d'une semaine ──
+   On n'imprime pas un rendu parallèle mais LES VRAIES VUES, filtrées sur la
+   semaine choisie : la règle de calcul des IDE n'est ainsi écrite qu'une fois. */
+const inPrintWeek=(pw,y,m,d)=>{
+  if(!pw)return true;
+  const a=new Date(pw.y,pw.m,pw.d);a.setHours(0,0,0,0);
+  const b=new Date(y,m,d);b.setHours(0,0,0,0);
+  const k=Math.round((b-a)/86400000);
+  return k>=0&&k<=6;
+};
+const mondayOf=(y,m,d)=>{const t=new Date(y,m,d);const mo=new Date(y,m,d-((t.getDay()+6)%7));return{y:mo.getFullYear(),m:mo.getMonth(),d:mo.getDate()};};
+const printWeekList=(y,m)=>{
+  const p=perStart(y,m),out=[],seen={};
+  perDaysList(p.sy,p.sm).forEach(o=>{
+    const w=mondayOf(o.y,o.m,o.d),k=w.y+"-"+w.m+"-"+w.d;
+    if(!seen[k]){seen[k]=1;out.push(w);}
+  });
+  return out;
+};
 
 const S={
   app:{minHeight:"100vh",background:"var(--bg)",fontFamily:"'Sora','Segoe UI',sans-serif",color:"var(--txt)"},
@@ -386,7 +406,7 @@ function GridH({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
 
 /* ════ GRID V ════ */
 let _gvLpT=null,_gvLpF=false;
-function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay}){
+function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
   const today=new Date();
   const C0=42,C1=24,CG=44;
   // Find garde med for a given day (slot N)
@@ -409,6 +429,7 @@ function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
     if(!showFull){const tod=new Date();tod.setHours(0,0,0,0);return days.filter(({y:ey,m:em,d})=>new Date(ey,em,d)>=tod);}
     return days;
   },[viewPeriod,allDays,year,month,showFull,PCFG.len,PCFG.startM]);
+  const printDays=printWk?effectiveDays.filter(o=>inPrintWeek(printWk,o.y,o.m,o.d)):effectiveDays;
   const getGardeMed=(d)=>getGardeMed2(year,month,d);
   const getGardeMed2=(y2,m2,d2)=>{
     const dw2=dow(y2,m2,d2);
@@ -522,8 +543,8 @@ function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
           </tr>
         </thead>
         <tbody>
-          {effectiveDays.map(({y:ey,m:em,d},di)=>{
-            const prevDay=di>0?effectiveDays[di-1]:null;
+          {printDays.map(({y:ey,m:em,d},di)=>{
+            const prevDay=di>0?printDays[di-1]:null;
             const isNewMonth=viewPeriod&&(!prevDay||prevDay.m!==em||prevDay.y!==ey);
             const we=isWE(ey,em,d),isT=d===today.getDate()&&em===today.getMonth()&&ey===today.getFullYear();
             const slots=we?["JOUR"]:["M","AM"];
@@ -753,7 +774,7 @@ function SiteView({site,year,month,prevM,nextM,actes,medecins,getEntries,salleOc
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,orient,setOrient,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde}){
+function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,orient,setOrient,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,printWk,onPrint}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -761,7 +782,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     if(!showFull){const tod=new Date();tod.setHours(0,0,0,0);return base.filter(({y:ey3,m:em3,d})=>new Date(ey3,em3,d)>=tod);}
     return base;
   },[year,month,showFull,PCFG.len,PCFG.startM]);
-  const wdays=atvEffDays2; // keep full objects
+  const wdays=printWk?atvEffDays2.filter(o=>inPrintWeek(printWk,o.y,o.m,o.d)):atvEffDays2; // keep full objects
 
   function getOcc(row,d,sl,ry,rm){
     if(!ry)ry=year; if(!rm&&rm!==0)rm=month;
@@ -829,7 +850,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     const ovv=ideOv[sk(y3,m3,d3,sl)];
     const isOv=(ovv!==undefined&&ovv!==null);
     const ok=need<=dispo;
-    return <span title={(isOv?"Effectif corrigé pour ce jour":"Effectif par défaut")+" — besoin simultané "+need+", disponible "+dispo+(difN>0?" — "+difN+" IDE en départ différé (activité qui démarre plus tard, donc non simultanée)":"")} onClick={canIde?(e=>{e.stopPropagation();setIdeEdit({y:y3,m:m3,d:d3,sl});}):undefined} style={{display:"inline-block",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:6,padding:"1px 4px",whiteSpace:"nowrap",cursor:canIde?"pointer":"default",background:need===0?"transparent":(ok?"rgba(63,185,80,.15)":"rgba(248,81,73,.15)"),color:need===0?"var(--txt3)":(ok?"#3fb950":"#f85149"),border:isOv?"1px dashed var(--txt3)":"1px solid transparent"}}>{need+"/"+dispo+(difN>0?" 🕙":"")}</span>;
+    return <span title={(isOv?"Effectif corrigé pour ce jour":"Effectif par défaut")+" — besoin simultané "+need+", disponible "+dispo+(difN>0?" — "+difN+" IDE en départ différé (activité qui démarre plus tard, donc non simultanée)":"")} onClick={canIde?(e=>{e.stopPropagation();setIdeEdit({y:y3,m:m3,d:d3,sl});}):undefined} style={{display:"inline-flex",flexDirection:"column",alignItems:"center",lineHeight:1.1,fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:6,padding:"2px 5px",whiteSpace:"nowrap",cursor:canIde?"pointer":"default",background:need===0?"transparent":(ok?"rgba(63,185,80,.15)":"rgba(248,81,73,.15)"),color:need===0?"var(--txt3)":(ok?"#3fb950":"#f85149"),border:isOv?"1px dashed var(--txt3)":"1px solid transparent"}}><span>{need+"/"+dispo}</span>{difN>0&&<span style={{fontSize:9,marginTop:1}}>🕙</span>}</span>;
   };
   const ideExtra=(ideActive?<div>
     {canIde&&idePanel&&<div style={{...S.card,marginBottom:8}}>
@@ -877,8 +898,8 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
             {row.hasSalleChoice&&salle&&<span style={{fontSize:7,fontWeight:700,color:"var(--txt3)",fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",borderRadius:4,padding:"0 3px",whiteSpace:"nowrap"}}>{salle}</span>}
           </div>
         );})}
-        {ideActive&&ideCell(row,d,sl,ry,rm)>0&&<span title="IDE nécessaires pour cette activité" style={{fontSize:8,fontWeight:800,color:"#3fb950",fontFamily:"'JetBrains Mono',monospace",border:"1px solid rgba(63,185,80,.5)",borderRadius:5,padding:"0 3px",whiteSpace:"nowrap",marginLeft:2}}>{"🩺"+ideCell(row,d,sl,ry,rm)}</span>}
-        {ideActive&&occ.some(o=>o.dif)&&<span title={"Départ différé — "+occ.filter(o=>o.dif).map(o=>((o.acte.short||o.acte.id)+" "+((o.dif&&o.dif.h)||"")+((o.dif&&o.dif.c)?" — "+o.dif.c:"")).trim()).join(" · ")} style={{fontSize:8,fontWeight:800,color:"#f59e0b",fontFamily:"'JetBrains Mono',monospace",border:"1px solid rgba(245,158,11,.5)",borderRadius:5,padding:"0 3px",whiteSpace:"nowrap",marginLeft:2}}>🕙</span>}
+        {ideActive&&ideCell(row,d,sl,ry,rm)>0&&<span title="IDE nécessaires pour cette activité" style={{fontSize:10,fontWeight:800,color:"#3fb950",fontFamily:"'JetBrains Mono',monospace",background:"rgba(63,185,80,.12)",border:"1px solid rgba(63,185,80,.5)",borderRadius:5,padding:"1px 5px",whiteSpace:"nowrap",marginLeft:2}}>{"🩺"+ideCell(row,d,sl,ry,rm)}</span>}
+        {ideActive&&occ.some(o=>o.dif)&&<span title={"Départ différé — "+occ.filter(o=>o.dif).map(o=>((o.acte.short||o.acte.id)+" "+((o.dif&&o.dif.h)||"")+((o.dif&&o.dif.c)?" — "+o.dif.c:"")).trim()).join(" · ")} style={{fontSize:10,fontWeight:800,color:"#f59e0b",fontFamily:"'JetBrains Mono',monospace",background:"rgba(245,158,11,.12)",border:"1px solid rgba(245,158,11,.5)",borderRadius:5,padding:"1px 5px",whiteSpace:"nowrap",marginLeft:2}}>🕙</span>}
         </div>
         {occ.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
       </td>
@@ -894,6 +915,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
         {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
+        {ideFeature&&onPrint&&<button onClick={onPrint} title="Imprimer une semaine" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
@@ -964,7 +986,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
                     <div style={{fontWeight:800,color:isT?"var(--today-c)":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600,lineHeight:1}}>{MOIS[wM]}</div>}</div>
                     <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dAT]}</div>
                   </td>}
-                  <td style={{...S.tdFix,position:"sticky",left:42,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--td-fix)",borderRight:"2px solid var(--border)",minWidth:ideActive?38:24,padding:"2px"}}>{SLOTS[sl]}{ideActive&&<div style={{marginTop:2}}>{idePill(wY,wM,d,sl)}</div>}</td>
+                  <td style={{...S.tdFix,position:"sticky",left:42,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--td-fix)",borderRight:"2px solid var(--border)",minWidth:ideActive?46:24,padding:"2px"}}>{SLOTS[sl]}{ideActive&&<div style={{marginTop:2}}>{idePill(wY,wM,d,sl)}</div>}</td>
                   {rows.map(row=>renderActCell(row,d,sl,wY,wM))}
                 </tr>
               ));
@@ -4005,6 +4027,10 @@ function CardioPlanning(){
   const [isCadre,setIsCadre]=useState(false);
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
+  /* ── v9.40 : impression ── */
+  const [printWk,setPrintWk]=useState(null);
+  const [printWhat,setPrintWhat]=useState("plateau");
+  const [printSel,setPrintSel]=useState(()=>{const t=new Date();return mondayOf(t.getFullYear(),t.getMonth(),t.getDate());});
   const [ideOn,setIdeOn]=useState(()=>{try{return localStorage.getItem("cp6_ide_on")==="1";}catch{return false;}});
   useEffect(()=>{try{localStorage.setItem("cp6_ide_on",ideOn?"1":"0");}catch{}},[ideOn]);
   const [adminEnabled,setAdminEnabled]=useState(true);
@@ -5503,8 +5529,8 @@ header::-webkit-scrollbar { display: none; }
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
           </div>
           {orient==="H"
-            ?<GridH planIssues={planIssues.map} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV planIssues={planIssues.map} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+            ?<GridH planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>
+            :<GridV planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -5533,7 +5559,7 @@ header::-webkit-scrollbar { display: none; }
           {label:"EE CHL",ids:["EE_CHL"],color:"#4ade80",salle:S_EE_CHL},
         ].concat(actes.filter(a=>acteRecapIn(a,"PLATEAU")&&!a.isSystem).map(a=>((a.salles||[]).length>1?{label:a.label,ids:[a.id],color:a.color,salle:null,hasSalleChoice:true,sallesDisp:a.salles}:{label:a.label,ids:[a.id],color:a.color,salle:(a.salles&&a.salles[0])||null})))}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
-        getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
@@ -6895,6 +6921,30 @@ header::-webkit-scrollbar { display: none; }
   onApply={p=>{applyAbsence(p);setModal(null);}}
   onRemove={p=>{removeAbsence(p);setModal(null);}}
   onClose={()=>setModal(null)}/></Ov>}
+      {modal==="print"&&<div style={S.ov} onClick={()=>setModal(null)}>
+        <div style={{...S.mb,width:340}} onClick={e=>e.stopPropagation()}>
+          <div style={S.mHd}><div style={S.mTit2}>🖨️ Imprimer une semaine</div><button style={S.xBtn} onClick={()=>setModal(null)}>×</button></div>
+          <div style={S.fl}>Quoi</div>
+          <div style={{display:"flex",gap:6,marginBottom:10}}>
+            {[["plateau","❤️ PT Cardio"],["planning","📅 Planning équipe"]].map(([k,lab])=>
+              <button key={k} onClick={()=>setPrintWhat(k)} style={{flex:1,...S.fi,cursor:"pointer",fontWeight:800,fontSize:11,textAlign:"center",background:printWhat===k?"rgba(63,185,80,.15)":"var(--bg2)",color:printWhat===k?"#3fb950":"var(--txt2)",border:`1px solid ${printWhat===k?"#3fb950":"var(--border)"}`}}>{lab}</button>)}
+          </div>
+          <div style={S.fl}>Semaine</div>
+          <div style={{maxHeight:210,overflowY:"auto",marginBottom:10}}>
+            {printWeekList(year,month).map(w=>{
+              const on=printSel&&printSel.y===w.y&&printSel.m===w.m&&printSel.d===w.d;
+              return <button key={w.y+"-"+w.m+"-"+w.d} onClick={()=>setPrintSel(w)} style={{width:"100%",textAlign:"left",...S.fi,marginBottom:4,cursor:"pointer",fontSize:12,fontWeight:on?800:600,background:on?"rgba(63,185,80,.15)":"var(--bg2)",color:on?"#3fb950":"var(--txt)",border:`1px solid ${on?"#3fb950":"var(--border)"}`}}>{"Semaine du lundi "+w.d+" "+MOIS[w.m]}</button>;
+            })}
+          </div>
+          <div style={{fontSize:9,color:"var(--txt3)",marginBottom:8}}>La boîte d'impression du navigateur s'ouvrira : choisissez l'imprimante, ou « Enregistrer en PDF » pour envoyer la feuille.</div>
+          <button style={{...S.btnP,width:"100%"}} onClick={()=>{
+            setTab(printWhat==="plateau"?"plateau":"planning");
+            setPrintWk(printSel);setModal(null);
+            setTimeout(()=>{window.print();setTimeout(()=>setPrintWk(null),500);},350);
+          }}>Imprimer</button>
+        </div>
+      </div>}
+
       {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
       {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
