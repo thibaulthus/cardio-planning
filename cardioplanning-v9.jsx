@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.40 — 31/07/2026";
+const APP_VERSION="v9.41 — 31/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -197,7 +197,22 @@ document.documentElement.style.fontSize="120%";
    Ce n'est pas un membre de l'équipe : il ne figure pas dans `medecins`, il sert
    uniquement de clé de rangement dans le plan, ce qui fait hériter ces activités
    de la synchro delta, du journal et des sauvegardes sans code supplémentaire. */
-const IDE_MED={id:"__IDE__",init:"🩺",nom:"IDE",prenom:"",color:"#3fb950"};
+const IDE_MED={id:"IDE_STAFF",init:"🩺",nom:"IDE",prenom:"",color:"#3fb950"};
+/* v9.41 : Firestore REFUSE tout nom de champ de la forme __xxx__ (motif réservé),
+   y compris pour les clés de map imbriquées. Comme les identifiants de médecin
+   servent de clés dans planV2, un identifiant ainsi encadré faisait échouer
+   l'écriture de TOUTE la case — et le repli échouait pareil, sans bruit.
+   Ce garde-fou renomme au vol une éventuelle clé réservée avant l'envoi. */
+const fbSafeCell=(cell)=>{
+  if(!cell||typeof cell!=="object")return cell;
+  let ch=false;const o={};
+  Object.keys(cell).forEach(k=>{
+    const k2=/^__.+__$/.test(k)?(k==="__IDE__"?"IDE_STAFF":k.slice(2,-2)):k;
+    if(k2!==k)ch=true;
+    o[k2]=cell[k];
+  });
+  return ch?o:cell;
+};
 
 /* ── v9.40 : impression d'une semaine ──
    On n'imprime pas un rendu parallèle mais LES VRAIES VUES, filtrées sur la
@@ -4230,14 +4245,14 @@ function CardioPlanning(){
     if(!PLANNING_DOC||!updatePaths)return;
     const prev=planSynced.current||{};
     const pairs=[];
-    Object.keys(cur).forEach(k=>{if(JSON.stringify(cur[k])!==JSON.stringify(prev[k])){pairs.push([["planV2",k],cur[k]]);planPending.current[k]=cur[k];}});
+    Object.keys(cur).forEach(k=>{const v=fbSafeCell(cur[k]);if(JSON.stringify(v)!==JSON.stringify(prev[k])){pairs.push([["planV2",k],v]);planPending.current[k]=v;}});
     Object.keys(prev).forEach(k=>{if(!(k in cur)){pairs.push([["planV2",k],"__DELETE__"]);planPending.current[k]=null;}});
     planSynced.current=cur;
     if(pairs.length===0)return;
     localChange.current=true;
     (async()=>{
       try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
-      catch(e){console.log("sync plan:",e);if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:cur},{merge:true})).catch(()=>{});}
+      catch(e){console.log("sync plan:",e);setFbStatus("error");if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:cur},{merge:true})).then(()=>setFbStatus("ok")).catch(e2=>{console.error("sync plan (repli):",e2);setFbStatus("error");});}
     })();
   },[]);
 

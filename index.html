@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.40 — 31/07/2026";
+var APP_VERSION = "v9.41 — 31/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -357,7 +357,21 @@ applyTheme(false);
 document.documentElement.style.fontSize = "120%";
 /* ════ STYLES ════ */
 /* v9.38 : porteur reserve des activites sans medecin (holters, tele-suivi). */
-var IDE_MED = { id: "__IDE__", init: "\ud83e\ude7a", nom: "IDE", prenom: "", color: "#3fb950" };
+var IDE_MED = { id: "IDE_STAFF", init: "\ud83e\ude7a", nom: "IDE", prenom: "", color: "#3fb950" };
+/* v9.41 : Firestore REFUSE tout nom de champ de la forme __xxx__ (motif reserve),
+   y compris pour les cles de map imbriquees — garde-fou avant l'envoi. */
+var fbSafeCell = function (cell) {
+    if (!cell || typeof cell !== "object")
+        return cell;
+    var ch = false, o = {};
+    Object.keys(cell).forEach(function (k) {
+        var k2 = /^__.+__$/.test(k) ? (k === "__IDE__" ? "IDE_STAFF" : k.slice(2, -2)) : k;
+        if (k2 !== k)
+            ch = true;
+        o[k2] = cell[k];
+    });
+    return ch ? o : cell;
+};
 /* v9.40 : impression d'une semaine — on imprime LES VRAIES VUES, filtrees. */
 var inPrintWeek = function (pw, y, m, d) {
     if (!pw)
@@ -4509,9 +4523,9 @@ function CardioPlanning() {
             return;
         var prev = planSynced.current || {};
         var pairs = [];
-        Object.keys(cur).forEach(function (k) { if (JSON.stringify(cur[k]) !== JSON.stringify(prev[k])) {
-            pairs.push([["planV2", k], cur[k]]);
-            planPending.current[k] = cur[k];
+        Object.keys(cur).forEach(function (k) { var v = fbSafeCell(cur[k]); if (JSON.stringify(v) !== JSON.stringify(prev[k])) {
+            pairs.push([["planV2", k], v]);
+            planPending.current[k] = v;
         } });
         Object.keys(prev).forEach(function (k) { if (!(k in cur)) {
             pairs.push([["planV2", k], "__DELETE__"]);
@@ -4525,8 +4539,8 @@ function CardioPlanning() {
         var mk = function (c) { pr = pr.then(function () { return updatePaths(PLANNING_DOC, c); }); };
         for (var i = 0; i < pairs.length; i += 400)
             mk(pairs.slice(i, i + 400));
-        pr.catch(function (e) { console.log("sync plan:", e); if (setDoc)
-            Promise.resolve(setDoc(PLANNING_DOC, { planV2: cur }, { merge: true })).catch(function () { }); });
+        pr.catch(function (e) { console.log("sync plan:", e); setFbStatus("error"); if (setDoc)
+            Promise.resolve(setDoc(PLANNING_DOC, { planV2: cur }, { merge: true })).then(function () { return setFbStatus("ok"); }).catch(function (e2) { console.error("sync plan (repli):", e2); setFbStatus("error"); }); });
     }, []);
     useEffect(function () {
         if (!PLANNING_DOC || !onSnapshot) {
