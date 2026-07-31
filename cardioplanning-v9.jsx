@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.36 — 30/07/2026";
+const APP_VERSION="v9.38 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -193,6 +193,12 @@ applyTheme(false);
 document.documentElement.style.fontSize="120%";
 
 /* ════ STYLES ════ */
+/* ── v9.38 : porteur réservé des activités sans médecin (holters, télé-suivi).
+   Ce n'est pas un membre de l'équipe : il ne figure pas dans `medecins`, il sert
+   uniquement de clé de rangement dans le plan, ce qui fait hériter ces activités
+   de la synchro delta, du journal et des sauvegardes sans code supplémentaire. */
+const IDE_MED={id:"__IDE__",init:"🩺",nom:"IDE",prenom:"",color:"#3fb950"};
+
 const S={
   app:{minHeight:"100vh",background:"var(--bg)",fontFamily:"'Sora','Segoe UI',sans-serif",color:"var(--txt)"},
   hdr:{background:"var(--hdr)",borderBottom:"1px solid var(--border)",padding:"0 10px",display:"flex",alignItems:"center",height:50,position:"sticky",top:0,zIndex:100,gap:6},
@@ -766,9 +772,16 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           const match=row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId;
           if(match&&!occ.find(x=>x.med.id===med.id&&x.acteId===acteId)){
             const acte=actes.find(a=>a.id===acteId)||{short:acteId,color:row.color,bg:"#111"};
-            occ.push({med,acte,salle:e.salle||null,dif:e.dif||null});
+            occ.push({med,acte,salle:e.salle||null,dif:e.dif||null,n:null});
           }
         });
+      });
+      getEntries(IDE_MED.id,ry,rm,d,sl).forEach(e=>{
+        const match=row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId;
+        if(match&&!occ.find(x=>x.med.id===IDE_MED.id&&x.acte&&x.acte.id===acteId)){
+          const acte=actes.find(a=>a.id===acteId)||{id:acteId,short:acteId,color:row.color,bg:"#111"};
+          occ.push({med:IDE_MED,acte,salle:e.salle||null,dif:e.dif||null,n:(e.n===undefined||e.n===null)?null:e.n});
+        }
       });
     });
     return occ;
@@ -792,11 +805,11 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           const inst={};
           getOcc(row,d,sl,wY,wM).forEach(o=>{
             const k2=o.acte.id+"|"+(o.salle||row.salle||"");
-            if(!inst[k2])inst[k2]={n:(o.acte.ideN||0),all:true};
-            if(!o.dif)inst[k2].all=false;
+            if(!inst[k2])inst[k2]={n:((o.n===null||o.n===undefined)?(o.acte.ideN||0):o.n),dif:false};
+            if(o.dif)inst[k2].dif=true;
           });
           let n=0,nd=0;
-          Object.keys(inst).forEach(k2=>{const it=inst[k2];if(it.all)nd+=it.n;else n+=it.n;});
+          Object.keys(inst).forEach(k2=>{const it=inst[k2];if(it.dif)nd+=it.n;else n+=it.n;});
           if(n>0)M[row.label+"|"+wY+"-"+wM+"-"+d+"|"+sl]=n;
           tot+=n;totD+=nd;
         });
@@ -1929,7 +1942,7 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
 }
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
-function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchEntry,canDif=false,onClose,adminOnly=false,selfOnly=null}){
+function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null}){
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
   const [difFor,setDifFor]=useState(null);
@@ -1941,6 +1954,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
   const eligMeds=medecins.filter(m=>allAuth.size===0||allAuth.has(m.init)).filter(m=>!selfOnly||m.id===selfOnly);
   const eligActesForMed=(selMed?rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)):[]).filter(a=>!adminOnly||a.adminOk===true);
 
+  const noMedMode=rowActes.length>0&&rowActes.every(a=>(a.medecinsAutorise||[]).includes("__AUCUN__"));
   const curOcc=[];
   row.ids.forEach(aid=>{
     medecins.forEach(med=>{
@@ -1951,6 +1965,10 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
           curOcc.push({med,acte,acteId:aid,e});
         }
       });
+    });
+    getEntries(IDE_MED.id,y2,m2,d,sl).forEach(e=>{
+      const match=row.salle?(e.acteId===aid&&e.salle===row.salle):e.acteId===aid;
+      if(match&&!curOcc.find(x=>x.med.id===IDE_MED.id&&x.acteId===aid))curOcc.push({med:IDE_MED,acte:actes.find(a=>a.id===aid),acteId:aid,e});
     });
   });
 
@@ -1978,11 +1996,11 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
             {canDif&&<div style={{margin:"-2px 0 7px 6px",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
               {(e&&e.dif)
                 ?<><span style={{fontSize:10,fontWeight:800,color:"#f59e0b",border:"1px solid rgba(245,158,11,.5)",borderRadius:5,padding:"1px 5px"}}>{"🕙 départ différé"+(e.dif.h?" — "+e.dif.h:"")+(e.dif.c?" — "+e.dif.c:"")}</span>
-                  <button onClick={()=>{if(patchEntry)patchEntry(med.id,y2,m2,d,sl,acteId,e.salle||null,{dif:null});}} style={{background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:10,textDecoration:"underline"}}>retirer</button></>
+                  <button onClick={()=>{if(patchAct)patchAct(med.id,y2,m2,d,sl,acteId,e.salle||null,{dif:null});}} style={{background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:10,textDecoration:"underline"}}>retirer</button></>
                 :difFor===i
                   ?<><input type="time" value={difH} onChange={ev=>setDifH(ev.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/>
                      <input placeholder="Commentaire (facultatif)" value={difC} onChange={ev=>setDifC(ev.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12,flex:1,minWidth:110}}/>
-                     <button onClick={()=>{if(patchEntry)patchEntry(med.id,y2,m2,d,sl,acteId,(e&&e.salle)||null,{dif:{h:difH,c:difC}});setDifFor(null);setDifH("");setDifC("");}} style={{...S.btnP,padding:"3px 9px",fontSize:11}}>OK</button>
+                     <button onClick={()=>{if(patchAct)patchAct(med.id,y2,m2,d,sl,acteId,(e&&e.salle)||null,{dif:{h:difH,c:difC}});setDifFor(null);setDifH("");setDifC("");}} style={{...S.btnP,padding:"3px 9px",fontSize:11}}>OK</button>
                      <button onClick={()=>setDifFor(null)} style={{background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:11}}>annuler</button></>
                   :<button onClick={()=>{setDifFor(i);setDifH("");setDifC("");}} style={{background:"none",border:"1px solid var(--border)",borderRadius:5,color:"var(--txt2)",cursor:"pointer",fontSize:10,padding:"1px 6px"}}>🕙 Départ différé</button>}
             </div>}
@@ -1991,7 +2009,33 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
         </div>
       )}
 
-      {!selMedId&&(
+      {noMedMode&&(
+        <div>
+          <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Activité sans médecin — IDE mobilisées</div>
+          {rowActes.filter(a=>!adminOnly||a.adminOk===true).map(a=>{
+            const cur=curOcc.find(x=>x.med.id===IDE_MED.id&&x.acteId===a.id);
+            const val=(cur&&cur.e&&cur.e.n!==undefined&&cur.e.n!==null)?cur.e.n:(a.ideN||0);
+            return(
+              <div key={a.id} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
+                <Badge a={a}/>
+                <span style={{flex:1,fontSize:12,fontWeight:700,color:"var(--txt)"}}>{a.label}</span>
+                {cur
+                  ?<>
+                     <span style={{fontSize:9,color:"var(--txt3)",fontWeight:700}}>IDE</span>
+                     <input type="number" min={0} max={99} value={val}
+                       onChange={ev=>{const v=Math.max(0,Math.min(99,parseInt(ev.target.value||"0",10)||0));if(patchAct)patchAct(IDE_MED.id,y2,m2,d,sl,a.id,(cur.e&&cur.e.salle)||null,{n:v});}}
+                       style={{...S.fi,width:54,textAlign:"center",padding:"3px 4px",fontSize:12}}/>
+                     <button onClick={()=>removeEntry(IDE_MED.id,y2,m2,d,sl,a.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>
+                   </>
+                  :<button onClick={()=>addEntry(IDE_MED.id,y2,m2,d,sl,{acteId:a.id,salle:row.salle||null,n:(a.ideN||0)})} style={{...S.btnP,padding:"4px 11px",fontSize:11}}>Poser</button>}
+              </div>
+            );
+          })}
+          <div style={{fontSize:9,color:"var(--txt3)",marginTop:6}}>Le nombre d'IDE est celui que mobilise l'activité sur ce créneau, quel que soit le nombre d'examens.</div>
+        </div>
+      )}
+
+      {!selMedId&&!noMedMode&&(
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
           {/* Salle occupancy warning for fixed-salle rows (Stim/EEP) */}
@@ -4788,20 +4832,26 @@ function CardioPlanning(){
     logCell("del",medId,y2,m2,d2,slot,acteId);
   },[]);
 
-  const patchEntry=useCallback((medId,y2,m2,d2,slot,acteId,salle,patch)=>{
+  /* v9.37 : le départ différé appartient à l'ACTIVITÉ — on marque toutes ses entrées,
+     quel que soit le nombre de médecins en salle (c'est l'effectif IDE qui conditionne le démarrage). */
+  const patchActivity=useCallback((medId,y2,m2,d2,slot,acteId,salle,patch)=>{
     const key=sk(y2,m2,d2,slot);
     setPlan(p=>{
-      const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
-      const arr=Array.isArray(ex)?ex:[ex];let done=false;
-      const nx=arr.map(e=>{
-        if(done||!e||e.acteId!==acteId)return e;
-        if(salle!==undefined&&salle!==null&&(e.salle||null)!==salle)return e;
-        done=true;const q={...e,...patch};
-        Object.keys(patch).forEach(k2=>{if(patch[k2]===null)delete q[k2];});
-        return q;
+      const cell=p[key];if(!cell)return p;
+      const dm={...cell};let done=false;
+      Object.keys(dm).forEach(mid=>{
+        const ex=dm[mid];if(!ex)return;
+        const arr=Array.isArray(ex)?ex:[ex];let ch=false;
+        const nx=arr.map(e=>{
+          if(!e||e.acteId!==acteId)return e;
+          if(salle!==undefined&&salle!==null&&(e.salle||null)!==salle)return e;
+          ch=true;done=true;const q={...e,...patch};
+          Object.keys(patch).forEach(k2=>{if(patch[k2]===null)delete q[k2];});
+          return q;
+        });
+        if(ch)dm[mid]=nx.length===1?nx[0]:nx;
       });
       if(!done)return p;
-      dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
     });
     logCell("add",medId,y2,m2,d2,slot,acteId);
@@ -6845,7 +6895,7 @@ header::-webkit-scrollbar { display: none; }
   onApply={p=>{applyAbsence(p);setModal(null);}}
   onRemove={p=>{removeAbsence(p);setModal(null);}}
   onClose={()=>setModal(null)}/></Ov>}
-      {modal==="pickMedAct"&&mData&&<PickMedActModal patchEntry={patchEntry} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
       {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 

@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.36 — 30/07/2026";
+var APP_VERSION = "v9.38 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -356,6 +356,8 @@ function applyTheme(dark) {
 applyTheme(false);
 document.documentElement.style.fontSize = "120%";
 /* ════ STYLES ════ */
+/* v9.38 : porteur reserve des activites sans medecin (holters, tele-suivi). */
+var IDE_MED = { id: "__IDE__", init: "\ud83e\ude7a", nom: "IDE", prenom: "", color: "#3fb950" };
 var S = {
     app: { minHeight: "100vh", background: "var(--bg)", fontFamily: "'Sora','Segoe UI',sans-serif", color: "var(--txt)" },
     hdr: { background: "var(--hdr)", borderBottom: "1px solid var(--border)", padding: "0 10px", display: "flex", alignItems: "center", height: 50, position: "sticky", top: 0, zIndex: 100, gap: 6 },
@@ -952,9 +954,16 @@ function ActTabView(_a) {
                     var match = row.salle ? (e.acteId === acteId && e.salle === row.salle) : e.acteId === acteId;
                     if (match && !occ.find(function (x) { return x.med.id === med.id && x.acteId === acteId; })) {
                         var acte = actes.find(function (a) { return a.id === acteId; }) || { short: acteId, color: row.color, bg: "#111" };
-                        occ.push({ med: med, acte: acte, salle: e.salle || null, dif: e.dif || null });
+                        occ.push({ med: med, acte: acte, salle: e.salle || null, dif: e.dif || null, n: null });
                     }
                 });
+            });
+            getEntries(IDE_MED.id, ry, rm, d, sl).forEach(function (e) {
+                var match = row.salle ? (e.acteId === acteId && e.salle === row.salle) : e.acteId === acteId;
+                if (match && !occ.find(function (x) { return x.med.id === IDE_MED.id && x.acte && x.acte.id === acteId; })) {
+                    var acte = actes.find(function (a) { return a.id === acteId; }) || { id: acteId, short: acteId, color: row.color, bg: "#111" };
+                    occ.push({ med: IDE_MED, acte: acte, salle: e.salle || null, dif: e.dif || null, n: (e.n === undefined || e.n === null) ? null : e.n });
+                }
             });
         });
         return occ;
@@ -978,11 +987,11 @@ function ActTabView(_a) {
                     var inst = {};
                     getOcc(row, d, sl, wY, wM).forEach(function (o) {
                         var k2 = o.acte.id + "|" + (o.salle || row.salle || "");
-                        if (!inst[k2]) inst[k2] = { n: (o.acte.ideN || 0), all: true };
-                        if (!o.dif) inst[k2].all = false;
+                        if (!inst[k2]) inst[k2] = { n: ((o.n === null || o.n === undefined) ? (o.acte.ideN || 0) : o.n), dif: false };
+                        if (o.dif) inst[k2].dif = true;
                     });
                     var n = 0, nd = 0;
-                    Object.keys(inst).forEach(function (k2) { var it = inst[k2]; if (it.all) nd += it.n; else n += it.n; });
+                    Object.keys(inst).forEach(function (k2) { var it = inst[k2]; if (it.dif) nd += it.n; else n += it.n; });
                     if (n > 0) M[row.label + "|" + wY + "-" + wM + "-" + d + "|" + sl] = n;
                     tot += n;
                     totD += nd;
@@ -2144,7 +2153,7 @@ function PickMedActModal(_a) {
     var _ao = _a.adminOnly, adminOnly = _ao === void 0 ? false : _ao;
     var _so = _a.selfOnly, selfOnly = _so === void 0 ? null : _so;
     var _cd = _a.canDif, canDif = _cd === void 0 ? false : _cd;
-    var mData = _a.mData, setMData = _a.setMData, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, isMedAvailable = _a.isMedAvailable, addEntry = _a.addEntry, removeEntry = _a.removeEntry, patchEntry = _a.patchEntry, onClose = _a.onClose;
+    var mData = _a.mData, setMData = _a.setMData, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, isMedAvailable = _a.isMedAvailable, addEntry = _a.addEntry, removeEntry = _a.removeEntry, patchAct = _a.patchAct, onClose = _a.onClose;
     var row = mData.row, d = mData.d, sl = mData.sl, y2 = mData.y, m2 = mData.m;
     var _b = useState(null), selMedId = _b[0], setSelMedId = _b[1];
     var _df = useState(null), difFor = _df[0], setDifFor = _df[1];
@@ -2155,6 +2164,7 @@ function PickMedActModal(_a) {
     var allAuth = new Set(rowActes.flatMap(function (a) { return a.medecinsAutorise || []; }));
     var eligMeds = medecins.filter(function (m) { return allAuth.size === 0 || allAuth.has(m.init); }).filter(function (m) { return !selfOnly || m.id === selfOnly; });
     var eligActesForMed = (selMed ? rowActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); }) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
+    var noMedMode = rowActes.length > 0 && rowActes.every(function (a) { return (a.medecinsAutorise || []).includes("__AUCUN__"); });
     var curOcc = [];
     row.ids.forEach(function (aid) {
         medecins.forEach(function (med) {
@@ -2165,6 +2175,11 @@ function PickMedActModal(_a) {
                     curOcc.push({ med: med, acte: acte, acteId: aid, e: e });
                 }
             });
+        });
+        getEntries(IDE_MED.id, y2, m2, d, sl).forEach(function (e) {
+            var match = row.salle ? (e.acteId === aid && e.salle === row.salle) : e.acteId === aid;
+            if (match && !curOcc.find(function (x) { return x.med.id === IDE_MED.id && x.acteId === aid; }))
+                curOcc.push({ med: IDE_MED, acte: actes.find(function (a) { return a.id === aid; }), acteId: aid, e: e });
         });
     });
     return (React.createElement(Ov, { onClose: onClose },
@@ -2191,9 +2206,24 @@ function PickMedActModal(_a) {
                         " ",
                         med.nom),
                     acte && React.createElement("span", { style: { padding: "2px 6px", borderRadius: 4, background: acte.bg, color: acte.color, fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" } }, acte.short),
-                    (!adminOnly || ((actes.find(function (a2) { return a2.id === acteId; }) || {}).adminOk === true)) && React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acteId); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7")), canDif && React.createElement("div", { style: { margin: "-2px 0 7px 6px", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" } }, (e && e.dif) ? React.createElement(React.Fragment, null, React.createElement("span", { style: { fontSize: 10, fontWeight: 800, color: "#f59e0b", border: "1px solid rgba(245,158,11,.5)", borderRadius: 5, padding: "1px 5px" } }, "\ud83d\udd59 d\u00e9part diff\u00e9r\u00e9" + (e.dif.h ? " \u2014 " + e.dif.h : "") + (e.dif.c ? " \u2014 " + e.dif.c : "")), React.createElement("button", { onClick: function () { if (patchEntry) patchEntry(med.id, y2, m2, d, sl, acteId, e.salle || null, { dif: null }); }, style: { background: "none", border: "none", color: "var(--txt3)", cursor: "pointer", fontSize: 10, textDecoration: "underline" } }, "retirer")) : (difFor === i ? React.createElement(React.Fragment, null, React.createElement("input", { type: "time", value: difH, onChange: function (ev) { setDifH(ev.target.value); }, style: __assign(__assign({}, S.fi), { padding: "3px 6px", fontSize: 12 }) }), React.createElement("input", { placeholder: "Commentaire (facultatif)", value: difC, onChange: function (ev) { setDifC(ev.target.value); }, style: __assign(__assign({}, S.fi), { padding: "3px 6px", fontSize: 12, flex: 1, minWidth: 110 }) }), React.createElement("button", { onClick: function () { if (patchEntry) patchEntry(med.id, y2, m2, d, sl, acteId, (e && e.salle) || null, { dif: { h: difH, c: difC } }); setDifFor(null); setDifH(""); setDifC(""); }, style: __assign(__assign({}, S.btnP), { padding: "3px 9px", fontSize: 11 }) }, "OK"), React.createElement("button", { onClick: function () { setDifFor(null); }, style: { background: "none", border: "none", color: "var(--txt3)", cursor: "pointer", fontSize: 11 } }, "annuler")) : React.createElement("button", { onClick: function () { setDifFor(i); setDifH(""); setDifC(""); }, style: { background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--txt2)", cursor: "pointer", fontSize: 10, padding: "1px 6px" } }, "\ud83d\udd59 D\u00e9part diff\u00e9r\u00e9")))));
+                    (!adminOnly || ((actes.find(function (a2) { return a2.id === acteId; }) || {}).adminOk === true)) && React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acteId); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7")), canDif && React.createElement("div", { style: { margin: "-2px 0 7px 6px", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" } }, (e && e.dif) ? React.createElement(React.Fragment, null, React.createElement("span", { style: { fontSize: 10, fontWeight: 800, color: "#f59e0b", border: "1px solid rgba(245,158,11,.5)", borderRadius: 5, padding: "1px 5px" } }, "\ud83d\udd59 d\u00e9part diff\u00e9r\u00e9" + (e.dif.h ? " \u2014 " + e.dif.h : "") + (e.dif.c ? " \u2014 " + e.dif.c : "")), React.createElement("button", { onClick: function () { if (patchAct) patchAct(med.id, y2, m2, d, sl, acteId, e.salle || null, { dif: null }); }, style: { background: "none", border: "none", color: "var(--txt3)", cursor: "pointer", fontSize: 10, textDecoration: "underline" } }, "retirer")) : (difFor === i ? React.createElement(React.Fragment, null, React.createElement("input", { type: "time", value: difH, onChange: function (ev) { setDifH(ev.target.value); }, style: __assign(__assign({}, S.fi), { padding: "3px 6px", fontSize: 12 }) }), React.createElement("input", { placeholder: "Commentaire (facultatif)", value: difC, onChange: function (ev) { setDifC(ev.target.value); }, style: __assign(__assign({}, S.fi), { padding: "3px 6px", fontSize: 12, flex: 1, minWidth: 110 }) }), React.createElement("button", { onClick: function () { if (patchAct) patchAct(med.id, y2, m2, d, sl, acteId, (e && e.salle) || null, { dif: { h: difH, c: difC } }); setDifFor(null); setDifH(""); setDifC(""); }, style: __assign(__assign({}, S.btnP), { padding: "3px 9px", fontSize: 11 }) }, "OK"), React.createElement("button", { onClick: function () { setDifFor(null); }, style: { background: "none", border: "none", color: "var(--txt3)", cursor: "pointer", fontSize: 11 } }, "annuler")) : React.createElement("button", { onClick: function () { setDifFor(i); setDifH(""); setDifC(""); }, style: { background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--txt2)", cursor: "pointer", fontSize: 10, padding: "1px 6px" } }, "\ud83d\udd59 D\u00e9part diff\u00e9r\u00e9")))));
             }))),
-        !selMedId && (React.createElement(React.Fragment, null,
+        noMedMode && (React.createElement("div", null,
+            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Activit\u00e9 sans m\u00e9decin \u2014 IDE mobilis\u00e9es"),
+            rowActes.filter(function (a) { return !adminOnly || a.adminOk === true; }).map(function (a) {
+                var cur = curOcc.find(function (x) { return x.med.id === IDE_MED.id && x.acteId === a.id; });
+                var val = (cur && cur.e && cur.e.n !== undefined && cur.e.n !== null) ? cur.e.n : (a.ideN || 0);
+                return (React.createElement("div", { key: a.id, style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", borderRadius: 7, background: "var(--bg2)", border: "1px solid var(--border)", marginBottom: 4 } },
+                    React.createElement(Badge, { a: a }),
+                    React.createElement("span", { style: { flex: 1, fontSize: 12, fontWeight: 700, color: "var(--txt)" } }, a.label),
+                    cur ? React.createElement(React.Fragment, null,
+                        React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)", fontWeight: 700 } }, "IDE"),
+                        React.createElement("input", { type: "number", min: 0, max: 99, value: val, onChange: function (ev) { var v = Math.max(0, Math.min(99, parseInt(ev.target.value || "0", 10) || 0)); if (patchAct) patchAct(IDE_MED.id, y2, m2, d, sl, a.id, (cur.e && cur.e.salle) || null, { n: v }); }, style: __assign(__assign({}, S.fi), { width: 54, textAlign: "center", padding: "3px 4px", fontSize: 12 }) }),
+                        React.createElement("button", { onClick: function () { return removeEntry(IDE_MED.id, y2, m2, d, sl, a.id); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7"))
+                        : React.createElement("button", { onClick: function () { return addEntry(IDE_MED.id, y2, m2, d, sl, { acteId: a.id, salle: row.salle || null, n: (a.ideN || 0) }); }, style: __assign(__assign({}, S.btnP), { padding: "4px 11px", fontSize: 11 }) }, "Poser")));
+            }),
+            React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 6 } }, "Le nombre d'IDE est celui que mobilise l'activit\u00e9 sur ce cr\u00e9neau, quel que soit le nombre d'examens."))),
+        !selMedId && !noMedMode && (React.createElement(React.Fragment, null,
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Choisir un m\u00E9decin"),
             row.salle && curOcc.length > 0 && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 8 } },
                 React.createElement("span", null, "\u26A0\uFE0F"),
@@ -5447,30 +5477,39 @@ function CardioPlanning() {
         });
         logCell("del", medId, y2, m2, d2, slot, acteId);
     }, []);
-    var patchEntry = useCallback(function (medId, y2, m2, d2, slot, acteId, salle, patch) {
+    /* v9.37 : le depart differe appartient a l'ACTIVITE — on marque toutes ses entrees. */
+    var patchActivity = useCallback(function (medId, y2, m2, d2, slot, acteId, salle, patch) {
         var key = sk(y2, m2, d2, slot);
         setPlan(function (p) {
             var _a;
-            var dm = __assign({}, (p[key] || {}));
-            var ex = dm[medId];
-            if (!ex)
+            var cell = p[key];
+            if (!cell)
                 return p;
-            var arr = Array.isArray(ex) ? ex : [ex];
+            var dm = __assign({}, cell);
             var done = false;
-            var nx = arr.map(function (e) {
-                if (done || !e || e.acteId !== acteId)
-                    return e;
-                if (salle !== undefined && salle !== null && (e.salle || null) !== salle)
-                    return e;
-                done = true;
-                var q = __assign(__assign({}, e), patch);
-                Object.keys(patch).forEach(function (k2) { if (patch[k2] === null)
-                    delete q[k2]; });
-                return q;
+            Object.keys(dm).forEach(function (mid) {
+                var ex = dm[mid];
+                if (!ex)
+                    return;
+                var arr = Array.isArray(ex) ? ex : [ex];
+                var ch = false;
+                var nx = arr.map(function (e) {
+                    if (!e || e.acteId !== acteId)
+                        return e;
+                    if (salle !== undefined && salle !== null && (e.salle || null) !== salle)
+                        return e;
+                    ch = true;
+                    done = true;
+                    var q = __assign(__assign({}, e), patch);
+                    Object.keys(patch).forEach(function (k2) { if (patch[k2] === null)
+                        delete q[k2]; });
+                    return q;
+                });
+                if (ch)
+                    dm[mid] = nx.length === 1 ? nx[0] : nx;
             });
             if (!done)
                 return p;
-            dm[medId] = nx.length === 1 ? nx[0] : nx;
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
         logCell("add", medId, y2, m2, d2, slot, acteId);
@@ -7666,7 +7705,7 @@ function CardioPlanning() {
                 }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
-        modal === "pickMedAct" && mData && React.createElement(PickMedActModal, { patchEntry: patchEntry, canDif: isEdit || isCadre, mData: mData, setMData: setMData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, selfOnly: isMedEdit && !isInterEdit ? editMedId : null, onClose: function () { return setModal(null); } }),
+        modal === "pickMedAct" && mData && React.createElement(PickMedActModal, { patchAct: patchActivity, canDif: isEdit || isCadre, mData: mData, setMData: setMData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, selfOnly: isMedEdit && !isInterEdit ? editMedId : null, onClose: function () { return setModal(null); } }),
         modal === "pickMedSite" && mData && React.createElement(PickMedSiteModal, { mData: mData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, selfOnly: isMedEdit && !isInterEdit ? editMedId : null, onClose: function () { return setModal(null); } }),
         modal === "editPT" && mData && React.createElement(EditPTModal, { mData: mData, setMData: setMData, medecins: medecins, actes: actes, planningType: planningType, setPlanningType: setPlanningType, onClose: function () { return setModal(null); } }),
         modal === "editActe" && mData && (React.createElement(Ov, { onClose: function () { return setModal(null); } },
