@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.35 — 30/07/2026";
+const APP_VERSION="v9.36 — 30/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -766,7 +766,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           const match=row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId;
           if(match&&!occ.find(x=>x.med.id===med.id&&x.acteId===acteId)){
             const acte=actes.find(a=>a.id===acteId)||{short:acteId,color:row.color,bg:"#111"};
-            occ.push({med,acte,salle:e.salle||null});
+            occ.push({med,acte,salle:e.salle||null,dif:e.dif||null});
           }
         });
       });
@@ -787,17 +787,21 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     wdays.forEach(({y:wY,m:wM,d})=>{
       if(isWE(wY,wM,d))return;
       ["M","AM"].forEach(sl=>{
-        let tot=0;
+        let tot=0,totD=0;
         rows.forEach(row=>{
-          const seen={};let n=0;
+          const inst={};
           getOcc(row,d,sl,wY,wM).forEach(o=>{
             const k2=o.acte.id+"|"+(o.salle||row.salle||"");
-            if(seen[k2])return;seen[k2]=1;n+=(o.acte.ideN||0);
+            if(!inst[k2])inst[k2]={n:(o.acte.ideN||0),all:true};
+            if(!o.dif)inst[k2].all=false;
           });
+          let n=0,nd=0;
+          Object.keys(inst).forEach(k2=>{const it=inst[k2];if(it.all)nd+=it.n;else n+=it.n;});
           if(n>0)M[row.label+"|"+wY+"-"+wM+"-"+d+"|"+sl]=n;
-          tot+=n;
+          tot+=n;totD+=nd;
         });
         M["#|"+wY+"-"+wM+"-"+d+"|"+sl]=tot;
+        M["$|"+wY+"-"+wM+"-"+d+"|"+sl]=totD;
       });
     });
     return M;
@@ -807,11 +811,12 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
   const setIdeOvV=(y3,m3,d3,sl,v)=>{if(setIdeCfg)setIdeCfg(p=>{const q={...(p||{})};q.ov={...(q.ov||{})};const k=sk(y3,m3,d3,sl);if(v===null)delete q.ov[k];else q.ov[k]=v;return q;});};
   const idePill=(y3,m3,d3,sl)=>{
     const need=ideMap["#|"+y3+"-"+m3+"-"+d3+"|"+sl]||0;
+    const difN=ideMap["$|"+y3+"-"+m3+"-"+d3+"|"+sl]||0;
     const dispo=ideDispo(y3,m3,d3,sl);
     const ovv=ideOv[sk(y3,m3,d3,sl)];
     const isOv=(ovv!==undefined&&ovv!==null);
     const ok=need<=dispo;
-    return <span title={(isOv?"Effectif corrigé pour ce jour":"Effectif par défaut")+" — besoin "+need+", disponible "+dispo} onClick={canIde?(e=>{e.stopPropagation();setIdeEdit({y:y3,m:m3,d:d3,sl});}):undefined} style={{display:"inline-block",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:6,padding:"1px 4px",whiteSpace:"nowrap",cursor:canIde?"pointer":"default",background:need===0?"transparent":(ok?"rgba(63,185,80,.15)":"rgba(248,81,73,.15)"),color:need===0?"var(--txt3)":(ok?"#3fb950":"#f85149"),border:isOv?"1px dashed var(--txt3)":"1px solid transparent"}}>{need+"/"+dispo}</span>;
+    return <span title={(isOv?"Effectif corrigé pour ce jour":"Effectif par défaut")+" — besoin simultané "+need+", disponible "+dispo+(difN>0?" — "+difN+" IDE en départ différé (activité qui démarre plus tard, donc non simultanée)":"")} onClick={canIde?(e=>{e.stopPropagation();setIdeEdit({y:y3,m:m3,d:d3,sl});}):undefined} style={{display:"inline-block",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:6,padding:"1px 4px",whiteSpace:"nowrap",cursor:canIde?"pointer":"default",background:need===0?"transparent":(ok?"rgba(63,185,80,.15)":"rgba(248,81,73,.15)"),color:need===0?"var(--txt3)":(ok?"#3fb950":"#f85149"),border:isOv?"1px dashed var(--txt3)":"1px solid transparent"}}>{need+"/"+dispo+(difN>0?" 🕙":"")}</span>;
   };
   const ideExtra=(ideActive?<div>
     {canIde&&idePanel&&<div style={{...S.card,marginBottom:8}}>
@@ -860,6 +865,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           </div>
         );})}
         {ideActive&&ideCell(row,d,sl,ry,rm)>0&&<span title="IDE nécessaires pour cette activité" style={{fontSize:8,fontWeight:800,color:"#3fb950",fontFamily:"'JetBrains Mono',monospace",border:"1px solid rgba(63,185,80,.5)",borderRadius:5,padding:"0 3px",whiteSpace:"nowrap",marginLeft:2}}>{"🩺"+ideCell(row,d,sl,ry,rm)}</span>}
+        {ideActive&&occ.some(o=>o.dif)&&<span title={"Départ différé — "+occ.filter(o=>o.dif).map(o=>((o.acte.short||o.acte.id)+" "+((o.dif&&o.dif.h)||"")+((o.dif&&o.dif.c)?" — "+o.dif.c:"")).trim()).join(" · ")} style={{fontSize:8,fontWeight:800,color:"#f59e0b",fontFamily:"'JetBrains Mono',monospace",border:"1px solid rgba(245,158,11,.5)",borderRadius:5,padding:"0 3px",whiteSpace:"nowrap",marginLeft:2}}>🕙</span>}
         </div>
         {occ.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
       </td>
@@ -1923,9 +1929,12 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
 }
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
-function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null}){
+function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchEntry,canDif=false,onClose,adminOnly=false,selfOnly=null}){
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
+  const [difFor,setDifFor]=useState(null);
+  const [difH,setDifH]=useState("");
+  const [difC,setDifC]=useState("");
   const selMed=medecins.find(x=>x.id===selMedId);
   const rowActes=row.ids.map(id=>actes.find(a=>a.id===id)).filter(Boolean);
   const allAuth=new Set(rowActes.flatMap(a=>a.medecinsAutorise||[]));
@@ -1939,7 +1948,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
         const match=row.salle?(e.acteId===aid&&e.salle===row.salle):e.acteId===aid;
         if(match&&!curOcc.find(x=>x.med.id===med.id&&x.acteId===aid)){
           const acte=actes.find(a=>a.id===aid);
-          curOcc.push({med,acte,acteId:aid});
+          curOcc.push({med,acte,acteId:aid,e});
         }
       });
     });
@@ -1958,12 +1967,25 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
       {curOcc.length>0&&(
         <div style={{marginBottom:12}}>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Assignés</div>
-          {curOcc.map(({med,acte,acteId},i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
+          {curOcc.map(({med,acte,acteId,e},i)=>(
+            <div key={i}>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
               <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
               {acte&&<span style={{padding:"2px 6px",borderRadius:4,background:acte.bg,color:acte.color,fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>}
               {(!adminOnly||((actes.find(a2=>a2.id===acteId)||{}).adminOk===true))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+            </div>
+            {canDif&&<div style={{margin:"-2px 0 7px 6px",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+              {(e&&e.dif)
+                ?<><span style={{fontSize:10,fontWeight:800,color:"#f59e0b",border:"1px solid rgba(245,158,11,.5)",borderRadius:5,padding:"1px 5px"}}>{"🕙 départ différé"+(e.dif.h?" — "+e.dif.h:"")+(e.dif.c?" — "+e.dif.c:"")}</span>
+                  <button onClick={()=>{if(patchEntry)patchEntry(med.id,y2,m2,d,sl,acteId,e.salle||null,{dif:null});}} style={{background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:10,textDecoration:"underline"}}>retirer</button></>
+                :difFor===i
+                  ?<><input type="time" value={difH} onChange={ev=>setDifH(ev.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/>
+                     <input placeholder="Commentaire (facultatif)" value={difC} onChange={ev=>setDifC(ev.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12,flex:1,minWidth:110}}/>
+                     <button onClick={()=>{if(patchEntry)patchEntry(med.id,y2,m2,d,sl,acteId,(e&&e.salle)||null,{dif:{h:difH,c:difC}});setDifFor(null);setDifH("");setDifC("");}} style={{...S.btnP,padding:"3px 9px",fontSize:11}}>OK</button>
+                     <button onClick={()=>setDifFor(null)} style={{background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:11}}>annuler</button></>
+                  :<button onClick={()=>{setDifFor(i);setDifH("");setDifC("");}} style={{background:"none",border:"1px solid var(--border)",borderRadius:5,color:"var(--txt2)",cursor:"pointer",fontSize:10,padding:"1px 6px"}}>🕙 Départ différé</button>}
+            </div>}
             </div>
           ))}
         </div>
@@ -4766,6 +4788,25 @@ function CardioPlanning(){
     logCell("del",medId,y2,m2,d2,slot,acteId);
   },[]);
 
+  const patchEntry=useCallback((medId,y2,m2,d2,slot,acteId,salle,patch)=>{
+    const key=sk(y2,m2,d2,slot);
+    setPlan(p=>{
+      const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
+      const arr=Array.isArray(ex)?ex:[ex];let done=false;
+      const nx=arr.map(e=>{
+        if(done||!e||e.acteId!==acteId)return e;
+        if(salle!==undefined&&salle!==null&&(e.salle||null)!==salle)return e;
+        done=true;const q={...e,...patch};
+        Object.keys(patch).forEach(k2=>{if(patch[k2]===null)delete q[k2];});
+        return q;
+      });
+      if(!done)return p;
+      dm[medId]=nx.length===1?nx[0]:nx;
+      return{...p,[key]:dm};
+    });
+    logCell("add",medId,y2,m2,d2,slot,acteId);
+  },[]);
+
   /* ── applyGarde (atomic) ── */
   /* ── v9.16 : répartition automatique du Bip (CHB) — dernière étape, après le planning type ── */
   const bipScan=()=>{
@@ -6804,7 +6845,7 @@ header::-webkit-scrollbar { display: none; }
   onApply={p=>{applyAbsence(p);setModal(null);}}
   onRemove={p=>{removeAbsence(p);setModal(null);}}
   onClose={()=>setModal(null)}/></Ov>}
-      {modal==="pickMedAct"&&mData&&<PickMedActModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal patchEntry={patchEntry} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
       {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
