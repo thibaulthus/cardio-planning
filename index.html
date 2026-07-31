@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.41 — 31/07/2026";
+var APP_VERSION = "v9.42 — 31/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -357,6 +357,25 @@ applyTheme(false);
 document.documentElement.style.fontSize = "120%";
 /* ════ STYLES ════ */
 /* v9.38 : porteur reserve des activites sans medecin (holters, tele-suivi). */
+/* v9.42 : dans PT Cardio, une case se lit PAR SALLE — le nombre d'IDE et le
+   depart differe qualifient la salle, pas le medecin qui l'occupe. */
+var salleGroups = function (row, occ) {
+    var groups = [], idx = {};
+    (occ || []).forEach(function (o) {
+        var k = (o.salle || "") + "|" + ((o.acte && o.acte.id) || "");
+        if (idx[k] === undefined) {
+            idx[k] = groups.length;
+            groups.push({ salle: o.salle || null, acte: o.acte || {}, meds: [], dif: null, n: null });
+        }
+        var g = groups[idx[k]];
+        g.meds.push(o.med);
+        if (o.dif && !g.dif)
+            g.dif = o.dif;
+        if (o.n !== null && o.n !== undefined)
+            g.n = o.n;
+    });
+    return groups;
+};
 var IDE_MED = { id: "IDE_STAFF", init: "\ud83e\ude7a", nom: "IDE", prenom: "", color: "#3fb950" };
 /* v9.41 : Firestore REFUSE tout nom de champ de la forme __xxx__ (motif reserve),
    y compris pour les cles de map imbriquees — garde-fou avant l'envoi. */
@@ -1051,7 +1070,7 @@ function ActTabView(_a) {
         var ovv = ideOv[sk(y3, m3, d3, sl)];
         var isOv = (ovv !== undefined && ovv !== null);
         var ok = need <= dispo;
-        return React.createElement("span", { title: (isOv ? "Effectif corrig\u00e9 pour ce jour" : "Effectif par d\u00e9faut") + " \u2014 besoin simultan\u00e9 " + need + ", disponible " + dispo + (difN > 0 ? " \u2014 " + difN + " IDE en d\u00e9part diff\u00e9r\u00e9 (activit\u00e9 qui d\u00e9marre plus tard, donc non simultan\u00e9e)" : ""), onClick: canIde ? function (e) { e.stopPropagation(); setIdeEdit({ y: y3, m: m3, d: d3, sl: sl }); } : undefined, style: { display: "inline-flex", flexDirection: "column", alignItems: "center", lineHeight: 1.1, fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", borderRadius: 6, padding: "2px 5px", whiteSpace: "nowrap", cursor: canIde ? "pointer" : "default", background: need === 0 ? "transparent" : (ok ? "rgba(63,185,80,.15)" : "rgba(248,81,73,.15)"), color: need === 0 ? "var(--txt3)" : (ok ? "#3fb950" : "#f85149"), border: isOv ? "1px dashed var(--txt3)" : "1px solid transparent" } }, React.createElement("span", null, need + "/" + dispo), difN > 0 && React.createElement("span", { style: { fontSize: 9, marginTop: 1 } }, "\ud83d\udd59"));
+        return React.createElement("span", { title: (isOv ? "Effectif corrig\u00e9 pour ce jour" : "Effectif par d\u00e9faut") + " \u2014 besoin simultan\u00e9 " + need + ", disponible " + dispo + (difN > 0 ? " \u2014 " + difN + " IDE en d\u00e9part diff\u00e9r\u00e9 (activit\u00e9 qui d\u00e9marre plus tard, donc non simultan\u00e9e)" : ""), onClick: canIde ? function (e) { e.stopPropagation(); setIdeEdit({ y: y3, m: m3, d: d3, sl: sl }); } : undefined, style: { display: "inline-flex", flexDirection: "column", alignItems: "center", lineHeight: 1.1, fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", borderRadius: 6, padding: "2px 5px", whiteSpace: "nowrap", cursor: canIde ? "pointer" : "default", background: need === 0 ? "transparent" : (ok ? "rgba(63,185,80,.15)" : "rgba(248,81,73,.15)"), color: need === 0 ? "var(--txt3)" : (ok ? "#3fb950" : "#f85149"), border: isOv ? "1px dashed var(--txt3)" : "1px solid transparent" } }, React.createElement("span", null, need + "/" + dispo), difN > 0 && React.createElement("span", { style: { fontSize: 9, marginTop: 1 } }, "\ud83d\udd59"));
     };
     var ideExtra = (ideActive ? React.createElement("div", null,
         (canIde && idePanel) ? React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 8 }) },
@@ -1087,18 +1106,20 @@ function ActTabView(_a) {
         if (isWE(ry, rm, d))
             return React.createElement("td", { key: "".concat(row.label, "-").concat(d, "-").concat(sl), style: __assign(__assign(__assign({}, S.td), S.tdWE), { padding: 2 }) });
         var occ = getOcc(row, d, sl, ry, rm);
-        return (React.createElement("td", { key: "".concat(row.label, "-").concat(d, "-").concat(sl), style: __assign(__assign(__assign({}, S.td), (isTd ? { background: "var(--bg-td)" } : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return onPickAct({ row: row, d: d, sl: sl, y: ry, m: rm }); } : undefined },
-            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 2 }, onClick: function (e) { e.stopPropagation(); if (isEdit)
-                    onPickAct({ row: row, d: d, sl: sl, y: ry, m: rm }); } }, occ.map(function (_a, i) {
-                var med = _a.med, acte = _a.acte, salle = _a.salle;
+        return (React.createElement("td", { key: "".concat(row.label, "-").concat(d, "-").concat(sl), style: __assign(__assign(__assign({}, S.td), (isTd ? { background: "var(--bg-td)" } : {})), { padding: 3, maxWidth: 150, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return onPickAct({ row: row, d: d, sl: sl, y: ry, m: rm }); } : undefined },
+            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2, alignItems: "stretch" }, onClick: function (e) { e.stopPropagation(); if (isEdit)
+                    onPickAct({ row: row, d: d, sl: sl, y: ry, m: rm }); } }, salleGroups(row, occ).map(function (g, gi) {
                 var monoActe = (row.ids || []).length === 1 && !row.multiActe;
-                return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 2 } },
-                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, med.init),
-                    monoActe
-                        ? React.createElement("span", { style: { fontSize: 9, fontWeight: 600, color: "var(--txt)", whiteSpace: "nowrap" } }, med.nom)
-                        : React.createElement(Badge, { a: acte }),
-                    row.hasSalleChoice && salle && React.createElement("span", { style: { fontSize: 7, fontWeight: 700, color: "var(--txt3)", fontFamily: "'JetBrains Mono',monospace", border: "1px solid var(--border)", borderRadius: 4, padding: "0 3px", whiteSpace: "nowrap" } }, salle)));
-            }), ideActive && ideCell(row, d, sl, ry, rm) > 0 && React.createElement("span", { title: "IDE n\u00e9cessaires pour cette activit\u00e9", style: { fontSize: 10, fontWeight: 800, color: "#3fb950", fontFamily: "'JetBrains Mono',monospace", background: "rgba(63,185,80,.12)", border: "1px solid rgba(63,185,80,.5)", borderRadius: 5, padding: "1px 5px", whiteSpace: "nowrap", marginLeft: 2 } }, "\ud83e\ude7a" + ideCell(row, d, sl, ry, rm)), ideActive && occ.some(function (o) { return o.dif; }) && React.createElement("span", { title: "D\u00e9part diff\u00e9r\u00e9 \u2014 " + occ.filter(function (o) { return o.dif; }).map(function (o) { return ((o.acte.short || o.acte.id) + " " + ((o.dif && o.dif.h) || "") + ((o.dif && o.dif.c) ? " \u2014 " + o.dif.c : "")).trim(); }).join(" \u00b7 "), style: { fontSize: 10, fontWeight: 800, color: "#f59e0b", fontFamily: "'JetBrains Mono',monospace", background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.5)", borderRadius: 5, padding: "1px 5px", whiteSpace: "nowrap", marginLeft: 2 } }, "\ud83d\udd59")),
+                var ideN = (g.n === null || g.n === undefined) ? (g.acte.ideN || 0) : g.n;
+                return (React.createElement("div", { key: gi, style: { display: "flex", alignItems: "center", gap: 3, paddingTop: gi ? 3 : 0, marginTop: gi ? 1 : 0, borderTop: gi ? "1px dashed var(--border)" : "none" } },
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0, alignItems: "flex-start" } },
+                        g.meds.map(function (m, mi) { return React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim(), style: { display: "inline-block", maxWidth: "100%", background: m.color, color: "#fff", borderRadius: 6, padding: "1px 6px", fontSize: 10, fontWeight: 700, lineHeight: 1.4, overflowWrap: "anywhere" } }, monoActe ? ((m.prenom ? m.prenom.charAt(0) + " " : "") + (m.nom || "")) : m.init); }),
+                        !monoActe && React.createElement(Badge, { a: g.acte })),
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 } },
+                        row.hasSalleChoice && g.salle && React.createElement("span", { style: { fontSize: 8, fontWeight: 700, color: "var(--txt3)", fontFamily: "'JetBrains Mono',monospace", border: "1px solid var(--border)", borderRadius: 4, padding: "0 3px", whiteSpace: "nowrap" } }, g.salle),
+                        ideActive && ideN > 0 && React.createElement("span", { title: "Cette salle mobilise " + ideN + " IDE", style: { fontSize: 12, fontWeight: 800, color: "#3fb950", fontFamily: "'JetBrains Mono',monospace", background: "rgba(63,185,80,.12)", border: "1px solid rgba(63,185,80,.5)", borderRadius: 5, padding: "1px 5px", whiteSpace: "nowrap" } }, "\ud83e\ude7a" + ideN),
+                        ideActive && g.dif && React.createElement("span", { title: "D\u00e9part diff\u00e9r\u00e9" + (g.dif.h ? " \u00e0 " + g.dif.h : "") + (g.dif.c ? " \u2014 " + g.dif.c : ""), style: { fontSize: 12, fontWeight: 800, color: "#f59e0b", fontFamily: "'JetBrains Mono',monospace", background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.5)", borderRadius: 5, padding: "1px 5px", whiteSpace: "nowrap" } }, "\ud83d\udd59" + (g.dif.h || "")))));
+            })),
             occ.length === 0 && React.createElement("div", { style: { color: "var(--border)", textAlign: "center", fontSize: 13 } }, "\u00B7")));
     }
     var hdr = (React.createElement("div", { style: S.bar },
@@ -1159,8 +1180,8 @@ function ActTabView(_a) {
                     React.createElement("tr", null,
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 42 }) }, "Jour"),
                         React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 42, zIndex: 40, minWidth: 24, borderRight: "2px solid var(--border)" }) }, "Sl"),
-                        rows.map(function (row) { return React.createElement("th", { key: row.label, style: __assign(__assign({}, S.th), { minWidth: 95, position: "sticky", top: 0, zIndex: 20 }) },
-                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10, color: darkMode ? lightenHex(row.color, .55) : row.color, fontFamily: "'JetBrains Mono',monospace" } }, row.label)); }))),
+                        rows.map(function (row) { return React.createElement("th", { key: row.label, style: __assign(__assign({}, S.th), { minWidth: 105, maxWidth: 150, position: "sticky", top: 0, zIndex: 20 }) },
+                            React.createElement("div", { style: { fontWeight: 800, fontSize: 13, color: darkMode ? lightenHex(row.color, .55) : row.color, fontFamily: "'JetBrains Mono',monospace" } }, row.label)); }))),
                 React.createElement("tbody", null, wdays.map(function (_a) {
                     var wY = _a.y, wM = _a.m, d = _a.d;
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();

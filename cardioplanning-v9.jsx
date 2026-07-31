@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.41 — 31/07/2026";
+const APP_VERSION="v9.42 — 31/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -197,6 +197,22 @@ document.documentElement.style.fontSize="120%";
    Ce n'est pas un membre de l'équipe : il ne figure pas dans `medecins`, il sert
    uniquement de clé de rangement dans le plan, ce qui fait hériter ces activités
    de la synchro delta, du journal et des sauvegardes sans code supplémentaire. */
+/* ── v9.42 : dans PT Cardio, une case se lit PAR SALLE. Le nombre d'IDE et le
+   départ différé qualifient la salle, pas le médecin qui l'occupe : deux
+   médecins dans la même salle ne réclament donc qu'un seul effectif. */
+const salleGroups=(row,occ)=>{
+  const groups=[],idx={};
+  (occ||[]).forEach(o=>{
+    const k=(o.salle||"")+"|"+((o.acte&&o.acte.id)||"");
+    if(idx[k]===undefined){idx[k]=groups.length;groups.push({salle:o.salle||null,acte:o.acte||{},meds:[],dif:null,n:null});}
+    const g=groups[idx[k]];
+    g.meds.push(o.med);
+    if(o.dif&&!g.dif)g.dif=o.dif;
+    if(o.n!==null&&o.n!==undefined)g.n=o.n;
+  });
+  return groups;
+};
+
 const IDE_MED={id:"IDE_STAFF",init:"🩺",nom:"IDE",prenom:"",color:"#3fb950"};
 /* v9.41 : Firestore REFUSE tout nom de champ de la forme __xxx__ (motif réservé),
    y compris pour les clés de map imbriquées. Comme les identifiants de médecin
@@ -865,7 +881,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     const ovv=ideOv[sk(y3,m3,d3,sl)];
     const isOv=(ovv!==undefined&&ovv!==null);
     const ok=need<=dispo;
-    return <span title={(isOv?"Effectif corrigé pour ce jour":"Effectif par défaut")+" — besoin simultané "+need+", disponible "+dispo+(difN>0?" — "+difN+" IDE en départ différé (activité qui démarre plus tard, donc non simultanée)":"")} onClick={canIde?(e=>{e.stopPropagation();setIdeEdit({y:y3,m:m3,d:d3,sl});}):undefined} style={{display:"inline-flex",flexDirection:"column",alignItems:"center",lineHeight:1.1,fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:6,padding:"2px 5px",whiteSpace:"nowrap",cursor:canIde?"pointer":"default",background:need===0?"transparent":(ok?"rgba(63,185,80,.15)":"rgba(248,81,73,.15)"),color:need===0?"var(--txt3)":(ok?"#3fb950":"#f85149"),border:isOv?"1px dashed var(--txt3)":"1px solid transparent"}}><span>{need+"/"+dispo}</span>{difN>0&&<span style={{fontSize:9,marginTop:1}}>🕙</span>}</span>;
+    return <span title={(isOv?"Effectif corrigé pour ce jour":"Effectif par défaut")+" — besoin simultané "+need+", disponible "+dispo+(difN>0?" — "+difN+" IDE en départ différé (activité qui démarre plus tard, donc non simultanée)":"")} onClick={canIde?(e=>{e.stopPropagation();setIdeEdit({y:y3,m:m3,d:d3,sl});}):undefined} style={{display:"inline-flex",flexDirection:"column",alignItems:"center",lineHeight:1.1,fontSize:12,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:6,padding:"2px 5px",whiteSpace:"nowrap",cursor:canIde?"pointer":"default",background:need===0?"transparent":(ok?"rgba(63,185,80,.15)":"rgba(248,81,73,.15)"),color:need===0?"var(--txt3)":(ok?"#3fb950":"#f85149"),border:isOv?"1px dashed var(--txt3)":"1px solid transparent"}}><span>{need+"/"+dispo}</span>{difN>0&&<span style={{fontSize:9,marginTop:1}}>🕙</span>}</span>;
   };
   const ideExtra=(ideActive?<div>
     {canIde&&idePanel&&<div style={{...S.card,marginBottom:8}}>
@@ -898,23 +914,28 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     if(isWE(ry,rm,d)) return <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...S.tdWE,padding:2}}/>;
     const occ=getOcc(row,d,sl,ry,rm);
     return(
-      <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...(isTd?{background:"var(--bg-td)"}:{}),padding:2,cursor:isEdit?"pointer":"default"}}
+      <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...(isTd?{background:"var(--bg-td)"}:{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
         onClick={isEdit?()=>onPickAct({row,d,sl,y:ry,m:rm}):undefined}>
-        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:2}}
+        <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"stretch"}}
           onClick={e=>{e.stopPropagation();if(isEdit)onPickAct({row,d,sl,y:ry,m:rm});}}>
-        {occ.map(({med,acte,salle},i)=>{
+        {salleGroups(row,occ).map((g,gi)=>{
           const monoActe=(row.ids||[]).length===1&&!row.multiActe;
+          const ideN=(g.n===null||g.n===undefined)?(g.acte.ideN||0):g.n;
           return(
-          <div key={i} style={{display:"flex",alignItems:"center",gap:2}}>
-            <div style={{width:24,height:24,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{med.init}</div>
-            {monoActe
-              ?<span style={{fontSize:9,fontWeight:600,color:"var(--txt)",whiteSpace:"nowrap"}}>{med.nom}</span>
-              :<Badge a={acte}/>}
-            {row.hasSalleChoice&&salle&&<span style={{fontSize:7,fontWeight:700,color:"var(--txt3)",fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",borderRadius:4,padding:"0 3px",whiteSpace:"nowrap"}}>{salle}</span>}
+          <div key={gi} style={{display:"flex",alignItems:"center",gap:3,paddingTop:gi?3:0,marginTop:gi?1:0,borderTop:gi?"1px dashed var(--border)":"none"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0,alignItems:"flex-start"}}>
+              {g.meds.map((m,mi)=>(
+                <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{display:"inline-block",maxWidth:"100%",background:m.color,color:"#fff",borderRadius:6,padding:"1px 6px",fontSize:10,fontWeight:700,lineHeight:1.4,overflowWrap:"anywhere"}}>{monoActe?((m.prenom?m.prenom.charAt(0)+" ":"")+(m.nom||"")):m.init}</span>
+              ))}
+              {!monoActe&&<Badge a={g.acte}/>}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,flexShrink:0}}>
+              {row.hasSalleChoice&&g.salle&&<span style={{fontSize:8,fontWeight:700,color:"var(--txt3)",fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",borderRadius:4,padding:"0 3px",whiteSpace:"nowrap"}}>{g.salle}</span>}
+              {ideActive&&ideN>0&&<span title={"Cette salle mobilise "+ideN+" IDE"} style={{fontSize:12,fontWeight:800,color:"#3fb950",fontFamily:"'JetBrains Mono',monospace",background:"rgba(63,185,80,.12)",border:"1px solid rgba(63,185,80,.5)",borderRadius:5,padding:"1px 5px",whiteSpace:"nowrap"}}>{"🩺"+ideN}</span>}
+              {ideActive&&g.dif&&<span title={"Départ différé"+(g.dif.h?" à "+g.dif.h:"")+(g.dif.c?" — "+g.dif.c:"")} style={{fontSize:12,fontWeight:800,color:"#f59e0b",fontFamily:"'JetBrains Mono',monospace",background:"rgba(245,158,11,.12)",border:"1px solid rgba(245,158,11,.5)",borderRadius:5,padding:"1px 5px",whiteSpace:"nowrap"}}>{"🕙"+(g.dif.h||"")}</span>}
+            </div>
           </div>
         );})}
-        {ideActive&&ideCell(row,d,sl,ry,rm)>0&&<span title="IDE nécessaires pour cette activité" style={{fontSize:10,fontWeight:800,color:"#3fb950",fontFamily:"'JetBrains Mono',monospace",background:"rgba(63,185,80,.12)",border:"1px solid rgba(63,185,80,.5)",borderRadius:5,padding:"1px 5px",whiteSpace:"nowrap",marginLeft:2}}>{"🩺"+ideCell(row,d,sl,ry,rm)}</span>}
-        {ideActive&&occ.some(o=>o.dif)&&<span title={"Départ différé — "+occ.filter(o=>o.dif).map(o=>((o.acte.short||o.acte.id)+" "+((o.dif&&o.dif.h)||"")+((o.dif&&o.dif.c)?" — "+o.dif.c:"")).trim()).join(" · ")} style={{fontSize:10,fontWeight:800,color:"#f59e0b",fontFamily:"'JetBrains Mono',monospace",background:"rgba(245,158,11,.12)",border:"1px solid rgba(245,158,11,.5)",borderRadius:5,padding:"1px 5px",whiteSpace:"nowrap",marginLeft:2}}>🕙</span>}
         </div>
         {occ.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
       </td>
@@ -980,7 +1001,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
             <tr>
               <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:42}}>Jour</th>
               <th style={{...S.thFix,position:"sticky",top:0,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
-              {rows.map(row=><th key={row.label} style={{...S.th,minWidth:95,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:10,color:darkMode?lightenHex(row.color,.55):row.color,fontFamily:"'JetBrains Mono',monospace"}}>{row.label}</div></th>)}
+              {rows.map(row=><th key={row.label} style={{...S.th,minWidth:105,maxWidth:150,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:13,color:darkMode?lightenHex(row.color,.55):row.color,fontFamily:"'JetBrains Mono',monospace"}}>{row.label}</div></th>)}
             </tr>
           </thead>
           <tbody>
