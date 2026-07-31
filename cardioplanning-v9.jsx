@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.42 — 31/07/2026";
+const APP_VERSION="v9.43 — 31/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -923,9 +923,9 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           const ideN=(g.n===null||g.n===undefined)?(g.acte.ideN||0):g.n;
           return(
           <div key={gi} style={{display:"flex",alignItems:"center",gap:3,paddingTop:gi?3:0,marginTop:gi?1:0,borderTop:gi?"1px dashed var(--border)":"none"}}>
-            <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0,alignItems:"flex-start"}}>
+            <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:3,flex:1,minWidth:0}}>
               {g.meds.map((m,mi)=>(
-                <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{display:"inline-block",maxWidth:"100%",background:m.color,color:"#fff",borderRadius:6,padding:"1px 6px",fontSize:10,fontWeight:700,lineHeight:1.4,overflowWrap:"anywhere"}}>{monoActe?((m.prenom?m.prenom.charAt(0)+" ":"")+(m.nom||"")):m.init}</span>
+                <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{display:"inline-block",background:m.color,color:"#fff",borderRadius:4,padding:"4px 7px",fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",lineHeight:1.3,whiteSpace:"nowrap"}}>{m.init}</span>
               ))}
               {!monoActe&&<Badge a={g.acte}/>}
             </div>
