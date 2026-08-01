@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.43 — 31/07/2026";
+var APP_VERSION = "v9.44 — 31/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4534,6 +4534,9 @@ function CardioPlanning() {
     var isVac = function (y, m, d) { return vacDates.has("".concat(y, "-").concat(String(m + 1).padStart(2, "0"), "-").concat(String(d).padStart(2, "0"))); };
     var isFirstLoad = useRef(true);
     var localChange = useRef(false);
+    /* v9.44 : suivi par champ — voir commentaire dans la source JSX. */
+    var fieldSync = useRef({});
+    var pendF = useRef({});
     var planSynced = useRef(null);
     var planPending = useRef({});
     var planMigrated = useRef(false);
@@ -4571,7 +4574,8 @@ function CardioPlanning() {
         setFbStatus("connecting");
         var unsub = onSnapshot(PLANNING_DOC, function (snap) {
             if (snap.exists) {
-                var data = snap.data();
+                var data0 = snap.data();
+                var data = data0;
                 /* ── plan V2 (objet) : toujours appliqué, modifications locales en attente ré-appliquées jusqu'à confirmation ── */
                 if (data.planV2) {
                     var incoming_1 = data.planV2;
@@ -4602,7 +4606,14 @@ function CardioPlanning() {
                     if (setDoc)
                         Promise.resolve(setDoc(PLANNING_DOC, { planV2: legacy }, { merge: true })).catch(function (e) { return console.log("migration plan:", e); });
                 }
-                if (isFirstLoad.current || !localChange.current) {
+                /* v9.44 : rejet par champ et non plus global. */
+                {
+                    var data = (function () { var o = {}; Object.keys(data0).forEach(function (k) {
+                        if (pendF.current[k])
+                            return;
+                        o[k] = data0[k];
+                        fieldSync.current[k] = JSON.stringify(data0[k]);
+                    }); return o; })();
                     if (data.tourMed)
                         setTourMed(JSON.parse(data.tourMed));
                     if (data.planningType)
@@ -5191,30 +5202,34 @@ function CardioPlanning() {
             return next;
         });
     }, [medecins]);
-    var saveToFirebase = useCallback(function (data) { return __awaiter(_this, void 0, void 0, function () {
-        var err_1;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    if (!PLANNING_DOC || !setDoc)
-                        return [2 /*return*/];
-                    _a.label = 1;
-                case 1:
-                    _a.trys.push([1, 3, , 4]);
-                    localChange.current = true;
-                    return [4 /*yield*/, setDoc(PLANNING_DOC, data, { merge: true })];
-                case 2:
-                    _a.sent();
-                    return [3 /*break*/, 4];
-                case 3:
-                    err_1 = _a.sent();
-                    console.error("Save:", err_1);
-                    setFbStatus("error");
-                    return [3 /*break*/, 4];
-                case 4: return [2 /*return*/];
-            }
+    var saveToFirebase = useCallback(function (data) {
+        if (!PLANNING_DOC || !setDoc)
+            return Promise.resolve();
+        /* v9.44 : on n'envoie que ce qui a reellement change depuis la derniere valeur
+           connue du champ — sinon chaque message recu declenchait sa propre reecriture. */
+        var out = {}, ks = [];
+        Object.keys(data || {}).forEach(function (k) {
+            var s = JSON.stringify(data[k] === undefined ? null : data[k]);
+            if (fieldSync.current[k] === s)
+                return;
+            fieldSync.current[k] = s;
+            out[k] = data[k];
+            ks.push(k);
         });
-    }); }, []);
+        if (ks.length === 0)
+            return Promise.resolve();
+        ks.forEach(function (k) { pendF.current[k] = (pendF.current[k] || 0) + 1; });
+        var release = function () { setTimeout(function () { ks.forEach(function (k) { var n = (pendF.current[k] || 1) - 1; if (n <= 0)
+            delete pendF.current[k];
+        else
+            pendF.current[k] = n; }); }, 1500); };
+        localChange.current = true;
+        return Promise.resolve(setDoc(PLANNING_DOC, out, { merge: true })).catch(function (err) {
+            console.error("Save:", err);
+            setFbStatus("error");
+            ks.forEach(function (k) { delete fieldSync.current[k]; });
+        }).then(release, release);
+    }, []);
     useEffect(function () { if (!isFirstLoad.current)
         flushPlan(plan); }, [plan]);
     useEffect(function () { if (!isFirstLoad.current)

@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.43 — 31/07/2026";
+const APP_VERSION="v9.44 — 31/07/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -4257,6 +4257,13 @@ function CardioPlanning(){
   const isVac=(y,m,d)=>vacDates.has(`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`);
   const isFirstLoad=useRef(true);
   const localChange=useRef(false);
+  /* ── v9.44 : suivi par champ.
+     fieldSync = dernière valeur connue de chaque champ (envoyée ou reçue) : sert à
+     ne pas renvoyer au serveur ce qu'on vient d'en recevoir.
+     pendF = champs dont une écriture est en vol : seuls ceux-là sont ignorés
+     quand un message arrive, au lieu du message entier comme avant. ── */
+  const fieldSync=useRef({});
+  const pendF=useRef({});
   const planSynced=useRef(null);
   const planPending=useRef({});
   const planMigrated=useRef(false);
@@ -4283,7 +4290,8 @@ function CardioPlanning(){
     const unsub=onSnapshot(PLANNING_DOC,
       (snap)=>{
         if(snap.exists){
-          const data=snap.data();
+          const data0=snap.data();
+          const data=data0;
           /* ── plan V2 (objet) : toujours appliqué, modifications locales en attente ré-appliquées jusqu'à confirmation ── */
           if(data.planV2){
             const incoming=data.planV2;
@@ -4304,7 +4312,15 @@ function CardioPlanning(){
             planMigrated.current=true;
             if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:legacy},{merge:true})).catch(e=>console.log("migration plan:",e));
           }
-          if(isFirstLoad.current||!localChange.current){
+          /* ── v9.44 : on n'écarte plus le message entier dès qu'une sauvegarde locale est en
+             vol — on n'écarte que les champs qu'on est justement en train d'écrire. Tout le
+             reste est appliqué, y compris ce qui vient d'un autre poste. ── */
+          {
+            const data=(()=>{const o={};Object.keys(data0).forEach(k=>{
+              if(pendF.current[k])return;                       // notre écriture prime, elle arrive
+              o[k]=data0[k];
+              fieldSync.current[k]=JSON.stringify(data0[k]);    // reçu = déjà au serveur, inutile de le renvoyer
+            });return o;})();
             if(data.tourMed)setTourMed(JSON.parse(data.tourMed));
             if(data.planningType)setPlanningType(JSON.parse(data.planningType));
             if(data.notes)setNotes(JSON.parse(data.notes));
@@ -4674,8 +4690,19 @@ function CardioPlanning(){
 
     const saveToFirebase=useCallback(async(data)=>{
     if(!PLANNING_DOC||!setDoc)return;
-    try{localChange.current=true;await setDoc(PLANNING_DOC,data,{merge:true});}
-    catch(err){console.error("Save:",err);setFbStatus("error");}
+    /* v9.44 : on n'envoie que ce qui a réellement changé depuis la dernière valeur
+       connue du champ — sinon chaque message reçu déclenchait sa propre réécriture. */
+    const out={},ks=[];
+    Object.keys(data||{}).forEach(k=>{
+      const s=JSON.stringify(data[k]===undefined?null:data[k]);
+      if(fieldSync.current[k]===s)return;
+      fieldSync.current[k]=s;out[k]=data[k];ks.push(k);
+    });
+    if(ks.length===0)return;
+    ks.forEach(k=>{pendF.current[k]=(pendF.current[k]||0)+1;});
+    try{localChange.current=true;await setDoc(PLANNING_DOC,out,{merge:true});}
+    catch(err){console.error("Save:",err);setFbStatus("error");ks.forEach(k=>{delete fieldSync.current[k];});}
+    finally{setTimeout(()=>{ks.forEach(k=>{const n=(pendF.current[k]||1)-1;if(n<=0)delete pendF.current[k];else pendF.current[k]=n;});},1500);}
   },[]);
 
   useEffect(()=>{if(!isFirstLoad.current)flushPlan(plan);},[plan]);
