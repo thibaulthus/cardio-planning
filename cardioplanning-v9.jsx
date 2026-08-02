@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.49 — 02/08/2026";
+const APP_VERSION="v9.50 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -321,6 +321,27 @@ function Badge({a,salle,hasNote,hideSalle=false}){
         {!hideSalle&&salle&&<span style={{display:"block",fontSize:7,opacity:.85,padding:"0 2px"}}>{salle}</span>}
       </div>
       {hasNote&&<div style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
+    </div>
+  );
+}
+/* v9.50 : bandeau des problèmes — partagé par le Planning et les Attachés,
+   chacun avec SON propre relevé. Chaque ligne ouvre la case concernée. */
+function IssuePanel({iss,open,setOpen,onGo}){
+  if(!iss||!iss.list.length)return null;
+  const n=iss.list.length;
+  return(
+    <div style={{background:"rgba(248,81,73,.12)",border:"1px solid #f85149",borderRadius:8,padding:"7px 11px",marginBottom:8}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setOpen(v=>!v)}>
+        <span style={{color:"#f85149",fontWeight:800,fontSize:12}}>{"⚠ "+n+" créneau"+(n>1?"x":"")+" à revoir — "+iss.counts.salle+" sans salle · "+iss.counts.double+" double(s) · "+iss.counts.abs+" sur absence/repos"}</span>
+        <span style={{marginLeft:"auto",color:"#f85149",fontSize:11,fontWeight:700}}>{open?"▲ replier":"▼ détail"}</span>
+      </div>
+      {open&&<div style={{marginTop:6,display:"flex",flexDirection:"column",gap:2}}>{iss.list.map((it,i)=>(
+        <button key={i} onClick={()=>onGo&&onGo(it)} title="Ouvrir cette case"
+          style={{textAlign:"left",background:"none",border:"none",borderBottom:"1px dotted var(--border)",padding:"3px 2px",cursor:"pointer",fontSize:11,color:"var(--txt)",fontFamily:"inherit"}}>
+          <b>{it.dw+" "+String(it.d).padStart(2,"0")+"/"+String(it.m+1).padStart(2,"0")+" "+it.sl}</b>{" — "}
+          <b style={{color:it.med.color}}>{it.med.init}</b>{" — "+it.label}
+        </button>
+      ))}</div>}
     </div>
   );
 }
@@ -5129,12 +5150,14 @@ function CardioPlanning(){
 
   /* ── applyPlanningType ── */
   const [plIssOpen,setPlIssOpen]=useState(false);
-  const planIssues=useMemo(()=>{
+  /* v9.50 : le relevé porte désormais sur la liste de médecins qu'on lui donne,
+     pour que chaque onglet compte les siens. */
+  const issuesFor=useCallback((medList)=>{
     const IGN=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORMATION","TP"];
     const ABSL=["ABSENCE","FORMATION","REPOS_GARDE"];
     const JRS=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
     const map={},list=[],counts={salle:0,double:0,abs:0};
-    (allDays4||[]).forEach(dd=>{medecins.forEach(med=>{["M","AM"].forEach(sl=>{
+    (allDays4||[]).forEach(dd=>{(medList||[]).forEach(med=>{["M","AM"].forEach(sl=>{
       const all=[];[sl,"JOUR"].forEach(s2=>getEntries(med.id,dd.y,dd.m,dd.d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)all.push(e);}));
       if(!all.length)return;
       const msgs=[];
@@ -5146,7 +5169,7 @@ function CardioPlanning(){
       if(msgs.length){map[med.id+"|"+dd.y+"|"+dd.m+"|"+dd.d+"|"+sl]="⚠ "+msgs.join(" · ");list.push({y:dd.y,m:dd.m,d:dd.d,sl,med,label:msgs.join(" · "),dw:JRS[new Date(dd.y,dd.m,dd.d).getDay()]});}
     });});});
     return {map,list,counts};
-  },[getEntries,medecins,acteById,allDays4,actes]);
+  },[getEntries,acteById,allDays4,actes]);
   /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
   const applyPTFlex=useCallback((medId,monthsList,fromToday)=>{
     const tod=new Date();tod.setHours(0,0,0,0);
@@ -5388,6 +5411,11 @@ function CardioPlanning(){
     });
   };
   const filteredMeds=medPlan.filter(m=>planFilter.length===0||planFilter.includes(m.id));
+  /* v9.50 : un relevé par onglet, et le clic mène à la case */
+  const medAttacheAll=useMemo(()=>[...medAttache,...medecins.filter(m=>m.role==="ide")],[medecins]);
+  const planIssues=useMemo(()=>issuesFor(medPlan),[issuesFor,medecins]);
+  const attIssues=useMemo(()=>issuesFor(medAttacheAll),[issuesFor,medAttacheAll]);
+  const goIssue=(it)=>{setMData({medId:it.med.id,y:it.y,m:it.m,d:it.d,slot:it.sl});setModal("cell");};
 
   /* ── Login ── */
   // Show loading while Firebase connects (so medPins are available for login)
@@ -5592,15 +5620,7 @@ header::-webkit-scrollbar { display: none; }
       {/* PLANNING */}
       {tab==="planning"&&(
         <div>
-          {isEdit&&planIssues.list.length>0&&<div style={{background:"rgba(248,81,73,.12)",border:"1px solid #f85149",borderRadius:8,padding:"7px 11px",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setPlIssOpen(v=>!v)}>
-              <span style={{color:"#f85149",fontWeight:800,fontSize:12}}>{"⚠ "+planIssues.list.length+" problème"+(planIssues.list.length>1?"s":"")+" — "+planIssues.counts.salle+" sans salle · "+planIssues.counts.double+" double(s) · "+planIssues.counts.abs+" sur absence/repos"}</span>
-              <span style={{marginLeft:"auto",color:"#f85149",fontSize:11,fontWeight:700}}>{plIssOpen?"▲ replier":"▼ détail"}</span>
-            </div>
-            {plIssOpen&&<div style={{marginTop:6,display:"flex",flexDirection:"column",gap:3}}>{planIssues.list.map((it,i)=>(
-              <div key={i} style={{fontSize:11,color:"var(--txt)"}}><b>{it.dw+" "+String(it.d).padStart(2,"0")+"/"+String(it.m+1).padStart(2,"0")+" "+it.sl}</b>{" — "}<b>{it.med.init}</b>{" — "+it.label}</div>
-            ))}</div>}
-          </div>}
+          {isEdit&&<IssuePanel iss={planIssues} open={plIssOpen} setOpen={setPlIssOpen} onGo={goIssue}/>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <button onClick={prevM} style={S.arr}>‹</button>
@@ -5700,15 +5720,7 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="attache"&&(
         <div>
-          {isEdit&&planIssues.list.length>0&&<div style={{background:"rgba(248,81,73,.12)",border:"1px solid #f85149",borderRadius:8,padding:"7px 11px",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setPlIssOpen(v=>!v)}>
-              <span style={{color:"#f85149",fontWeight:800,fontSize:12}}>{"⚠ "+planIssues.list.length+" problème"+(planIssues.list.length>1?"s":"")+" — "+planIssues.counts.salle+" sans salle · "+planIssues.counts.double+" double(s) · "+planIssues.counts.abs+" sur absence/repos"}</span>
-              <span style={{marginLeft:"auto",color:"#f85149",fontSize:11,fontWeight:700}}>{plIssOpen?"▲ replier":"▼ détail"}</span>
-            </div>
-            {plIssOpen&&<div style={{marginTop:6,display:"flex",flexDirection:"column",gap:3}}>{planIssues.list.map((it,i)=>(
-              <div key={i} style={{fontSize:11,color:"var(--txt)"}}><b>{it.dw+" "+String(it.d).padStart(2,"0")+"/"+String(it.m+1).padStart(2,"0")+" "+it.sl}</b>{" — "}<b>{it.med.init}</b>{" — "+it.label}</div>
-            ))}</div>}
-          </div>}
+          {isEdit&&<IssuePanel iss={attIssues} open={plIssOpen} setOpen={setPlIssOpen} onGo={goIssue}/>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}><button onClick={prevM} style={S.arr}>‹</button><h2 style={S.mTit}>{"👔 Attachés — "+(MOIS[perStart(year,month).sm]+" — "+MOIS[(perStart(year,month).sm+PCFG.len-1)%12]+" "+perStart(year,month).sy)}</h2><button onClick={nextM} style={S.arr}>›</button></div>
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button><button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button></div>
@@ -5717,8 +5729,8 @@ header::-webkit-scrollbar { display: none; }
              <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
            </div>}
           {orient==="H"
-            ?<GridH planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+            ?<GridH planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
+            :<GridV planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -6784,7 +6796,8 @@ header::-webkit-scrollbar { display: none; }
                     const a=acteById(e.acteId);if(!a)return null;
                     return(
                       <div key={i} style={{display:"flex",alignItems:"center",gap:3}}>
-                        <Badge a={a}/>
+                        <Badge a={a} salle={e.salle}/>
+                        {a.hasSalle&&!e.salle&&<span style={{fontSize:9,fontWeight:800,color:"#f85149",border:"1px solid rgba(248,81,73,.5)",background:"rgba(248,81,73,.10)",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>sans salle</span>}
                         {canEditThisMed&&(!isAdminEdit||a.adminOk===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
                           if(e.acteId==="GARDE"){
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);

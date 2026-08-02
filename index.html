@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.49 — 02/08/2026";
+var APP_VERSION = "v9.50 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -486,6 +486,24 @@ function Badge(_a) {
             React.createElement("span", { style: { display: "block", padding: "0 3px" } }, a.short),
             !hideSalle && salle && React.createElement("span", { style: { display: "block", fontSize: 7, opacity: .85, padding: "0 2px" } }, salle)),
         hasNote && React.createElement("div", { style: { position: "absolute", top: -1, right: -1, width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" } })));
+}
+/* v9.50 : bandeau des problemes — partage par le Planning et les Attaches. */
+function IssuePanel(_a) {
+    var iss = _a.iss, open = _a.open, setOpen = _a.setOpen, onGo = _a.onGo;
+    if (!iss || !iss.list.length)
+        return null;
+    var n = iss.list.length;
+    return (React.createElement("div", { style: { background: "rgba(248,81,73,.12)", border: "1px solid #f85149", borderRadius: 8, padding: "7px 11px", marginBottom: 8 } },
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }, onClick: function () { return setOpen(function (v) { return !v; }); } },
+            React.createElement("span", { style: { color: "#f85149", fontWeight: 800, fontSize: 12 } }, "\u26A0 " + n + " cr\u00E9neau" + (n > 1 ? "x" : "") + " \u00E0 revoir \u2014 " + iss.counts.salle + " sans salle \u00B7 " + iss.counts.double + " double(s) \u00B7 " + iss.counts.abs + " sur absence/repos"),
+            React.createElement("span", { style: { marginLeft: "auto", color: "#f85149", fontSize: 11, fontWeight: 700 } }, open ? "\u25B2 replier" : "\u25BC d\u00E9tail")),
+        open && React.createElement("div", { style: { marginTop: 6, display: "flex", flexDirection: "column", gap: 2 } }, iss.list.map(function (it, i) {
+            return React.createElement("button", { key: i, onClick: function () { return onGo && onGo(it); }, title: "Ouvrir cette case", style: { textAlign: "left", background: "none", border: "none", borderBottom: "1px dotted var(--border)", padding: "3px 2px", cursor: "pointer", fontSize: 11, color: "var(--txt)", fontFamily: "inherit" } },
+                React.createElement("b", null, it.dw + " " + String(it.d).padStart(2, "0") + "/" + String(it.m + 1).padStart(2, "0") + " " + it.sl),
+                " \u2014 ",
+                React.createElement("b", { style: { color: it.med.color } }, it.med.init),
+                " \u2014 " + it.label);
+        }))));
 }
 function Av(_a) {
     var med = _a.med;
@@ -5829,13 +5847,14 @@ function CardioPlanning() {
     }, []);
     /* ── applyPlanningType ── */
     var _pio = useState(false), plIssOpen = _pio[0], setPlIssOpen = _pio[1];
-    var planIssues = useMemo(function () {
+    /* v9.50 : le releve porte sur la liste de medecins qu'on lui donne. */
+    var issuesFor = useCallback(function (medList) {
         var IGN = ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE", "FORMATION", "TP"];
         var ABSL = ["ABSENCE", "FORMATION", "REPOS_GARDE"];
         var JRS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
         var map = {}; var list = []; var counts = { salle: 0, double: 0, abs: 0 };
         (allDays4 || []).forEach(function (dd) {
-            medecins.forEach(function (med) {
+            (medList || []).forEach(function (med) {
                 ["M", "AM"].forEach(function (sl) {
                     var all = [];
                     [sl, "JOUR"].forEach(function (s2) { getEntries(med.id, dd.y, dd.m, dd.d, s2).forEach(function (e) { if (e && e.acteId && !e._blocked)
@@ -5866,7 +5885,7 @@ function CardioPlanning() {
             });
         });
         return { map: map, list: list, counts: counts };
-    }, [getEntries, medecins, acteById, allDays4, actes]);
+    }, [getEntries, acteById, allDays4, actes]);
     /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
     var applyPTFlex = useCallback(function (medId, monthsList, fromToday) {
         var tod = new Date();
@@ -6183,6 +6202,11 @@ function CardioPlanning() {
         });
     };
     var filteredMeds = medPlan.filter(function (m) { return planFilter.length === 0 || planFilter.includes(m.id); });
+    /* v9.50 : un releve par onglet, et le clic mene a la case */
+    var medAttacheAll = useMemo(function () { return __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true); }, [medecins]);
+    var planIssues = useMemo(function () { return issuesFor(medPlan); }, [issuesFor, medecins]);
+    var attIssues = useMemo(function () { return issuesFor(medAttacheAll); }, [issuesFor, medAttacheAll]);
+    var goIssue = function (it) { setMData({ medId: it.med.id, y: it.y, m: it.m, d: it.d, slot: it.sl }); setModal("cell"); };
     /* ── Login ── */
     // Show loading while Firebase connects (so medPins are available for login)
     if (accessMode === "ask" && fbStatus === "connecting" && !PLANNING_DOC)
@@ -6327,17 +6351,7 @@ function CardioPlanning() {
                     React.createElement("button", { onClick: function () { return setShowFull(true); }, style: { fontSize: 11, fontWeight: 800, padding: "5px 12px", borderRadius: 6, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.15)", color: "#b45309", cursor: "pointer" } }, "\ud83d\udcc5 Afficher la p\u00e9riode compl\u00e8te")));
             })(),
             tab === "planning" && (React.createElement("div", null,
-                isEdit && planIssues.list.length > 0 && React.createElement("div", { style: { background: "rgba(248,81,73,.12)", border: "1px solid #f85149", borderRadius: 8, padding: "7px 11px", marginBottom: 8 } },
-                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }, onClick: function () { return setPlIssOpen(function (v) { return !v; }); } },
-                        React.createElement("span", { style: { color: "#f85149", fontWeight: 800, fontSize: 12 } }, "\u26A0 " + planIssues.list.length + " probl\u00E8me" + (planIssues.list.length > 1 ? "s" : "") + " \u2014 " + planIssues.counts.salle + " sans salle \u00B7 " + planIssues.counts.double + " double(s) \u00B7 " + planIssues.counts.abs + " sur absence/repos"),
-                        React.createElement("span", { style: { marginLeft: "auto", color: "#f85149", fontSize: 11, fontWeight: 700 } }, plIssOpen ? "\u25B2 replier" : "\u25BC d\u00E9tail")),
-                    plIssOpen && React.createElement("div", { style: { marginTop: 6, display: "flex", flexDirection: "column", gap: 3 } }, planIssues.list.map(function (it, i) {
-                        return React.createElement("div", { key: i, style: { fontSize: 11, color: "var(--txt)" } },
-                            React.createElement("b", null, it.dw + " " + String(it.d).padStart(2, "0") + "/" + String(it.m + 1).padStart(2, "0") + " " + it.sl),
-                            " \u2014 ",
-                            React.createElement("b", null, it.med.init),
-                            " \u2014 " + it.label);
-                    }))),
+                isEdit && React.createElement(IssuePanel, { iss: planIssues, open: plIssOpen, setOpen: setPlIssOpen, onGo: goIssue }),
                 React.createElement("div", { style: S.bar },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
@@ -6415,17 +6429,7 @@ function CardioPlanning() {
                 React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit || isInterEdit, orient: orient, acteById: acteById, setMData: setMData, setModal: setModal }),
                 React.createElement(PTOccRooms, { medecins: medecins, planningType: planningType, actes: actes, acteById: acteById, salleReg: salleReg }))),
             tab === "attache" && (React.createElement("div", null,
-                isEdit && planIssues.list.length > 0 && React.createElement("div", { style: { background: "rgba(248,81,73,.12)", border: "1px solid #f85149", borderRadius: 8, padding: "7px 11px", marginBottom: 8 } },
-                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }, onClick: function () { return setPlIssOpen(function (v) { return !v; }); } },
-                        React.createElement("span", { style: { color: "#f85149", fontWeight: 800, fontSize: 12 } }, "\u26A0 " + planIssues.list.length + " probl\u00E8me" + (planIssues.list.length > 1 ? "s" : "") + " \u2014 " + planIssues.counts.salle + " sans salle \u00B7 " + planIssues.counts.double + " double(s) \u00B7 " + planIssues.counts.abs + " sur absence/repos"),
-                        React.createElement("span", { style: { marginLeft: "auto", color: "#f85149", fontSize: 11, fontWeight: 700 } }, plIssOpen ? "\u25B2 replier" : "\u25BC d\u00E9tail")),
-                    plIssOpen && React.createElement("div", { style: { marginTop: 6, display: "flex", flexDirection: "column", gap: 3 } }, planIssues.list.map(function (it, i) {
-                        return React.createElement("div", { key: i, style: { fontSize: 11, color: "var(--txt)" } },
-                            React.createElement("b", null, it.dw + " " + String(it.d).padStart(2, "0") + "/" + String(it.m + 1).padStart(2, "0") + " " + it.sl),
-                            " \u2014 ",
-                            React.createElement("b", null, it.med.init),
-                            " \u2014 " + it.label);
-                    }))),
+                isEdit && React.createElement(IssuePanel, { iss: attIssues, open: plIssOpen, setOpen: setPlIssOpen, onGo: goIssue }),
                 React.createElement("div", { style: S.bar },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
@@ -6438,8 +6442,8 @@ function CardioPlanning() {
                 isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 8 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type")),
                 orient === "H"
-                    ? React.createElement(GridH, { planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, getAstreinteForDay: getAstreinteForDay })
-                    : React.createElement(GridV, { planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
+                    ? React.createElement(GridH, { planIssues: attIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, getAstreinteForDay: getAstreinteForDay })
+                    : React.createElement(GridV, { planIssues: attIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit },
@@ -7593,7 +7597,8 @@ function CardioPlanning() {
                         if (!a)
                             return null;
                         return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 3 } },
-                            React.createElement(Badge, { a: a }),
+                            React.createElement(Badge, { a: a, salle: e.salle }),
+                            a.hasSalle && !e.salle && React.createElement("span", { style: { fontSize: 9, fontWeight: 800, color: "#f85149", border: "1px solid rgba(248,81,73,.5)", background: "rgba(248,81,73,.10)", borderRadius: 4, padding: "1px 4px", whiteSpace: "nowrap" } }, "sans salle"),
                             canEditThisMed && (!isAdminEdit || a.adminOk === true || a.id === "ABSENCE" || a.id === "FORMATION") && React.createElement("button", { onClick: function () {
                                     if (e.acteId === "GARDE") {
                                         removeEntry(medId, y2, m2, d2, slot, e.acteId);
