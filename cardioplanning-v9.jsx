@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.46 — 02/08/2026";
+const APP_VERSION="v9.47 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -6858,7 +6858,10 @@ header::-webkit-scrollbar { display: none; }
               </div>
             )}
 
-            {mData&&mData._pickSalle&&isEdit&&(()=>{
+            {/* v9.47 : c'était `isEdit` — le rôle administratif et la cadre voyaient donc la
+                grille des activités sans jamais obtenir le choix de salle, ce qui rendait
+                inopérante toute activité en ayant une (c'est-à-dire presque toutes). */}
+            {mData&&mData._pickSalle&&canEditThisMed&&(()=>{
               const a=acteById(mData._pickSalle);if(!a)return null;
               // Check occupancy for each salle: ALL activities, not just this one
               const occ=salleOcc(a.id,y2,m2,d2,slot);

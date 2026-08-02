@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.46 — 02/08/2026";
+var APP_VERSION = "v9.47 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -7664,7 +7664,8 @@ function CardioPlanning() {
                             fixedSalleOcc.map(function (m) { return m.init; }).join(", "),
                             " d\u00E9j\u00E0 assign\u00E9")));
                 }))),
-                mData && mData._pickSalle && isEdit && (function () {
+                /* v9.47 : c'etait `isEdit` — le role administratif n'obtenait jamais le choix de salle. */
+                mData && mData._pickSalle && canEditThisMed && (function () {
                     var a = acteById(mData._pickSalle);
                     if (!a)
                         return null;
