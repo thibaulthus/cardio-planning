@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.45 — 02/08/2026";
+const APP_VERSION="v9.46 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -925,15 +925,20 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
              le libellé de l'activité — jamais les deux, jamais de couleur de fond. */
           const lieu=(row.hasSalleChoice&&g.salle)?g.salle:(monoActe?null:(g.acte.short||g.acte.label||""));
           const dc=g.dif?((g.dif.c||"")+(g.dif.h?(g.dif.c?" — ":"")+g.dif.h:"")):"";
+          /* v9.46 : un groupe porté par IDE_MED n'a pas d'occupant — pas de vignette,
+             et le chiffre porte son unité puisque aucun nom ne l'éclaire. */
+          const meds=g.meds.filter(m=>m&&m.id!==IDE_MED.id);
+          const ideOnly=meds.length===0&&g.meds.length>0;
+          const showIde=ideOnly?(ideN>0):(ideActive&&(ideN>0||g.dif));
           return(
           <div key={gi} style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"flex-start",gap:4,paddingTop:gi?4:0,marginTop:gi?1:0,borderTop:gi?"1px dashed var(--border)":"none"}}>
-            {g.meds.map((m,mi)=>(
+            {meds.map((m,mi)=>(
               <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{display:"inline-flex",alignItems:"center",height:22,padding:"0 6px",background:m.color,color:"#fff",borderRadius:4,fontSize:9.5,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>{m.init}</span>
             ))}
-            {(lieu||(ideActive&&(ideN>0||g.dif)))&&
+            {(lieu||showIde)&&
               <span title={g.dif?("Départ différé"+(dc?" — "+dc:"")):undefined} style={{display:"inline-flex",alignItems:"stretch",height:22,borderRadius:4,overflow:"hidden",border:"1px solid rgba(63,185,80,.55)",fontFamily:"'JetBrains Mono',monospace",fontSize:9.5,fontWeight:800,whiteSpace:"nowrap",cursor:g.dif?"help":"inherit"}}>
                 {lieu&&<span style={{display:"flex",alignItems:"center",padding:"0 6px",background:"var(--bg)",color:"var(--txt2)"}}>{lieu}</span>}
-                {ideActive&&(ideN>0||g.dif)&&<span style={{display:"flex",alignItems:"center",padding:"0 5px",background:"rgba(63,185,80,.16)",color:"#2f9440",borderLeft:lieu?"1px solid rgba(63,185,80,.55)":"none"}}>{ideN}{g.dif&&<span style={{marginLeft:4,fontSize:9}}>🕙</span>}</span>}
+                {showIde&&<span style={{display:"flex",alignItems:"center",padding:"0 5px",background:"rgba(63,185,80,.16)",color:"#2f9440",borderLeft:lieu?"1px solid rgba(63,185,80,.55)":"none"}}>{ideOnly?(ideN+" IDE"):ideN}{g.dif&&<span style={{marginLeft:4,fontSize:9}}>🕙</span>}</span>}
               </span>}
           </div>
         );})}

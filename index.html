@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.45 — 02/08/2026";
+var APP_VERSION = "v9.46 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1114,11 +1114,15 @@ function ActTabView(_a) {
                 /* v9.45 : segment gauche = salle si la ligne en propose, sinon libelle d'activite. */
                 var lieu = (row.hasSalleChoice && g.salle) ? g.salle : (monoActe ? null : (g.acte.short || g.acte.label || ""));
                 var dc = g.dif ? ((g.dif.c || "") + (g.dif.h ? (g.dif.c ? " \u2014 " : "") + g.dif.h : "")) : "";
+                /* v9.46 : un groupe porte par IDE_MED n'a pas d'occupant. */
+                var meds = g.meds.filter(function (m) { return m && m.id !== IDE_MED.id; });
+                var ideOnly = meds.length === 0 && g.meds.length > 0;
+                var showIde = ideOnly ? (ideN > 0) : (ideActive && (ideN > 0 || g.dif));
                 return (React.createElement("div", { key: gi, style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start", gap: 4, paddingTop: gi ? 4 : 0, marginTop: gi ? 1 : 0, borderTop: gi ? "1px dashed var(--border)" : "none" } },
-                    g.meds.map(function (m, mi) { return React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim(), style: { display: "inline-flex", alignItems: "center", height: 22, padding: "0 6px", background: m.color, color: "#fff", borderRadius: 4, fontSize: 9.5, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap" } }, m.init); }),
-                    (lieu || (ideActive && (ideN > 0 || g.dif))) && React.createElement("span", { title: g.dif ? ("D\u00e9part diff\u00e9r\u00e9" + (dc ? " \u2014 " + dc : "")) : undefined, style: { display: "inline-flex", alignItems: "stretch", height: 22, borderRadius: 4, overflow: "hidden", border: "1px solid rgba(63,185,80,.55)", fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 800, whiteSpace: "nowrap", cursor: g.dif ? "help" : "inherit" } },
+                    meds.map(function (m, mi) { return React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim(), style: { display: "inline-flex", alignItems: "center", height: 22, padding: "0 6px", background: m.color, color: "#fff", borderRadius: 4, fontSize: 9.5, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap" } }, m.init); }),
+                    (lieu || showIde) && React.createElement("span", { title: g.dif ? ("D\u00e9part diff\u00e9r\u00e9" + (dc ? " \u2014 " + dc : "")) : undefined, style: { display: "inline-flex", alignItems: "stretch", height: 22, borderRadius: 4, overflow: "hidden", border: "1px solid rgba(63,185,80,.55)", fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 800, whiteSpace: "nowrap", cursor: g.dif ? "help" : "inherit" } },
                         lieu && React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 6px", background: "var(--bg)", color: "var(--txt2)" } }, lieu),
-                        ideActive && (ideN > 0 || g.dif) && React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 5px", background: "rgba(63,185,80,.16)", color: "#2f9440", borderLeft: lieu ? "1px solid rgba(63,185,80,.55)" : "none" } }, ideN, g.dif && React.createElement("span", { style: { marginLeft: 4, fontSize: 9 } }, "\ud83d\udd59")))));
+                        showIde && React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 5px", background: "rgba(63,185,80,.16)", color: "#2f9440", borderLeft: lieu ? "1px solid rgba(63,185,80,.55)" : "none" } }, ideOnly ? (ideN + " IDE") : ideN, g.dif && React.createElement("span", { style: { marginLeft: 4, fontSize: 9 } }, "\ud83d\udd59")))));
             })),
             occ.length === 0 && React.createElement("div", { style: { color: "var(--border)", textAlign: "center", fontSize: 13 } }, "\u00B7")));
     }
