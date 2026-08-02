@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.53 — 02/08/2026";
+var APP_VERSION = "v9.54 — 03/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -472,6 +472,22 @@ function hexToLum(hex) {
     var toL = function (c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
     return 0.2126 * toL(r) + 0.7152 * toL(g) + 0.0722 * toL(b);
 }
+/* v9.54 : pastille d'activite BORDEE des 4 onglets salles. Fond OPAQUE (ne vire pas sur le rouge).
+   Planning et Attaches gardent volontairement leurs pastilles PLEINES. */
+var _hx = function (c) { c = String(c || "#888888").replace("#", ""); return [parseInt(c.slice(0, 2), 16) || 0, parseInt(c.slice(2, 4), 16) || 0, parseInt(c.slice(4, 6), 16) || 0]; };
+var mixC = function (c, t, k) { var a = _hx(c), b = _hx(t); return "#" + [0, 1, 2].map(function (i) { return Math.round(a[i] + (b[i] - a[i]) * k).toString(16).padStart(2, "0"); }).join(""); };
+var pillCols = function (c, night) { return ({ border: "2px solid " + mixC(c, "#000000", .12), background: night ? mixC(c, "#0d1117", .86) : "#ffffff", color: night ? mixC(c, "#ffffff", .55) : mixC(c, "#000000", .62) }); };
+var conflBg = function (night) { return ({ background: night ? "rgba(239,68,68,.16)" : "#fee2e2", outline: "1px solid #ef4444" }); };
+var conflSep = function (night) { return night ? "#f87171" : "#b91c1c"; };
+function ActPill(_a) {
+    var a = _a.a, night = _a.night, hasNote = _a.hasNote;
+    if (!a)
+        return null;
+    return (React.createElement("div", { style: { position: "relative", display: "inline-block", margin: "1px" } },
+        React.createElement("div", { style: __assign(__assign({}, pillCols(a.color || "#888888", night)), { fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", borderRadius: 4, padding: "2px 3px", lineHeight: 1.3, textAlign: "center", width: 48, minWidth: 48, maxWidth: 48, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }) }, a.short),
+        hasNote && React.createElement("div", { style: { position: "absolute", top: -1, right: -1, width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" } })));
+}
+
 function Badge(_a) {
     var a = _a.a, salle = _a.salle, hasNote = _a.hasNote, _b = _a.hideSalle, hideSalle = _b === void 0 ? false : _b;
     if (!a)
@@ -924,17 +940,30 @@ function SiteView(_a) {
             (o[salle] || []).forEach(function (med) { if (!occ.find(function (x) { return x.med.id === med.id; }))
                 occ.push({ med: med, acte: acte }); });
         });
-        var conflict = occ.length > 1;
+        /* v9.54 : une case se lit PAR ACTIVITE ; le fond rouge signale deux ACTIVITES differentes. */
+        var grps = [];
+        occ.forEach(function (_a) {
+            var med = _a.med, acte = _a.acte;
+            var k = (acte && acte.id) || "";
+            var g = grps.find(function (x) { return x.k === k; });
+            if (!g) {
+                g = { k: k, acte: acte, meds: [] };
+                grps.push(g);
+            }
+            g.meds.push(med);
+        });
+        var conflict = grps.length > 1;
         var noteTips = occ.map(function (_a) {
             var med = _a.med;
             return notes[nk(med.id, ry, rm, d, sl)];
         }).filter(Boolean).join(" | ");
-        return (React.createElement("td", { key: "".concat(salle, "-").concat(d, "-").concat(sl), title: noteTips || undefined, style: __assign(__assign(__assign(__assign({}, S.td), (conflict ? S.tdConfl : {})), (isTdRC ? { background: "var(--bg-td)" } : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return onPickSite({ salle: salle, siteActes: salleActes, d: d, sl: sl, y: ry, m: rm }); } : undefined },
-            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 2 } }, occ.map(function (_a, i) {
-                var med = _a.med, acte = _a.acte;
-                return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 1 } },
-                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, med.init),
-                    React.createElement(Badge, { a: acte, hasNote: !!notes[nk(med.id, ry, rm, d, sl)] })));
+        return (React.createElement("td", { key: "".concat(salle, "-").concat(d, "-").concat(sl), title: noteTips || undefined, style: __assign(__assign(__assign(__assign({}, S.td), (conflict ? conflBg(darkMode) : {})), (isTdRC ? { background: "var(--bg-td)" } : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return onPickSite({ salle: salle, siteActes: salleActes, d: d, sl: sl, y: ry, m: rm }); } : undefined },
+            React.createElement("div", { style: { display: "flex", flexDirection: "column" } }, grps.map(function (g, gi) {
+                return (React.createElement("div", { key: gi, style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, padding: "2px 0", borderTop: gi ? "1px dashed " + (conflict ? conflSep(darkMode) : "var(--border)") : "none" } },
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, g.meds.map(function (m, mi) {
+                        return React.createElement("div", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim(), style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, m.init);
+                    })),
+                    React.createElement(ActPill, { a: g.acte, night: darkMode, hasNote: g.meds.some(function (m) { return !!notes[nk(m.id, ry, rm, d, sl)]; }) })));
             }))));
     }
     var hdr = (React.createElement("div", { style: S.bar },
@@ -1137,9 +1166,15 @@ function ActTabView(_a) {
         if (isWE(ry, rm, d))
             return React.createElement("td", { key: "".concat(row.label, "-").concat(d, "-").concat(sl), style: __assign(__assign(__assign({}, S.td), S.tdWE), { padding: 2 }) });
         var occ = getOcc(row, d, sl, ry, rm);
-        return (React.createElement("td", { key: "".concat(row.label, "-").concat(d, "-").concat(sl), style: __assign(__assign(__assign({}, S.td), (isTd ? { background: "var(--bg-td)" } : {})), { padding: 3, maxWidth: 150, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return onPickAct({ row: row, d: d, sl: sl, y: ry, m: rm }); } : undefined },
+        /* v9.54 : deux ACTIVITES differentes sur le creneau passent la case en rouge. */
+        var _grpsA = salleGroups(row, occ);
+        var _idsA = {};
+        _grpsA.forEach(function (g) { if (g.acte && g.acte.id)
+            _idsA[g.acte.id] = 1; });
+        var conflA = Object.keys(_idsA).length > 1;
+        return (React.createElement("td", { key: "".concat(row.label, "-").concat(d, "-").concat(sl), style: __assign(__assign(__assign(__assign({}, S.td), (conflA ? conflBg(darkMode) : {})), (isTd ? { background: "var(--bg-td)" } : {})), { padding: 3, maxWidth: 150, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return onPickAct({ row: row, d: d, sl: sl, y: ry, m: rm }); } : undefined },
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2, alignItems: "stretch" }, onClick: function (e) { e.stopPropagation(); if (isEdit)
-                    onPickAct({ row: row, d: d, sl: sl, y: ry, m: rm }); } }, salleGroups(row, occ).map(function (g, gi) {
+                    onPickAct({ row: row, d: d, sl: sl, y: ry, m: rm }); } }, _grpsA.map(function (g, gi) {
                 var monoActe = (row.ids || []).length === 1 && !row.multiActe;
                 var ideN = (g.n === null || g.n === undefined) ? (g.acte.ideN || 0) : g.n;
                 /* v9.45 : segment gauche = salle si la ligne en propose, sinon libelle d'activite. */
@@ -1149,11 +1184,11 @@ function ActTabView(_a) {
                 var meds = g.meds.filter(function (m) { return m && m.id !== IDE_MED.id; });
                 var ideOnly = meds.length === 0 && g.meds.length > 0;
                 var showIde = ideOnly ? (ideN > 0) : (ideActive && (ideN > 0 || g.dif));
-                return (React.createElement("div", { key: gi, style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start", gap: 4, paddingTop: gi ? 4 : 0, marginTop: gi ? 1 : 0, borderTop: gi ? "1px dashed var(--border)" : "none" } },
-                    meds.map(function (m, mi) { return React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim(), style: { display: "inline-flex", alignItems: "center", height: 22, padding: "0 6px", background: m.color, color: "#fff", borderRadius: 4, fontSize: 9.5, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap" } }, m.init); }),
-                    (lieu || showIde) && React.createElement("span", { title: g.dif ? ("D\u00e9part diff\u00e9r\u00e9" + (dc ? " \u2014 " + dc : "")) : undefined, style: { display: "inline-flex", alignItems: "stretch", height: 22, borderRadius: 4, overflow: "hidden", border: "1px solid rgba(63,185,80,.55)", fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 800, whiteSpace: "nowrap", cursor: g.dif ? "help" : "inherit" } },
-                        lieu && React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 6px", background: "var(--bg)", color: "var(--txt2)" } }, lieu),
-                        showIde && React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 5px", background: "rgba(63,185,80,.16)", color: "#2f9440", borderLeft: lieu ? "1px solid rgba(63,185,80,.55)" : "none" } }, ideOnly ? (ideN + " IDE") : ideN, g.dif && React.createElement("span", { style: { marginLeft: 4, fontSize: 9 } }, "\ud83d\udd59")))));
+                return (React.createElement("div", { key: gi, style: { display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 4, paddingTop: gi ? 4 : 0, marginTop: gi ? 1 : 0, borderTop: gi ? "1px dashed " + (conflA ? conflSep(darkMode) : "var(--border)") : "none" } },
+                    meds.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, meds.map(function (m, mi) { return React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim(), style: { width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 } }, m.init); })),
+                    (lieu || showIde) && React.createElement("span", { title: g.dif ? ("D\u00e9part diff\u00e9r\u00e9" + (dc ? " \u2014 " + dc : "")) : undefined, style: __assign(__assign({}, pillCols((g.acte && g.acte.color) || "#888888", darkMode)), { display: "inline-flex", alignItems: "stretch", height: 22, borderRadius: 4, overflow: "hidden", fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 800, whiteSpace: "nowrap", cursor: g.dif ? "help" : "inherit" }) },
+                        lieu && React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 6px" } }, lieu),
+                        showIde && React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 5px", background: "#e0f4e3", color: "#2f9440", borderLeft: lieu ? "1px solid #95d99f" : "none" } }, ideOnly ? (ideN + " IDE") : ideN, g.dif && React.createElement("span", { style: { marginLeft: 4, fontSize: 9 } }, "\ud83d\udd59")))));
             })),
             occ.length === 0 && React.createElement("div", { style: { color: "var(--border)", textAlign: "center", fontSize: 13 } }, "\u00B7")));
     }
@@ -3446,7 +3481,7 @@ function TourTab(_a) {
                         var avoidW = !!((tourAvoid || {})[w.key] || {})[m.id];
                         var wishW = !!((tourWish || {})[w.key] || {})[m.id];
                         return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "3px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 44,
-                                background: on ? ({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec] || "#388bfd") : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontWeight: on ? 800 : 600, opacity: dis ? .3 : 1,
+                                background: on ? ({ coro: "rgba(118,165,175,.82)", pace: "rgba(227,179,65,.82)", eep: "rgba(139,92,246,.82)", ett: "rgba(236,72,153,.82)" }[m.surSpec] || "rgba(56,139,253,.82)") : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontWeight: on ? 800 : 600, opacity: dis ? .3 : 1,
                                 outline: on ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec] || "#388bfd") : m.surSpec && !blocked ? "2px solid " + ({ coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" }[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
                                 if (dis || !isEdit)
                                     return;

@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.53 — 02/08/2026";
+const APP_VERSION="v9.54 — 03/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -307,6 +307,30 @@ function hexToLum(hex){
   const toL=c=>c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);
   return 0.2126*toL(r)+0.7152*toL(g)+0.0722*toL(b);
 }
+/* v9.54 : pastille d'activité BORDÉE des 4 onglets salles (CHL, CHB, PT Cardio, PT Angio).
+   Bord = couleur de l'activité assombrie de 12 %, texte = la même assombrie de 62 % ;
+   en mode nuit, fond très sombre teinté et texte éclairci de 55 %. Le fond est OPAQUE :
+   posé sur une case rouge il ne vire pas, contrairement à un rgba.
+   L'onglet Planning et l'onglet Attachés gardent volontairement leurs pastilles PLEINES. */
+const _hx=c=>{c=String(c||"#888888").replace("#","");return [parseInt(c.slice(0,2),16)||0,parseInt(c.slice(2,4),16)||0,parseInt(c.slice(4,6),16)||0];};
+const mixC=(c,t,k)=>{const a=_hx(c),b=_hx(t);return "#"+[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*k).toString(16).padStart(2,"0")).join("");};
+const pillCols=(c,night)=>({border:"2px solid "+mixC(c,"#000000",.12),background:night?mixC(c,"#0d1117",.86):"#ffffff",color:night?mixC(c,"#ffffff",.55):mixC(c,"#000000",.62)});
+/* fond rouge des cases à deux activités : le pointillé y prend sa couleur propre,
+   celle de bordure générale étant invisible sur ce fond (surtout en mode nuit) */
+const conflBg=night=>({background:night?"rgba(239,68,68,.16)":"#fee2e2",outline:"1px solid #ef4444"});
+const conflSep=night=>night?"#f87171":"#b91c1c";
+function ActPill({a,night,hasNote}){
+  if(!a)return null;
+  return(
+    <div style={{position:"relative",display:"inline-block",margin:"1px"}}>
+      <div style={{...pillCols(a.color||"#888888",night),fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",
+        borderRadius:4,padding:"2px 3px",lineHeight:1.3,textAlign:"center",
+        width:48,minWidth:48,maxWidth:48,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{a.short}</div>
+      {hasNote&&<div style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
+    </div>
+  );
+}
+
 function Badge({a,salle,hasNote,hideSalle=false}){
   if(!a)return null;
   const col=a.color||"#888888";
@@ -729,17 +753,33 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
       const o=salleOcc(acte.id,ry,rm,d,sl);
       (o[salle]||[]).forEach(med=>{if(!occ.find(x=>x.med.id===med.id))occ.push({med,acte});});
     });
-    const conflict=occ.length>1;
+    /* v9.54 : une case se lit PAR ACTIVITÉ — les praticiens d'une même activité
+       s'empilent et l'activité n'est écrite qu'une fois. Le fond rouge ne signale
+       plus deux praticiens ensemble (c'est fréquent et normal dans ces salles)
+       mais DEUX ACTIVITÉS DIFFÉRENTES sur le même créneau. */
+    const grps=[];
+    occ.forEach(({med,acte})=>{
+      const k=(acte&&acte.id)||"";
+      let g=grps.find(x=>x.k===k);
+      if(!g){g={k,acte,meds:[]};grps.push(g);}
+      g.meds.push(med);
+    });
+    const conflict=grps.length>1;
     const noteTips=occ.map(({med})=>notes[nk(med.id,ry,rm,d,sl)]).filter(Boolean).join(" | ");
     return(
       <td key={`${salle}-${d}-${sl}`} title={noteTips||undefined}
-        style={{...S.td,...(conflict?S.tdConfl:{}),...(isTdRC?{background:"var(--bg-td)"}:{}),padding:2,cursor:isEdit?"pointer":"default"}}
+        style={{...S.td,...(conflict?conflBg(darkMode):{}),...(isTdRC?{background:"var(--bg-td)"}:{}),padding:2,cursor:isEdit?"pointer":"default"}}
         onClick={isEdit?()=>onPickSite({salle,siteActes:salleActes,d,sl,y:ry,m:rm}):undefined}>
-        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:2}}>
-        {occ.map(({med,acte},i)=>(
-          <div key={i} style={{display:"flex",alignItems:"center",gap:1}}>
-            <div style={{width:24,height:24,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{med.init}</div>
-            <Badge a={acte} hasNote={!!notes[nk(med.id,ry,rm,d,sl)]}/>
+        <div style={{display:"flex",flexDirection:"column"}}>
+        {grps.map((g,gi)=>(
+          <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,padding:"2px 0",
+            borderTop:gi?"1px dashed "+(conflict?conflSep(darkMode):"var(--border)"):"none"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+              {g.meds.map((m,mi)=>(
+                <div key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{m.init}</div>
+              ))}
+            </div>
+            <ActPill a={g.acte} night={darkMode} hasNote={g.meds.some(m=>!!notes[nk(m.id,ry,rm,d,sl)])}/>
           </div>
         ))}
         </div>
@@ -942,12 +982,17 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     const isTd=d===today.getDate()&&rm===today.getMonth()&&ry===today.getFullYear();
     if(isWE(ry,rm,d)) return <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...S.tdWE,padding:2}}/>;
     const occ=getOcc(row,d,sl,ry,rm);
+    /* v9.54 : deux ACTIVITÉS différentes sur le créneau passent la case en rouge —
+       deux salles d'une même activité, non. */
+    const _grpsA=salleGroups(row,occ);
+    const _idsA={};_grpsA.forEach(g=>{if(g.acte&&g.acte.id)_idsA[g.acte.id]=1;});
+    const conflA=Object.keys(_idsA).length>1;
     return(
-      <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...(isTd?{background:"var(--bg-td)"}:{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
+      <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
         onClick={isEdit?()=>onPickAct({row,d,sl,y:ry,m:rm}):undefined}>
         <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"stretch"}}
           onClick={e=>{e.stopPropagation();if(isEdit)onPickAct({row,d,sl,y:ry,m:rm});}}>
-        {salleGroups(row,occ).map((g,gi)=>{
+        {_grpsA.map((g,gi)=>{
           const monoActe=(row.ids||[]).length===1&&!row.multiActe;
           const ideN=(g.n===null||g.n===undefined)?(g.acte.ideN||0):g.n;
           /* v9.45 : le segment gauche porte la SALLE si la ligne en propose, sinon
@@ -960,14 +1005,16 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           const ideOnly=meds.length===0&&g.meds.length>0;
           const showIde=ideOnly?(ideN>0):(ideActive&&(ideN>0||g.dif));
           return(
-          <div key={gi} style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"flex-start",gap:4,paddingTop:gi?4:0,marginTop:gi?1:0,borderTop:gi?"1px dashed var(--border)":"none"}}>
-            {meds.map((m,mi)=>(
-              <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{display:"inline-flex",alignItems:"center",height:22,padding:"0 6px",background:m.color,color:"#fff",borderRadius:4,fontSize:9.5,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>{m.init}</span>
-            ))}
+          <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:4,paddingTop:gi?4:0,marginTop:gi?1:0,borderTop:gi?"1px dashed "+(conflA?conflSep(darkMode):"var(--border)"):"none"}}>
+            {meds.length>0&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
+              {meds.map((m,mi)=>(
+                <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}</span>
+              ))}
+            </div>}
             {(lieu||showIde)&&
-              <span title={g.dif?("Départ différé"+(dc?" — "+dc:"")):undefined} style={{display:"inline-flex",alignItems:"stretch",height:22,borderRadius:4,overflow:"hidden",border:"1px solid rgba(63,185,80,.55)",fontFamily:"'JetBrains Mono',monospace",fontSize:9.5,fontWeight:800,whiteSpace:"nowrap",cursor:g.dif?"help":"inherit"}}>
-                {lieu&&<span style={{display:"flex",alignItems:"center",padding:"0 6px",background:"var(--bg)",color:"var(--txt2)"}}>{lieu}</span>}
-                {showIde&&<span style={{display:"flex",alignItems:"center",padding:"0 5px",background:"rgba(63,185,80,.16)",color:"#2f9440",borderLeft:lieu?"1px solid rgba(63,185,80,.55)":"none"}}>{ideOnly?(ideN+" IDE"):ideN}{g.dif&&<span style={{marginLeft:4,fontSize:9}}>🕙</span>}</span>}
+              <span title={g.dif?("Départ différé"+(dc?" — "+dc:"")):undefined} style={{...pillCols((g.acte&&g.acte.color)||"#888888",darkMode),display:"inline-flex",alignItems:"stretch",height:22,borderRadius:4,overflow:"hidden",fontFamily:"'JetBrains Mono',monospace",fontSize:9.5,fontWeight:800,whiteSpace:"nowrap",cursor:g.dif?"help":"inherit"}}>
+                {lieu&&<span style={{display:"flex",alignItems:"center",padding:"0 6px"}}>{lieu}</span>}
+                {showIde&&<span style={{display:"flex",alignItems:"center",padding:"0 5px",background:"#e0f4e3",color:"#2f9440",borderLeft:lieu?"1px solid #95d99f":"none"}}>{ideOnly?(ideN+" IDE"):ideN}{g.dif&&<span style={{marginLeft:4,fontSize:9}}>🕙</span>}</span>}
               </span>}
           </div>
         );})}
@@ -3208,7 +3255,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
                     return(
                       <button key={m.id} disabled={dis||!isEdit}
                         style={{padding:"3px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:44,
-                          background:on?({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"#388bfd"):"var(--bg2)",color:on?"#fff":"var(--txt2)",fontWeight:on?800:600,opacity:dis?.3:1,
+                          background:on?({coro:"rgba(118,165,175,.82)",pace:"rgba(227,179,65,.82)",eep:"rgba(139,92,246,.82)",ett:"rgba(236,72,153,.82)"}[m.surSpec]||"rgba(56,139,253,.82)"):"var(--bg2)",color:on?"#fff":"var(--txt2)",fontWeight:on?800:600,opacity:dis?.3:1,
                            outline:on?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"#388bfd"):m.surSpec&&!blocked?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
                         onClick={()=>{if(dis||!isEdit)return;
                         const wasOn=on;
