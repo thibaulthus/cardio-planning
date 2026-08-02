@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.51 — 02/08/2026";
+const APP_VERSION="v9.52 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2143,12 +2143,16 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
             {eligMeds.map(med=>{
               const avail=isMedAvailable(med,y2,m2,d,sl);
-              // Extra warning if this med would be in an already-occupied fixed salle
-              const salleOccupied=row.salle&&curOcc.length>0&&!curOcc.find(x=>x.med.id===med.id);
-              const borderCol=avail==="warning"||salleOccupied?"#f59e0b44":"var(--border)";
-              const bgCol=avail==="warning"||salleOccupied?"rgba(245,158,11,.15)":"var(--bg2)";
-              const statusTxt=avail==="blocked"?"Absent/repos":salleOccupied?`⚠ ${row.salle} déjà occupée`:avail==="warning"?"⚠ Déjà une activité":"Disponible";
-              const statusCol=avail==="blocked"?"#ef4444":salleOccupied||avail==="warning"?"#f59e0b":"var(--txt3)";
+              // v9.52 : la salle occupée est annoncée UNE fois dans le bandeau au-dessus.
+              // La ligne du médecin ne dit plus que ce qui le concerne LUI, et nomme son activité.
+              const busyLabs=[...new Set((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
+                .flatMap(s2=>getEntries(med.id,y2,m2,d,s2)||[])
+                .filter(e=>e&&e.acteId&&!e._blocked&&!["TOUR_HC","TOUR_USIC"].includes(e.acteId))
+                .map(e=>{const ax=actes.find(x=>x.id===e.acteId);return ax?ax.short:e.acteId;}))];
+              const borderCol=avail==="warning"?"#f59e0b44":"var(--border)";
+              const bgCol=avail==="warning"?"rgba(245,158,11,.15)":"var(--bg2)";
+              const statusTxt=avail==="blocked"?"Absent/repos":avail==="warning"?("⚠ Déjà : "+(busyLabs.join(", ")||"une activité")):"Disponible";
+              const statusCol=avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)";
               return(
                 <button key={med.id} disabled={avail==="blocked"}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px solid ${borderCol}`,
@@ -4865,7 +4869,7 @@ function CardioPlanning(){
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
-  useEffect(()=>{authorRef.current=isEdit?"Éditeur":(isMedEdit?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+" (administratif)"):"?"));},[isEdit,isMedEdit,isAdminEdit,editMedId,adminName,medecins]);
+  useEffect(()=>{authorRef.current=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+" (administratif)"):(isEdit?"Éditeur":"?"));},[accessMode,isEdit,isMedEdit,isAdminEdit,editMedId,adminName,medecins]);
   useEffect(()=>{ // purge du journal au-delà de 1200 entrées (éditeur uniquement, garde les 1000 plus récentes)
     if(!isEdit||!window.firebaseDB)return;
     (async()=>{try{
@@ -6894,7 +6898,7 @@ header::-webkit-scrollbar { display: none; }
                       onClick={()=>{ if(a.fixedSalle){doAdd(a.id,a.fixedSalle);}else if(a.hasSalle)setMData(p=>({...p,_pickSalle:a.id}));else doAdd(a.id); }}>
                       <span style={{fontWeight:800,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{a.short}{salleWarn?" ⚠":""}</span>
                       <span style={{fontSize:10}}>{a.label}</span>
-                      {salleWarn&&<span style={{fontSize:9,color:"#f59e0b"}}>{fixedSalleOcc.map(m=>m.init).join(", ")} déjà assigné</span>}
+                      {salleWarn&&<span style={{fontSize:9,fontWeight:800,color:"#b45309",background:"#fff8e6",border:"1px solid #f59e0b",borderRadius:4,padding:"1px 5px",marginTop:2,alignSelf:"flex-start",lineHeight:1.35}}>⚠ {fixedSalleOcc.map(m=>m.init).join(", ")} déjà assigné</span>}
                     </button>
                   );
                 })
@@ -7341,20 +7345,22 @@ header::-webkit-scrollbar { display: none; }
               {!mData.init
                 ?<div style={{fontSize:11,color:"var(--txt3)"}}>Renseignez d'abord les initiales pour gérer les activités.</div>
                 :[["Général",a2=>a2.site!=="CHL"&&a2.site!=="CHB"],["CHL",a2=>a2.site==="CHL"],["CHB",a2=>a2.site==="CHB"]].map(([grp,fil])=>{
-                  const glist=actes.filter(a2=>!a2.isSystem&&a2.id!=="TP"&&fil(a2));
+                  const glist=actes.filter(a2=>!a2.isSystem&&a2.id!=="TP"&&!(a2.medecinsAutorise||[]).includes("__AUCUN__")&&fil(a2));
+                  const authInit=((medecins.find(m3=>m3.id===mData.id)||{}).init)||mData._authInit||mData.init;
                   if(glist.length===0)return null;
                   return <div key={grp} style={{marginBottom:8}}>
                     <div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{grp}</div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                       {glist.map(a2=>{
-                        const allowed=!(a2.medecinsAutorise&&a2.medecinsAutorise.length)||a2.medecinsAutorise.includes(mData.init);
+                        const allowed=!(a2.medecinsAutorise&&a2.medecinsAutorise.length)||a2.medecinsAutorise.includes(authInit);
                         return <button key={a2.id} type="button" onClick={()=>{
+                          if(!mData._authInit)setMData(p=>({...p,_authInit:authInit}));
                           setActes(prev=>prev.map(act=>{
                             if(act.id!==a2.id)return act;
                             const cur=act.medecinsAutorise||[];
-                            if(!allowed){if(cur.length===0)return act;return{...act,medecinsAutorise:[...cur,mData.init]};}
-                            if(cur.length===0){const all2=medecins.map(m3=>m3.init).filter(i2=>i2!==mData.init);return{...act,medecinsAutorise:all2};}
-                            return{...act,medecinsAutorise:cur.filter(i2=>i2!==mData.init)};
+                            if(!allowed){if(cur.length===0)return act;return{...act,medecinsAutorise:[...cur,authInit]};}
+                            if(cur.length===0){const all2=medecins.map(m3=>m3.init).filter(i2=>i2!==authInit);return{...act,medecinsAutorise:all2};}
+                            return{...act,medecinsAutorise:cur.filter(i2=>i2!==authInit)};
                           }));
                         }} style={{fontSize:10,padding:"3px 8px",borderRadius:11,cursor:"pointer",fontWeight:700,border:allowed?"1.5px solid "+a2.color:"1px solid var(--border)",background:allowed?a2.color+"33":"var(--bg2)",color:allowed?"var(--txt)":"var(--txt3)"}}>{a2.short}</button>;
                       })}
@@ -7366,7 +7372,19 @@ header::-webkit-scrollbar { display: none; }
           </div>
           <button style={{...S.btnP,width:"100%",marginTop:10}} onClick={()=>{
             if(!mData.nom||!mData.init)return toast("Nom et initiales requis","warn");
-            const {_new,...rest}=mData;
+            // v9.52 : medecinsAutorise indexe les INITIALES ; un changement d'initiales
+            // orphelinait donc toutes les activités du médecin. On les renomme ici.
+            const newInit=String(mData.init).trim();
+            const oldInit=((medecins.find(m3=>m3.id===mData.id)||{}).init)||mData._authInit||"";
+            if(newInit!==oldInit&&medecins.some(m3=>m3.id!==mData.id&&m3.init===newInit))
+              return toast("Initiales déjà utilisées par un autre membre","warn");
+            const {_new,_authInit,...rest}=mData;
+            rest.init=newInit;
+            if(oldInit&&oldInit!==newInit)setActes(prev=>prev.map(act=>{
+              const cur=act.medecinsAutorise;
+              if(!cur||!cur.length||!cur.includes(oldInit))return act;
+              return{...act,medecinsAutorise:cur.map(i2=>i2===oldInit?newInit:i2)};
+            }));
             if(_new)setMedecins(p=>[...p,rest]);else setMedecins(p=>p.map(m=>m.id===rest.id?rest:m));
             setModal(null);toast("Médecin enregistré");
           }}>Enregistrer</button>

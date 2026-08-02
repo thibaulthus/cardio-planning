@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.51 — 02/08/2026";
+var APP_VERSION = "v9.52 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2333,12 +2333,21 @@ function PickMedActModal(_a) {
                     " \u2014 vous pouvez quand m\u00EAme ajouter un second m\u00E9decin."))),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" } }, eligMeds.map(function (med) {
                 var avail = isMedAvailable(med, y2, m2, d, sl);
-                // Extra warning if this med would be in an already-occupied fixed salle
-                var salleOccupied = row.salle && curOcc.length > 0 && !curOcc.find(function (x) { return x.med.id === med.id; });
-                var borderCol = avail === "warning" || salleOccupied ? "#f59e0b44" : "var(--border)";
-                var bgCol = avail === "warning" || salleOccupied ? "rgba(245,158,11,.15)" : "var(--bg2)";
-                var statusTxt = avail === "blocked" ? "Absent/repos" : salleOccupied ? "\u26A0 ".concat(row.salle, " d\u00E9j\u00E0 occup\u00E9e") : avail === "warning" ? "⚠ Déjà une activité" : "Disponible";
-                var statusCol = avail === "blocked" ? "#ef4444" : salleOccupied || avail === "warning" ? "#f59e0b" : "var(--txt3)";
+                // v9.52 : la salle occupee est annoncee UNE fois dans le bandeau au-dessus.
+                // La ligne du medecin ne dit plus que ce qui le concerne LUI, et nomme son activite.
+                var _slots52 = sl === "JOUR" ? ["JOUR", "M", "AM"] : [sl, "JOUR"];
+                var _busy52 = [];
+                _slots52.forEach(function (s2) { (getEntries(med.id, y2, m2, d, s2) || []).forEach(function (e) {
+                    if (!e || !e.acteId || e._blocked) return;
+                    if (e.acteId === "TOUR_HC" || e.acteId === "TOUR_USIC") return;
+                    var ax = actes.find(function (x) { return x.id === e.acteId; });
+                    var lb = ax ? ax.short : e.acteId;
+                    if (_busy52.indexOf(lb) < 0) _busy52.push(lb);
+                }); });
+                var borderCol = avail === "warning" ? "#f59e0b44" : "var(--border)";
+                var bgCol = avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)";
+                var statusTxt = avail === "blocked" ? "Absent/repos" : avail === "warning" ? ("⚠ Déjà : " + (_busy52.join(", ") || "une activité")) : "Disponible";
+                var statusCol = avail === "blocked" ? "#ef4444" : avail === "warning" ? "#f59e0b" : "var(--txt3)";
                 return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(borderCol),
                         cursor: avail !== "blocked" ? "pointer" : "default", background: bgCol, opacity: avail === "blocked" ? .35 : 1 }, onClick: function () {
                         if (avail === "blocked")
@@ -5462,7 +5471,7 @@ function CardioPlanning() {
     // Returns true if current user can edit this specific medecin's data
     var canEdit = function (medId) { return isEdit || isInterEdit || (isMedEdit && editMedId === medId) || isAdminEdit; };
     var isAnyEdit = isEdit || isMedEdit || isAdminEdit;
-    useEffect(function () { authorRef.current = isEdit ? "\u00C9diteur" : (isMedEdit ? (((medecins.find(function (m) { return m.id === editMedId; }) || {}).init) || "?") : (isAdminEdit ? ((adminName || "?") + " (administratif)") : "?")); }, [isEdit, isMedEdit, isAdminEdit, editMedId, adminName, medecins]);
+    useEffect(function () { authorRef.current = accessMode === "medecinEdit" ? (((medecins.find(function (m) { return m.id === editMedId; }) || {}).init) || "?") : (isAdminEdit ? ((adminName || "?") + " (administratif)") : (isEdit ? "\u00C9diteur" : "?")); }, [accessMode, isEdit, isMedEdit, isAdminEdit, editMedId, adminName, medecins]);
     useEffect(function () {
         if (!isEdit || !window.firebaseDB)
             return;
@@ -7700,7 +7709,8 @@ function CardioPlanning() {
                             a.short,
                             salleWarn ? " ⚠" : ""),
                         React.createElement("span", { style: { fontSize: 10 } }, a.label),
-                        salleWarn && React.createElement("span", { style: { fontSize: 9, color: "#f59e0b" } },
+                        salleWarn && React.createElement("span", { style: { fontSize: 9, fontWeight: 800, color: "#b45309", background: "#fff8e6", border: "1px solid #f59e0b", borderRadius: 4, padding: "1px 5px", marginTop: 2, alignSelf: "flex-start", lineHeight: 1.35 } },
+                            "\u26A0 ",
                             fixedSalleOcc.map(function (m) { return m.init; }).join(", "),
                             " d\u00E9j\u00E0 assign\u00E9")));
                 }))),
@@ -8143,14 +8153,17 @@ function CardioPlanning() {
                     ? React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Renseignez d'abord les initiales pour g\u00E9rer les activit\u00E9s.")
                     : [["G\u00E9n\u00E9ral", function (a2) { return a2.site !== "CHL" && a2.site !== "CHB"; }], ["CHL", function (a2) { return a2.site === "CHL"; }], ["CHB", function (a2) { return a2.site === "CHB"; }]].map(function (_g) {
                         var grp = _g[0], fil = _g[1];
-                        var glist = actes.filter(function (a2) { return !a2.isSystem && a2.id !== "TP" && fil(a2); });
+                        var glist = actes.filter(function (a2) { return !a2.isSystem && a2.id !== "TP" && (a2.medecinsAutorise || []).indexOf("__AUCUN__") < 0 && fil(a2); });
+                        var authInit = ((medecins.find(function (m3) { return m3.id === mData.id; }) || {}).init) || mData._authInit || mData.init;
                         if (glist.length === 0)
                             return null;
                         return React.createElement("div", { key: grp, style: { marginBottom: 8 } },
                             React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 3 } }, grp),
                             React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, glist.map(function (a2) {
-                                var allowed = !(a2.medecinsAutorise && a2.medecinsAutorise.length) || a2.medecinsAutorise.includes(mData.init);
+                                var allowed = !(a2.medecinsAutorise && a2.medecinsAutorise.length) || a2.medecinsAutorise.includes(authInit);
                                 return React.createElement("button", { key: a2.id, type: "button", onClick: function () {
+                                        if (!mData._authInit)
+                                            setMData(function (p) { return (__assign(__assign({}, p), { _authInit: authInit })); });
                                         setActes(function (prev) { return prev.map(function (act) {
                                             if (act.id !== a2.id)
                                                 return act;
@@ -8158,13 +8171,13 @@ function CardioPlanning() {
                                             if (!allowed) {
                                                 if (cur.length === 0)
                                                     return act;
-                                                return __assign(__assign({}, act), { medecinsAutorise: cur.concat([mData.init]) });
+                                                return __assign(__assign({}, act), { medecinsAutorise: cur.concat([authInit]) });
                                             }
                                             if (cur.length === 0) {
-                                                var all2 = medecins.map(function (m3) { return m3.init; }).filter(function (i2) { return i2 !== mData.init; });
+                                                var all2 = medecins.map(function (m3) { return m3.init; }).filter(function (i2) { return i2 !== authInit; });
                                                 return __assign(__assign({}, act), { medecinsAutorise: all2 });
                                             }
-                                            return __assign(__assign({}, act), { medecinsAutorise: cur.filter(function (i2) { return i2 !== mData.init; }) });
+                                            return __assign(__assign({}, act), { medecinsAutorise: cur.filter(function (i2) { return i2 !== authInit; }) });
                                         }); });
                                     }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 11, cursor: "pointer", fontWeight: 700, border: allowed ? "1.5px solid " + a2.color : "1px solid var(--border)", background: allowed ? a2.color + "33" : "var(--bg2)", color: allowed ? "var(--txt)" : "var(--txt3)" } }, a2.short);
                             })));
@@ -8173,7 +8186,21 @@ function CardioPlanning() {
             React.createElement("button", { style: __assign(__assign({}, S.btnP), { width: "100%", marginTop: 10 }), onClick: function () {
                     if (!mData.nom || !mData.init)
                         return toast("Nom et initiales requis", "warn");
-                    var _new = mData._new, rest = __rest(mData, ["_new"]);
+                    // v9.52 : medecinsAutorise indexe les INITIALES ; un changement d'initiales
+                    // orphelinait donc toutes les activites du medecin. On les renomme ici.
+                    var newInit = String(mData.init).trim();
+                    var oldInit = ((medecins.find(function (m3) { return m3.id === mData.id; }) || {}).init) || mData._authInit || "";
+                    if (newInit !== oldInit && medecins.some(function (m3) { return m3.id !== mData.id && m3.init === newInit; }))
+                        return toast("Initiales d\u00E9j\u00E0 utilis\u00E9es par un autre membre", "warn");
+                    var _new = mData._new, rest = __rest(mData, ["_new", "_authInit"]);
+                    rest.init = newInit;
+                    if (oldInit && oldInit !== newInit)
+                        setActes(function (prev) { return prev.map(function (act) {
+                            var cur = act.medecinsAutorise;
+                            if (!cur || !cur.length || cur.indexOf(oldInit) < 0)
+                                return act;
+                            return __assign(__assign({}, act), { medecinsAutorise: cur.map(function (i2) { return i2 === oldInit ? newInit : i2; }) });
+                        }); });
                     if (_new)
                         setMedecins(function (p) { return __spreadArray(__spreadArray([], p, true), [rest], false); });
                     else
