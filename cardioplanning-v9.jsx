@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.48 — 02/08/2026";
+const APP_VERSION="v9.49 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -645,7 +645,7 @@ function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
 }
 
 /* ════ SITE VIEW (CHL/CHB) ════ */
-function SiteView({printWk=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,orient,setOrient,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod}){
+function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,orient,setOrient,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -734,7 +734,7 @@ function SiteView({printWk=null,site,year,month,prevM,nextM,actes,medecins,getEn
         <button onClick={nextM} style={S.arr}>›</button>
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-        
+        {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
       </div>
@@ -966,6 +966,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
         {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
         {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
+        {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
       </div>
@@ -1048,7 +1049,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
 }
 
 /* ════ GARDE VIEW ════ */
-function GardeView({printWk=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orient,setOrient,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
+function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orient,setOrient,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
   const removeGarde=(d3,y3,m3)=>{
     setPlan(p=>{
       let next={...p};const gIds=[];
@@ -1393,6 +1394,7 @@ function GardeView({printWk=null,year,month,prevM,nextM,medecins,getEntry,allDay
           <button onClick={nextM} style={S.arr}>›</button>
         </div>
         <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
+          {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
           <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
           <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
         </div>
@@ -5558,10 +5560,6 @@ header::-webkit-scrollbar { display: none; }
               style={{...S.nb,...(tab===v?S.nba:{}),cursor:"grab",userSelect:"none"}}>{l}</button>
           ))}
         </nav>
-        {/* v9.48 : une seule imprimante, dans l'en-tête — elle vaut pour l'onglet ouvert. */}
-        {["planning","chl","chb","plateau","angio","garde","attache"].indexOf(tab)>=0&&
-          <button onClick={()=>{setPrintSel(mondayOf(year,month,1));setModal("print");}} title="Imprimer cet onglet"
-            style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.1)",color:"#f0f6fc",cursor:"pointer",fontSize:13,flexShrink:0,marginLeft:6}}>🖨️</button>}
       {Object.keys(archPlan).length>0&&(()=>{
         const {sy,sm}=perStart(year,month);
         const shown=[];
@@ -5610,6 +5608,7 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={nextM} style={S.arr}>›</button>
             </div>
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
+              <button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>
               <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
               <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
             </div>
@@ -5631,13 +5630,13 @@ header::-webkit-scrollbar { display: none; }
       {/* TOUR MÉDICAL */}
       {tab==="tourmedical"&&<TourTab tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
 
-      {tab==="chl"&&<SiteView printWk={printWk} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
+      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
         {isEdit&&<div style={{marginBottom:6}}><button style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}} onClick={bipOpen}>📟 Répartition du Bip</button></div>}
-        <SiteView printWk={printWk} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
+        <SiteView printWk={printWk} onPrint={()=>setModal("print")} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           const full=bip&&["CHB-1","CHB-2","CHB-3"].includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
@@ -5656,7 +5655,7 @@ header::-webkit-scrollbar { display: none; }
         getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView printWk={printWk} site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -5671,7 +5670,7 @@ header::-webkit-scrollbar { display: none; }
         getEntries={getEntries} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="garde"&&<GardeView printWk={printWk} year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} getEntry={getEntry} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} applyGarde={applyGarde} isMedAvailable={isMedAvailable} plan={plan} setPlan={setPlan} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod} tourMed={tourMed} gardeAvoid={gardeAvoid} gardeWish={gardeWish} toast={toast}/>}
+      {tab==="garde"&&<GardeView printWk={printWk} onPrint={()=>setModal("print")} year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} getEntry={getEntry} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} applyGarde={applyGarde} isMedAvailable={isMedAvailable} plan={plan} setPlan={setPlan} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod} tourMed={tourMed} gardeAvoid={gardeAvoid} gardeWish={gardeWish} toast={toast}/>}
 
       {tab==="bip"&&<BipTab year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} allDays={allDays} isEdit={isEdit} actes={actes} getEntries={getEntries} salleOcc={salleOcc} addEntry={addEntry} removeEntry={removeEntry} isMedAvailable={isMedAvailable} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull}/>}
 
@@ -5712,14 +5711,14 @@ header::-webkit-scrollbar { display: none; }
           </div>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}><button onClick={prevM} style={S.arr}>‹</button><h2 style={S.mTit}>{"👔 Attachés — "+(MOIS[perStart(year,month).sm]+" — "+MOIS[(perStart(year,month).sm+PCFG.len-1)%12]+" "+perStart(year,month).sy)}</h2><button onClick={nextM} style={S.arr}>›</button></div>
-            <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button><button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button></div>
+            <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button><button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button></div>
           </div>
            {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
              <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
            </div>}
           {orient==="H"
-            ?<GridH planIssues={planIssues.map} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV planIssues={planIssues.map} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+            ?<GridH planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
+            :<GridV planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -5825,6 +5824,9 @@ header::-webkit-scrollbar { display: none; }
         const prevAst=()=>{const p=perPrev(sy,sm);setAstYear(p.sy);setAstMonth(p.sm);};
         const nextAst=()=>{const p=perNext(sy,sm);setAstYear(p.sy);setAstMonth(p.sm);};
         const allDays4M=perDaysList(sy,sm);
+        /* v9.49 : liste d'affichage seule — les statistiques et le retrait de période
+           continuent de porter sur toute la période, quelle que soit l'impression. */
+        const astPrintDays=printWk?allDays4M.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):allDays4M;
         const stats={};
         astMeds.forEach(m=>{stats[String(m.id)]=0;});
         allDays4M.forEach(({y,m,d})=>{const mid=astForDay2(y,m,d);if(mid&&stats[mid]!==undefined)stats[mid]++;});
@@ -5946,7 +5948,8 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={prevP} style={S.arr}>‹</button>
               <h2 style={{...S.mTit,margin:0}}><span style={{color:"#7c3aed"}}>📞</span> {pLabel}</h2>
               <button onClick={nextP} style={S.arr}>›</button>
-                <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30,marginLeft:"auto"}}>{darkMode?"☀️":"🌓"}</button>
+                <button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30,marginLeft:"auto"}}>🖨️</button>
+                <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
               </div>
             <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
               {isEdit&&<button onClick={runAstAuto} style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>⚙️ Répartition auto</button>}
@@ -5993,7 +5996,7 @@ header::-webkit-scrollbar { display: none; }
                   </tr>
                 </thead>
                 <tbody>
-                  {allDays4M.map(({y,m,d})=>{
+                  {astPrintDays.map(({y,m,d})=>{
                     const dt=new Date(y,m,d);const dw2=dt.getDay();
                     const we=dw2===6||dw2===0;
                     const isT=d===astToday.getDate()&&m===astToday.getMonth()&&y===astToday.getFullYear();
@@ -7019,9 +7022,11 @@ header::-webkit-scrollbar { display: none; }
   onRemove={p=>{removeAbsence(p);setModal(null);}}
   onClose={()=>setModal(null)}/></Ov>}
       {modal==="print"&&(()=>{
-        const TABN={planning:"📅 Planning équipe",chl:"🏥 CHL",chb:"🏥 CHB",plateau:"❤️ PT Cardio",angio:"🔬 PT Angio",garde:"🌙 Gardes",attache:"🏢 Attachés"};
-        const isG=tab==="garde";
-        const mois=[];for(let i=0;i<PCFG.len;i++){const p=perStart(year,month);const m3=(p.sm+i)%12,y3=p.sm+i>11?p.sy+1:p.sy;mois.push({y:y3,m:m3});}
+        const TABN={planning:"📅 Planning équipe",chl:"🏥 CHL",chb:"🏥 CHB",plateau:"❤️ PT Cardio",angio:"🔬 PT Angio",garde:"🌙 Gardes",attache:"👔 Attachés",astreinte:"📞 Astreinte"};
+        const isG=tab==="garde"||tab==="astreinte";
+        /* l'onglet Astreinte navigue sur sa propre période */
+        const pBase=tab==="astreinte"?perStart(astYear,astMonth):perStart(year,month);
+        const mois=[];for(let i=0;i<PCFG.len;i++){const m3=(pBase.sm+i)%12,y3=pBase.sm+i>11?pBase.sy+1:pBase.sy;mois.push({y:y3,m:m3});}
         const doPrint=(range)=>{setPrintWk(range);setModal(null);setTimeout(()=>{window.print();setTimeout(()=>setPrintWk(null),600);},350);};
         return(
         <div style={S.ov} onClick={()=>setModal(null)}>
