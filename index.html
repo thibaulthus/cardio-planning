@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.52 — 02/08/2026";
+var APP_VERSION = "v9.53 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2281,6 +2281,8 @@ function PickMedActModal(_a) {
                 curOcc.push({ med: IDE_MED, acte: actes.find(function (a) { return a.id === aid; }), acteId: aid, e: e });
         });
     });
+    // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
+    var pickMeds = eligMeds.filter(function (m) { return !curOcc.find(function (x) { return x.med.id === m.id; }); });
     return (React.createElement(Ov, { onClose: onClose },
         React.createElement("div", { style: S.mHd },
             React.createElement("div", null,
@@ -2331,7 +2333,7 @@ function PickMedActModal(_a) {
                     " d\u00E9j\u00E0 occup\u00E9e par ",
                     curOcc.map(function (x) { return x.med.init; }).join(", "),
                     " \u2014 vous pouvez quand m\u00EAme ajouter un second m\u00E9decin."))),
-            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" } }, eligMeds.map(function (med) {
+            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" } }, pickMeds.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", padding: "4px 2px" } }, "Tous les médecins autorisés sont déjà assignés sur ce créneau."), pickMeds.map(function (med) {
                 var avail = isMedAvailable(med, y2, m2, d, sl);
                 // v9.52 : la salle occupee est annoncee UNE fois dans le bandeau au-dessus.
                 // La ligne du medecin ne dit plus que ce qui le concerne LUI, et nomme son activite.
@@ -2450,6 +2452,10 @@ function PickMedSiteModal(_a) {
     var _d = useState(null), selBipSalle = _d[0], setSelBipSalle = _d[1];
     var bipActe = isBipCol ? actes.find(function (a) { return a.id === "BIP"; }) : null;
     var eligActes = (selMed ? (isBipCol ? [bipActe].filter(Boolean) : siteActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); })) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
+    // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
+    var pickMeds = medecins.filter(function (med) { return !selfOnly || med.id === selfOnly; })
+        .filter(function (med) { return !curOcc.find(function (x) { return x.med.id === med.id; }); })
+        .filter(function (med) { return siteActes.some(function (a) { return !a.medecinsAutorise || !a.medecinsAutorise.length || a.medecinsAutorise.includes(med.init); }); });
     return (React.createElement(Ov, { onClose: onClose },
         React.createElement("div", { style: S.mHd },
             React.createElement("div", null,
@@ -2478,11 +2484,7 @@ function PickMedSiteModal(_a) {
             }))),
         step === "med" && (React.createElement(React.Fragment, null,
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Choisir un m\u00E9decin"),
-            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" } }, medecins.filter(function (med) { return !selfOnly || med.id === selfOnly; }).filter(function (med) {
-                // Only show medecins who have at least one eligible acte in this salle
-                var elig = siteActes.filter(function (a) { return !a.medecinsAutorise || !a.medecinsAutorise.length || a.medecinsAutorise.includes(med.init); });
-                return elig.length > 0;
-            }).map(function (med) {
+            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" } }, pickMeds.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", padding: "4px 2px" } }, "Tous les médecins autorisés sont déjà dans cette salle."), pickMeds.map(function (med) {
                 var avail = isMedAvailable(med, y2, m2, d, sl);
                 return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(avail === "warning" ? "#f59e0b44" : "var(--border)"),
                         cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: function () { if (avail === "blocked")

@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.52 — 02/08/2026";
+const APP_VERSION="v9.53 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2066,6 +2066,9 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
     });
   });
 
+  // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
+  const pickMeds=eligMeds.filter(m=>!curOcc.find(x=>x.med.id===m.id));
+
   return(
     <Ov onClose={onClose}>
       <div style={S.mHd}>
@@ -2141,7 +2144,8 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
             </div>
           )}
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
-            {eligMeds.map(med=>{
+            {pickMeds.length===0&&<div style={{fontSize:11,color:"var(--txt3)",padding:"4px 2px"}}>Tous les médecins autorisés sont déjà assignés sur ce créneau.</div>}
+            {pickMeds.map(med=>{
               const avail=isMedAvailable(med,y2,m2,d,sl);
               // v9.52 : la salle occupée est annoncée UNE fois dans le bandeau au-dessus.
               // La ligne du médecin ne dit plus que ce qui le concerne LUI, et nomme son activité.
@@ -2292,6 +2296,10 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
   const [selBipSalle,setSelBipSalle]=useState(null);
   const bipActe=isBipCol?actes.find(a=>a.id==="BIP"):null;
   const eligActes=(selMed?(isBipCol?[bipActe].filter(Boolean):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init))):[]).filter(a=>!adminOnly||a.adminOk===true);
+  // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
+  const pickMeds=medecins.filter(med=>!selfOnly||med.id===selfOnly)
+    .filter(med=>!curOcc.find(x=>x.med.id===med.id))
+    .filter(med=>siteActes.some(a=>!a.medecinsAutorise||!a.medecinsAutorise.length||a.medecinsAutorise.includes(med.init)));
 
   return(
     <Ov onClose={onClose}>
@@ -2319,11 +2327,8 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
-            {medecins.filter(med=>!selfOnly||med.id===selfOnly).filter(med=>{
-              // Only show medecins who have at least one eligible acte in this salle
-              const elig=siteActes.filter(a=>!a.medecinsAutorise||!a.medecinsAutorise.length||a.medecinsAutorise.includes(med.init));
-              return elig.length>0;
-            }).map(med=>{
+            {pickMeds.length===0&&<div style={{fontSize:11,color:"var(--txt3)",padding:"4px 2px"}}>Tous les médecins autorisés sont déjà dans cette salle.</div>}
+            {pickMeds.map(med=>{
               const avail=isMedAvailable(med,y2,m2,d,sl);
               return(
                 <button key={med.id} disabled={avail==="blocked"}
