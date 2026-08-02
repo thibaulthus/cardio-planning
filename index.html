@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.47 — 02/08/2026";
+var APP_VERSION = "v9.48 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -402,6 +402,16 @@ var inPrintWeek = function (pw, y, m, d) {
     var k = Math.round((b - a) / 86400000);
     return k >= 0 && k <= 6;
 };
+/* v9.48 : portee d'impression generalisee — semaine, mois, ou periode entiere. */
+var inPrintRange = function (pr, y, m, d) {
+    if (!pr)
+        return true;
+    if (pr.k === "m")
+        return y === pr.y && m === pr.m;
+    if (pr.k === "p")
+        return true;
+    return inPrintWeek(pr, y, m, d);
+};
 var mondayOf = function (y, m, d) { var t = new Date(y, m, d); var mo = new Date(y, m, d - ((t.getDay() + 6) % 7)); return { y: mo.getFullYear(), m: mo.getMonth(), d: mo.getDate() }; };
 var printWeekList = function (y, m) {
     var p = perStart(y, m), out = [], seen = {};
@@ -653,7 +663,7 @@ function GridV(_a) {
         }
         return days;
     }, [viewPeriod, allDays, year, month, showFull, PCFG.len, PCFG.startM]);
-    var printDays = printWk ? effectiveDays.filter(function (o) { return inPrintWeek(printWk, o.y, o.m, o.d); }) : effectiveDays;
+    var printDays = printWk ? effectiveDays.filter(function (o) { return inPrintRange(printWk, o.y, o.m, o.d); }) : effectiveDays;
     var getGardeMed = function (d) { return getGardeMed2(year, month, d); };
     var getGardeMed2 = function (y2, m2, d2) {
         var dw2 = dow(y2, m2, d2);
@@ -825,6 +835,7 @@ function GridV(_a) {
 }
 /* ════ SITE VIEW (CHL/CHB) ════ */
 function SiteView(_a) {
+    var _pwv = _a.printWk, printWk = _pwv === void 0 ? null : _pwv;
     var site = _a.site, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, actes = _a.actes, medecins = _a.medecins, getEntries = _a.getEntries, salleOcc = _a.salleOcc, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, onPickSite = _a.onPickSite, _b = _a.notes, notes = _b === void 0 ? {} : _b, _c = _a.salleReg, salleReg = _c === void 0 ? [] : _c, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod;
     var today = new Date();
     var ANGIO_SALLES_ALL = ["Angio-1", "Angio-2", "Angio-3"];
@@ -862,7 +873,7 @@ function SiteView(_a) {
     var _legacy = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }) : (_robustSalles || __spreadArray([], new Set(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles || []; })), true));
     var _allSallesBase = _uniq(_regS.concat(_legacy).filter(function (s) { return s !== "CHB-BIP"; }));
     var allSalles = _allSallesBase.concat(_recapCols);
-    var wdays = svEffDays; // keep full {y,m,d} objects
+    var wdays = printWk ? svEffDays.filter(function (o) { return inPrintRange(printWk, o.y, o.m, o.d); }) : svEffDays; // keep full {y,m,d} objects
     var siteColor = site === "CHL" ? "#388bfd" : site === "ANGIO" ? "#76a5af" : "#3fb950";
     function renderCell(salle, d, sl, ry, rm) {
         if (ry === undefined)
@@ -999,7 +1010,7 @@ function ActTabView(_a) {
         }
         return base;
     }, [year, month, showFull, PCFG.len, PCFG.startM]);
-    var wdays = printWk ? atvEffDays2.filter(function (o) { return inPrintWeek(printWk, o.y, o.m, o.d); }) : atvEffDays2; // keep full objects
+    var wdays = printWk ? atvEffDays2.filter(function (o) { return inPrintRange(printWk, o.y, o.m, o.d); }) : atvEffDays2; // keep full objects
     function getOcc(row, d, sl, ry, rm) {
         if (!ry)
             ry = year;
@@ -1136,7 +1147,6 @@ function ActTabView(_a) {
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
             ideFeature && React.createElement("button", { onClick: function () { return setIdeOn(function (v) { return !v; }); }, title: "Afficher les effectifs IDE", style: __assign(__assign({}, S.arr), { width: "auto", padding: "0 8px", fontSize: 11, fontWeight: 800, color: ideOn ? "#3fb950" : "var(--txt2)", border: "1px solid ".concat(ideOn ? "#3fb950" : "var(--border)") }) }, "\ud83e\ude7a IDE"),
-            ideFeature && onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer une semaine", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\ud83d\udda8\ufe0f"),
             ideFeature && ideOn && canIde && React.createElement("button", { onClick: function () { return setIdePanel(function (p) { return !p; }); }, title: "R\u00e9gler les effectifs par d\u00e9faut", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30, color: idePanel ? "#3fb950" : "var(--txt2)" }) }, "\u2699\ufe0f"),
             React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
@@ -1211,6 +1221,7 @@ function ActTabView(_a) {
 }
 /* ════ GARDE VIEW ════ */
 function GardeView(_a) {
+    var _pwg = _a.printWk, printWk = _pwg === void 0 ? null : _pwg;
     var year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
     var removeGarde = function (d3, y3, m3) {
         setPlan(function (p) {
@@ -1608,7 +1619,7 @@ function GardeView(_a) {
                 " ",
                 gMed.nom))) : null));
     }
-    var wdays = gvEffDays; // keep full objects
+    var wdays = printWk ? gvEffDays.filter(function (o) { return inPrintRange(printWk, o.y, o.m, o.d); }) : gvEffDays; // keep full objects
     var viewV = (React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)" } },
         React.createElement("table", { key: showFull ? "gvfull" : "gvpart", style: { borderCollapse: "collapse", tableLayout: "fixed" } },
             React.createElement("thead", null,
@@ -6273,6 +6284,9 @@ function CardioPlanning() {
                         !isEdit && React.createElement("span", { style: { color: "#e3b341", marginLeft: 5 } }, "\uD83D\uDC41"),
                         React.createElement("span", { style: { marginLeft: 4, width: 6, height: 6, borderRadius: "50%", display: "inline-block",
                                 background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: netOff ? "Hors ligne — lecture seule" : fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
+            /* v9.48 : une seule imprimante, dans l'en-tete — elle vaut pour l'onglet ouvert. */
+            ["planning", "chl", "chb", "plateau", "angio", "garde", "attache"].indexOf(tab) >= 0 &&
+                React.createElement("button", { onClick: function () { setPrintSel(mondayOf(year, month, 1)); setModal("print"); }, title: "Imprimer cet onglet", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.1)", color: "#f0f6fc", cursor: "pointer", fontSize: 13, flexShrink: 0, marginLeft: 6 } }, "\ud83d\udda8\ufe0f"),
             React.createElement("nav", { style: S.nav }, orderedTabs.map(function (_a) {
                 var v = _a[0], l = _a[1];
                 return (React.createElement("button", { key: v, draggable: true, onDragStart: function () { return setDragTab(v); }, onDragOver: function (e) { e.preventDefault(); }, onDrop: function (e) { e.preventDefault(); if (dragTab && dragTab !== v) {
@@ -6297,6 +6311,19 @@ function CardioPlanning() {
                     ") \u2014 consultation : les modifications iraient dans les donn\u00E9es actives.") : null;
             })()),
         React.createElement("main", { style: S.main },
+            /* v9.48 : le filtre « depuis aujourd'hui » peut ne laisser aucun jour. */
+            (function () {
+                if (showFull || !allDays4 || allDays4.length === 0)
+                    return null;
+                var tod = new Date();
+                tod.setHours(0, 0, 0, 0);
+                if (allDays4.some(function (o) { return new Date(o.y, o.m, o.d) >= tod; }))
+                    return null;
+                return (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "rgba(245,158,11,.12)", border: "1px solid #f59e0b66", borderRadius: 9, padding: "10px 13px", marginBottom: 10 } },
+                    React.createElement("span", { style: { fontSize: 16 } }, "\ud83d\uddd3\ufe0f"),
+                    React.createElement("span", { style: { fontSize: 12, color: "var(--txt)", flex: 1, minWidth: 180 } }, "Cette p\u00e9riode est enti\u00e8rement pass\u00e9e. L'affichage \u00ab depuis aujourd'hui \u00bb ne laisse donc aucun jour."),
+                    React.createElement("button", { onClick: function () { return setShowFull(true); }, style: { fontSize: 11, fontWeight: 800, padding: "5px 12px", borderRadius: 6, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.15)", color: "#b45309", cursor: "pointer" } }, "\ud83d\udcc5 Afficher la p\u00e9riode compl\u00e8te")));
+            })(),
             tab === "planning" && (React.createElement("div", null,
                 isEdit && planIssues.list.length > 0 && React.createElement("div", { style: { background: "rgba(248,81,73,.12)", border: "1px solid #f85149", borderRadius: 8, padding: "7px 11px", marginBottom: 8 } },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }, onClick: function () { return setPlIssOpen(function (v) { return !v; }); } },
@@ -6327,7 +6354,7 @@ function CardioPlanning() {
                     ? React.createElement(GridH, { planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
-            tab === "chl" && React.createElement(SiteView, { site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "chl" && React.createElement(SiteView, { printWk: printWk, site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
@@ -6335,7 +6362,7 @@ function CardioPlanning() {
             tab === "chb" && React.createElement("div", null,
                 isEdit && React.createElement("div", { style: { marginBottom: 6 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #46bdc6", background: "rgba(70,189,198,.10)", color: "#46bdc6", fontWeight: 800, cursor: "pointer" }, onClick: bipOpen }, "\uD83D\uDCDF R\u00E9partition du Bip")),
-                React.createElement(SiteView, { site: "CHB", darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+                React.createElement(SiteView, { printWk: printWk, site: "CHB", darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
                     var full = bip && ["CHB-1", "CHB-2", "CHB-3"].includes(salle) ? __spreadArray(__spreadArray([], siteActes.filter(function (a) { return a.id !== "BIP"; }), true), [bip], false) : siteActes;
@@ -6354,7 +6381,7 @@ function CardioPlanning() {
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "angio" && React.createElement(SiteView, { site: "ANGIO", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "angio" && React.createElement(SiteView, { printWk: printWk, site: "ANGIO", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
@@ -6368,7 +6395,7 @@ function CardioPlanning() {
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "garde" && React.createElement(GardeView, { year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, getEntry: getEntry, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast }),
+            tab === "garde" && React.createElement(GardeView, { printWk: printWk, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, getEntry: getEntry, allDays: allDays, isEdit: isEdit, orient: orient, setOrient: setOrient, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast }),
             tab === "bip" && React.createElement(BipTab, { year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, allDays: allDays, isEdit: isEdit, actes: actes, getEntries: getEntries, salleOcc: salleOcc, addEntry: addEntry, removeEntry: removeEntry, isMedAvailable: isMedAvailable, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull }),
             tab === "plantype" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
@@ -7790,28 +7817,27 @@ function CardioPlanning() {
                 }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
-        modal === "print" && React.createElement("div", { style: S.ov, onClick: function () { return setModal(null); } },
-            React.createElement("div", { style: __assign(__assign({}, S.mb), { width: 340 }), onClick: function (e) { e.stopPropagation(); } },
-                React.createElement("div", { style: S.mHd },
-                    React.createElement("div", { style: S.mTit2 }, "\ud83d\udda8\ufe0f Imprimer une semaine"),
-                    React.createElement("button", { style: S.xBtn, onClick: function () { return setModal(null); } }, "\u00d7")),
-                React.createElement("div", { style: S.fl }, "Quoi"),
-                React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, [["plateau", "\u2764\ufe0f PT Cardio"], ["planning", "\ud83d\udcc5 Planning \u00e9quipe"]].map(function (p) {
-                    var k = p[0], lab = p[1];
-                    return React.createElement("button", { key: k, onClick: function () { return setPrintWhat(k); }, style: __assign(__assign({ flex: 1 }, S.fi), { cursor: "pointer", fontWeight: 800, fontSize: 11, textAlign: "center", background: printWhat === k ? "rgba(63,185,80,.15)" : "var(--bg2)", color: printWhat === k ? "#3fb950" : "var(--txt2)", border: "1px solid ".concat(printWhat === k ? "#3fb950" : "var(--border)") }) }, lab);
-                })),
-                React.createElement("div", { style: S.fl }, "Semaine"),
-                React.createElement("div", { style: { maxHeight: 210, overflowY: "auto", marginBottom: 10 } }, printWeekList(year, month).map(function (w) {
-                    var on = printSel && printSel.y === w.y && printSel.m === w.m && printSel.d === w.d;
-                    return React.createElement("button", { key: w.y + "-" + w.m + "-" + w.d, onClick: function () { return setPrintSel(w); }, style: __assign(__assign({ width: "100%", textAlign: "left" }, S.fi), { marginBottom: 4, cursor: "pointer", fontSize: 12, fontWeight: on ? 800 : 600, background: on ? "rgba(63,185,80,.15)" : "var(--bg2)", color: on ? "#3fb950" : "var(--txt)", border: "1px solid ".concat(on ? "#3fb950" : "var(--border)") }) }, "Semaine du lundi " + w.d + " " + MOIS[w.m]);
-                })),
-                React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginBottom: 8 } }, "La bo\u00eete d'impression du navigateur s'ouvrira : choisissez l'imprimante, ou \u00ab Enregistrer en PDF \u00bb pour envoyer la feuille."),
-                React.createElement("button", { style: __assign(__assign({}, S.btnP), { width: "100%" }), onClick: function () {
-                        setTab(printWhat === "plateau" ? "plateau" : "planning");
-                        setPrintWk(printSel);
-                        setModal(null);
-                        setTimeout(function () { window.print(); setTimeout(function () { return setPrintWk(null); }, 500); }, 350);
-                    } }, "Imprimer"))),
+        modal === "print" && (function () {
+            var TABN = { planning: "\ud83d\udcc5 Planning \u00e9quipe", chl: "\ud83c\udfe5 CHL", chb: "\ud83c\udfe5 CHB", plateau: "\u2764\ufe0f PT Cardio", angio: "\ud83d\udd2c PT Angio", garde: "\ud83c\udf19 Gardes", attache: "\ud83c\udfe2 Attach\u00e9s" };
+            var isG = tab === "garde";
+            var mois = [];
+            for (var i = 0; i < PCFG.len; i++) {
+                var p = perStart(year, month);
+                var m3 = (p.sm + i) % 12, y3 = p.sm + i > 11 ? p.sy + 1 : p.sy;
+                mois.push({ y: y3, m: m3 });
+            }
+            var doPrint = function (range) { setPrintWk(range); setModal(null); setTimeout(function () { window.print(); setTimeout(function () { return setPrintWk(null); }, 600); }, 350); };
+            return (React.createElement("div", { style: S.ov, onClick: function () { return setModal(null); } },
+                React.createElement("div", { style: __assign(__assign({}, S.mb), { width: 330 }), onClick: function (e) { e.stopPropagation(); } },
+                    React.createElement("div", { style: S.mHd },
+                        React.createElement("div", { style: S.mTit2 }, "\ud83d\udda8\ufe0f Imprimer \u2014 " + (TABN[tab] || "")),
+                        React.createElement("button", { style: S.xBtn, onClick: function () { return setModal(null); } }, "\u00d7")),
+                    React.createElement("div", { style: S.fl }, isG ? "P\u00e9riode \u00e0 imprimer" : "Semaine \u00e0 imprimer"),
+                    React.createElement("div", { style: { maxHeight: 250, overflowY: "auto", marginBottom: 10 } }, isG
+                        ? React.createElement(React.Fragment, null, mois.map(function (o) { return React.createElement("button", { key: o.y + "-" + o.m, onClick: function () { return doPrint({ k: "m", y: o.y, m: o.m }); }, style: __assign(__assign({ width: "100%", textAlign: "left" }, S.fi), { marginBottom: 4, cursor: "pointer", fontSize: 12, fontWeight: 700, background: "var(--bg2)", color: "var(--txt)" }) }, MOIS[o.m] + " " + o.y); }), React.createElement("button", { onClick: function () { return doPrint({ k: "p" }); }, style: __assign(__assign({ width: "100%", textAlign: "left" }, S.fi), { marginBottom: 4, cursor: "pointer", fontSize: 12, fontWeight: 800, background: "rgba(63,185,80,.15)", color: "#3fb950", border: "1px solid #3fb950" }) }, "Toute la p\u00e9riode (" + _titlePeriod + ")"))
+                        : printWeekList(year, month).map(function (w) { return React.createElement("button", { key: w.y + "-" + w.m + "-" + w.d, onClick: function () { return doPrint({ k: "w", y: w.y, m: w.m, d: w.d }); }, style: __assign(__assign({ width: "100%", textAlign: "left" }, S.fi), { marginBottom: 4, cursor: "pointer", fontSize: 12, fontWeight: 700, background: "var(--bg2)", color: "var(--txt)" }) }, "Semaine du lundi " + w.d + " " + MOIS[w.m]); })),
+                    React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "La bo\u00eete d'impression du navigateur s'ouvrira : choisissez l'imprimante, ou \u00ab Enregistrer en PDF \u00bb pour envoyer la feuille."))));
+        })(),
         modal === "pickMedAct" && mData && React.createElement(PickMedActModal, { patchAct: patchActivity, canDif: isEdit || isCadre, mData: mData, setMData: setMData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, selfOnly: isMedEdit && !isInterEdit ? editMedId : null, onClose: function () { return setModal(null); } }),
         modal === "pickMedSite" && mData && React.createElement(PickMedSiteModal, { mData: mData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, selfOnly: isMedEdit && !isInterEdit ? editMedId : null, onClose: function () { return setModal(null); } }),
         modal === "editPT" && mData && React.createElement(EditPTModal, { mData: mData, setMData: setMData, medecins: medecins, actes: actes, planningType: planningType, setPlanningType: setPlanningType, onClose: function () { return setModal(null); } }),
