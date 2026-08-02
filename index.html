@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.50 — 02/08/2026";
+var APP_VERSION = "v9.51 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -7597,8 +7597,9 @@ function CardioPlanning() {
                         if (!a)
                             return null;
                         return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 3 } },
-                            React.createElement(Badge, { a: a, salle: e.salle }),
-                            a.hasSalle && !e.salle && React.createElement("span", { style: { fontSize: 9, fontWeight: 800, color: "#f85149", border: "1px solid rgba(248,81,73,.5)", background: "rgba(248,81,73,.10)", borderRadius: 4, padding: "1px 4px", whiteSpace: "nowrap" } }, "sans salle"),
+                            React.createElement(Badge, { a: a, hideSalle: true }),
+                            e.salle && React.createElement("span", { style: { fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: "var(--txt)", border: "1px solid var(--border)", background: "var(--bg2)", borderRadius: 4, padding: "3px 7px", whiteSpace: "nowrap" } }, e.salle),
+                            a.hasSalle && !e.salle && React.createElement("span", { style: { fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: "#f85149", border: "1px solid rgba(248,81,73,.5)", background: "rgba(248,81,73,.10)", borderRadius: 4, padding: "3px 7px", whiteSpace: "nowrap" } }, "sans salle"),
                             canEditThisMed && (!isAdminEdit || a.adminOk === true || a.id === "ABSENCE" || a.id === "FORMATION") && React.createElement("button", { onClick: function () {
                                     if (e.acteId === "GARDE") {
                                         removeEntry(medId, y2, m2, d2, slot, e.acteId);

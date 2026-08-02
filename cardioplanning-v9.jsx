@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.50 — 02/08/2026";
+const APP_VERSION="v9.51 — 02/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -6796,8 +6796,9 @@ header::-webkit-scrollbar { display: none; }
                     const a=acteById(e.acteId);if(!a)return null;
                     return(
                       <div key={i} style={{display:"flex",alignItems:"center",gap:3}}>
-                        <Badge a={a} salle={e.salle}/>
-                        {a.hasSalle&&!e.salle&&<span style={{fontSize:9,fontWeight:800,color:"#f85149",border:"1px solid rgba(248,81,73,.5)",background:"rgba(248,81,73,.10)",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>sans salle</span>}
+                        <Badge a={a} hideSalle={true}/>
+                        {e.salle&&<span style={{fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"var(--txt)",border:"1px solid var(--border)",background:"var(--bg2)",borderRadius:4,padding:"3px 7px",whiteSpace:"nowrap"}}>{e.salle}</span>}
+                        {a.hasSalle&&!e.salle&&<span style={{fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"#f85149",border:"1px solid rgba(248,81,73,.5)",background:"rgba(248,81,73,.10)",borderRadius:4,padding:"3px 7px",whiteSpace:"nowrap"}}>sans salle</span>}
                         {canEditThisMed&&(!isAdminEdit||a.adminOk===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
                           if(e.acteId==="GARDE"){
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);
