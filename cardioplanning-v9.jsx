@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.54 — 03/08/2026";
+const APP_VERSION="v9.55 — 03/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -85,6 +85,20 @@ const GRP={
 
 const SALLES_CHL=["CHL-1","CHL-2","CHL-3","CHL-4","CHL-5","CHL-6","CHL-7","Holter","HC-Exam"];
 const S_STIM="Salle-Stim",S_EEP="Salle-EEP",S_EE_CHL="EE-CHL",S_EE_CHB="EE-CHB";
+/* v9.55 : les colonnes de PT Cardio sont TOUTES ordonnables. Les six historiques,
+   jusque-là écrites en dur dans le rendu, deviennent des données porteuses d'une clé ;
+   les autres prennent la clé de leur activité. L'ordre est un simple tableau de clés
+   partagé par toute l'équipe (champ Firestore ptOrder) : ce qui n'y figure pas garde
+   son rang naturel À LA FIN, donc une activité nouvellement cochée « PT Cardio »
+   apparaît en dernier sans migration ni réglage. */
+const PT_FIXED_ROWS=[
+  {key:"ROW_STIM",label:"Salle-Stim",ids:["STIM","STIM_AG","EEP_AG"],color:"#e3b341",salle:S_STIM,multiActe:true},
+  {key:"ROW_EEP",label:"Salle-EEP",ids:["EEP"],color:"#f472b6",salle:S_EEP,multiActe:true},
+  {key:"ROW_DOBU",label:"Dobu",ids:["DOBU"],color:"#60a5fa",salle:null,hasSalleChoice:true,sallesDisp:["CHL-4","CHL-5"]},
+  {key:"ROW_ETO",label:"ETO",ids:["ETO_CHL"],color:"#2dd4bf",salle:null,hasSalleChoice:true,sallesDisp:SALLES_CHL},
+  {key:"ROW_REVEAL",label:"Reveal",ids:["REVEAL"],color:"#818cf8",salle:null,hasSalleChoice:true,sallesDisp:SALLES_CHL},
+  {key:"ROW_EECHL",label:"EE CHL",ids:["EE_CHL"],color:"#4ade80",salle:S_EE_CHL},
+];
 
 const DEFAULT_ACTES=[
   {id:"GARDE",label:"Garde nuit",short:"G",color:"#93c47d",bg:"#f85149",hasSalle:false,salles:[],isSystem:true,site:"tous",medecinsAutorise:[]},
@@ -874,7 +888,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,orient,setOrient,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,printWk,onPrint}){
+function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,orient,setOrient,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1032,6 +1046,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
         <button onClick={nextM} style={S.arr}>›</button>
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
+        {orderCtl&&<button onClick={onOrder} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↕</button>}
         {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
         {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
         {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
@@ -4154,6 +4169,7 @@ function CardioPlanning(){
   const [isCadre,setIsCadre]=useState(false);
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
+  const [ptOrder,setPtOrder]=useState([]);
   /* ── v9.40 : impression ── */
   const [printWk,setPrintWk]=useState(null);
   const [printWhat,setPrintWhat]=useState("plateau");
@@ -4426,6 +4442,7 @@ function CardioPlanning(){
             if(data.adminPin!==undefined)setAdminPin(data.adminPin);
           if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
+          if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
             if(data.adminEnabled!==undefined)setAdminEnabled(data.adminEnabled);
             if(data.adminCanReports!==undefined)setAdminCanReports(data.adminCanReports);
             if(data.adminCanNotes!==undefined)setAdminCanNotes(data.adminCanNotes);
@@ -4861,6 +4878,25 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({editPin});},[editPin]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
+  /* Les lignes de PT Cardio, fixes et automatiques réunies, rangées selon ptOrder. */
+  const ptRows=useMemo(()=>{
+    const used={};PT_FIXED_ROWS.forEach(r=>(r.ids||[]).forEach(i=>{used[i]=1;}));
+    const auto=actes.filter(a=>acteRecapIn(a,"PLATEAU")&&!a.isSystem&&!used[a.id]).map(a=>(
+      (a.salles||[]).length>1
+        ?{key:a.id,label:a.label,ids:[a.id],color:a.color,salle:null,hasSalleChoice:true,sallesDisp:a.salles}
+        :{key:a.id,label:a.label,ids:[a.id],color:a.color,salle:(a.salles&&a.salles[0])||null}));
+    const all=PT_FIXED_ROWS.concat(auto);
+    const rank=k=>{const i=(ptOrder||[]).indexOf(k);return i<0?9999:i;};
+    return all.map((r,i)=>({r,i})).sort((a,b)=>(rank(a.r.key)-rank(b.r.key))||(a.i-b.i)).map(x=>x.r);
+  },[actes,ptOrder]);
+  const movePtRow=(key,dir)=>{
+    const cur=ptRows.map(r=>r.key);
+    const i=cur.indexOf(key),j=i+dir;
+    if(i<0||j<0||j>=cur.length)return;
+    const nx=cur.slice();nx[i]=cur[j];nx[j]=cur[i];
+    setPtOrder(nx);
+  };
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astreinte:JSON.stringify(astreinte)});},[astreinte]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medPins:JSON.stringify(medPins)});},[medPins]);
 
@@ -5719,14 +5755,7 @@ header::-webkit-scrollbar { display: none; }
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
       {tab==="plateau"&&<ActTabView title="❤️ PT Cardio" titleColor="#e3b341"
-        rows={[
-          {label:"Salle-Stim",ids:["STIM","STIM_AG","EEP_AG"],color:"#e3b341",salle:S_STIM,multiActe:true},
-          {label:"Salle-EEP",ids:["EEP"],color:"#f472b6",salle:S_EEP,multiActe:true},
-          {label:"Dobu",ids:["DOBU"],color:"#60a5fa",salle:null,hasSalleChoice:true,sallesDisp:["CHL-4","CHL-5"]},
-          {label:"ETO",ids:["ETO_CHL"],color:"#2dd4bf",salle:null,hasSalleChoice:true,sallesDisp:SALLES_CHL},
-          {label:"Reveal",ids:["REVEAL"],color:"#818cf8",salle:null,hasSalleChoice:true,sallesDisp:SALLES_CHL},
-          {label:"EE CHL",ids:["EE_CHL"],color:"#4ade80",salle:S_EE_CHL},
-        ].concat(actes.filter(a=>acteRecapIn(a,"PLATEAU")&&!a.isSystem).map(a=>((a.salles||[]).length>1?{label:a.label,ids:[a.id],color:a.color,salle:null,hasSalleChoice:true,sallesDisp:a.salles}:{label:a.label,ids:[a.id],color:a.color,salle:(a.salles&&a.salles[0])||null})))}
+        rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
         getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
@@ -7091,6 +7120,23 @@ header::-webkit-scrollbar { display: none; }
   onApply={p=>{applyAbsence(p);setModal(null);}}
   onRemove={p=>{removeAbsence(p);setModal(null);}}
   onClose={()=>setModal(null)}/></Ov>}
+      {modal==="ptOrder"&&<div style={S.ov} onClick={()=>setModal(null)}>
+        <div style={{...S.mb,width:330}} onClick={e=>e.stopPropagation()}>
+          <div style={S.mHd}><div style={S.mTit2}>↕ Ordre des colonnes — PT Cardio</div><button style={S.xBtn} onClick={()=>setModal(null)}>×</button></div>
+          <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>Cet ordre est partagé par toute l'équipe. Une activité que l'on vient de cocher « ❤️ PT Cardio » se place en dernier.</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
+            {ptRows.map((r,i)=>(
+              <div key={r.key} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 6px",border:"1px solid var(--border)",borderRadius:6,background:"var(--bg2)"}}>
+                <span style={{width:8,height:18,borderRadius:3,background:r.color,flexShrink:0}}/>
+                <span style={{flex:1,fontSize:12,fontWeight:700}}>{r.label}</span>
+                <button disabled={i===0} title="Monter" style={{...S.icnBtn,fontSize:11,fontWeight:800,opacity:i===0?.3:1}} onClick={()=>movePtRow(r.key,-1)}>▲</button>
+                <button disabled={i===ptRows.length-1} title="Descendre" style={{...S.icnBtn,fontSize:11,fontWeight:800,opacity:i===ptRows.length-1?.3:1}} onClick={()=>movePtRow(r.key,1)}>▼</button>
+              </div>
+            ))}
+          </div>
+          <button style={{...S.icnBtn,width:"100%",marginTop:10}} onClick={()=>setPtOrder([])}>↩ Ordre par défaut</button>
+        </div>
+      </div>}
       {modal==="print"&&(()=>{
         const TABN={planning:"📅 Planning équipe",chl:"🏥 CHL",chb:"🏥 CHB",plateau:"❤️ PT Cardio",angio:"🔬 PT Angio",garde:"🌙 Gardes",attache:"👔 Attachés",astreinte:"📞 Astreinte"};
         const isG=tab==="garde"||tab==="astreinte";

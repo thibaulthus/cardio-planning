@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.54 — 03/08/2026";
+var APP_VERSION = "v9.55 — 03/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -214,6 +214,16 @@ var GRP = {
 };
 var SALLES_CHL = ["CHL-1", "CHL-2", "CHL-3", "CHL-4", "CHL-5", "CHL-6", "CHL-7", "Holter", "HC-Exam"];
 var S_STIM = "Salle-Stim", S_EEP = "Salle-EEP", S_EE_CHL = "EE-CHL", S_EE_CHB = "EE-CHB";
+/* v9.55 : toutes les colonnes de PT Cardio sont ordonnables. ptOrder = tableau de cles
+   partage par l'equipe ; une cle absente garde son rang naturel a la fin. */
+var PT_FIXED_ROWS = [
+    { key: "ROW_STIM", label: "Salle-Stim", ids: ["STIM", "STIM_AG", "EEP_AG"], color: "#e3b341", salle: S_STIM, multiActe: true },
+    { key: "ROW_EEP", label: "Salle-EEP", ids: ["EEP"], color: "#f472b6", salle: S_EEP, multiActe: true },
+    { key: "ROW_DOBU", label: "Dobu", ids: ["DOBU"], color: "#60a5fa", salle: null, hasSalleChoice: true, sallesDisp: ["CHL-4", "CHL-5"] },
+    { key: "ROW_ETO", label: "ETO", ids: ["ETO_CHL"], color: "#2dd4bf", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
+    { key: "ROW_REVEAL", label: "Reveal", ids: ["REVEAL"], color: "#818cf8", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
+    { key: "ROW_EECHL", label: "EE CHL", ids: ["EE_CHL"], color: "#4ade80", salle: S_EE_CHL },
+];
 var DEFAULT_ACTES = [
     { id: "GARDE", label: "Garde nuit", short: "G", color: "#93c47d", bg: "#f85149", hasSalle: false, salles: [], isSystem: true, site: "tous", medecinsAutorise: [] },
     { id: "REPOS_GARDE", label: "Repos post-garde", short: "RG", color: "#ffe599", bg: "#8b949e", hasSalle: false, salles: [], isSystem: true, site: "tous", medecinsAutorise: ["VA", "HV", "TOM", "NH", "CV", "TH", "CBV", "JSL", "TD", "ND", "JSS", "PM", "MG", "CB", "AB"] },
@@ -1044,7 +1054,7 @@ function SiteView(_a) {
 }
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
 function ActTabView(_a) {
-    var title = _a.title, titleColor = _a.titleColor, rows = _a.rows, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, onPickAct = _a.onPickAct, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, ideFeature = _a.ideFeature, ideOn = _a.ideOn, setIdeOn = _a.setIdeOn, ideCfg = _a.ideCfg, setIdeCfg = _a.setIdeCfg, canIde = _a.canIde, printWk = _a.printWk, onPrint = _a.onPrint;
+    var title = _a.title, titleColor = _a.titleColor, rows = _a.rows, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, onPickAct = _a.onPickAct, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, ideFeature = _a.ideFeature, ideOn = _a.ideOn, setIdeOn = _a.setIdeOn, ideCfg = _a.ideCfg, setIdeCfg = _a.setIdeCfg, canIde = _a.canIde, orderCtl = _a.orderCtl, onOrder = _a.onOrder, printWk = _a.printWk, onPrint = _a.onPrint;
     var today = new Date();
     var atvEffDays2 = useMemo(function () {
         var p = perStart(year, month);
@@ -1201,6 +1211,7 @@ function ActTabView(_a) {
                 (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
+            orderCtl && React.createElement("button", { onClick: onOrder, title: "Ordre des colonnes", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\u2195"),
             ideFeature && React.createElement("button", { onClick: function () { return setIdeOn(function (v) { return !v; }); }, title: "Afficher les effectifs IDE", style: __assign(__assign({}, S.arr), { width: "auto", padding: "0 8px", fontSize: 11, fontWeight: 800, color: ideOn ? "#3fb950" : "var(--txt2)", border: "1px solid ".concat(ideOn ? "#3fb950" : "var(--border)") }) }, "\ud83e\ude7a IDE"),
             ideFeature && ideOn && canIde && React.createElement("button", { onClick: function () { return setIdePanel(function (p) { return !p; }); }, title: "R\u00e9gler les effectifs par d\u00e9faut", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30, color: idePanel ? "#3fb950" : "var(--txt2)" }) }, "\u2699\ufe0f"),
             React.createElement("button", { onClick: onPrint, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\ud83d\udda8\ufe0f"),
@@ -4359,6 +4370,7 @@ function CardioPlanning() {
     var _ic = useState(false), isCadre = _ic[0], setIsCadre = _ic[1];
     /* ── v9.35 : effectifs IDE ── */
     var _icf = useState({ def: {}, ov: {} }), ideCfg = _icf[0], setIdeCfg = _icf[1];
+    var _pto = useState([]), ptOrder = _pto[0], setPtOrder = _pto[1];
     /* v9.40 : impression */
     var _pw2 = useState(null), printWk = _pw2[0], setPrintWk = _pw2[1];
     var _pwh = useState("plateau"), printWhat = _pwh[0], setPrintWhat = _pwh[1];
@@ -4721,6 +4733,7 @@ function CardioPlanning() {
                     if (data.cadrePin !== undefined)
                         setCadrePin(data.cadrePin);
                     if (data.ideCfg) { try { setIdeCfg(JSON.parse(data.ideCfg)); } catch (e) { } }
+                    if (data.ptOrder) { try { setPtOrder(JSON.parse(data.ptOrder) || []); } catch (e) { } }
                     if (data.adminEnabled !== undefined)
                         setAdminEnabled(data.adminEnabled);
                     if (data.adminCanReports !== undefined)
@@ -5432,6 +5445,32 @@ function CardioPlanning() {
         saveToFirebase({ adminPin: adminPin, cadrePin: cadrePin, adminEnabled: adminEnabled, adminCanReports: adminCanReports, adminCanNotes: adminCanNotes }); }, [adminPin, cadrePin, adminEnabled, adminCanReports, adminCanNotes]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ ideCfg: JSON.stringify(ideCfg) }); }, [ideCfg]);
+    useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ ptOrder: JSON.stringify(ptOrder) }); }, [ptOrder]);
+    var ptRows = useMemo(function () {
+        var used = {};
+        PT_FIXED_ROWS.forEach(function (r) { (r.ids || []).forEach(function (i) { used[i] = 1; }); });
+        var auto = actes.filter(function (a) { return acteRecapIn(a, "PLATEAU") && !a.isSystem && !used[a.id]; }).map(function (a) {
+            return ((a.salles || []).length > 1
+                ? { key: a.id, label: a.label, ids: [a.id], color: a.color, salle: null, hasSalleChoice: true, sallesDisp: a.salles }
+                : { key: a.id, label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null });
+        });
+        var all = PT_FIXED_ROWS.concat(auto);
+        var rank = function (k) { var i = (ptOrder || []).indexOf(k); return i < 0 ? 9999 : i; };
+        return all.map(function (r, i) { return ({ r: r, i: i }); })
+            .sort(function (a, b) { return (rank(a.r.key) - rank(b.r.key)) || (a.i - b.i); })
+            .map(function (x) { return x.r; });
+    }, [actes, ptOrder]);
+    var movePtRow = function (key, dir) {
+        var cur = ptRows.map(function (r) { return r.key; });
+        var i = cur.indexOf(key), j = i + dir;
+        if (i < 0 || j < 0 || j >= cur.length)
+            return;
+        var nx = cur.slice();
+        nx[i] = cur[j];
+        nx[j] = cur[i];
+        setPtOrder(nx);
+    };
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ astreinte: JSON.stringify(astreinte) }); }, [astreinte]);
     useEffect(function () { if (!isFirstLoad.current)
@@ -6432,14 +6471,7 @@ function CardioPlanning() {
                     setMData({ salle: salle, siteActes: full, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod })),
-            tab === "plateau" && React.createElement(ActTabView, { title: "\u2764\uFE0F PT Cardio", titleColor: "#e3b341", rows: [
-                    { label: "Salle-Stim", ids: ["STIM", "STIM_AG", "EEP_AG"], color: "#e3b341", salle: S_STIM, multiActe: true },
-                    { label: "Salle-EEP", ids: ["EEP"], color: "#f472b6", salle: S_EEP, multiActe: true },
-                    { label: "Dobu", ids: ["DOBU"], color: "#60a5fa", salle: null, hasSalleChoice: true, sallesDisp: ["CHL-4", "CHL-5"] },
-                    { label: "ETO", ids: ["ETO_CHL"], color: "#2dd4bf", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
-                    { label: "Reveal", ids: ["REVEAL"], color: "#818cf8", salle: null, hasSalleChoice: true, sallesDisp: SALLES_CHL },
-                    { label: "EE CHL", ids: ["EE_CHL"], color: "#4ade80", salle: S_EE_CHL },
-                ].concat(actes.filter(function (a) { return acteRecapIn(a, "PLATEAU") && !a.isSystem; }).map(function (a) { return ((a.salles || []).length > 1 ? { label: a.label, ids: [a.id], color: a.color, salle: null, hasSalleChoice: true, sallesDisp: a.salles } : { label: a.label, ids: [a.id], color: a.color, salle: (a.salles && a.salles[0]) || null }); })), year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, ideFeature: true, ideOn: ideOn, setIdeOn: setIdeOn, ideCfg: ideCfg, setIdeCfg: setIdeCfg, canIde: isEdit || isCadre, printWk: printWk, onPrint: function () { return setModal("print"); }, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
+            tab === "plateau" && React.createElement(ActTabView, { title: "\u2764\uFE0F PT Cardio", titleColor: "#e3b341", rows: ptRows, orderCtl: isEdit, onOrder: function () { return setModal("ptOrder"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, ideFeature: true, ideOn: ideOn, setIdeOn: setIdeOn, ideCfg: ideCfg, setIdeCfg: setIdeCfg, canIde: isEdit || isCadre, printWk: printWk, onPrint: function () { return setModal("print"); }, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
@@ -7877,6 +7909,20 @@ function CardioPlanning() {
                 }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
+        modal === "ptOrder" && React.createElement("div", { style: S.ov, onClick: function () { return setModal(null); } },
+            React.createElement("div", { style: __assign(__assign({}, S.mb), { width: 330 }), onClick: function (e) { return e.stopPropagation(); } },
+                React.createElement("div", { style: S.mHd },
+                    React.createElement("div", { style: S.mTit2 }, "\u2195 Ordre des colonnes \u2014 PT Cardio"),
+                    React.createElement("button", { style: S.xBtn, onClick: function () { return setModal(null); } }, "\u00d7")),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8 } }, "Cet ordre est partag\u00e9 par toute l'\u00e9quipe. Une activit\u00e9 que l'on vient de cocher \u00ab \u2764\ufe0f PT Cardio \u00bb se place en dernier."),
+                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 340, overflowY: "auto" } }, ptRows.map(function (r, i) {
+                    return React.createElement("div", { key: r.key, style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg2)" } },
+                        React.createElement("span", { style: { width: 8, height: 18, borderRadius: 3, background: r.color, flexShrink: 0 } }),
+                        React.createElement("span", { style: { flex: 1, fontSize: 12, fontWeight: 700 } }, r.label),
+                        React.createElement("button", { disabled: i === 0, title: "Monter", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800, opacity: i === 0 ? .3 : 1 }), onClick: function () { return movePtRow(r.key, -1); } }, "\u25b2"),
+                        React.createElement("button", { disabled: i === ptRows.length - 1, title: "Descendre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800, opacity: i === ptRows.length - 1 ? .3 : 1 }), onClick: function () { return movePtRow(r.key, 1); } }, "\u25bc"));
+                })),
+                React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { width: "100%", marginTop: 10 }), onClick: function () { return setPtOrder([]); } }, "\u21a9 Ordre par d\u00e9faut"))),
         modal === "print" && (function () {
             var TABN = { planning: "\ud83d\udcc5 Planning \u00e9quipe", chl: "\ud83c\udfe5 CHL", chb: "\ud83c\udfe5 CHB", plateau: "\u2764\ufe0f PT Cardio", angio: "\ud83d\udd2c PT Angio", garde: "\ud83c\udf19 Gardes", attache: "\ud83d\udc54 Attach\u00e9s", astreinte: "\ud83d\udcde Astreinte" };
             var isG = tab === "garde" || tab === "astreinte";
