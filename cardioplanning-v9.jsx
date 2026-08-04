@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.59 — 04/08/2026";
+const APP_VERSION="v9.60 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -7042,7 +7042,8 @@ header::-webkit-scrollbar { display: none; }
         const doGarde=()=>{ applyGarde(medId,y2,m2,d2); setModal(null); };
         const doAdd=(acteId,salle=null)=>{
           if(acteId==="GARDE"){doGarde();return;}
-          const _curA=getEntries(medId,y2,m2,d2,we?"JOUR":slot).map(e2=>e2.acteId);
+          /* v9.60 : une branche non tranchée n'est pas « déjà posée » — la reposer, c'est trancher */
+          const _curA=getEntries(medId,y2,m2,d2,we?"JOUR":slot).filter(e2=>e2&&!e2.cond).map(e2=>e2.acteId);
           if(_curA.includes(acteId)){toast("Cette activité est déjà posée sur ce créneau — retirez-la d'abord (×) si besoin","warn");return;}
           const acteObj=acteById(acteId);
           const finalSalle=salle||(acteObj&&acteObj.fixedSalle)||null;
@@ -7065,15 +7066,33 @@ header::-webkit-scrollbar { display: none; }
             {(()=>{
               const cE=entries.filter(e=>e&&e.acteId&&e.cond);
               if(!cE.length)return null;
+              /* v9.60 : les branches d'un choix ouvert sont posées SANS SALLE (c'est le principe).
+                 Trancher depuis ici doit donc pouvoir attribuer la salle dans la foulée, et
+                 surtout MONTRER avant de cliquer s'il en reste une de libre. */
+              const busy={};
+              actes.filter(ax=>ax.hasSalle||ax.fixedSalle).forEach(ax=>{
+                const ao=salleOcc(ax.id,y2,m2,d2,slot);
+                Object.keys(ao).forEach(s=>{if(!busy[s])busy[s]=[];ao[s].forEach(m=>{if(!busy[s].find(x=>x.id===m.id))busy[s].push(m);});});
+              });
+              const freeOf=a=>(a.salles||[]).filter(s=>!((busy[s]||[]).some(m=>m.id!==medId)));
               return(
                 <div style={{marginBottom:10,padding:"7px 9px",borderRadius:8,border:"1.5px dashed "+COND_C,background:COND_BG}}>
                   <div style={{fontSize:10,color:COND_C,fontWeight:800,marginBottom:6}}>◇ CHOIX OUVERT — {cE.length} branches, non tranché</div>
-                  {cE.map((e,i)=>{const a=acteById(e.acteId);if(!a)return null;return(
+                  {cE.map((e,i)=>{const a=acteById(e.acteId);if(!a)return null;
+                    const tot=(a.salles||[]).length,fr=freeOf(a);
+                    const dispo=tot===0?null:fr.length>0;
+                    return(
                     <div key={i} style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
                       <Badge a={a} hideSalle={true}/>
-                      <span style={{flex:1,fontSize:10,color:"var(--txt3)"}}>{a.hasSalle?"sans salle":"pas de salle"}</span>
-                      {canEditThisMed&&<button onClick={()=>settleCond(medId,y2,m2,d2,slot,e.acteId)}
-                        style={{background:"transparent",border:"1px solid "+COND_C,color:COND_C,borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>✓ c'est celle-ci</button>}
+                      <span style={{flex:1,fontSize:10,fontWeight:700,color:dispo===null?"var(--txt3)":dispo?"#2f9440":"#f85149"}}>
+                        {dispo===null?"pas de salle":dispo?(fr.length+"/"+tot+" salle"+(tot>1?"s":"")+" libre"+(fr.length>1?"s":"")+" : "+fr.join(", ")):"aucune salle libre"}
+                      </span>
+                      {canEditThisMed&&<button onClick={()=>{
+                          if(a.fixedSalle){doAdd(a.id,a.fixedSalle);return;}
+                          if(tot>0){setMData(p=>({...p,_pickSalle:a.id}));return;}
+                          settleCond(medId,y2,m2,d2,slot,a.id);
+                        }}
+                        style={{background:"transparent",border:"1px solid "+COND_C,color:COND_C,borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>{tot>0&&!a.fixedSalle?"Choisir la salle…":"✓ c'est celle-ci"}</button>}
                     </div>);})}
                   <div style={{fontSize:10,color:"var(--txt3)",lineHeight:1.45}}>Attribuer une salle depuis un onglet de salles tranche aussi le choix.</div>
                 </div>);
@@ -7223,6 +7242,7 @@ header::-webkit-scrollbar { display: none; }
                 <div style={{marginTop:9,padding:10,background:"var(--bg)",borderRadius:8,border:`1px solid ${a.color}33`}}>
                   <div style={{fontSize:10,color:a.color,fontWeight:700,marginBottom:7}}>{a.label} — Salle</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    <button style={{padding:"5px 9px",borderRadius:5,border:"1px solid var(--border)",cursor:"pointer",background:"var(--bg2)",color:"var(--txt2)",fontSize:11,fontWeight:700}} onClick={()=>setMData(p=>({...p,_pickSalle:null}))}>← Retour</button>
                     {!a.fixedSalle&&<button style={{padding:"5px 9px",borderRadius:5,border:"1px solid var(--border)",cursor:"pointer",background:"var(--bg2)",color:"var(--txt2)",fontSize:11,fontWeight:700}} onClick={()=>doAdd(a.id,null)}>Sans salle</button>}
                     {(a.salles||[]).map(s=>{
                       const roomOccs=fullRoomOcc[s]||[];

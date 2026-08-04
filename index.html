@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.59 — 04/08/2026";
+var APP_VERSION = "v9.60 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -7807,7 +7807,8 @@ function CardioPlanning() {
                     doGarde();
                     return;
                 }
-                var _curA = getEntries(medId, y2, m2, d2, we ? "JOUR" : slot).map(function (e2) { return e2.acteId; });
+                /* v9.60 : une branche non tranchee n'est pas « deja posee » */
+                var _curA = getEntries(medId, y2, m2, d2, we ? "JOUR" : slot).filter(function (e2) { return e2 && !e2.cond; }).map(function (e2) { return e2.acteId; });
                 if (_curA.includes(acteId)) {
                     toast("Cette activité est déjà posée sur ce créneau — retirez-la d'abord (×) si besoin", "warn");
                     return;
@@ -7841,16 +7842,42 @@ function CardioPlanning() {
                     var cE = entries.filter(function (e) { return e && e.acteId && e.cond; });
                     if (!cE.length)
                         return null;
+                    /* v9.60 : les branches d'un choix ouvert sont posées SANS SALLE (c'est le principe).
+                       Trancher depuis ici doit donc pouvoir attribuer la salle dans la foulée, et
+                       surtout MONTRER avant de cliquer s'il en reste une de libre. */
+                    var busy = {};
+                    actes.filter(function (ax) { return ax.hasSalle || ax.fixedSalle; }).forEach(function (ax) {
+                        var ao = salleOcc(ax.id, y2, m2, d2, slot);
+                        Object.keys(ao).forEach(function (s) { if (!busy[s])
+                            busy[s] = []; ao[s].forEach(function (m) { if (!busy[s].find(function (x) { return x.id === m.id; }))
+                            busy[s].push(m); }); });
+                    });
+                    var freeOf = function (a) { return (a.salles || []).filter(function (s) { return !((busy[s] || []).some(function (m) { return m.id !== medId; })); }); };
                     return (React.createElement("div", { style: { marginBottom: 10, padding: "7px 9px", borderRadius: 8, border: "1.5px dashed " + COND_C, background: COND_BG } },
-                        React.createElement("div", { style: { fontSize: 10, color: COND_C, fontWeight: 800, marginBottom: 6 } }, "\u25c7 CHOIX OUVERT \u2014 " + cE.length + " branches, non tranch\u00e9"),
+                        React.createElement("div", { style: { fontSize: 10, color: COND_C, fontWeight: 800, marginBottom: 6 } },
+                            "\u25C7 CHOIX OUVERT \u2014 ",
+                            cE.length,
+                            " branches, non tranch\u00E9"),
                         cE.map(function (e, i) {
                             var a = acteById(e.acteId);
                             if (!a)
                                 return null;
+                            var tot = (a.salles || []).length, fr = freeOf(a);
+                            var dispo = tot === 0 ? null : fr.length > 0;
                             return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 4 } },
                                 React.createElement(Badge, { a: a, hideSalle: true }),
-                                React.createElement("span", { style: { flex: 1, fontSize: 10, color: "var(--txt3)" } }, a.hasSalle ? "sans salle" : "pas de salle"),
-                                canEditThisMed && React.createElement("button", { onClick: function () { return settleCond(medId, y2, m2, d2, slot, e.acteId); }, style: { background: "transparent", border: "1px solid " + COND_C, color: COND_C, borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 800, padding: "3px 8px", whiteSpace: "nowrap" } }, "\u2713 c'est celle-ci")));
+                                React.createElement("span", { style: { flex: 1, fontSize: 10, fontWeight: 700, color: dispo === null ? "var(--txt3)" : dispo ? "#2f9440" : "#f85149" } }, dispo === null ? "pas de salle" : dispo ? (fr.length + "/" + tot + " salle" + (tot > 1 ? "s" : "") + " libre" + (fr.length > 1 ? "s" : "") + " : " + fr.join(", ")) : "aucune salle libre"),
+                                canEditThisMed && React.createElement("button", { onClick: function () {
+                                        if (a.fixedSalle) {
+                                            doAdd(a.id, a.fixedSalle);
+                                            return;
+                                        }
+                                        if (tot > 0) {
+                                            setMData(function (p) { return (__assign(__assign({}, p), { _pickSalle: a.id })); });
+                                            return;
+                                        }
+                                        settleCond(medId, y2, m2, d2, slot, a.id);
+                                    }, style: { background: "transparent", border: "1px solid " + COND_C, color: COND_C, borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 800, padding: "3px 8px", whiteSpace: "nowrap" } }, tot > 0 && !a.fixedSalle ? "Choisir la salle…" : "✓ c'est celle-ci")));
                         }),
                         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", lineHeight: 1.45 } }, "Attribuer une salle depuis un onglet de salles tranche aussi le choix.")));
                 })(),
@@ -8007,7 +8034,8 @@ function CardioPlanning() {
                             a.label,
                             " \u2014 Salle"),
                         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } },
-                            !a.fixedSalle && React.createElement("button", { style: { padding: "5px 9px", borderRadius: 5, border: "1px solid var(--border)", cursor: "pointer", background: "var(--bg2)", color: "var(--txt2)", fontSize: 11, fontWeight: 700 }, onClick: function () { return doAdd(a.id, null); } }, "Sans salle"),
+                            React.createElement("button", { style: { padding: "5px 9px", borderRadius: 5, border: "1px solid var(--border)", cursor: "pointer", background: "var(--bg2)", color: "var(--txt2)", fontSize: 11, fontWeight: 700 }, onClick: function () { return setMData(function (p) { return (__assign(__assign({}, p), { _pickSalle: null })); }); } }, "\u2190 Retour"),
+                                    !a.fixedSalle && React.createElement("button", { style: { padding: "5px 9px", borderRadius: 5, border: "1px solid var(--border)", cursor: "pointer", background: "var(--bg2)", color: "var(--txt2)", fontSize: 11, fontWeight: 700 }, onClick: function () { return doAdd(a.id, null); } }, "Sans salle"),
                             (a.salles || []).map(function (s) {
                                 var roomOccs = fullRoomOcc[s] || [];
                                 var selfOccs = occ[s] || [];
