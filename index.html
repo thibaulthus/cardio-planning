@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.56 — 04/08/2026";
+var APP_VERSION = "v9.57 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -493,6 +493,19 @@ var conflSep = function (night) { return night ? "#f87171" : "#b91c1c"; };
    ou 2 a 3 branches non tranchees, marquees cond:1 a l'application. Affichage : cadre
    pointille violet, branches EMPILEES (la largeur se paierait sur toutes les colonnes). */
 var COND_C = "#a371f7", COND_BG = "rgba(163,113,247,.12)";
+/* v9.57 — CHOIX OUVERT (etape 2/4) : les branches non tranchees d'un creneau.
+   Un praticien en choix ouvert reste DISPONIBLE mais seulement pour ses branches,
+   et ses branches n'occupent aucune salle ni ne consomment d'IDE. */
+var condOn = function (getEntries, medId, y, m, d, slot) {
+    var check = slot === "N" ? ["N", "JOUR"] : slot === "JOUR" ? ["JOUR", "M", "AM"] : [slot, "JOUR"];
+    var out = [];
+    check.forEach(function (sl) { (getEntries(medId, y, m, d, sl) || []).forEach(function (e) {
+        if (e && e.acteId && e.cond && out.indexOf(e.acteId) < 0)
+            out.push(e.acteId);
+    }); });
+    return out;
+};
+
 var ptCell = function (a1, s1, a2, s2, a3, s3) {
     var brs = [[a1, s1], [a2, s2], [a3, s3]].filter(function (b) { return b[0]; });
     if (!brs.length)
@@ -1107,7 +1120,7 @@ function ActTabView(_a) {
         row.ids.forEach(function (acteId) {
             medecins.forEach(function (med) {
                 getEntries(med.id, ry, rm, d, sl).forEach(function (e) {
-                    var match = row.salle ? (e.acteId === acteId && e.salle === row.salle) : e.acteId === acteId;
+                    var match = (!e.cond) && (row.salle ? (e.acteId === acteId && e.salle === row.salle) : e.acteId === acteId);
                     if (match && !occ.find(function (x) { return x.med.id === med.id && x.acteId === acteId; })) {
                         var acte = actes.find(function (a) { return a.id === acteId; }) || { short: acteId, color: row.color, bg: "#111" };
                         occ.push({ med: med, acte: acte, salle: e.salle || null, dif: e.dif || null, n: null });
@@ -2426,10 +2439,12 @@ function PickMedActModal(_a) {
                     var lb = ax ? ax.short : e.acteId;
                     if (_busy52.indexOf(lb) < 0) _busy52.push(lb);
                 }); });
-                var borderCol = avail === "warning" ? "#f59e0b44" : "var(--border)";
-                var bgCol = avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)";
-                var statusTxt = avail === "blocked" ? "Absent/repos" : avail === "warning" ? ("⚠ Déjà : " + (_busy52.join(", ") || "une activité")) : "Disponible";
-                var statusCol = avail === "blocked" ? "#ef4444" : avail === "warning" ? "#f59e0b" : "var(--txt3)";
+                var borderCol = avail === "cond" ? COND_C : avail === "warning" ? "#f59e0b44" : "var(--border)";
+                var bgCol = avail === "cond" ? COND_BG : avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)";
+                var cIds = avail === "cond" ? condOn(getEntries, med.id, y2, m2, d, sl) : [];
+                var cLab = cIds.map(function (id) { var ax = actes.find(function (x) { return x.id === id; }); return ax ? ax.short : id; }).join(" / ");
+                var statusTxt = avail === "blocked" ? "Absent/repos" : avail === "cond" ? ("\u25c7 Choix ouvert \u2014 " + cLab + ", non tranch\u00e9") : avail === "warning" ? ("⚠ Déjà : " + (_busy52.join(", ") || "une activité")) : "Disponible";
+                var statusCol = avail === "blocked" ? "#ef4444" : avail === "cond" ? COND_C : avail === "warning" ? "#f59e0b" : "var(--txt3)";
                 return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(borderCol),
                         cursor: avail !== "blocked" ? "pointer" : "default", background: bgCol, opacity: avail === "blocked" ? .35 : 1 }, onClick: function () {
                         if (avail === "blocked")
@@ -2531,7 +2546,13 @@ function PickMedSiteModal(_a) {
     });
     var _d = useState(null), selBipSalle = _d[0], setSelBipSalle = _d[1];
     var bipActe = isBipCol ? actes.find(function (a) { return a.id === "BIP"; }) : null;
-    var eligActes = (selMed ? (isBipCol ? [bipActe].filter(Boolean) : siteActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); })) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
+    var eligActes0 = (selMed ? (isBipCol ? [bipActe].filter(Boolean) : siteActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); })) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
+    /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches ;
+       si aucune n'est offerte ici, on ne le bloque pas, on le previent. */
+    var selCond = selMed ? condOn(getEntries, selMed.id, y2, m2, d, sl) : [];
+    var condHere = eligActes0.filter(function (a) { return selCond.indexOf(a.id) >= 0; });
+    var eligActes = condHere.length ? condHere : eligActes0;
+    var condOff = selCond.length > 0 && condHere.length === 0;
     // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
     var pickMeds = medecins.filter(function (med) { return !selfOnly || med.id === selfOnly; })
         .filter(function (med) { return !curOcc.find(function (x) { return x.med.id === med.id; }); })
@@ -2566,8 +2587,10 @@ function PickMedSiteModal(_a) {
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Choisir un m\u00E9decin"),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" } }, pickMeds.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", padding: "4px 2px" } }, "Tous les médecins autorisés sont déjà dans cette salle."), pickMeds.map(function (med) {
                 var avail = isMedAvailable(med, y2, m2, d, sl);
-                return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(avail === "warning" ? "#f59e0b44" : "var(--border)"),
-                        cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: function () { if (avail === "blocked")
+                var cIds = avail === "cond" ? condOn(getEntries, med.id, y2, m2, d, sl) : [];
+                var cLab = cIds.map(function (id) { var a = actes.find(function (x) { return x.id === id; }); return a ? a.short : id; }).join(" / ");
+                return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px ".concat(avail === "cond" ? "dashed " + COND_C : "solid " + (avail === "warning" ? "#f59e0b44" : "var(--border)")),
+                        cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "cond" ? COND_BG : avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: function () { if (avail === "blocked")
                         return; setSelMedId(med.id); setStep("acte"); } },
                     React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, med.init),
                     React.createElement("div", { style: { textAlign: "left" } },
@@ -2575,7 +2598,7 @@ function PickMedSiteModal(_a) {
                             med.prenom,
                             " ",
                             med.nom),
-                        React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : avail === "warning" ? "#f59e0b" : "var(--txt3)" } }, avail === "blocked" ? "Absent/repos" : avail === "warning" ? "⚠ Déjà une activité" : "Disponible"))));
+                        React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : avail === "cond" ? COND_C : avail === "warning" ? "#f59e0b" : "var(--txt3)" } }, avail === "blocked" ? "Absent/repos" : avail === "cond" ? ("\u25c7 Choix ouvert \u2014 " + cLab + ", non tranch\u00e9") : avail === "warning" ? "⚠ Déjà une activité" : "Disponible"))));
             })))),
         step === "acte" && selMed && (React.createElement(React.Fragment, null,
             eligActes.length === 1 && eligActes[0].fixedSalle && (function () { addEntry(selMed.id, y2, m2, d, sl, { acteId: eligActes[0].id, salle: eligActes[0].fixedSalle }); onClose(); return null; })(),
@@ -2593,6 +2616,9 @@ function PickMedSiteModal(_a) {
                     "Cette salle a d\u00E9j\u00E0 ",
                     curOcc.length,
                     " praticien(s) assign\u00E9(s). Confirmer quand m\u00EAme ?")),
+            selCond.length > 0 && React.createElement("div", { style: { fontSize: 10, color: COND_C, fontWeight: 700, marginBottom: 8, padding: "5px 8px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, lineHeight: 1.45 } }, condOff
+                    ? "\u25c7 Ce praticien est sur un choix ouvert, dont aucune branche n'est propos\u00e9e dans cette salle. Poser une activit\u00e9 ici s'ajoutera \u00e0 ses activit\u00e9s."
+                    : "\u25c7 Choix ouvert \u2014 seules ses branches sont propos\u00e9es. En attribuer une avec sa salle tranchera le choix."),
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } },
                 "Activit\u00E9 dans ",
                 salle),
@@ -5668,13 +5694,15 @@ function CardioPlanning() {
     /* ── isMedAvailable ── */
     var isMedAvailable = useCallback(function (med, y2, m2, d2, slot) {
         var check = slot === "N" ? ["N", "JOUR"] : slot === "JOUR" ? ["JOUR", "M", "AM"] : [slot, "JOUR"];
-        var ids = [];
+        var ids = [], cIds = [];
         check.forEach(function (sl) { return getEntries(med.id, y2, m2, d2, sl).forEach(function (e) { if ((e && e.acteId) && !e._blocked)
-            ids.push(e.acteId); }); });
+            (e.cond ? cIds : ids).push(e.acteId); }); });
         if (ids.some(function (id) { return ["ABSENCE", "FORMATION"].includes(id); }))
             return "blocked";
         if (ids.some(function (id) { return !["TOUR_HC", "TOUR_USIC"].includes(id); }))
             return "warning";
+        if (cIds.length)
+            return "cond";
         return "free";
     }, [getEntries]);
     /* ── setEntry / addEntry / removeEntry ── */
@@ -6270,7 +6298,7 @@ function CardioPlanning() {
         var res = {};
         medecins.forEach(function (med) {
             getEntries(med.id, y2, m2, d2, slot).forEach(function (e) {
-                if ((e && e.acteId) === acteId && e.salle) {
+                if ((e && e.acteId) === acteId && e.salle && !e.cond) {
                     if (!res[e.salle])
                         res[e.salle] = [];
                     if (!res[e.salle].find(function (x) { return x.id === med.id; }))
