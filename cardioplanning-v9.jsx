@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.58.1 — 04/08/2026";
+const APP_VERSION="v9.59 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -409,12 +409,31 @@ function Badge({a,salle,hasNote,hideSalle=false}){
 /* v9.50 : bandeau des problèmes — partagé par le Planning et les Attachés,
    chacun avec SON propre relevé. Chaque ligne ouvre la case concernée. */
 function IssuePanel({iss,open,setOpen,onGo}){
-  if(!iss||!iss.list.length)return null;
+  if(!iss||(!iss.list.length&&!(iss.condList||[]).length))return null;
   const n=iss.list.length;
+  const cL=iss.condList||[];
+  const row=(it,i,col)=>(
+    <button key={i} onClick={()=>onGo&&onGo(it)} title="Ouvrir cette case"
+      style={{textAlign:"left",background:"none",border:"none",borderBottom:"1px dotted var(--border)",padding:"3px 2px",cursor:"pointer",fontSize:11,color:col||"var(--txt)",fontFamily:"inherit"}}>
+      <b>{it.dw+" "+String(it.d).padStart(2,"0")+"/"+String(it.m+1).padStart(2,"0")+" "+it.sl}</b>{" — "}
+      <b style={{color:it.med.color}}>{it.med.init}</b>{" — "+it.label}
+    </button>
+  );
   return(
+  <>
+    {cL.length>0&&(
+      <div style={{background:COND_BG,border:"1.5px dashed "+COND_C,borderRadius:8,padding:"7px 11px",marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setOpen(v=>!v)}>
+          <span style={{color:COND_C,fontWeight:800,fontSize:12}}>{"◇ "+cL.length+" choix ouvert"+(cL.length>1?"s":"")+" à trancher"}</span>
+          <span style={{marginLeft:"auto",color:COND_C,fontSize:11,fontWeight:700}}>{open?"▲ replier":"▼ détail"}</span>
+        </div>
+        {open&&<div style={{marginTop:6,display:"flex",flexDirection:"column",gap:2}}>{cL.map((it,i)=>row(it,i,COND_C))}</div>}
+      </div>
+    )}
+    {n>0&&
     <div style={{background:"rgba(248,81,73,.12)",border:"1px solid #f85149",borderRadius:8,padding:"7px 11px",marginBottom:8}}>
       <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setOpen(v=>!v)}>
-        <span style={{color:"#f85149",fontWeight:800,fontSize:12}}>{"⚠ "+n+" créneau"+(n>1?"x":"")+" à revoir — "+iss.counts.salle+" sans salle · "+iss.counts.double+" double(s) · "+iss.counts.abs+" sur absence/repos"}</span>
+        <span style={{color:"#f85149",fontWeight:800,fontSize:12}}>{"⚠ "+n+" créneau"+(n>1?"x":"")+" à revoir — "+iss.counts.salle+" sans salle · "+iss.counts.double+" double(s) · "+iss.counts.abs+" sur absence/repos"+(iss.counts.hop?" · "+iss.counts.hop+" sur deux hôpitaux":"")}</span>
         <span style={{marginLeft:"auto",color:"#f85149",fontSize:11,fontWeight:700}}>{open?"▲ replier":"▼ détail"}</span>
       </div>
       {open&&<div style={{marginTop:6,display:"flex",flexDirection:"column",gap:2}}>{iss.list.map((it,i)=>(
@@ -424,7 +443,8 @@ function IssuePanel({iss,open,setOpen,onGo}){
           <b style={{color:it.med.color}}>{it.med.init}</b>{" — "+it.label}
         </button>
       ))}</div>}
-    </div>
+    </div>}
+  </>
   );
 }
 function Av({med}){return <div style={{...S.av,background:med.color}}>{med.init}</div>;}
@@ -5230,7 +5250,9 @@ function CardioPlanning(){
     const jours=allDays4.filter(o=>{const dw=new Date(o.y,o.m,o.d).getDay();return dw>=1&&dw<=5&&!isFerie(o.y,o.m,o.d);});
     jours.forEach(o=>["M","AM"].forEach(sl=>{
       elig.forEach(m=>{
-        const es=getEntries(m.id,o.y,o.m,o.d,sl)||[];
+        /* v9.59 : une branche non tranchée ne compte ni comme demi-journée à Béthune
+           (elle n'est pas décidée) ni comme bip posé — et laisse le créneau « libre ». */
+        const es=(getEntries(m.id,o.y,o.m,o.d,sl)||[]).filter(e=>e&&!e.cond);
         if(es.length===0){offN[m.id]++;return;}
         let hasCHB=false;
         es.forEach(e=>{const a=acteById(e.acteId);if(a&&a.site==="CHB")hasCHB=true;if(e.acteId==="BIP"){bipN[m.id]++;const kw=m.id+"|"+wKey(o.y,o.m,o.d);wkN[kw]=(wkN[kw]||0)+1;}});
@@ -5246,23 +5268,31 @@ function CardioPlanning(){
     if(!S.acteB){toast("Activité BIP introuvable","warn");return;}
     const elig=S.elig,chb=S.chb,bipN=S.bipN,offN=S.offN,wkN=S.wkN,jours=S.jours,salles=S.acteB.salles||[];
     const BIP_MAX_SEM=2;
-    const fails2=[];let posed=0;
+    const fails2=[];let posed=0,condN=0;
     jours.forEach(o=>{
       let deja=false;
-      ["M","AM"].forEach(sl=>elig.forEach(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.acteId==="BIP")deja=true;})));
+      ["M","AM"].forEach(sl=>elig.forEach(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.acteId==="BIP"&&!e.cond)deja=true;})));
       if(deja)return;
       let done=false,capped=false;
       const wk=wKey(o.y,o.m,o.d);
       ["AM","M"].forEach(sl=>{
         if(done)return;
-        const dispo=elig.filter(m=>(getEntries(m.id,o.y,o.m,o.d,sl)||[]).length===0);
+        /* v9.59 : est disponible celui qui n'a rien de ferme, ET dont l'éventuel choix
+           ouvert contient BIP — l'algorithme ne décide donc jamais à la place de l'humain. */
+        const dispo=elig.filter(m=>{
+          const es=getEntries(m.id,o.y,o.m,o.d,sl)||[];
+          if(es.some(e=>e&&e.acteId&&!e.cond))return false;
+          const cd=es.filter(e=>e&&e.cond);
+          return cd.length===0||cd.some(e=>e.acteId==="BIP");
+        });
         const libres=dispo.filter(m=>(wkN[m.id+"|"+wk]||0)<BIP_MAX_SEM);
         if(dispo.length>0&&libres.length===0)capped=true;
         if(libres.length===0)return;
         libres.sort((a,b)=>(chb[a.id]-chb[b.id])||(offN[b.id]-offN[a.id])||(bipN[a.id]-bipN[b.id])||String(a.init).localeCompare(String(b.init)));
         const m=libres[0];
-        const occ={};elig.forEach(x=>(getEntries(x.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.salle)occ[e.salle]=true;}));
+        const occ={};elig.forEach(x=>(getEntries(x.id,o.y,o.m,o.d,sl)||[]).forEach(e=>{if(e.salle&&!e.cond)occ[e.salle]=true;}));
         const salle=salles.filter(s=>!occ[s])[0]||null;
+        if((getEntries(m.id,o.y,o.m,o.d,sl)||[]).some(e=>e&&e.cond))condN++;
         addEntry(m.id,o.y,o.m,o.d,sl,{acteId:"BIP",salle:salle});
         chb[m.id]++;bipN[m.id]++;offN[m.id]--;wkN[m.id+"|"+wk]=(wkN[m.id+"|"+wk]||0)+1;posed++;done=true;
       });
@@ -5270,7 +5300,7 @@ function CardioPlanning(){
     });
     setBipModal({posed:posed,fails:fails2,stats:bipStats({elig:elig,chb:chb,bipN:bipN,offN:offN})});
     /* ⚑ dans la liste des jours non pourvus = plafond de 2 bips/semaine atteint par tous les disponibles */
-    toast(posed+" bip"+(posed>1?"s":"")+" posé"+(posed>1?"s":"")+(fails2.length?" · "+fails2.length+" jour(s) sans solution":""));
+    toast(posed+" bip"+(posed>1?"s":"")+" posé"+(posed>1?"s":"")+(condN?" · dont "+condN+" choix ouvert(s) tranché(s)":"")+(fails2.length?" · "+fails2.length+" jour(s) sans solution":""));
   };
   const bipClear=()=>{
     const S=bipScan();let n=0;
@@ -5394,19 +5424,32 @@ function CardioPlanning(){
     const IGN=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORMATION","TP"];
     const ABSL=["ABSENCE","FORMATION","REPOS_GARDE"];
     const JRS=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
-    const map={},list=[],counts={salle:0,double:0,abs:0};
+    const map={},list=[],condList=[],counts={salle:0,double:0,abs:0,hop:0,cond:0};
+    const sh=e=>{const a=acteById(e.acteId);return a?a.short:e.acteId;};
     (allDays4||[]).forEach(dd=>{(medList||[]).forEach(med=>{["M","AM"].forEach(sl=>{
       const all=[];[sl,"JOUR"].forEach(s2=>getEntries(med.id,dd.y,dd.m,dd.d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)all.push(e);}));
       if(!all.length)return;
+      /* v9.59 : un choix ouvert n'est pas une anomalie mais une décision en attente —
+         il a son propre décompte et ne gonfle plus « sans salle » ni « double activité ». */
+      const allC=all.filter(e=>e&&e.cond),allF=all.filter(e=>!(e&&e.cond));
+      if(allC.length){
+        counts.cond++;
+        condList.push({y:dd.y,m:dd.m,d:dd.d,sl,med,cond:true,label:"choix ouvert : "+allC.map(sh).join(" ou "),dw:JRS[new Date(dd.y,dd.m,dd.d).getDay()]});
+      }
+      if(!allF.length)return;
       const msgs=[];
-      all.forEach(e=>{const a=acteById(e.acteId);if(a&&a.hasSalle&&!e.salle){msgs.push((a.short||e.acteId)+" sans salle");counts.salle++;}});
-      const met=all.filter(e=>IGN.indexOf(e.acteId)<0);
-      if(met.length>=2){msgs.push("double activité : "+met.map(e=>{const a=acteById(e.acteId);return a?a.short:e.acteId;}).join(" + "));counts.double++;}
-      const ab=all.filter(e=>ABSL.indexOf(e.acteId)>=0);
+      allF.forEach(e=>{const a=acteById(e.acteId);if(a&&a.hasSalle&&!e.salle){msgs.push((a.short||e.acteId)+" sans salle");counts.salle++;}});
+      const met=allF.filter(e=>IGN.indexOf(e.acteId)<0);
+      if(met.length>=2){msgs.push("double activité : "+met.map(sh).join(" + "));counts.double++;}
+      const ab=allF.filter(e=>ABSL.indexOf(e.acteId)>=0);
       if(met.length>=1&&ab.length>=1){const a0=acteById(ab[0].acteId);msgs.push("activité sur "+(a0?a0.label:ab[0].acteId));counts.abs++;}
+      /* deux salles DÉDIÉES dans deux hôpitaux sur la même demi-journée : les sites sont
+         proches et on passe de l'un à l'autre, mais pas quand les deux lieux sont fixés. */
+      const sts=[...new Set(allF.filter(e=>e.salle).map(e=>{const a=acteById(e.acteId);return a&&a.site;}).filter(Boolean))];
+      if(sts.length>=2){msgs.push("deux hôpitaux : "+sts.join(" + "));counts.hop++;}
       if(msgs.length){map[med.id+"|"+dd.y+"|"+dd.m+"|"+dd.d+"|"+sl]="⚠ "+msgs.join(" · ");list.push({y:dd.y,m:dd.m,d:dd.d,sl,med,label:msgs.join(" · "),dw:JRS[new Date(dd.y,dd.m,dd.d).getDay()]});}
     });});});
-    return {map,list,counts};
+    return {map,list,condList,counts};
   },[getEntries,acteById,allDays4,actes]);
   /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
   const applyPTFlex=useCallback((medId,monthsList,fromToday)=>{
