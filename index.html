@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.57.1 — 04/08/2026";
+var APP_VERSION = "v9.58 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2618,7 +2618,7 @@ function PickMedSiteModal(_a) {
                     curOcc.length,
                     " praticien(s) assign\u00E9(s). Confirmer quand m\u00EAme ?")),
             selCond.length > 0 && React.createElement("div", { style: { fontSize: 10, color: COND_C, fontWeight: 700, marginBottom: 8, padding: "5px 8px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, lineHeight: 1.45 } }, condOff
-                    ? "\u25c7 Ce praticien est sur un choix ouvert, dont aucune branche n'est propos\u00e9e dans cette salle. Poser une activit\u00e9 ici s'ajoutera \u00e0 ses activit\u00e9s."
+                    ? "\u25c7 Ce praticien est sur un choix ouvert, dont aucune branche n'est propos\u00e9e dans cette salle. Poser une activit\u00e9 ici tranchera son choix et retirera ses branches."
                     : "\u25c7 Choix ouvert \u2014 seules ses branches sont propos\u00e9es. En attribuer une avec sa salle tranchera le choix."),
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } },
                 "Activit\u00E9 dans ",
@@ -5720,21 +5720,69 @@ function CardioPlanning() {
         });
         logCell(entry ? "add" : "del", medId, y2, m2, d2, slot, entry ? entry.acteId : null);
     }, []);
+    /* v9.58 : poser une activite FERME sur une case en choix ouvert, c'est TRANCHER,
+       quel que soit le chemin. `wasCond` garde la memoire des branches ecartees. */
     var addEntry = useCallback(function (medId, y2, m2, d2, slot, entry) {
         var key = sk(y2, m2, d2, slot);
         setPlan(function (p) {
             var _a;
             var dm = __assign({}, (p[key] || {}));
             var ex = dm[medId];
-            if (!ex)
-                dm[medId] = entry;
-            else if (Array.isArray(ex))
-                dm[medId] = __spreadArray(__spreadArray([], ex, true), [entry], false);
-            else
-                dm[medId] = [ex, entry];
+            var prev = ex ? (Array.isArray(ex) ? ex : [ex]) : [];
+            var dropped = (entry && !entry.cond) ? prev.filter(function (e) { return e && e.cond; }) : [];
+            var kept = dropped.length ? prev.filter(function (e) { return !(e && e.cond); }) : prev;
+            var ent = entry;
+            if (dropped.length) {
+                var others = dropped.map(function (e) { return e.acteId; }).filter(function (id) { return id !== entry.acteId; });
+                ent = others.length ? __assign(__assign({}, entry), { wasCond: others }) : __assign({}, entry);
+            }
+            var nx = kept.concat([ent]);
+            dm[medId] = nx.length === 1 ? nx[0] : nx;
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
         logCell("add", medId, y2, m2, d2, slot, entry.acteId);
+    }, []);
+    var settleCond = useCallback(function (medId, y2, m2, d2, slot, acteId) {
+        var key = sk(y2, m2, d2, slot);
+        setPlan(function (p) {
+            var _a;
+            var dm = __assign({}, (p[key] || {}));
+            var ex = dm[medId];
+            if (!ex)
+                return p;
+            var arr = Array.isArray(ex) ? ex : [ex];
+            var win = arr.find(function (e) { return e && e.cond && e.acteId === acteId; });
+            if (!win)
+                return p;
+            var others = arr.filter(function (e) { return e && e.cond && e.acteId !== acteId; }).map(function (e) { return e.acteId; });
+            var ent = __assign({}, win);
+            delete ent.cond;
+            if (others.length)
+                ent.wasCond = others;
+            var nx = arr.filter(function (e) { return !(e && e.cond); }).concat([ent]);
+            dm[medId] = nx.length === 1 ? nx[0] : nx;
+            return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
+        });
+        logCell("add", medId, y2, m2, d2, slot, acteId);
+    }, []);
+    var restoreCond = useCallback(function (medId, y2, m2, d2, slot, acteId) {
+        var key = sk(y2, m2, d2, slot);
+        setPlan(function (p) {
+            var _a;
+            var dm = __assign({}, (p[key] || {}));
+            var ex = dm[medId];
+            if (!ex)
+                return p;
+            var arr = Array.isArray(ex) ? ex : [ex];
+            var src = arr.find(function (e) { return e && e.acteId === acteId && e.wasCond && e.wasCond.length; });
+            if (!src)
+                return p;
+            var brs = [{ acteId: src.acteId, salle: null, cond: 1 }].concat(src.wasCond.map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); }));
+            var nx = arr.filter(function (e) { return e !== src; }).concat(brs);
+            dm[medId] = nx.length === 1 ? nx[0] : nx;
+            return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
+        });
+        logCell("add", medId, y2, m2, d2, slot, acteId);
     }, []);
     var removeEntry = useCallback(function (medId, y2, m2, d2, slot, acteId) {
         var key = sk(y2, m2, d2, slot);
@@ -5744,15 +5792,16 @@ function CardioPlanning() {
             var ex = dm[medId];
             if (!ex)
                 return p;
-            if (Array.isArray(ex)) {
-                var f = ex.filter(function (e) { return e.acteId !== acteId; });
-                if (f.length === 0)
-                    delete dm[medId];
-                else
-                    dm[medId] = f.length === 1 ? f[0] : f;
-            }
-            else
+            var arr = Array.isArray(ex) ? ex : [ex];
+            /* v9.58 : retirer une activite issue d'un choix ouvert remet les branches. */
+            var gone = arr.find(function (e) { return e && e.acteId === acteId && e.wasCond && e.wasCond.length; });
+            var f = arr.filter(function (e) { return e.acteId !== acteId; });
+            var back = gone ? [{ acteId: gone.acteId, salle: null, cond: 1 }].concat(gone.wasCond.map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); })) : [];
+            var nx = f.concat(back);
+            if (nx.length === 0)
                 delete dm[medId];
+            else
+                dm[medId] = nx.length === 1 ? nx[0] : nx;
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
         logCell("del", medId, y2, m2, d2, slot, acteId);
@@ -7745,9 +7794,40 @@ function CardioPlanning() {
                             " \u00B7 ",
                             React.createElement("span", { style: { color: "#388bfd" } }, SLOTL[slot]))),
                     React.createElement("button", { onClick: function () { return setModal(null); }, style: S.xBtn }, "\u00D7")),
+                (function () {
+                    var cE = entries.filter(function (e) { return e && e.acteId && e.cond; });
+                    if (!cE.length)
+                        return null;
+                    return (React.createElement("div", { style: { marginBottom: 10, padding: "7px 9px", borderRadius: 8, border: "1.5px dashed " + COND_C, background: COND_BG } },
+                        React.createElement("div", { style: { fontSize: 10, color: COND_C, fontWeight: 800, marginBottom: 6 } }, "\u25c7 CHOIX OUVERT \u2014 " + cE.length + " branches, non tranch\u00e9"),
+                        cE.map(function (e, i) {
+                            var a = acteById(e.acteId);
+                            if (!a)
+                                return null;
+                            return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 4 } },
+                                React.createElement(Badge, { a: a, hideSalle: true }),
+                                React.createElement("span", { style: { flex: 1, fontSize: 10, color: "var(--txt3)" } }, a.hasSalle ? "sans salle" : "pas de salle"),
+                                canEditThisMed && React.createElement("button", { onClick: function () { return settleCond(medId, y2, m2, d2, slot, e.acteId); }, style: { background: "transparent", border: "1px solid " + COND_C, color: COND_C, borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 800, padding: "3px 8px", whiteSpace: "nowrap" } }, "\u2713 c'est celle-ci")));
+                        }),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", lineHeight: 1.45 } }, "Attribuer une salle depuis un onglet de salles tranche aussi le choix.")));
+                })(),
+                (function () {
+                    var wE = entries.filter(function (e) { return e && e.acteId && !e.cond && e.wasCond && e.wasCond.length; });
+                    if (!wE.length)
+                        return null;
+                    return wE.map(function (e, i) {
+                        var a = acteById(e.acteId);
+                        if (!a)
+                            return null;
+                        var lab = e.wasCond.map(function (id) { var x = acteById(id); return x ? x.short : id; }).join(" ou ");
+                        return (React.createElement("div", { key: "w" + i, style: { marginBottom: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 9px", borderRadius: 8, border: "1px solid " + COND_C, background: COND_BG } },
+                            React.createElement("span", { style: { fontSize: 10, color: COND_C, fontWeight: 700, flex: 1, lineHeight: 1.4 } }, "\u25c7 " + a.short + " est issue d'un choix ouvert \u2014 \u00e9cart\u00e9es : " + lab),
+                            canEditThisMed && React.createElement("button", { onClick: function () { return restoreCond(medId, y2, m2, d2, slot, e.acteId); }, style: { background: "transparent", border: "1px solid " + COND_C, color: COND_C, borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 800, padding: "3px 8px", whiteSpace: "nowrap" } }, "\u21a9 r\u00e9tablir")));
+                    });
+                })(),
                 curIds.length > 0 && (React.createElement("div", { style: { marginBottom: 10 } },
                     React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 5 } }, "Activit\u00E9s"),
-                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, entries.filter(function (e) { return e.acteId; }).map(function (e, i) {
+                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, entries.filter(function (e) { return e.acteId && !e.cond; }).map(function (e, i) {
                         var a = acteById(e.acteId);
                         if (!a)
                             return null;

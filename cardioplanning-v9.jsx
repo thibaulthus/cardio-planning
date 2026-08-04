@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.57.1 — 04/08/2026";
+const APP_VERSION="v9.58 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2484,7 +2484,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
           </div>}
           {selCond.length>0&&<div style={{fontSize:10,color:COND_C,fontWeight:700,marginBottom:8,padding:"5px 8px",borderRadius:6,border:"1.5px dashed "+COND_C,background:COND_BG,lineHeight:1.45}}>
             {condOff
-              ? "◇ Ce praticien est sur un choix ouvert, dont aucune branche n'est proposée dans cette salle. Poser une activité ici s'ajoutera à ses activités."
+              ? "◇ Ce praticien est sur un choix ouvert, dont aucune branche n'est proposée dans cette salle. Poser une activité ici tranchera son choix et retirera ses branches."
               : "◇ Choix ouvert — seules ses branches sont proposées. En attribuer une avec sa salle tranchera le choix."}
           </div>}
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Activité dans {salle}</div>
@@ -5116,15 +5116,76 @@ function CardioPlanning(){
     logCell(entry?"add":"del",medId,y2,m2,d2,slot,entry?entry.acteId:null);
   },[]);
 
+  /* v9.58 : poser une activité FERME sur une case qui porte un choix ouvert, c'est
+     TRANCHER — quel que soit le chemin (salle d'un onglet, modale de case, BIP auto),
+     et que l'activité posée soit l'une des branches ou non. Les branches disparaissent
+     et l'entrée posée garde leur mémoire dans `wasCond`, ce qui permet de rétablir le
+     choix si on la retire ensuite. */
   const addEntry=useCallback((medId,y2,m2,d2,slot,entry)=>{
     const key=sk(y2,m2,d2,slot);
-    setPlan(p=>{const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)dm[medId]=entry;else if(Array.isArray(ex))dm[medId]=[...ex,entry];else dm[medId]=[ex,entry];return{...p,[key]:dm};});
+    setPlan(p=>{
+      const dm={...(p[key]||{})};const ex=dm[medId];
+      const prev=ex?(Array.isArray(ex)?ex:[ex]):[];
+      const dropped=(entry&&!entry.cond)?prev.filter(e=>e&&e.cond):[];
+      const kept=dropped.length?prev.filter(e=>!(e&&e.cond)):prev;
+      let ent=entry;
+      if(dropped.length){
+        const others=dropped.map(e=>e.acteId).filter(id=>id!==entry.acteId);
+        ent=others.length?{...entry,wasCond:others}:{...entry};
+      }
+      const nx=kept.concat([ent]);
+      dm[medId]=nx.length===1?nx[0]:nx;
+      return{...p,[key]:dm};
+    });
     logCell("add",medId,y2,m2,d2,slot,entry.acteId);
+  },[]);
+
+  /* Trancher depuis la modale de case : la branche choisie devient ferme, les autres
+     partent dans son wasCond. Indispensable pour la Scintigraphie, qui n'a pas de salle. */
+  const settleCond=useCallback((medId,y2,m2,d2,slot,acteId)=>{
+    const key=sk(y2,m2,d2,slot);
+    setPlan(p=>{
+      const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
+      const arr=Array.isArray(ex)?ex:[ex];
+      const win=arr.find(e=>e&&e.cond&&e.acteId===acteId);if(!win)return p;
+      const others=arr.filter(e=>e&&e.cond&&e.acteId!==acteId).map(e=>e.acteId);
+      const ent={...win};delete ent.cond;if(others.length)ent.wasCond=others;
+      const nx=arr.filter(e=>!(e&&e.cond)).concat([ent]);
+      dm[medId]=nx.length===1?nx[0]:nx;
+      return{...p,[key]:dm};
+    });
+    logCell("add",medId,y2,m2,d2,slot,acteId);
+  },[]);
+
+  /* Rétablir le choix ouvert à partir de la mémoire d'une entrée tranchée. */
+  const restoreCond=useCallback((medId,y2,m2,d2,slot,acteId)=>{
+    const key=sk(y2,m2,d2,slot);
+    setPlan(p=>{
+      const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
+      const arr=Array.isArray(ex)?ex:[ex];
+      const src=arr.find(e=>e&&e.acteId===acteId&&e.wasCond&&e.wasCond.length);if(!src)return p;
+      const brs=[{acteId:src.acteId,salle:null,cond:1}].concat(src.wasCond.map(id=>({acteId:id,salle:null,cond:1})));
+      const nx=arr.filter(e=>e!==src).concat(brs);
+      dm[medId]=nx.length===1?nx[0]:nx;
+      return{...p,[key]:dm};
+    });
+    logCell("add",medId,y2,m2,d2,slot,acteId);
   },[]);
 
   const removeEntry=useCallback((medId,y2,m2,d2,slot,acteId)=>{
     const key=sk(y2,m2,d2,slot);
-    setPlan(p=>{const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;if(Array.isArray(ex)){const f=ex.filter(e=>e.acteId!==acteId);if(f.length===0)delete dm[medId];else dm[medId]=f.length===1?f[0]:f;}else delete dm[medId];return{...p,[key]:dm};});
+    setPlan(p=>{
+      const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
+      const arr=Array.isArray(ex)?ex:[ex];
+      /* v9.58 : si l'activité retirée était issue d'un choix ouvert, on ne vide pas la
+         case — on remet les branches. Le choix redevient visible et à trancher. */
+      const gone=arr.find(e=>e&&e.acteId===acteId&&e.wasCond&&e.wasCond.length);
+      const f=arr.filter(e=>e.acteId!==acteId);
+      const back=gone?[{acteId:gone.acteId,salle:null,cond:1}].concat(gone.wasCond.map(id=>({acteId:id,salle:null,cond:1}))):[];
+      const nx=f.concat(back);
+      if(nx.length===0)delete dm[medId];else dm[medId]=nx.length===1?nx[0]:nx;
+      return{...p,[key]:dm};
+    });
     logCell("del",medId,y2,m2,d2,slot,acteId);
   },[]);
 
@@ -6953,11 +7014,39 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={()=>setModal(null)} style={S.xBtn}>×</button>
             </div>
 
+            {(()=>{
+              const cE=entries.filter(e=>e&&e.acteId&&e.cond);
+              if(!cE.length)return null;
+              return(
+                <div style={{marginBottom:10,padding:"7px 9px",borderRadius:8,border:"1.5px dashed "+COND_C,background:COND_BG}}>
+                  <div style={{fontSize:10,color:COND_C,fontWeight:800,marginBottom:6}}>◇ CHOIX OUVERT — {cE.length} branches, non tranché</div>
+                  {cE.map((e,i)=>{const a=acteById(e.acteId);if(!a)return null;return(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+                      <Badge a={a} hideSalle={true}/>
+                      <span style={{flex:1,fontSize:10,color:"var(--txt3)"}}>{a.hasSalle?"sans salle":"pas de salle"}</span>
+                      {canEditThisMed&&<button onClick={()=>settleCond(medId,y2,m2,d2,slot,e.acteId)}
+                        style={{background:"transparent",border:"1px solid "+COND_C,color:COND_C,borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>✓ c'est celle-ci</button>}
+                    </div>);})}
+                  <div style={{fontSize:10,color:"var(--txt3)",lineHeight:1.45}}>Attribuer une salle depuis un onglet de salles tranche aussi le choix.</div>
+                </div>);
+            })()}
+            {(()=>{
+              const wE=entries.filter(e=>e&&e.acteId&&!e.cond&&e.wasCond&&e.wasCond.length);
+              if(!wE.length)return null;
+              return wE.map((e,i)=>{const a=acteById(e.acteId);if(!a)return null;
+                const lab=e.wasCond.map(id=>{const x=acteById(id);return x?x.short:id;}).join(" ou ");
+                return(
+                  <div key={"w"+i} style={{marginBottom:10,display:"flex",alignItems:"center",gap:6,padding:"6px 9px",borderRadius:8,border:"1px solid "+COND_C,background:COND_BG}}>
+                    <span style={{fontSize:10,color:COND_C,fontWeight:700,flex:1,lineHeight:1.4}}>◇ {a.short} est issue d'un choix ouvert — écartées : {lab}</span>
+                    {canEditThisMed&&<button onClick={()=>restoreCond(medId,y2,m2,d2,slot,e.acteId)}
+                      style={{background:"transparent",border:"1px solid "+COND_C,color:COND_C,borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>↩ rétablir</button>}
+                  </div>);});
+            })()}
             {curIds.length>0&&(
               <div style={{marginBottom:10}}>
                 <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>Activités</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                  {entries.filter(e=>e.acteId).map((e,i)=>{
+                  {entries.filter(e=>e.acteId&&!e.cond).map((e,i)=>{
                     const a=acteById(e.acteId);if(!a)return null;
                     return(
                       <div key={i} style={{display:"flex",alignItems:"center",gap:3}}>
