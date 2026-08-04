@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.58 — 04/08/2026";
+const APP_VERSION="v9.58.1 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2397,20 +2397,26 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
   const [selMedId,setSelMedId]=useState(null);
   const selMed=medecins.find(x=>x.id===selMedId);
 
-  const isBipCol=mData&&(mData.salle==="CHB-BIP"||String(mData.salle||"").indexOf("RECAP:")===0);
+  /* v9.58.1 : les colonnes « ↩ reprise activité » étaient câblées pour le seul BIP —
+     occupants introuvables et activité proposée toujours BIP dès qu'on en créait une
+     autre (SCINTI). Elles s'identifient désormais par l'activité qu'elles reprennent. */
+  const recapId=mData?(mData.salle==="CHB-BIP"?"BIP":(String(mData.salle||"").indexOf("RECAP:")===0?String(mData.salle).slice(6):null)):null;
+  const isRecapCol=!!recapId;
+  const recapActe=recapId?actes.find(a=>a.id===recapId):null;
+  const isBipCol=recapId==="BIP";
   const curOcc=[];
   siteActes.forEach(acte=>{
     medecins.forEach(med=>{
       getEntries(med.id,y2,m2,d,sl).forEach(e=>{
-        // For BIP col: match any CHB salle; for regular cols: match exact salle
-        const salleMatch=isBipCol?(["CHB-1","CHB-2","CHB-3"].includes(e.salle)):e.salle===salle;
-        if(e.acteId===acte.id&&salleMatch&&!curOcc.find(x=>x.med.id===med.id)) curOcc.push({med,acte,rs:e.salle});
+        /* colonne de reprise : on repère par l'ACTIVITÉ, la salle étant sans objet
+           (le BIP en a une, la scintigraphie n'en a pas) ; colonne de salle : salle exacte */
+        const match=isRecapCol?(e.acteId===recapId):(e.acteId===acte.id&&e.salle===salle);
+        if(match&&!e.cond&&!curOcc.find(x=>x.med.id===med.id)) curOcc.push({med,acte:(isRecapCol?(recapActe||acte):acte),rs:e.salle});
       });
     });
   });
   const [selBipSalle,setSelBipSalle]=useState(null);
-  const bipActe=isBipCol?actes.find(a=>a.id==="BIP"):null;
-  const eligActes0=(selMed?(isBipCol?[bipActe].filter(Boolean):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init))):[]).filter(a=>!adminOnly||a.adminOk===true);
+  const eligActes0=(selMed?(isRecapCol?[recapActe].filter(Boolean):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init))):[]).filter(a=>!adminOnly||a.adminOk===true);
   /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches.
      Si aucune n'est offerte par cette salle, on ne le bloque pas — on le prévient. */
   const selCond=selMed?condOn(getEntries,selMed.id,y2,m2,d,sl):[];
@@ -2492,10 +2498,9 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
             {eligActes.map(a=>(
               <button key={a.id} style={{...S.actTog,background:a.color,color:"#111",outline:`1px solid ${a.color}55`}}
                 onClick={()=>{
-                  if(isBipCol){
-                    // For BIP col: need to pick salle first
-                    setStep("salle"); return;
-                  }
+                  /* une colonne de reprise ne demande une salle que si l'activité en a une */
+                  if(isBipCol&&a.hasSalle){setStep("salle");return;}
+                  if(isRecapCol){addEntry(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:a.fixedSalle||null});onClose();return;}
                   const fs=a.fixedSalle||salle;
                   addEntry(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:fs});
                   onClose();

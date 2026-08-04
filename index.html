@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.58 — 04/08/2026";
+var APP_VERSION = "v9.58.1 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2533,21 +2533,23 @@ function PickMedSiteModal(_a) {
     var _b = useState("med"), step = _b[0], setStep = _b[1]; // med | acte | salle
     var _c = useState(null), selMedId = _c[0], setSelMedId = _c[1];
     var selMed = medecins.find(function (x) { return x.id === selMedId; });
-    var isBipCol = mData && (mData.salle === "CHB-BIP" || String(mData.salle || "").indexOf("RECAP:") === 0);
+    /* v9.58.1 : les colonnes de reprise s'identifient par l'ACTIVITE reprise, plus par le BIP. */
+    var recapId = mData ? (mData.salle === "CHB-BIP" ? "BIP" : (String(mData.salle || "").indexOf("RECAP:") === 0 ? String(mData.salle).slice(6) : null)) : null;
+    var isRecapCol = !!recapId;
+    var recapActe = recapId ? actes.find(function (a) { return a.id === recapId; }) : null;
+    var isBipCol = recapId === "BIP";
     var curOcc = [];
     siteActes.forEach(function (acte) {
         medecins.forEach(function (med) {
             getEntries(med.id, y2, m2, d, sl).forEach(function (e) {
-                // For BIP col: match any CHB salle; for regular cols: match exact salle
-                var salleMatch = isBipCol ? (["CHB-1", "CHB-2", "CHB-3"].includes(e.salle)) : e.salle === salle;
-                if (e.acteId === acte.id && salleMatch && !curOcc.find(function (x) { return x.med.id === med.id; }))
-                    curOcc.push({ med: med, acte: acte, rs: e.salle });
+                var match = isRecapCol ? (e.acteId === recapId) : (e.acteId === acte.id && e.salle === salle);
+                if (match && !e.cond && !curOcc.find(function (x) { return x.med.id === med.id; }))
+                    curOcc.push({ med: med, acte: (isRecapCol ? (recapActe || acte) : acte), rs: e.salle });
             });
         });
     });
     var _d = useState(null), selBipSalle = _d[0], setSelBipSalle = _d[1];
-    var bipActe = isBipCol ? actes.find(function (a) { return a.id === "BIP"; }) : null;
-    var eligActes0 = (selMed ? (isBipCol ? [bipActe].filter(Boolean) : siteActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); })) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
+    var eligActes0 = (selMed ? (isRecapCol ? [recapActe].filter(Boolean) : siteActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); })) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
     /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches ;
        si aucune n'est offerte ici, on ne le bloque pas, on le previent. */
     var selCond = selMed ? condOn(getEntries, selMed.id, y2, m2, d, sl) : [];
@@ -2625,9 +2627,13 @@ function PickMedSiteModal(_a) {
                 salle),
             React.createElement("div", { style: S.actGrd },
                 eligActes.map(function (a) { return (React.createElement("button", { key: a.id, style: __assign(__assign({}, S.actTog), { background: a.color, color: "#111", outline: "1px solid ".concat(a.color, "55") }), onClick: function () {
-                        if (isBipCol) {
-                            // For BIP col: need to pick salle first
+                        if (isBipCol && a.hasSalle) {
                             setStep("salle");
+                            return;
+                        }
+                        if (isRecapCol) {
+                            addEntry(selMed.id, y2, m2, d, sl, { acteId: a.id, salle: a.fixedSalle || null });
+                            onClose();
                             return;
                         }
                         var fs = a.fixedSalle || salle;
