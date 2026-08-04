@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.61 — 04/08/2026";
+const APP_VERSION="v9.62 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5183,6 +5183,24 @@ function CardioPlanning(){
     logCell("add",medId,y2,m2,d2,slot,acteId);
   },[]);
 
+  /* v9.62 : retirer UNE branche (acteId fourni) ou TOUT le choix ouvert (acteId nul).
+     Une branche unique reste volontairement conditionnelle : c'est la façon de dire
+     « je prévois cette activité mais je n'ai pas encore de salle ». Elle n'occupe rien
+     et reste dans la liste violette, là où une activité ferme sans salle irait, elle,
+     dans la liste rouge des anomalies. Ce sont deux états différents. */
+  const dropCond=useCallback((medId,y2,m2,d2,slot,acteId)=>{
+    const key=sk(y2,m2,d2,slot);
+    setPlan(p=>{
+      const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
+      const arr=Array.isArray(ex)?ex:[ex];
+      const nx=arr.filter(e=>!(e&&e.cond&&(!acteId||e.acteId===acteId)));
+      if(nx.length===arr.length)return p;
+      if(nx.length===0)delete dm[medId];else dm[medId]=nx.length===1?nx[0]:nx;
+      return{...p,[key]:dm};
+    });
+    logCell("del",medId,y2,m2,d2,slot,acteId||null);
+  },[]);
+
   /* Rétablir le choix ouvert à partir de la mémoire d'une entrée tranchée. */
   const restoreCond=useCallback((medId,y2,m2,d2,slot,acteId)=>{
     const key=sk(y2,m2,d2,slot);
@@ -7081,7 +7099,11 @@ header::-webkit-scrollbar { display: none; }
               const freeOf=a=>(a.salles||[]).filter(s=>!((busy[s]||[]).some(m=>m.id!==medId)));
               return(
                 <div style={{marginBottom:10,padding:"7px 9px",borderRadius:8,border:"1.5px dashed "+COND_C,background:COND_BG}}>
-                  <div style={{fontSize:10,color:COND_C,fontWeight:800,marginBottom:6}}>◇ CHOIX OUVERT — {cE.length} branches, non tranché</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                    <span style={{fontSize:10,color:COND_C,fontWeight:800}}>{cE.length>1?("◇ CHOIX OUVERT — "+cE.length+" branches, non tranché"):"◇ EN ATTENTE — 1 activité, non tranchée"}</span>
+                    {canEditThisMed&&<button title="Effacer tout le choix ouvert" onClick={()=>dropCond(medId,y2,m2,d2,slot,null)}
+                      style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:900,padding:"1px 6px"}}>×</button>}
+                  </div>
                   {cE.map((e,i)=>{const a=acteById(e.acteId);if(!a)return null;
                     const tot=(a.salles||[]).length,fr=freeOf(a);
                     const dispo=tot===0?null:fr.length>0;
@@ -7097,8 +7119,10 @@ header::-webkit-scrollbar { display: none; }
                           settleCond(medId,y2,m2,d2,slot,a.id);
                         }}
                         style={{background:"transparent",border:"1px solid "+COND_C,color:COND_C,borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>{tot>0&&!a.fixedSalle?"Choisir la salle…":"✓ c'est celle-ci"}</button>}
+                      {canEditThisMed&&<button title="Retirer cette branche" onClick={()=>dropCond(medId,y2,m2,d2,slot,a.id)}
+                        style={{background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:900,padding:"1px 6px"}}>×</button>}
                     </div>);})}
-                  <div style={{fontSize:10,color:"var(--txt3)",lineHeight:1.45}}>Attribuer une salle depuis un onglet de salles tranche aussi le choix.</div>
+                  <div style={{fontSize:10,color:"var(--txt3)",lineHeight:1.45}}>{cE.length>1?"Attribuer une salle depuis un onglet de salles tranche aussi le choix.":"Tant qu'elle n'est pas tranchée, cette activité n'occupe aucune salle et reste à confirmer."}</div>
                 </div>);
             })()}
             {(()=>{

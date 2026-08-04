@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.61 — 04/08/2026";
+var APP_VERSION = "v9.62 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -5786,6 +5786,31 @@ function CardioPlanning() {
         });
         logCell("add", medId, y2, m2, d2, slot, acteId);
     }, []);
+    /* v9.62 : retirer UNE branche (acteId fourni) ou TOUT le choix ouvert (acteId nul).
+       Une branche unique reste volontairement conditionnelle : c'est la façon de dire
+       « je prévois cette activité mais je n'ai pas encore de salle ». Elle n'occupe rien
+       et reste dans la liste violette, là où une activité ferme sans salle irait, elle,
+       dans la liste rouge des anomalies. Ce sont deux états différents. */
+    var dropCond = useCallback(function (medId, y2, m2, d2, slot, acteId) {
+        var key = sk(y2, m2, d2, slot);
+        setPlan(function (p) {
+            var _a;
+            var dm = __assign({}, (p[key] || {}));
+            var ex = dm[medId];
+            if (!ex)
+                return p;
+            var arr = Array.isArray(ex) ? ex : [ex];
+            var nx = arr.filter(function (e) { return !(e && e.cond && (!acteId || e.acteId === acteId)); });
+            if (nx.length === arr.length)
+                return p;
+            if (nx.length === 0)
+                delete dm[medId];
+            else
+                dm[medId] = nx.length === 1 ? nx[0] : nx;
+            return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
+        });
+        logCell("del", medId, y2, m2, d2, slot, acteId || null);
+    }, []);
     /* Rétablir le choix ouvert à partir de la mémoire d'une entrée tranchée. */
     var restoreCond = useCallback(function (medId, y2, m2, d2, slot, acteId) {
         var key = sk(y2, m2, d2, slot);
@@ -7864,10 +7889,9 @@ function CardioPlanning() {
                     });
                     var freeOf = function (a) { return (a.salles || []).filter(function (s) { return !((busy[s] || []).some(function (m) { return m.id !== medId; })); }); };
                     return (React.createElement("div", { style: { marginBottom: 10, padding: "7px 9px", borderRadius: 8, border: "1.5px dashed " + COND_C, background: COND_BG } },
-                        React.createElement("div", { style: { fontSize: 10, color: COND_C, fontWeight: 800, marginBottom: 6 } },
-                            "\u25C7 CHOIX OUVERT \u2014 ",
-                            cE.length,
-                            " branches, non tranch\u00E9"),
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 6 } },
+                            React.createElement("span", { style: { fontSize: 10, color: COND_C, fontWeight: 800 } }, cE.length > 1 ? ("◇ CHOIX OUVERT — " + cE.length + " branches, non tranché") : "◇ EN ATTENTE — 1 activité, non tranchée"),
+                            canEditThisMed && React.createElement("button", { title: "Effacer tout le choix ouvert", onClick: function () { return dropCond(medId, y2, m2, d2, slot, null); }, style: { marginLeft: "auto", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 900, padding: "1px 6px" } }, "\u00D7")),
                         cE.map(function (e, i) {
                             var a = acteById(e.acteId);
                             if (!a)
@@ -7887,9 +7911,10 @@ function CardioPlanning() {
                                             return;
                                         }
                                         settleCond(medId, y2, m2, d2, slot, a.id);
-                                    }, style: { background: "transparent", border: "1px solid " + COND_C, color: COND_C, borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 800, padding: "3px 8px", whiteSpace: "nowrap" } }, tot > 0 && !a.fixedSalle ? "Choisir la salle…" : "✓ c'est celle-ci")));
+                                    }, style: { background: "transparent", border: "1px solid " + COND_C, color: COND_C, borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 800, padding: "3px 8px", whiteSpace: "nowrap" } }, tot > 0 && !a.fixedSalle ? "Choisir la salle…" : "✓ c'est celle-ci"),
+                                canEditThisMed && React.createElement("button", { title: "Retirer cette branche", onClick: function () { return dropCond(medId, y2, m2, d2, slot, a.id); }, style: { background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 900, padding: "1px 6px" } }, "\u00D7")));
                         }),
-                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", lineHeight: 1.45 } }, "Attribuer une salle depuis un onglet de salles tranche aussi le choix.")));
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", lineHeight: 1.45 } }, cE.length > 1 ? "Attribuer une salle depuis un onglet de salles tranche aussi le choix." : "Tant qu'elle n'est pas tranchée, cette activité n'occupe aucune salle et reste à confirmer.")));
                 })(),
                 (function () {
                     var wE = entries.filter(function (e) { return e && e.acteId && !e.cond && e.wasCond && e.wasCond.length; });
