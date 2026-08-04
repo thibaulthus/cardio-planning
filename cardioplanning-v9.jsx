@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.55 — 03/08/2026";
+const APP_VERSION="v9.56 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -333,6 +333,37 @@ const pillCols=(c,night)=>({border:"2px solid "+mixC(c,"#000000",.12),background
    celle de bordure générale étant invisible sur ce fond (surtout en mode nuit) */
 const conflBg=night=>({background:night?"rgba(239,68,68,.16)":"#fee2e2",outline:"1px solid #ef4444"});
 const conflSep=night=>night?"#f87171":"#b91c1c";
+/* v9.56 — CHOIX OUVERT (étape 1/4).
+   Une case de planning type porte soit UNE activité ferme, soit 2 à 3 branches
+   entre lesquelles le choix n'est pas encore fait. À l'application, chaque branche
+   d'un choix ouvert est marquée `cond:1` — un champ porté par l'entrée, donc qui
+   hérite de la synchro en delta, du journal et des sauvegardes sans code.
+   Affichage : cadre pointillé violet, branches EMPILÉES. En grille, la largeur se
+   paie sur toutes les colonnes de médecins ; la hauteur, seulement sur les rares
+   lignes concernées. Violet fixe et non variable de thème : il tient sur les deux. */
+const COND_C="#a371f7", COND_BG="rgba(163,113,247,.12)";
+const ptCell=(a1,s1,a2,s2,a3,s3)=>{
+  const brs=[[a1,s1],[a2,s2],[a3,s3]].filter(b=>b[0]);
+  if(!brs.length)return null;
+  if(brs.length===1)return {acteId:brs[0][0],salle:brs[0][1]||null};
+  return brs.map(b=>({acteId:b[0],salle:b[1]||null,cond:1}));
+};
+function CondBadges({es,acteById,noteT}){
+  const firm=(es||[]).filter(e=>e&&e.acteId&&!e.cond);
+  const cond=(es||[]).filter(e=>e&&e.acteId&&e.cond);
+  return(<>
+    {firm.map((e,i)=>{const a=acteById(e.acteId);return a?<Badge key={"f"+i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
+    {cond.length>0&&<span title={"Choix ouvert — "+cond.map(e=>{const a=acteById(e.acteId);return a?a.short:e.acteId;}).join(" ou ")}
+      style={{display:"inline-flex",flexDirection:"column",alignItems:"center",gap:1,border:"1.5px dashed "+COND_C,borderRadius:6,padding:"2px 3px",background:COND_BG}}>
+      {cond.map((e,i)=>{const a=acteById(e.acteId);if(!a)return null;
+        return <span key={"c"+i} style={{display:"inline-flex",flexDirection:"column",alignItems:"center",gap:1}}>
+          {i>0&&<span style={{fontSize:8,fontWeight:800,color:COND_C,lineHeight:1}}>ou</span>}
+          <Badge a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>
+        </span>;})}
+    </span>}
+  </>);
+}
+
 function ActPill({a,night,hasNote}){
   if(!a)return null;
   return(
@@ -466,7 +497,7 @@ function GridH({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
                   const es=getEntries(med.id,year,month,d,"JOUR");
                   const noteT=notes[nk(med.id,year,month,d,"JOUR")];
                   return <td key={d} title={noteT||undefined} style={{...S.td,...S.tdWE,cursor:isEdit?"pointer":"default"}} onClick={()=>onCell(med.id,year,month,d,"JOUR")}>
-                    {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
+                    <CondBadges es={es} acteById={acteById} noteT={noteT}/>
                   </td>;
                 }
                 return["M","AM","N"].map(sl=>{
@@ -489,7 +520,7 @@ function GridH({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
                     style={{...S.td,...(sl==="N"?S.tdN:{}),...(isAstH?{background:"var(--ast-bg)",boxShadow:astShH}:{}),...(isTgh?{background:"var(--bg-td)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle",position:"relative"}}
                     onClick={bl||!isEdit?undefined:()=>onCell(med.id,ghY,ghM,d,sl)}>
                     {issueT&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}{!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
-                      {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
+                      <CondBadges es={es} acteById={acteById} noteT={noteT}/>
                     </div>}
                   </td>;
                 });
@@ -689,7 +720,7 @@ function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
                     onTouchMove={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
                     onClick={bl||!isEdit?undefined:()=>{if(_gvLpF){_gvLpF=false;return;}onCell(med.id,ey,em,d,sl);}}>
                     {issueT&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}{!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
-                      {es.map((e,i)=>{const a=e.acteId?acteById(e.acteId):null;return a?<Badge key={i} a={a} salle={e.salle} hideSalle={true} hasNote={!!noteT}/>:null;})}
+                      <CondBadges es={es} acteById={acteById} noteT={noteT}/>
                     </div>}
                   </td>;
                 })}
@@ -2042,12 +2073,15 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
                   </div>
                 </td>
                 {[1,2,3,4,5].map(dw=>["M","AM"].map(sl=>{
-                  const [acteId,salle,acteId2,salle2]=(pt[dw]||{})[sl]||[null,null];const acte2=acteId2?acteById(acteId2):null;const ptIss=(acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2);
-                  const acte=acteId?acteById(acteId):null;
+                  const [acteId,salle,acteId2,salle2,acteId3,salle3]=(pt[dw]||{})[sl]||[null,null];
+                  const acte=acteId?acteById(acteId):null;const acte2=acteId2?acteById(acteId2):null;const acte3=acteId3?acteById(acteId3):null;
+                  const ptIss=(acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2)||(acte3&&acte3.hasSalle&&!salle3);
+                  const ptEs=[{acteId,salle},{acteId:acteId2,salle:salle2},{acteId:acteId3,salle:salle3}].filter(x=>x.acteId);
+                  if(ptEs.length>1)ptEs.forEach(x=>{x.cond=1;});
                   return(
                     <td key={dw+sl} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative"}} title={ptIss?"⚠ salle non attribuée":undefined}
                       onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>{ptIss&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}
-                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>{acte&&<Badge a={acte} salle={salle}/>}{acte2&&<Badge a={acte2} salle={salle2}/>}</div>
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}><CondBadges es={ptEs} acteById={acteById} noteT={null}/></div>
                     </td>
                   );
                 }))}
@@ -2080,12 +2114,15 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
               <td style={{...S.tdFix,position:"sticky",left:48,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--th)",borderRight:"2px solid var(--border)",minWidth:26,padding:"2px"}}>{sl}</td>
               {medecins.map(med=>{
                 const pt=planningType[med.id]||{};
-                const [acteId,salle,acteId2,salle2]=(pt[dw]||{})[sl]||[null,null];const acte2=acteId2?acteById(acteId2):null;const ptIss=(acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2);
-                const acte=acteId?acteById(acteId):null;
+                const [acteId,salle,acteId2,salle2,acteId3,salle3]=(pt[dw]||{})[sl]||[null,null];
+                const acte=acteId?acteById(acteId):null;const acte2=acteId2?acteById(acteId2):null;const acte3=acteId3?acteById(acteId3):null;
+                const ptIss=(acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2)||(acte3&&acte3.hasSalle&&!salle3);
+                const ptEs=[{acteId,salle},{acteId:acteId2,salle:salle2},{acteId:acteId3,salle:salle3}].filter(x=>x.acteId);
+                if(ptEs.length>1)ptEs.forEach(x=>{x.cond=1;});
                 return(
                   <td key={med.id} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative"}} title={ptIss?"⚠ salle non attribuée":undefined}
                     onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>{ptIss&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>{acte&&<Badge a={acte} salle={salle}/>}{acte2&&<Badge a={acte2} salle={salle2}/>}</div>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}><CondBadges es={ptEs} acteById={acteById} noteT={null}/></div>
                   </td>
                 );
               })}
@@ -2487,12 +2524,16 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
   const {medId,dayOfWeek,slot}=mData;
   const med=medecins.find(x=>x.id===medId);
   const pt=planningType[medId]||{};
-  const [acteId,curSalle,acteId2=null,curSalle2=null]=((pt[dayOfWeek]||{})[slot])||[null,null];
-  const second=!!(mData&&mData._ptSecond);
+  const [acteId,curSalle,acteId2=null,curSalle2=null,acteId3=null,curSalle3=null]=((pt[dayOfWeek]||{})[slot])||[null,null];
+  const brs=[[acteId,curSalle],[acteId2,curSalle2],[acteId3,curSalle3]];
+  const nBr=brs.filter(b=>b[0]).length;
+  const addIdx=(mData&&mData._ptAdd)||null;   // 2 ou 3 : la branche en cours d'ajout
   const jours=["","Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
   const writePT=(arr)=>setPlanningType(p=>({...p,[medId]:{...p[medId],[dayOfWeek]:{...((p[medId]||{})[dayOfWeek]||{}),[slot]:arr}}}));
-  const setPT=(aId,salle)=>writePT(second?[acteId,curSalle,aId,salle]:(acteId2?[aId,salle,acteId2,curSalle2]:[aId,salle]));
-  const afterPick=()=>setMData(p=>({...p,_ptPickSalle:null,_ptSecond:false}));
+  const flushBrs=(list)=>{const k=list.filter(b=>b&&b[0]);writePT(k.length?k.reduce((acc,b)=>acc.concat([b[0],b[1]||null]),[]):[null,null]);};
+  const setPT=(aId,salle)=>{const list=brs.slice();list[addIdx?addIdx-1:0]=[aId,salle];flushBrs(list);};
+  const dropBr=(i)=>{const list=brs.slice();list[i]=[null,null];flushBrs(list);};
+  const afterPick=()=>setMData(p=>({...p,_ptPickSalle:null,_ptAdd:null}));
   const eligActes=actes.filter(a=>!SYS.includes(a.id)&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes((med&&med.init))));
 
   return(
@@ -2506,24 +2547,33 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
       {/* Current activity badge with X to remove */}
       {acteId&&(()=>{const cur=actes.find(x=>x.id===acteId);return cur?(
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 10px",background:"var(--bg)",borderRadius:8,border:"1px solid var(--border)"}}>
-          <span style={{fontSize:11,color:"var(--txt3)",fontWeight:600}}>Activité actuelle :</span>
+          <span style={{fontSize:11,color:nBr>1?COND_C:"var(--txt3)",fontWeight:700}}>{nBr>1?"Choix ouvert ①":"Activité actuelle :"}</span>
           <Badge a={cur}/>
           {curSalle&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle}</span>}
-          <button onClick={()=>{writePT(acteId2?[acteId2,curSalle2]:[null,null]);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
+          <button onClick={()=>{dropBr(0);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
         </div>
       ):null;})()}
       {acteId2&&(()=>{const cur2=actes.find(x=>x.id===acteId2);return cur2?(
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 10px",background:"var(--bg)",borderRadius:8,border:"1px solid var(--border)"}}>
-          <span style={{fontSize:11,color:"var(--txt3)",fontWeight:600}}>2e activité :</span>
+          <span style={{fontSize:11,color:COND_C,fontWeight:700}}>Choix ouvert ②</span>
           <Badge a={cur2}/>
           {curSalle2&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle2}</span>}
-          <button onClick={()=>{writePT([acteId,curSalle]);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
+          <button onClick={()=>{dropBr(1);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
         </div>):null;})()}
-      {acteId&&!acteId2&&!second&&<button style={{marginBottom:10,padding:"5px 11px",borderRadius:6,border:"1.5px dashed var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer",fontSize:11,fontWeight:700}} onClick={()=>setMData(p=>({...p,_ptSecond:true}))}>+ Ajouter une 2e activité</button>}
-      {second&&<div style={{marginBottom:8,fontSize:11,color:"#e3b341",fontWeight:700}}>⚡ Choisissez la 2e activité ci-dessous</div>}
+      {acteId3&&(()=>{const cur3=actes.find(x=>x.id===acteId3);return cur3?(
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 10px",background:COND_BG,borderRadius:8,border:"1.5px dashed "+COND_C}}>
+          <span style={{fontSize:11,color:COND_C,fontWeight:700}}>Choix ouvert ③</span>
+          <Badge a={cur3}/>
+          {curSalle3&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle3}</span>}
+          <button onClick={()=>{dropBr(2);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
+        </div>):null;})()}
+      {acteId&&nBr<3&&!addIdx&&<button style={{marginBottom:10,padding:"5px 11px",borderRadius:6,border:"1.5px dashed "+COND_C,background:COND_BG,color:COND_C,cursor:"pointer",fontSize:11,fontWeight:700}} onClick={()=>setMData(p=>({...p,_ptAdd:nBr+1}))}>{nBr===1?"◇ Transformer en choix ouvert":"◇ Ajouter une 3e branche"}</button>}
+      {addIdx&&<div style={{marginBottom:8,fontSize:11,color:COND_C,fontWeight:700}}>◇ Choisissez la branche {addIdx===2?"②":"③"} du choix ouvert ci-dessous</div>}
+      {nBr>1&&!addIdx&&<div style={{marginBottom:8,fontSize:10,color:"var(--txt3)",lineHeight:1.45}}>Le praticien restera disponible pour ces activités tant que le choix n'est pas tranché.</div>}
       <div style={S.actGrd}>
 {eligActes.map(a=>{
-          const on=(second?acteId2:acteId)===a.id;const locked=!!(second?acteId2:acteId)&&!on;
+          const tgt=addIdx===2?acteId2:addIdx===3?acteId3:acteId;
+          const on=tgt===a.id;const locked=!on&&(!!tgt||[acteId,acteId2,acteId3].filter(Boolean).includes(a.id));
           return(
             <button key={a.id} style={{...S.actTog,
               background:a.color,color:"#111",
@@ -2792,10 +2842,10 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
               const ex=(next[k]||{})[mid];
               const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
               if(PROT.includes(exA))return;
-              const[acteId,salle,a2x=null,s2x=null]=(pt[dw2][sl])||[null,null];
+              const[acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw2][sl])||[null,null];
               if(!acteId)return;
               if(!next[k])next[k]={};
-              next[k]={...next[k],[mid]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
+              next[k]={...next[k],[mid]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
             });
           });
         });
@@ -4692,10 +4742,10 @@ function CardioPlanning(){
             return;
           }
           if(!pt||!pt[dw2])return;
-          const[acteId,salle,a2x=null,s2x=null]=(pt[dw2][sl])||[null,null];
+          const[acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw2][sl])||[null,null];
           if(!acteId)return;
           if(!next[k])next[k]={};
-          next[k]={...next[k],[medId]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
+          next[k]={...next[k],[medId]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
         });
       }
       return next;
@@ -5295,9 +5345,9 @@ function CardioPlanning(){
               const k=sk(ay,am,d,sl),ex=(next[k]||{})[med.id];
               const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
               if(["ABSENCE","GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","TP"].includes(exA))return;
-              const [acteId,salle,a2x=null,s2x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
+              const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
               if(!next[k])next[k]={};
-              next[k]={...next[k],[med.id]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
+              next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
               nApplied++;
             });
           });
@@ -5377,9 +5427,9 @@ function CardioPlanning(){
             const k=sk(year,month,d,sl),ex=(next[k]||{})[med.id];
             const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
             if(["ABSENCE","GARDE","REPOS_GARDE"].includes(exA))return;
-            const [acteId,salle,a2x=null,s2x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
+            const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
             if(!next[k])next[k]={};
-            next[k]={...next[k],[med.id]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
+            next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
           });
         });
       });
@@ -5405,9 +5455,9 @@ function CardioPlanning(){
           const k=sk(year,month,d,sl),ex=(next[k]||{})[medId];
           const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
           if(["ABSENCE","GARDE","REPOS_GARDE"].includes(exA))return;
-          const [acteId,salle,a2x=null,s2x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
+          const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
           if(!next[k])next[k]={};
-          next[k]={...next[k],[medId]:a2x?[{acteId,salle:salle||null},{acteId:a2x,salle:s2x||null}]:{acteId,salle:salle||null}};
+          next[k]={...next[k],[medId]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
         });
       });
       return next;
