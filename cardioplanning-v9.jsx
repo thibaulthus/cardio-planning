@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.57 — 04/08/2026";
+const APP_VERSION="v9.57.1 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -791,7 +791,8 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
       if(!bipActe)return <td key={"bip"+d+sl} style={{...S.td}}/>;
       const bipOcc2=medecins.flatMap(med=>{
         const es=getEntries(med.id,ry,rm,d,sl);
-        return es.filter(e=>e.acteId===_rId).map(e=>({med,acte:bipActe,rs:e.salle}));
+        /* v9.57.1 : une branche non tranchée ne figure pas dans la colonne de reprise */
+        return es.filter(e=>e.acteId===_rId&&!e.cond).map(e=>({med,acte:bipActe,rs:e.salle}));
       });
       return(
         <td key={"bip"+d+sl} style={{...S.td,borderLeft:"3px solid var(--border)",cursor:isEdit?"pointer":"default",padding:2,verticalAlign:"middle",textAlign:"center"}}

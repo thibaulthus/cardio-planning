@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.57 — 04/08/2026";
+var APP_VERSION = "v9.57.1 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -975,7 +975,8 @@ function SiteView(_a) {
                 return React.createElement("td", { key: "bip" + d + sl, style: __assign({}, S.td) });
             var bipOcc2 = medecins.flatMap(function (med) {
                 var es = getEntries(med.id, ry, rm, d, sl);
-                return es.filter(function (e) { return e.acteId === _rId_1; }).map(function (e) { return ({ med: med, acte: bipActe_1, rs: e.salle }); });
+                /* v9.57.1 : une branche non tranchee ne figure pas dans la colonne de reprise */
+                return es.filter(function (e) { return e.acteId === _rId_1 && !e.cond; }).map(function (e) { return ({ med: med, acte: bipActe_1, rs: e.salle }); });
             });
             return (React.createElement("td", { key: "bip" + d + sl, style: __assign(__assign({}, S.td), { borderLeft: "3px solid var(--border)", cursor: isEdit ? "pointer" : "default", padding: 2, verticalAlign: "middle", textAlign: "center" }), onClick: function () { return isEdit && onPickSite({ salle: salle, siteActes: [bipActe_1], d: d, sl: sl, y: ry, m: rm }); } }, bipOcc2.map(function (_a, i) {
                 var med = _a.med, acte = _a.acte, rs = _a.rs;
