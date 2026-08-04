@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.60 — 04/08/2026";
+const APP_VERSION="v9.61 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5154,10 +5154,11 @@ function CardioPlanning(){
       const dropped=(entry&&!entry.cond)?prev.filter(e=>e&&e.cond):[];
       const kept=dropped.length?prev.filter(e=>!(e&&e.cond)):prev;
       let ent=entry;
-      if(dropped.length){
-        const others=dropped.map(e=>e.acteId).filter(id=>id!==entry.acteId);
-        ent=others.length?{...entry,wasCond:others}:{...entry};
-      }
+      /* v9.61 : wasCond garde la liste COMPLÈTE des branches d'origine, sans en retirer
+         celle qu'on garde. Rétablir devient « je remets exactement ce qu'il y avait »,
+         règle valable que l'activité posée ait fait partie du choix ou non — l'ancienne
+         version en rajoutait une quand elle venait d'ailleurs, et le compte était faux. */
+      if(dropped.length)ent={...entry,wasCond:dropped.map(e=>e.acteId)};
       const nx=kept.concat([ent]);
       dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
@@ -5173,8 +5174,8 @@ function CardioPlanning(){
       const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
       const arr=Array.isArray(ex)?ex:[ex];
       const win=arr.find(e=>e&&e.cond&&e.acteId===acteId);if(!win)return p;
-      const others=arr.filter(e=>e&&e.cond&&e.acteId!==acteId).map(e=>e.acteId);
-      const ent={...win};delete ent.cond;if(others.length)ent.wasCond=others;
+      const allBr=arr.filter(e=>e&&e.cond).map(e=>e.acteId);
+      const ent={...win};delete ent.cond;if(allBr.length>1)ent.wasCond=allBr;
       const nx=arr.filter(e=>!(e&&e.cond)).concat([ent]);
       dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
@@ -5189,7 +5190,7 @@ function CardioPlanning(){
       const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
       const arr=Array.isArray(ex)?ex:[ex];
       const src=arr.find(e=>e&&e.acteId===acteId&&e.wasCond&&e.wasCond.length);if(!src)return p;
-      const brs=[{acteId:src.acteId,salle:null,cond:1}].concat(src.wasCond.map(id=>({acteId:id,salle:null,cond:1})));
+      const brs=src.wasCond.map(id=>({acteId:id,salle:null,cond:1}));
       const nx=arr.filter(e=>e!==src).concat(brs);
       dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
@@ -5204,9 +5205,12 @@ function CardioPlanning(){
       const arr=Array.isArray(ex)?ex:[ex];
       /* v9.58 : si l'activité retirée était issue d'un choix ouvert, on ne vide pas la
          case — on remet les branches. Le choix redevient visible et à trancher. */
-      const gone=arr.find(e=>e&&e.acteId===acteId&&e.wasCond&&e.wasCond.length);
-      const f=arr.filter(e=>e.acteId!==acteId);
-      const back=gone?[{acteId:gone.acteId,salle:null,cond:1}].concat(gone.wasCond.map(id=>({acteId:id,salle:null,cond:1}))):[];
+      const gone=arr.find(e=>e&&e.acteId===acteId&&!e.cond&&e.wasCond&&e.wasCond.length);
+      /* v9.61 : ne retirer que l'entrée FERME. Filtrer sur le seul acteId emportait aussi
+         la branche de même activité — c'est l'origine du « 3 choix devenus 2 » observé
+         dès les premières versions, quand une activité posée coexistait avec sa branche. */
+      const f=arr.filter(e=>!(e.acteId===acteId&&!e.cond));
+      const back=gone?gone.wasCond.map(id=>({acteId:id,salle:null,cond:1})):[];
       const nx=f.concat(back);
       if(nx.length===0)delete dm[medId];else dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
@@ -7027,7 +7031,7 @@ header::-webkit-scrollbar { display: none; }
         const canEditThisMed=canEdit(medId);
         const dw2=dow(y2,m2,d2);
         const entries=getEntries(medId,y2,m2,d2,slot);
-        const curIds=entries.filter(e=>!e._blocked&&!e._fullDay).map(e=>e.acteId);
+        const curIds=entries.filter(e=>!e._blocked&&!e._fullDay&&!e.cond).map(e=>e.acteId);
         const hasOther=curIds.some(id=>!["TOUR_HC","TOUR_USIC"].includes(id));
 
         const eligible=actes.filter(a=>{
@@ -7104,7 +7108,7 @@ header::-webkit-scrollbar { display: none; }
                 const lab=e.wasCond.map(id=>{const x=acteById(id);return x?x.short:id;}).join(" ou ");
                 return(
                   <div key={"w"+i} style={{marginBottom:10,display:"flex",alignItems:"center",gap:6,padding:"6px 9px",borderRadius:8,border:"1px solid "+COND_C,background:COND_BG}}>
-                    <span style={{fontSize:10,color:COND_C,fontWeight:700,flex:1,lineHeight:1.4}}>◇ {a.short} est issue d'un choix ouvert — écartées : {lab}</span>
+                    <span style={{fontSize:10,color:COND_C,fontWeight:700,flex:1,lineHeight:1.4}}>◇ {a.short} est issue d'un choix ouvert entre {lab}</span>
                     {canEditThisMed&&<button onClick={()=>restoreCond(medId,y2,m2,d2,slot,e.acteId)}
                       style={{background:"transparent",border:"1px solid "+COND_C,color:COND_C,borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>↩ rétablir</button>}
                   </div>);});

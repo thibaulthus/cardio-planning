@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.60 — 04/08/2026";
+var APP_VERSION = "v9.61 — 04/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -5749,16 +5749,20 @@ function CardioPlanning() {
             var dropped = (entry && !entry.cond) ? prev.filter(function (e) { return e && e.cond; }) : [];
             var kept = dropped.length ? prev.filter(function (e) { return !(e && e.cond); }) : prev;
             var ent = entry;
-            if (dropped.length) {
-                var others = dropped.map(function (e) { return e.acteId; }).filter(function (id) { return id !== entry.acteId; });
-                ent = others.length ? __assign(__assign({}, entry), { wasCond: others }) : __assign({}, entry);
-            }
+            /* v9.61 : wasCond garde la liste COMPLÈTE des branches d'origine, sans en retirer
+               celle qu'on garde. Rétablir devient « je remets exactement ce qu'il y avait »,
+               règle valable que l'activité posée ait fait partie du choix ou non — l'ancienne
+               version en rajoutait une quand elle venait d'ailleurs, et le compte était faux. */
+            if (dropped.length)
+                ent = __assign(__assign({}, entry), { wasCond: dropped.map(function (e) { return e.acteId; }) });
             var nx = kept.concat([ent]);
             dm[medId] = nx.length === 1 ? nx[0] : nx;
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
         logCell("add", medId, y2, m2, d2, slot, entry.acteId);
     }, []);
+    /* Trancher depuis la modale de case : la branche choisie devient ferme, les autres
+       partent dans son wasCond. Indispensable pour la Scintigraphie, qui n'a pas de salle. */
     var settleCond = useCallback(function (medId, y2, m2, d2, slot, acteId) {
         var key = sk(y2, m2, d2, slot);
         setPlan(function (p) {
@@ -5771,17 +5775,18 @@ function CardioPlanning() {
             var win = arr.find(function (e) { return e && e.cond && e.acteId === acteId; });
             if (!win)
                 return p;
-            var others = arr.filter(function (e) { return e && e.cond && e.acteId !== acteId; }).map(function (e) { return e.acteId; });
+            var allBr = arr.filter(function (e) { return e && e.cond; }).map(function (e) { return e.acteId; });
             var ent = __assign({}, win);
             delete ent.cond;
-            if (others.length)
-                ent.wasCond = others;
+            if (allBr.length > 1)
+                ent.wasCond = allBr;
             var nx = arr.filter(function (e) { return !(e && e.cond); }).concat([ent]);
             dm[medId] = nx.length === 1 ? nx[0] : nx;
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
         logCell("add", medId, y2, m2, d2, slot, acteId);
     }, []);
+    /* Rétablir le choix ouvert à partir de la mémoire d'une entrée tranchée. */
     var restoreCond = useCallback(function (medId, y2, m2, d2, slot, acteId) {
         var key = sk(y2, m2, d2, slot);
         setPlan(function (p) {
@@ -5794,7 +5799,7 @@ function CardioPlanning() {
             var src = arr.find(function (e) { return e && e.acteId === acteId && e.wasCond && e.wasCond.length; });
             if (!src)
                 return p;
-            var brs = [{ acteId: src.acteId, salle: null, cond: 1 }].concat(src.wasCond.map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); }));
+            var brs = src.wasCond.map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); });
             var nx = arr.filter(function (e) { return e !== src; }).concat(brs);
             dm[medId] = nx.length === 1 ? nx[0] : nx;
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
@@ -5810,10 +5815,14 @@ function CardioPlanning() {
             if (!ex)
                 return p;
             var arr = Array.isArray(ex) ? ex : [ex];
-            /* v9.58 : retirer une activite issue d'un choix ouvert remet les branches. */
-            var gone = arr.find(function (e) { return e && e.acteId === acteId && e.wasCond && e.wasCond.length; });
-            var f = arr.filter(function (e) { return e.acteId !== acteId; });
-            var back = gone ? [{ acteId: gone.acteId, salle: null, cond: 1 }].concat(gone.wasCond.map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); })) : [];
+            /* v9.58 : si l'activité retirée était issue d'un choix ouvert, on ne vide pas la
+               case — on remet les branches. Le choix redevient visible et à trancher. */
+            var gone = arr.find(function (e) { return e && e.acteId === acteId && !e.cond && e.wasCond && e.wasCond.length; });
+            /* v9.61 : ne retirer que l'entrée FERME. Filtrer sur le seul acteId emportait aussi
+               la branche de même activité — c'est l'origine du « 3 choix devenus 2 » observé
+               dès les premières versions, quand une activité posée coexistait avec sa branche. */
+            var f = arr.filter(function (e) { return !(e.acteId === acteId && !e.cond); });
+            var back = gone ? gone.wasCond.map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); }) : [];
             var nx = f.concat(back);
             if (nx.length === 0)
                 delete dm[medId];
@@ -5823,7 +5832,8 @@ function CardioPlanning() {
         });
         logCell("del", medId, y2, m2, d2, slot, acteId);
     }, []);
-    /* v9.37 : le depart differe appartient a l'ACTIVITE — on marque toutes ses entrees. */
+    /* v9.37 : le départ différé appartient à l'ACTIVITÉ — on marque toutes ses entrées,
+       quel que soit le nombre de médecins en salle (c'est l'effectif IDE qui conditionne le démarrage). */
     var patchActivity = useCallback(function (medId, y2, m2, d2, slot, acteId, salle, patch) {
         var key = sk(y2, m2, d2, slot);
         setPlan(function (p) {
@@ -7786,7 +7796,7 @@ function CardioPlanning() {
             var canEditThisMed = canEdit(medId);
             var dw2 = dow(y2, m2, d2);
             var entries = getEntries(medId, y2, m2, d2, slot);
-            var curIds = entries.filter(function (e) { return !e._blocked && !e._fullDay; }).map(function (e) { return e.acteId; });
+            var curIds = entries.filter(function (e) { return !e._blocked && !e._fullDay && !e.cond; }).map(function (e) { return e.acteId; });
             var hasOther = curIds.some(function (id) { return !["TOUR_HC", "TOUR_USIC"].includes(id); });
             var eligible = actes.filter(function (a) {
                 if (isNight)
@@ -7891,7 +7901,7 @@ function CardioPlanning() {
                             return null;
                         var lab = e.wasCond.map(function (id) { var x = acteById(id); return x ? x.short : id; }).join(" ou ");
                         return (React.createElement("div", { key: "w" + i, style: { marginBottom: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 9px", borderRadius: 8, border: "1px solid " + COND_C, background: COND_BG } },
-                            React.createElement("span", { style: { fontSize: 10, color: COND_C, fontWeight: 700, flex: 1, lineHeight: 1.4 } }, "\u25c7 " + a.short + " est issue d'un choix ouvert \u2014 \u00e9cart\u00e9es : " + lab),
+                            React.createElement("span", { style: { fontSize: 10, color: COND_C, fontWeight: 700, flex: 1, lineHeight: 1.4 } }, "\u25c7 " + a.short + " est issue d'un choix ouvert entre " + lab),
                             canEditThisMed && React.createElement("button", { onClick: function () { return restoreCond(medId, y2, m2, d2, slot, e.acteId); }, style: { background: "transparent", border: "1px solid " + COND_C, color: COND_C, borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 800, padding: "3px 8px", whiteSpace: "nowrap" } }, "\u21a9 r\u00e9tablir")));
                     });
                 })(),
