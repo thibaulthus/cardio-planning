@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.67.1 — 05/08/2026";
+const APP_VERSION="v9.67.2 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -840,8 +840,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
           onClick={()=>isEdit&&onPickSite({salle,siteActes:[bipActe],d,sl,y:ry,m:rm})}>
           {bipOcc2.map(({med,acte,rs},i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
-              <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
-              <span style={{fontSize:10,fontWeight:600,color:"var(--txt)",whiteSpace:"nowrap"}}>{med.nom}</span>
+              <div title={((med.prenom||"")+" "+(med.nom||"")).trim()} style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
               {rs?<span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg2)",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>{rs}</span>
                 :(bipActe.hasSalle?<span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>⚠ sans salle</span>:null)}
             </div>
@@ -2511,6 +2510,12 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12}}>{med.prenom} {med.nom}</span>
               <span style={{fontSize:10,color:acte.color,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>
+              {(()=>{const _r=curOcc[i]&&curOcc[i].rs;
+                if(_r)return <span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>{_r}</span>;
+                if(acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
+                return null;})()}
+              {isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!adminOnly||acte.adminOk===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
+                style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
               {(!adminOnly||acte.adminOk===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
             </div>
           ))}
