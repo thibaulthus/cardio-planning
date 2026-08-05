@@ -27,7 +27,7 @@ try{_db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){
 if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
 window.firebaseDoc=function(db,col,id){return db.collection(col).doc(id);};
 window.firebaseSetDoc=function(ref,data,opts){return opts&&opts.merge?ref.set(data,{merge:true}):ref.set(data);};
-window.firebaseOnSnapshot=function(ref,onNext,onErr){return ref.onSnapshot(onNext,onErr);};
+window.firebaseOnSnapshot=function(ref,onNext,onErr){return ref.onSnapshot({includeMetadataChanges:true},onNext,onErr);};/* v9.71 : sans ceci, si le cache local est identique au serveur, aucun second message n'arrive et on ne saurait jamais qu'on est synchronisé */
 window.firebaseUpdatePaths=function(ref,pairs){
   var args=[];
   pairs.forEach(function(p){
@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.70 — 05/08/2026";
+var APP_VERSION = "v9.71 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4823,6 +4823,9 @@ function CardioPlanning() {
     }, [vacZone]);
     var isVac = function (y, m, d) { return vacDates.has("".concat(y, "-").concat(String(m + 1).padStart(2, "0"), "-").concat(String(d).padStart(2, "0"))); };
     var isFirstLoad = useRef(true);
+    /* v9.71 : le premier message vient du CACHE LOCAL, pas du serveur. Tant qu'un message
+       serveur n'est pas arrive, on affiche mais on n'ecrit RIEN. */
+    var serverSeen = useRef(false);
     var localChange = useRef(false);
     /* v9.44 : suivi par champ — voir commentaire dans la source JSX. */
     var fieldSync = useRef({});
@@ -4863,6 +4866,8 @@ function CardioPlanning() {
         }
         setFbStatus("connecting");
         var unsub = onSnapshot(PLANNING_DOC, function (snap) {
+            if (snap.metadata && snap.metadata.fromCache === false)
+                serverSeen.current = true;
             if (snap.exists) {
                 var data0 = snap.data();
                 var data = data0;
@@ -5004,11 +5009,11 @@ function CardioPlanning() {
                     if (data.medPins)
                         setMedPins(JSON.parse(data.medPins));
                 }
-                isFirstLoad.current = false;
+                isFirstLoad.current = !serverSeen.current;
                 localChange.current = false;
             }
             else {
-                isFirstLoad.current = false;
+                isFirstLoad.current = !serverSeen.current;
             }
             setFbStatus("ok");
         }, function (err) { console.error("Firebase:", err); setFbStatus("error"); });
@@ -5510,6 +5515,8 @@ function CardioPlanning() {
     var saveToFirebase = useCallback(function (data) {
         if (!PLANNING_DOC || !setDoc)
             return Promise.resolve();
+        if (!serverSeen.current)
+            return Promise.resolve();   // v9.71
         /* v9.44 : on n'envoie que ce qui a reellement change depuis la derniere valeur
            connue du champ — sinon chaque message recu declenchait sa propre reecriture. */
         var out = {}, ks = [];

@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.70 — 05/08/2026";
+const APP_VERSION="v9.71 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -4534,6 +4534,12 @@ function CardioPlanning(){
 
   const isVac=(y,m,d)=>vacDates.has(`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`);
   const isFirstLoad=useRef(true);
+  /* v9.71 : la persistance hors ligne fait que le TOUT PREMIER message vient du CACHE
+     LOCAL, pas du serveur. Il peut être en retard. Tant qu'un message serveur n'est pas
+     arrivé, on affiche ce cache mais on n'écrit RIEN : sinon une modification faite dans
+     cette fenêtre serait écrite par-dessus une base périmée et effacerait tout ce qui a
+     été ajouté depuis — le planning type étant enregistré d'un bloc, la perte est totale. */
+  const serverSeen=useRef(false);
   const localChange=useRef(false);
   /* ── v9.44 : suivi par champ.
      fieldSync = dernière valeur connue de chaque champ (envoyée ou reçue) : sert à
@@ -4567,6 +4573,7 @@ function CardioPlanning(){
     setFbStatus("connecting");
     const unsub=onSnapshot(PLANNING_DOC,
       (snap)=>{
+        if(snap.metadata&&snap.metadata.fromCache===false)serverSeen.current=true;
         if(snap.exists){
           const data0=snap.data();
           const data=data0;
@@ -4656,9 +4663,9 @@ function CardioPlanning(){
           if(data.periodCfg)setPeriodCfg(JSON.parse(data.periodCfg));
           if(data.medPins)setMedPins(JSON.parse(data.medPins));
           }
-          isFirstLoad.current=false;
+          isFirstLoad.current=!serverSeen.current;
           localChange.current=false;
-        }else{isFirstLoad.current=false;}
+        }else{isFirstLoad.current=!serverSeen.current;}
         setFbStatus("ok");
       },
       (err)=>{console.error("Firebase:",err);setFbStatus("error");}
@@ -4975,6 +4982,7 @@ function CardioPlanning(){
 
     const saveToFirebase=useCallback(async(data)=>{
     if(!PLANNING_DOC||!setDoc)return;
+    if(!serverSeen.current)return;   // v9.71 : jamais d'écriture sur une base venant du seul cache
     /* v9.44 : on n'envoie que ce qui a réellement changé depuis la dernière valeur
        connue du champ — sinon chaque message reçu déclenchait sa propre réécriture. */
     const out={},ks=[];
