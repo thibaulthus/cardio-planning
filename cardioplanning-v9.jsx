@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.68 — 05/08/2026";
+const APP_VERSION="v9.69 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2641,6 +2641,10 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
   const [acteId,curSalle,acteId2=null,curSalle2=null,acteId3=null,curSalle3=null,c1flag=null]=((pt[dayOfWeek]||{})[slot])||[null,null];
   const brs=[[acteId,curSalle],[acteId2,curSalle2],[acteId3,curSalle3]];
   const nBr=brs.filter(b=>b[0]).length;
+  /* v9.69 : « en attente » et « choix ouvert » étaient deux noms pour la même chose et
+     deux boutons pour y arriver. Un seul concept désormais : un choix ouvert a de 1 à 3
+     branches. `isC` dit si la case est conditionnelle, quel que soit le nombre. */
+  const isC=nBr>1||!!c1flag;
   const addIdx=(mData&&mData._ptAdd)||null;   // 2 ou 3 : la branche en cours d'ajout
   const jours=["","Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
   const writePT=(arr)=>setPlanningType(p=>({...p,[medId]:{...p[medId],[dayOfWeek]:{...((p[medId]||{})[dayOfWeek]||{}),[slot]:arr}}}));
@@ -2660,8 +2664,8 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
       </div>
       {/* Current activity badge with X to remove */}
       {acteId&&(()=>{const cur=actes.find(x=>x.id===acteId);return cur?(
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 10px",background:"var(--bg)",borderRadius:8,border:"1px solid var(--border)"}}>
-          <span style={{fontSize:11,color:nBr>1?COND_C:"var(--txt3)",fontWeight:700}}>{nBr>1?"Choix ouvert ①":"Activité actuelle :"}</span>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 10px",background:isC?COND_BG:"var(--bg)",borderRadius:8,border:isC?"1.5px dashed "+COND_C:"1px solid var(--border)"}}>
+          <span style={{fontSize:11,color:isC?COND_C:"var(--txt3)",fontWeight:700}}>{isC?"Choix ouvert ①":"Activité actuelle :"}</span>
           <Badge a={cur}/>
           {curSalle&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle}</span>}
           <button onClick={()=>{dropBr(0);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
@@ -2681,12 +2685,13 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
           {curSalle3&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle3}</span>}
           <button onClick={()=>{dropBr(2);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
         </div>):null;})()}
-      {acteId&&nBr===1&&!addIdx&&<button style={{marginBottom:10,marginRight:8,padding:"5px 11px",borderRadius:6,border:"1.5px "+(c1flag?"solid":"dashed")+" "+COND_C,background:c1flag?COND_C:COND_BG,color:c1flag?"#fff":COND_C,cursor:"pointer",fontSize:11,fontWeight:700}}
-        onClick={()=>writePT(c1flag?[acteId,curSalle||null]:[acteId,curSalle||null,null,null,null,null,1])}>
-        {c1flag?"◇ En attente — cliquer pour confirmer":"◇ Marquer en attente"}</button>}
-      {acteId&&nBr<3&&!addIdx&&<button style={{marginBottom:10,padding:"5px 11px",borderRadius:6,border:"1.5px dashed "+COND_C,background:COND_BG,color:COND_C,cursor:"pointer",fontSize:11,fontWeight:700}} onClick={()=>setMData(p=>({...p,_ptAdd:nBr+1}))}>{nBr===1?"◇ Transformer en choix ouvert":"◇ Ajouter une 3e branche"}</button>}
+      {acteId&&!isC&&!addIdx&&<button style={{marginBottom:10,marginRight:8,padding:"5px 11px",borderRadius:6,border:"1.5px dashed "+COND_C,background:COND_BG,color:COND_C,cursor:"pointer",fontSize:11,fontWeight:700}}
+        onClick={()=>writePT([acteId,curSalle||null,null,null,null,null,1])}>◇ Transformer en choix ouvert</button>}
+      {acteId&&isC&&nBr<3&&!addIdx&&<button style={{marginBottom:10,marginRight:8,padding:"5px 11px",borderRadius:6,border:"1.5px dashed "+COND_C,background:COND_BG,color:COND_C,cursor:"pointer",fontSize:11,fontWeight:700}} onClick={()=>setMData(p=>({...p,_ptAdd:nBr+1}))}>{nBr===1?"◇ Ajouter une 2e branche":"◇ Ajouter une 3e branche"}</button>}
+      {acteId&&isC&&nBr===1&&!addIdx&&<button style={{marginBottom:10,padding:"5px 11px",borderRadius:6,border:"1.5px solid #16a34a",background:"#f0fdf4",color:"#16a34a",cursor:"pointer",fontSize:11,fontWeight:800}}
+        onClick={()=>writePT([acteId,curSalle||null])}>✓ Confirmer l’activité</button>}
       {addIdx&&<div style={{marginBottom:8,fontSize:11,color:COND_C,fontWeight:700}}>◇ Choisissez la branche {addIdx===2?"②":"③"} du choix ouvert ci-dessous</div>}
-      {nBr>1&&!addIdx&&<div style={{marginBottom:8,fontSize:10,color:"var(--txt3)",lineHeight:1.45}}>Le praticien restera disponible pour ces activités tant que le choix n'est pas tranché.</div>}
+      {isC&&!addIdx&&<div style={{marginBottom:8,fontSize:10,color:"var(--txt3)",lineHeight:1.45}}>{nBr>1?"Le praticien restera disponible pour ces activités tant que le choix n'est pas tranché.":"Branche unique : n'occupe aucune salle ni IDE tant que ce n'est pas tranché."}</div>}
       <div style={S.actGrd}>
 {eligActes.map(a=>{
           const tgt=addIdx===2?acteId2:addIdx===3?acteId3:acteId;

@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.68 — 05/08/2026";
+var APP_VERSION = "v9.69 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2784,6 +2784,10 @@ function EditPTModal(_a) {
     var _b = ((pt[dayOfWeek] || {})[slot]) || [null, null], acteId = _b[0], curSalle = _b[1], _c = _b[2], acteId2 = _c === void 0 ? null : _c, _d = _b[3], curSalle2 = _d === void 0 ? null : _d, _e = _b[4], acteId3 = _e === void 0 ? null : _e, _f = _b[5], curSalle3 = _f === void 0 ? null : _f, _g = _b[6], c1flag = _g === void 0 ? null : _g;
     var brs = [[acteId, curSalle], [acteId2, curSalle2], [acteId3, curSalle3]];
     var nBr = brs.filter(function (b) { return b[0]; }).length;
+    /* v9.69 : « en attente » et « choix ouvert » étaient deux noms pour la même chose et
+       deux boutons pour y arriver. Un seul concept désormais : un choix ouvert a de 1 à 3
+       branches. `isC` dit si la case est conditionnelle, quel que soit le nombre. */
+    var isC = nBr > 1 || !!c1flag;
     var addIdx = (mData && mData._ptAdd) || null; // 2 ou 3 : la branche en cours d'ajout
     var jours = ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
     var writePT = function (arr) { return setPlanningType(function (p) {
@@ -2808,8 +2812,8 @@ function EditPTModal(_a) {
             React.createElement("button", { onClick: onClose, style: S.xBtn }, "\u00D7")),
         acteId && (function () {
             var cur = actes.find(function (x) { return x.id === acteId; });
-            return cur ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "6px 10px", background: "var(--bg)", borderRadius: 8, border: "1px solid var(--border)" } },
-                React.createElement("span", { style: { fontSize: 11, color: nBr > 1 ? COND_C : "var(--txt3)", fontWeight: 700 } }, nBr > 1 ? "Choix ouvert ①" : "Activité actuelle :"),
+            return cur ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "6px 10px", background: isC ? COND_BG : "var(--bg)", borderRadius: 8, border: isC ? "1.5px dashed " + COND_C : "1px solid var(--border)" } },
+                React.createElement("span", { style: { fontSize: 11, color: isC ? COND_C : "var(--txt3)", fontWeight: 700 } }, isC ? "Choix ouvert ①" : "Activité actuelle :"),
                 React.createElement(Badge, { a: cur }),
                 curSalle && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, curSalle),
                 React.createElement("button", { onClick: function () { dropBr(0); afterPick(); }, style: { marginLeft: "auto", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 900, padding: "1px 6px" } }, "\u00D7"))) : null;
@@ -2830,13 +2834,14 @@ function EditPTModal(_a) {
                 curSalle3 && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, curSalle3),
                 React.createElement("button", { onClick: function () { dropBr(2); afterPick(); }, style: { marginLeft: "auto", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 900, padding: "1px 6px" } }, "\u00D7"))) : null;
         })(),
-        acteId && nBr === 1 && !addIdx && React.createElement("button", { style: { marginBottom: 10, marginRight: 8, padding: "5px 11px", borderRadius: 6, border: "1.5px " + (c1flag ? "solid" : "dashed") + " " + COND_C, background: c1flag ? COND_C : COND_BG, color: c1flag ? "#fff" : COND_C, cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { return writePT(c1flag ? [acteId, curSalle || null] : [acteId, curSalle || null, null, null, null, null, 1]); } }, c1flag ? "◇ En attente — cliquer pour confirmer" : "◇ Marquer en attente"),
-        acteId && nBr < 3 && !addIdx && React.createElement("button", { style: { marginBottom: 10, padding: "5px 11px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, color: COND_C, cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { return setMData(function (p) { return (__assign(__assign({}, p), { _ptAdd: nBr + 1 })); }); } }, nBr === 1 ? "◇ Transformer en choix ouvert" : "◇ Ajouter une 3e branche"),
+        acteId && !isC && !addIdx && React.createElement("button", { style: { marginBottom: 10, marginRight: 8, padding: "5px 11px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, color: COND_C, cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { return writePT([acteId, curSalle || null, null, null, null, null, 1]); } }, "\u25C7 Transformer en choix ouvert"),
+        acteId && isC && nBr < 3 && !addIdx && React.createElement("button", { style: { marginBottom: 10, marginRight: 8, padding: "5px 11px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, color: COND_C, cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { return setMData(function (p) { return (__assign(__assign({}, p), { _ptAdd: nBr + 1 })); }); } }, nBr === 1 ? "◇ Ajouter une 2e branche" : "◇ Ajouter une 3e branche"),
+        acteId && isC && nBr === 1 && !addIdx && React.createElement("button", { style: { marginBottom: 10, padding: "5px 11px", borderRadius: 6, border: "1.5px solid #16a34a", background: "#f0fdf4", color: "#16a34a", cursor: "pointer", fontSize: 11, fontWeight: 800 }, onClick: function () { return writePT([acteId, curSalle || null]); } }, "\u2713 Confirmer l\u2019activit\u00E9"),
         addIdx && React.createElement("div", { style: { marginBottom: 8, fontSize: 11, color: COND_C, fontWeight: 700 } },
             "\u25C7 Choisissez la branche ",
             addIdx === 2 ? "②" : "③",
             " du choix ouvert ci-dessous"),
-        nBr > 1 && !addIdx && React.createElement("div", { style: { marginBottom: 8, fontSize: 10, color: "var(--txt3)", lineHeight: 1.45 } }, "Le praticien restera disponible pour ces activit\u00E9s tant que le choix n'est pas tranch\u00E9."),
+        isC && !addIdx && React.createElement("div", { style: { marginBottom: 8, fontSize: 10, color: "var(--txt3)", lineHeight: 1.45 } }, nBr > 1 ? "Le praticien restera disponible pour ces activités tant que le choix n'est pas tranché." : "Branche unique : n'occupe aucune salle ni IDE tant que ce n'est pas tranché."),
         React.createElement("div", { style: S.actGrd }, eligActes.map(function (a) {
             var tgt = addIdx === 2 ? acteId2 : addIdx === 3 ? acteId3 : acteId;
             var on = tgt === a.id;
