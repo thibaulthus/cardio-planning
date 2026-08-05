@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.69 — 05/08/2026";
+var APP_VERSION = "v9.70 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4898,12 +4898,28 @@ function CardioPlanning() {
                 }
                 /* v9.44 : rejet par champ et non plus global. */
                 {
+                    var resend = {};
                     var data = (function () { var o = {}; Object.keys(data0).forEach(function (k) {
-                        if (pendF.current[k])
-                            return;
+                        var inc = JSON.stringify(data0[k]);
+                        var p = pendF.current[k];
+                        if (p) {
+                            if (p.s === inc)
+                                delete pendF.current[k];
+                            else if (p.n < 3) {
+                                p.n++;
+                                resend[k] = p.v;
+                                return;
+                            }
+                            else
+                                return;
+                        }
                         o[k] = data0[k];
-                        fieldSync.current[k] = JSON.stringify(data0[k]);
+                        fieldSync.current[k] = inc;
                     }); return o; })();
+                    if (Object.keys(resend).length) {
+                        Object.keys(resend).forEach(function (k) { delete fieldSync.current[k]; });
+                        setTimeout(function () { saveToFirebase(resend); }, 400);
+                    }
                     if (data.tourMed)
                         setTourMed(JSON.parse(data.tourMed));
                     if (data.planningType)
@@ -5507,17 +5523,14 @@ function CardioPlanning() {
         });
         if (ks.length === 0)
             return Promise.resolve();
-        ks.forEach(function (k) { pendF.current[k] = (pendF.current[k] || 0) + 1; });
-        var release = function () { setTimeout(function () { ks.forEach(function (k) { var n = (pendF.current[k] || 1) - 1; if (n <= 0)
-            delete pendF.current[k];
-        else
-            pendF.current[k] = n; }); }, 1500); };
+        /* v9.70 : on retient la VALEUR envoyee, plus un compteur relache apres 1,5 s. */
+        ks.forEach(function (k) { var p = pendF.current[k]; pendF.current[k] = { v: data[k], s: fieldSync.current[k], n: p ? p.n : 0 }; });
         localChange.current = true;
         return Promise.resolve(setDoc(PLANNING_DOC, out, { merge: true })).catch(function (err) {
             console.error("Save:", err);
             setFbStatus("error");
             ks.forEach(function (k) { delete fieldSync.current[k]; });
-        }).then(release, release);
+        });
     }, []);
     useEffect(function () { if (!isFirstLoad.current)
         flushPlan(plan); }, [plan]);

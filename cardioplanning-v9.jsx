@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.69 — 05/08/2026";
+const APP_VERSION="v9.70 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -4594,11 +4594,19 @@ function CardioPlanning(){
              vol — on n'écarte que les champs qu'on est justement en train d'écrire. Tout le
              reste est appliqué, y compris ce qui vient d'un autre poste. ── */
           {
+            const resend={};
             const data=(()=>{const o={};Object.keys(data0).forEach(k=>{
-              if(pendF.current[k])return;                       // notre écriture prime, elle arrive
+              const inc=JSON.stringify(data0[k]);
+              const p=pendF.current[k];
+              if(p){
+                if(p.s===inc)delete pendF.current[k];            // notre écriture est arrivée : on peut suivre le serveur
+                else if(p.n<3){p.n++;resend[k]=p.v;return;}      // écho en retard : on garde le local ET on le renvoie
+                else return;                                     // renvois épuisés : on garde le local, jamais d'écrasement
+              }
               o[k]=data0[k];
-              fieldSync.current[k]=JSON.stringify(data0[k]);    // reçu = déjà au serveur, inutile de le renvoyer
+              fieldSync.current[k]=inc;                          // reçu = déjà au serveur, inutile de le renvoyer
             });return o;})();
+            if(Object.keys(resend).length){Object.keys(resend).forEach(k=>{delete fieldSync.current[k];});setTimeout(()=>saveToFirebase(resend),400);}
             if(data.tourMed)setTourMed(JSON.parse(data.tourMed));
             if(data.planningType)setPlanningType(JSON.parse(data.planningType));
             if(data.notes)setNotes(JSON.parse(data.notes));
@@ -4976,10 +4984,14 @@ function CardioPlanning(){
       fieldSync.current[k]=s;out[k]=data[k];ks.push(k);
     });
     if(ks.length===0)return;
-    ks.forEach(k=>{pendF.current[k]=(pendF.current[k]||0)+1;});
+    /* v9.70 : on retient la VALEUR envoyée, plus un simple compteur relâché après 1,5 s.
+       Un champ n'est repris du serveur QUE lorsque l'écho confirme exactement ce qu'on a
+       écrit ; sinon on garde la version locale et on la renvoie. Un message serveur en
+       retard ne peut donc plus effacer une saisie récente — c'est déjà le principe de
+       planPending pour le plan, qui lui n'a jamais perdu de données. */
+    ks.forEach(k=>{const p=pendF.current[k];pendF.current[k]={v:data[k],s:fieldSync.current[k],n:p?p.n:0};});
     try{localChange.current=true;await setDoc(PLANNING_DOC,out,{merge:true});}
     catch(err){console.error("Save:",err);setFbStatus("error");ks.forEach(k=>{delete fieldSync.current[k];});}
-    finally{setTimeout(()=>{ks.forEach(k=>{const n=(pendF.current[k]||1)-1;if(n<=0)delete pendF.current[k];else pendF.current[k]=n;});},1500);}
   },[]);
 
   useEffect(()=>{if(!isFirstLoad.current)flushPlan(plan);},[plan]);
