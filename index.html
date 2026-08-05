@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.62 — 04/08/2026";
+var APP_VERSION = "v9.63 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2373,7 +2373,8 @@ function PickMedActModal(_a) {
     row.ids.forEach(function (aid) {
         medecins.forEach(function (med) {
             getEntries(med.id, y2, m2, d, sl).forEach(function (e) {
-                var match = row.salle ? (e.acteId === aid && e.salle === row.salle) : e.acteId === aid;
+                /* v9.63 : une branche non tranchee n'occupe pas la ligne (colonnes sans salle fixe). */
+                var match = (!e.cond) && (row.salle ? (e.acteId === aid && e.salle === row.salle) : e.acteId === aid);
                 if (match && !curOcc.find(function (x) { return x.med.id === med.id && x.acteId === aid; })) {
                     var acte = actes.find(function (a) { return a.id === aid; });
                     curOcc.push({ med: med, acte: acte, acteId: aid, e: e });
@@ -5748,6 +5749,13 @@ function CardioPlanning() {
             var prev = ex ? (Array.isArray(ex) ? ex : [ex]) : [];
             var dropped = (entry && !entry.cond) ? prev.filter(function (e) { return e && e.cond; }) : [];
             var kept = dropped.length ? prev.filter(function (e) { return !(e && e.cond); }) : prev;
+            /* v9.63 : reposer une activité DÉJÀ ferme sur la case la remplace au lieu de la
+               dupliquer — c'est ainsi qu'on lui attribue sa salle. La modale de case s'en
+               gardait déjà, mais les modales de salles et le BIP automatique passent par ici
+               sans ce contrôle, et pouvaient créer deux fois la même activité. */
+            var dup = (entry && !entry.cond) ? kept.filter(function (e) { return e && e.acteId === entry.acteId && !e.cond; }) : [];
+            if (dup.length)
+                kept = kept.filter(function (e) { return !(e && e.acteId === entry.acteId && !e.cond); });
             var ent = entry;
             /* v9.61 : wasCond garde la liste COMPLÈTE des branches d'origine, sans en retirer
                celle qu'on garde. Rétablir devient « je remets exactement ce qu'il y avait »,
@@ -5755,6 +5763,8 @@ function CardioPlanning() {
                version en rajoutait une quand elle venait d'ailleurs, et le compte était faux. */
             if (dropped.length)
                 ent = __assign(__assign({}, entry), { wasCond: dropped.map(function (e) { return e.acteId; }) });
+            if (dup.length && dup[0].wasCond && !ent.wasCond)
+                ent = __assign(__assign({}, ent), { wasCond: dup[0].wasCond });
             var nx = kept.concat([ent]);
             dm[medId] = nx.length === 1 ? nx[0] : nx;
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
@@ -5824,8 +5834,13 @@ function CardioPlanning() {
             var src = arr.find(function (e) { return e && e.acteId === acteId && e.wasCond && e.wasCond.length; });
             if (!src)
                 return p;
-            var brs = src.wasCond.map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); });
-            var nx = arr.filter(function (e) { return e !== src; }).concat(brs);
+            /* v9.63 : ne pas ressusciter une branche dont l'activité est déjà posée FERME sur
+               la case — on recréerait le couple « branche + activité de même nom » qui était
+               à l'origine du choix à 3 devenu 2. */
+            var rest = arr.filter(function (e) { return e !== src; });
+            var firmIds = rest.filter(function (e) { return e && !e.cond; }).map(function (e) { return e.acteId; });
+            var brs = src.wasCond.filter(function (id) { return firmIds.indexOf(id) < 0; }).map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); });
+            var nx = rest.concat(brs);
             dm[medId] = nx.length === 1 ? nx[0] : nx;
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
@@ -5847,7 +5862,8 @@ function CardioPlanning() {
                la branche de même activité — c'est l'origine du « 3 choix devenus 2 » observé
                dès les premières versions, quand une activité posée coexistait avec sa branche. */
             var f = arr.filter(function (e) { return !(e.acteId === acteId && !e.cond); });
-            var back = gone ? gone.wasCond.map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); }) : [];
+            var firmIds = f.filter(function (e) { return e && !e.cond; }).map(function (e) { return e.acteId; });
+            var back = gone ? gone.wasCond.filter(function (id) { return firmIds.indexOf(id) < 0; }).map(function (id) { return ({ acteId: id, salle: null, cond: 1 }); }) : [];
             var nx = f.concat(back);
             if (nx.length === 0)
                 delete dm[medId];

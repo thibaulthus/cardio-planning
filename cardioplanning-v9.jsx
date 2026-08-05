@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.62 — 04/08/2026";
+const APP_VERSION="v9.63 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2186,7 +2186,11 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
   row.ids.forEach(aid=>{
     medecins.forEach(med=>{
       getEntries(med.id,y2,m2,d,sl).forEach(e=>{
-        const match=row.salle?(e.acteId===aid&&e.salle===row.salle):e.acteId===aid;
+        /* v9.63 : une branche non tranchée n'occupe pas la ligne. Sans ce filtre, sur une
+           colonne SANS salle fixe (Dobu, ETO, Holter) la comparaison portait sur le seul
+           acteId : le praticien passait pour assigné, et disparaissait donc de la liste
+           de choix depuis la v9.53 qui écarte les occupants déjà présents. */
+        const match=(!e.cond)&&(row.salle?(e.acteId===aid&&e.salle===row.salle):e.acteId===aid);
         if(match&&!curOcc.find(x=>x.med.id===med.id&&x.acteId===aid)){
           const acte=actes.find(a=>a.id===aid);
           curOcc.push({med,acte,acteId:aid,e});
@@ -5152,13 +5156,20 @@ function CardioPlanning(){
       const dm={...(p[key]||{})};const ex=dm[medId];
       const prev=ex?(Array.isArray(ex)?ex:[ex]):[];
       const dropped=(entry&&!entry.cond)?prev.filter(e=>e&&e.cond):[];
-      const kept=dropped.length?prev.filter(e=>!(e&&e.cond)):prev;
+      let kept=dropped.length?prev.filter(e=>!(e&&e.cond)):prev;
+      /* v9.63 : reposer une activité DÉJÀ ferme sur la case la remplace au lieu de la
+         dupliquer — c'est ainsi qu'on lui attribue sa salle. La modale de case s'en
+         gardait déjà, mais les modales de salles et le BIP automatique passent par ici
+         sans ce contrôle, et pouvaient créer deux fois la même activité. */
+      const dup=(entry&&!entry.cond)?kept.filter(e=>e&&e.acteId===entry.acteId&&!e.cond):[];
+      if(dup.length)kept=kept.filter(e=>!(e&&e.acteId===entry.acteId&&!e.cond));
       let ent=entry;
       /* v9.61 : wasCond garde la liste COMPLÈTE des branches d'origine, sans en retirer
          celle qu'on garde. Rétablir devient « je remets exactement ce qu'il y avait »,
          règle valable que l'activité posée ait fait partie du choix ou non — l'ancienne
          version en rajoutait une quand elle venait d'ailleurs, et le compte était faux. */
       if(dropped.length)ent={...entry,wasCond:dropped.map(e=>e.acteId)};
+      if(dup.length&&dup[0].wasCond&&!ent.wasCond)ent={...ent,wasCond:dup[0].wasCond};
       const nx=kept.concat([ent]);
       dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
@@ -5208,8 +5219,13 @@ function CardioPlanning(){
       const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
       const arr=Array.isArray(ex)?ex:[ex];
       const src=arr.find(e=>e&&e.acteId===acteId&&e.wasCond&&e.wasCond.length);if(!src)return p;
-      const brs=src.wasCond.map(id=>({acteId:id,salle:null,cond:1}));
-      const nx=arr.filter(e=>e!==src).concat(brs);
+      /* v9.63 : ne pas ressusciter une branche dont l'activité est déjà posée FERME sur
+         la case — on recréerait le couple « branche + activité de même nom » qui était
+         à l'origine du choix à 3 devenu 2. */
+      const rest=arr.filter(e=>e!==src);
+      const firmIds=rest.filter(e=>e&&!e.cond).map(e=>e.acteId);
+      const brs=src.wasCond.filter(id=>firmIds.indexOf(id)<0).map(id=>({acteId:id,salle:null,cond:1}));
+      const nx=rest.concat(brs);
       dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
     });
@@ -5228,7 +5244,8 @@ function CardioPlanning(){
          la branche de même activité — c'est l'origine du « 3 choix devenus 2 » observé
          dès les premières versions, quand une activité posée coexistait avec sa branche. */
       const f=arr.filter(e=>!(e.acteId===acteId&&!e.cond));
-      const back=gone?gone.wasCond.map(id=>({acteId:id,salle:null,cond:1})):[];
+      const firmIds=f.filter(e=>e&&!e.cond).map(e=>e.acteId);
+      const back=gone?gone.wasCond.filter(id=>firmIds.indexOf(id)<0).map(id=>({acteId:id,salle:null,cond:1})):[];
       const nx=f.concat(back);
       if(nx.length===0)delete dm[medId];else dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
