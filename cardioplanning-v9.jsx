@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.65 — 05/08/2026";
+const APP_VERSION="v9.65.1 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5432,7 +5432,14 @@ function CardioPlanning(){
         else if(cellHasAny(dm[medId],["ABSENCE","FORM","FORMATION"]))nxWarn=true;
         next={...next,[k]:dm};
       } else {
-        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};else if(cellHasAny(dm[medId],["ABSENCE","FORM","FORMATION"]))nxWarn=true;next={...next,[k]:dm};});
+        /* v9.65.1 : une absence ou FMC « journée entière » vit dans la case JOUR du
+           lendemain, pas dans M/AM — le contrôle ne la voyait pas : l'alerte ne partait
+           jamais et deux repos fantômes se posaient dessous. On lit donc aussi JOUR,
+           et si la journée est bloquée, aucun repos n'est posé. */
+        const jC=(next[sk(ny,nm,nd2,"JOUR")]||{})[medId];
+        const jBlk=cellHasAny(jC,EXCL_IDS);
+        if(cellHasAny(jC,["ABSENCE","FORM","FORMATION"]))nxWarn=true;
+        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!jBlk&&!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};else if(cellHasAny(dm[medId],["ABSENCE","FORM","FORMATION"]))nxWarn=true;next={...next,[k]:dm};});
       }
       return next;
     });
