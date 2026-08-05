@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.67.3 — 05/08/2026";
+const APP_VERSION="v9.68 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -366,10 +366,12 @@ const condOn=(getEntries,medId,y,m,d,slot)=>{
   return out;
 };
 
-const ptCell=(a1,s1,a2,s2,a3,s3)=>{
+const ptCell=(a1,s1,a2,s2,a3,s3,c1)=>{
   const brs=[[a1,s1],[a2,s2],[a3,s3]].filter(b=>b[0]);
   if(!brs.length)return null;
-  if(brs.length===1)return {acteId:brs[0][0],salle:brs[0][1]||null};
+  /* v9.68 : c1 (7e élément du planning type) marque une activité SEULE comme choix
+     ouvert « en attente » — même comportement qu'à 2 ou 3 branches (v9.62). */
+  if(brs.length===1)return c1?{acteId:brs[0][0],salle:brs[0][1]||null,cond:1}:{acteId:brs[0][0],salle:brs[0][1]||null};
   return brs.map(b=>({acteId:b[0],salle:b[1]||null,cond:1}));
 };
 function CondBadges({es,acteById,noteT}){
@@ -2148,11 +2150,11 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
                   </div>
                 </td>
                 {[1,2,3,4,5].map(dw=>["M","AM"].map(sl=>{
-                  const [acteId,salle,acteId2,salle2,acteId3,salle3]=(pt[dw]||{})[sl]||[null,null];
+                  const [acteId,salle,acteId2,salle2,acteId3,salle3,c1f]=(pt[dw]||{})[sl]||[null,null];
                   const acte=acteId?acteById(acteId):null;const acte2=acteId2?acteById(acteId2):null;const acte3=acteId3?acteById(acteId3):null;
-                  const ptIss=(acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2)||(acte3&&acte3.hasSalle&&!salle3);
+                  const _isC=!!c1f||[acteId,acteId2,acteId3].filter(Boolean).length>1;const ptIss=!_isC&&((acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2)||(acte3&&acte3.hasSalle&&!salle3));
                   const ptEs=[{acteId,salle},{acteId:acteId2,salle:salle2},{acteId:acteId3,salle:salle3}].filter(x=>x.acteId);
-                  if(ptEs.length>1)ptEs.forEach(x=>{x.cond=1;});
+                  if(ptEs.length>1||c1f)ptEs.forEach(x=>{x.cond=1;});
                   return(
                     <td key={dw+sl} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative"}} title={ptIss?"⚠ salle non attribuée":undefined}
                       onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>{ptIss&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}
@@ -2189,11 +2191,11 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
               <td style={{...S.tdFix,position:"sticky",left:48,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--th)",borderRight:"2px solid var(--border)",minWidth:26,padding:"2px"}}>{sl}</td>
               {medecins.map(med=>{
                 const pt=planningType[med.id]||{};
-                const [acteId,salle,acteId2,salle2,acteId3,salle3]=(pt[dw]||{})[sl]||[null,null];
+                const [acteId,salle,acteId2,salle2,acteId3,salle3,c1f]=(pt[dw]||{})[sl]||[null,null];
                 const acte=acteId?acteById(acteId):null;const acte2=acteId2?acteById(acteId2):null;const acte3=acteId3?acteById(acteId3):null;
-                const ptIss=(acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2)||(acte3&&acte3.hasSalle&&!salle3);
+                const _isC=!!c1f||[acteId,acteId2,acteId3].filter(Boolean).length>1;const ptIss=!_isC&&((acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2)||(acte3&&acte3.hasSalle&&!salle3));
                 const ptEs=[{acteId,salle},{acteId:acteId2,salle:salle2},{acteId:acteId3,salle:salle3}].filter(x=>x.acteId);
-                if(ptEs.length>1)ptEs.forEach(x=>{x.cond=1;});
+                if(ptEs.length>1||c1f)ptEs.forEach(x=>{x.cond=1;});
                 return(
                   <td key={med.id} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative"}} title={ptIss?"⚠ salle non attribuée":undefined}
                     onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>{ptIss&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}
@@ -2636,13 +2638,13 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
   const {medId,dayOfWeek,slot}=mData;
   const med=medecins.find(x=>x.id===medId);
   const pt=planningType[medId]||{};
-  const [acteId,curSalle,acteId2=null,curSalle2=null,acteId3=null,curSalle3=null]=((pt[dayOfWeek]||{})[slot])||[null,null];
+  const [acteId,curSalle,acteId2=null,curSalle2=null,acteId3=null,curSalle3=null,c1flag=null]=((pt[dayOfWeek]||{})[slot])||[null,null];
   const brs=[[acteId,curSalle],[acteId2,curSalle2],[acteId3,curSalle3]];
   const nBr=brs.filter(b=>b[0]).length;
   const addIdx=(mData&&mData._ptAdd)||null;   // 2 ou 3 : la branche en cours d'ajout
   const jours=["","Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
   const writePT=(arr)=>setPlanningType(p=>({...p,[medId]:{...p[medId],[dayOfWeek]:{...((p[medId]||{})[dayOfWeek]||{}),[slot]:arr}}}));
-  const flushBrs=(list)=>{const k=list.filter(b=>b&&b[0]);writePT(k.length?k.reduce((acc,b)=>acc.concat([b[0],b[1]||null]),[]):[null,null]);};
+  const flushBrs=(list)=>{const k=list.filter(b=>b&&b[0]);const arr=k.length?k.reduce((acc,b)=>acc.concat([b[0],b[1]||null]),[]):[null,null];writePT((k.length===1&&c1flag)?arr.concat([null,null,null,null,1]):arr);};
   const setPT=(aId,salle)=>{const list=brs.slice();list[addIdx?addIdx-1:0]=[aId,salle];flushBrs(list);};
   const dropBr=(i)=>{const list=brs.slice();list[i]=[null,null];flushBrs(list);};
   const afterPick=()=>setMData(p=>({...p,_ptPickSalle:null,_ptAdd:null}));
@@ -2679,6 +2681,9 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
           {curSalle3&&<span style={{fontSize:10,color:"var(--txt3)"}}>{curSalle3}</span>}
           <button onClick={()=>{dropBr(2);afterPick();}} style={{marginLeft:"auto",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:4,color:"#dc2626",cursor:"pointer",fontSize:12,fontWeight:900,padding:"1px 6px"}}>×</button>
         </div>):null;})()}
+      {acteId&&nBr===1&&!addIdx&&<button style={{marginBottom:10,marginRight:8,padding:"5px 11px",borderRadius:6,border:"1.5px "+(c1flag?"solid":"dashed")+" "+COND_C,background:c1flag?COND_C:COND_BG,color:c1flag?"#fff":COND_C,cursor:"pointer",fontSize:11,fontWeight:700}}
+        onClick={()=>writePT(c1flag?[acteId,curSalle||null]:[acteId,curSalle||null,null,null,null,null,1])}>
+        {c1flag?"◇ En attente — cliquer pour confirmer":"◇ Marquer en attente"}</button>}
       {acteId&&nBr<3&&!addIdx&&<button style={{marginBottom:10,padding:"5px 11px",borderRadius:6,border:"1.5px dashed "+COND_C,background:COND_BG,color:COND_C,cursor:"pointer",fontSize:11,fontWeight:700}} onClick={()=>setMData(p=>({...p,_ptAdd:nBr+1}))}>{nBr===1?"◇ Transformer en choix ouvert":"◇ Ajouter une 3e branche"}</button>}
       {addIdx&&<div style={{marginBottom:8,fontSize:11,color:COND_C,fontWeight:700}}>◇ Choisissez la branche {addIdx===2?"②":"③"} du choix ouvert ci-dessous</div>}
       {nBr>1&&!addIdx&&<div style={{marginBottom:8,fontSize:10,color:"var(--txt3)",lineHeight:1.45}}>Le praticien restera disponible pour ces activités tant que le choix n'est pas tranché.</div>}
@@ -2953,10 +2958,10 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
               const k=sk(dy,dm,dd,sl);
               const ex=(next[k]||{})[mid];
               if(cellHasAny(ex,PROT))return;
-              const[acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw2][sl])||[null,null];
+              const[acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null,c1x=null]=(pt[dw2][sl])||[null,null];
               if(!acteId)return;
               if(!next[k])next[k]={};
-              next[k]={...next[k],[mid]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
+              next[k]={...next[k],[mid]:ptCell(acteId,salle,a2x,s2x,a3x,s3x,c1x)};
             });
           });
         });
@@ -4851,10 +4856,10 @@ function CardioPlanning(){
             return;
           }
           if(!pt||!pt[dw2])return;
-          const[acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw2][sl])||[null,null];
+          const[acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null,c1x=null]=(pt[dw2][sl])||[null,null];
           if(!acteId)return;
           if(!next[k])next[k]={};
-          next[k]={...next[k],[medId]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
+          next[k]={...next[k],[medId]:ptCell(acteId,salle,a2x,s2x,a3x,s3x,c1x)};
         });
       }
       return next;
@@ -5605,9 +5610,9 @@ function CardioPlanning(){
             ["M","AM"].forEach(sl=>{
               const k=sk(ay,am,d,sl),ex=(next[k]||{})[med.id];
               if(cellHasAny(ex,PROT_TOUR))return;
-              const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
+              const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null,c1x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
               if(!next[k])next[k]={};
-              next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
+              next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x,c1x)};
               nApplied++;
             });
           });
@@ -5686,9 +5691,9 @@ function CardioPlanning(){
           ["M","AM"].forEach(sl=>{
             const k=sk(year,month,d,sl),ex=(next[k]||{})[med.id];
             if(cellHasAny(ex,PROT_TOUR))return;
-            const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
+            const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null,c1x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
             if(!next[k])next[k]={};
-            next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
+            next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x,c1x)};
           });
         });
       });
@@ -5713,9 +5718,9 @@ function CardioPlanning(){
         ["M","AM"].forEach(sl=>{
           const k=sk(year,month,d,sl),ex=(next[k]||{})[medId];
           if(cellHasAny(ex,PROT_TOUR))return;
-          const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
+          const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null,c1x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
           if(!next[k])next[k]={};
-          next[k]={...next[k],[medId]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
+          next[k]={...next[k],[medId]:ptCell(acteId,salle,a2x,s2x,a3x,s3x,c1x)};
         });
       });
       return next;

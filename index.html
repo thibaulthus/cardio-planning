@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.67.3 — 05/08/2026";
+var APP_VERSION = "v9.68 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -513,12 +513,14 @@ var condOn = function (getEntries, medId, y, m, d, slot) {
     return out;
 };
 
-var ptCell = function (a1, s1, a2, s2, a3, s3) {
+var ptCell = function (a1, s1, a2, s2, a3, s3, c1) {
     var brs = [[a1, s1], [a2, s2], [a3, s3]].filter(function (b) { return b[0]; });
     if (!brs.length)
         return null;
+    /* v9.68 : c1 (7e élément du planning type) marque une activité SEULE comme choix
+       ouvert « en attente » — même comportement qu'à 2 ou 3 branches (v9.62). */
     if (brs.length === 1)
-        return { acteId: brs[0][0], salle: brs[0][1] || null };
+        return c1 ? { acteId: brs[0][0], salle: brs[0][1] || null, cond: 1 } : { acteId: brs[0][0], salle: brs[0][1] || null };
     return brs.map(function (b) { return ({ acteId: b[0], salle: b[1] || null, cond: 1 }); });
 };
 function CondBadges(_a) {
@@ -2361,15 +2363,20 @@ function PlanTypeGrid(_a) {
                                     med.role === "attache" && React.createElement("span", { style: { fontSize: 8, color: "#fb923c" } }, "Attach\u00E9"),
                                     med.role === "ide" && React.createElement("span", { style: { fontSize: 8, color: "#a5b4fc" } }, "IDE")))),
                         [1, 2, 3, 4, 5].map(function (dw) { return ["M", "AM"].map(function (sl) {
-                            var _a = (pt[dw] || {})[sl] || [null, null], acteId = _a[0], salle = _a[1], acteId2 = _a[2], salle2 = _a[3], acteId3 = _a[4], salle3 = _a[5];
+                            var _a = (pt[dw] || {})[sl] || [null, null], acteId = _a[0], salle = _a[1], acteId2 = _a[2], salle2 = _a[3], acteId3 = _a[4], salle3 = _a[5], c1f = _a[6];
                             var acte = acteId ? acteById(acteId) : null;
                             var acte2 = acteId2 ? acteById(acteId2) : null;
                             var acte3 = acteId3 ? acteById(acteId3) : null;
-                            var ptIss = (acte && acte.hasSalle && !salle) || (acte2 && acte2.hasSalle && !salle2) || (acte3 && acte3.hasSalle && !salle3);
+                            var _isC = !!c1f || [acteId, acteId2, acteId3].filter(Boolean).length > 1;
+                            var ptIss = !_isC && ((acte && acte.hasSalle && !salle) || (acte2 && acte2.hasSalle && !salle2) || (acte3 && acte3.hasSalle && !salle3));
                             var ptEs = [{ acteId: acteId, salle: salle }, { acteId: acteId2, salle: salle2 }, { acteId: acteId3, salle: salle3 }].filter(function (x) { return x.acteId; });
-                            if (ptEs.length > 1) ptEs.forEach(function (x) { x.cond = 1; });
-                            return (React.createElement("td", { key: dw + sl, style: __assign(__assign({}, S.td), { padding: 2, cursor: isEdit ? "pointer" : "default", position: "relative" }), title: ptIss ? "\u26A0 salle non attribu\u00E9e" : undefined, onClick: function () { if (!isEdit)
-                                    return; setMData({ medId: med.id, dayOfWeek: dw, slot: sl }); setModal("editPT"); } }, ptIss && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }), React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1 } }, React.createElement(CondBadges, { es: ptEs, acteById: acteById, noteT: null }))));
+                            if (ptEs.length > 1 || c1f)
+                                ptEs.forEach(function (x) { x.cond = 1; });
+                            return (React.createElement("td", { key: dw + sl, style: __assign(__assign({}, S.td), { padding: 2, cursor: isEdit ? "pointer" : "default", position: "relative" }), title: ptIss ? "⚠ salle non attribuée" : undefined, onClick: function () { if (!isEdit)
+                                    return; setMData({ medId: med.id, dayOfWeek: dw, slot: sl }); setModal("editPT"); } },
+                                ptIss && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }),
+                                React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1 } },
+                                    React.createElement(CondBadges, { es: ptEs, acteById: acteById, noteT: null }))));
                         }); })));
                 })))));
     return (React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 150px)", borderRadius: 8, border: "1px solid var(--border)" } },
@@ -2386,15 +2393,20 @@ function PlanTypeGrid(_a) {
                 React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 48, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: "var(--th)", borderRight: "2px solid var(--border)", minWidth: 26, padding: "2px" }) }, sl),
                 medecins.map(function (med) {
                     var pt = planningType[med.id] || {};
-                    var _a = (pt[dw] || {})[sl] || [null, null], acteId = _a[0], salle = _a[1], acteId2 = _a[2], salle2 = _a[3], acteId3 = _a[4], salle3 = _a[5];
+                    var _a = (pt[dw] || {})[sl] || [null, null], acteId = _a[0], salle = _a[1], acteId2 = _a[2], salle2 = _a[3], acteId3 = _a[4], salle3 = _a[5], c1f = _a[6];
                     var acte = acteId ? acteById(acteId) : null;
                     var acte2 = acteId2 ? acteById(acteId2) : null;
                     var acte3 = acteId3 ? acteById(acteId3) : null;
-                    var ptIss = (acte && acte.hasSalle && !salle) || (acte2 && acte2.hasSalle && !salle2) || (acte3 && acte3.hasSalle && !salle3);
+                    var _isC = !!c1f || [acteId, acteId2, acteId3].filter(Boolean).length > 1;
+                    var ptIss = !_isC && ((acte && acte.hasSalle && !salle) || (acte2 && acte2.hasSalle && !salle2) || (acte3 && acte3.hasSalle && !salle3));
                     var ptEs = [{ acteId: acteId, salle: salle }, { acteId: acteId2, salle: salle2 }, { acteId: acteId3, salle: salle3 }].filter(function (x) { return x.acteId; });
-                    if (ptEs.length > 1) ptEs.forEach(function (x) { x.cond = 1; });
-                    return (React.createElement("td", { key: med.id, style: __assign(__assign({}, S.td), { padding: 2, cursor: isEdit ? "pointer" : "default", position: "relative" }), title: ptIss ? "\u26A0 salle non attribu\u00E9e" : undefined, onClick: function () { if (!isEdit)
-                            return; setMData({ medId: med.id, dayOfWeek: dw, slot: sl }); setModal("editPT"); } }, ptIss && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }), React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1 } }, React.createElement(CondBadges, { es: ptEs, acteById: acteById, noteT: null }))));
+                    if (ptEs.length > 1 || c1f)
+                        ptEs.forEach(function (x) { x.cond = 1; });
+                    return (React.createElement("td", { key: med.id, style: __assign(__assign({}, S.td), { padding: 2, cursor: isEdit ? "pointer" : "default", position: "relative" }), title: ptIss ? "⚠ salle non attribuée" : undefined, onClick: function () { if (!isEdit)
+                            return; setMData({ medId: med.id, dayOfWeek: dw, slot: sl }); setModal("editPT"); } },
+                        ptIss && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }),
+                        React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1 } },
+                            React.createElement(CondBadges, { es: ptEs, acteById: acteById, noteT: null }))));
                 }))); }); })))));
 }
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
@@ -2769,19 +2781,19 @@ function EditPTModal(_a) {
     var medId = mData.medId, dayOfWeek = mData.dayOfWeek, slot = mData.slot;
     var med = medecins.find(function (x) { return x.id === medId; });
     var pt = planningType[medId] || {};
-    var _b = ((pt[dayOfWeek] || {})[slot]) || [null, null], acteId = _b[0], curSalle = _b[1], acteId2 = _b[2] || null, curSalle2 = _b[3] || null, acteId3 = _b[4] || null, curSalle3 = _b[5] || null;
+    var _b = ((pt[dayOfWeek] || {})[slot]) || [null, null], acteId = _b[0], curSalle = _b[1], _c = _b[2], acteId2 = _c === void 0 ? null : _c, _d = _b[3], curSalle2 = _d === void 0 ? null : _d, _e = _b[4], acteId3 = _e === void 0 ? null : _e, _f = _b[5], curSalle3 = _f === void 0 ? null : _f, _g = _b[6], c1flag = _g === void 0 ? null : _g;
     var brs = [[acteId, curSalle], [acteId2, curSalle2], [acteId3, curSalle3]];
     var nBr = brs.filter(function (b) { return b[0]; }).length;
-    var addIdx = (mData && mData._ptAdd) || null;
+    var addIdx = (mData && mData._ptAdd) || null; // 2 ou 3 : la branche en cours d'ajout
     var jours = ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
     var writePT = function (arr) { return setPlanningType(function (p) {
         var _a, _b, _c;
         return (__assign(__assign({}, p), (_a = {}, _a[medId] = __assign(__assign({}, p[medId]), (_b = {}, _b[dayOfWeek] = __assign(__assign({}, ((p[medId] || {})[dayOfWeek] || {})), (_c = {}, _c[slot] = arr, _c)), _b)), _a)));
     }); };
-    var flushBrs = function (list) { var k = list.filter(function (b) { return b && b[0]; }); writePT(k.length ? k.reduce(function (acc, b) { return acc.concat([b[0], b[1] || null]); }, []) : [null, null]); };
+    var flushBrs = function (list) { var k = list.filter(function (b) { return b && b[0]; }); var arr = k.length ? k.reduce(function (acc, b) { return acc.concat([b[0], b[1] || null]); }, []) : [null, null]; writePT((k.length === 1 && c1flag) ? arr.concat([null, null, null, null, 1]) : arr); };
     var setPT = function (aId, salle) { var list = brs.slice(); list[addIdx ? addIdx - 1 : 0] = [aId, salle]; flushBrs(list); };
     var dropBr = function (i) { var list = brs.slice(); list[i] = [null, null]; flushBrs(list); };
-    var afterPick = function () { setMData(function (p) { return (__assign(__assign({}, p), { _ptPickSalle: null, _ptAdd: null })); }); };
+    var afterPick = function () { return setMData(function (p) { return (__assign(__assign({}, p), { _ptPickSalle: null, _ptAdd: null })); }); };
     var eligActes = actes.filter(function (a) { return !SYS.includes(a.id) && (!(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes((med && med.init))); });
     return (React.createElement(Ov, { onClose: onClose },
         React.createElement("div", { style: S.mHd },
@@ -2797,7 +2809,7 @@ function EditPTModal(_a) {
         acteId && (function () {
             var cur = actes.find(function (x) { return x.id === acteId; });
             return cur ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "6px 10px", background: "var(--bg)", borderRadius: 8, border: "1px solid var(--border)" } },
-                React.createElement("span", { style: { fontSize: 11, color: nBr > 1 ? COND_C : "var(--txt3)", fontWeight: 700 } }, nBr > 1 ? "Choix ouvert \u2460" : "Activit\u00E9 actuelle :"),
+                React.createElement("span", { style: { fontSize: 11, color: nBr > 1 ? COND_C : "var(--txt3)", fontWeight: 700 } }, nBr > 1 ? "Choix ouvert ①" : "Activité actuelle :"),
                 React.createElement(Badge, { a: cur }),
                 curSalle && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, curSalle),
                 React.createElement("button", { onClick: function () { dropBr(0); afterPick(); }, style: { marginLeft: "auto", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 900, padding: "1px 6px" } }, "\u00D7"))) : null;
@@ -2818,13 +2830,17 @@ function EditPTModal(_a) {
                 curSalle3 && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, curSalle3),
                 React.createElement("button", { onClick: function () { dropBr(2); afterPick(); }, style: { marginLeft: "auto", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 900, padding: "1px 6px" } }, "\u00D7"))) : null;
         })(),
-        acteId && nBr < 3 && !addIdx && React.createElement("button", { style: { marginBottom: 10, padding: "5px 11px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, color: COND_C, cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { setMData(function (p) { return (__assign(__assign({}, p), { _ptAdd: nBr + 1 })); }); } }, nBr === 1 ? "\u25c7 Transformer en choix ouvert" : "\u25c7 Ajouter une 3e branche"),
-        addIdx && React.createElement("div", { style: { marginBottom: 8, fontSize: 11, color: COND_C, fontWeight: 700 } }, "\u25c7 Choisissez la branche " + (addIdx === 2 ? "\u2461" : "\u2462") + " du choix ouvert ci-dessous"),
-        nBr > 1 && !addIdx && React.createElement("div", { style: { marginBottom: 8, fontSize: 10, color: "var(--txt3)", lineHeight: 1.45 } }, "Le praticien restera disponible pour ces activit\u00e9s tant que le choix n'est pas tranch\u00e9."),
+        acteId && nBr === 1 && !addIdx && React.createElement("button", { style: { marginBottom: 10, marginRight: 8, padding: "5px 11px", borderRadius: 6, border: "1.5px " + (c1flag ? "solid" : "dashed") + " " + COND_C, background: c1flag ? COND_C : COND_BG, color: c1flag ? "#fff" : COND_C, cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { return writePT(c1flag ? [acteId, curSalle || null] : [acteId, curSalle || null, null, null, null, null, 1]); } }, c1flag ? "◇ En attente — cliquer pour confirmer" : "◇ Marquer en attente"),
+        acteId && nBr < 3 && !addIdx && React.createElement("button", { style: { marginBottom: 10, padding: "5px 11px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, color: COND_C, cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { return setMData(function (p) { return (__assign(__assign({}, p), { _ptAdd: nBr + 1 })); }); } }, nBr === 1 ? "◇ Transformer en choix ouvert" : "◇ Ajouter une 3e branche"),
+        addIdx && React.createElement("div", { style: { marginBottom: 8, fontSize: 11, color: COND_C, fontWeight: 700 } },
+            "\u25C7 Choisissez la branche ",
+            addIdx === 2 ? "②" : "③",
+            " du choix ouvert ci-dessous"),
+        nBr > 1 && !addIdx && React.createElement("div", { style: { marginBottom: 8, fontSize: 10, color: "var(--txt3)", lineHeight: 1.45 } }, "Le praticien restera disponible pour ces activit\u00E9s tant que le choix n'est pas tranch\u00E9."),
         React.createElement("div", { style: S.actGrd }, eligActes.map(function (a) {
             var tgt = addIdx === 2 ? acteId2 : addIdx === 3 ? acteId3 : acteId;
             var on = tgt === a.id;
-            var locked = !on && (!!tgt || [acteId, acteId2, acteId3].filter(Boolean).indexOf(a.id) >= 0);
+            var locked = !on && (!!tgt || [acteId, acteId2, acteId3].filter(Boolean).includes(a.id));
             return (React.createElement("button", { key: a.id, style: __assign(__assign({}, S.actTog), { background: a.color, color: "#111", border: "2px solid ".concat(on ? "#1d4ed8" : a.color), fontWeight: 900, opacity: on ? 1 : (locked ? 0.22 : 0.8), pointerEvents: locked ? "none" : "auto", filter: locked ? "grayscale(.7)" : "none" }), onClick: function () { if (a.hasSalle)
                     setMData(function (p) { return (__assign(__assign({}, p), { _ptPickSalle: a.id })); });
                 else {
@@ -3089,12 +3105,12 @@ function TourTab(_a) {
                                 var ex = (next[k] || {})[mid];
                                 if (cellHasAny(ex, PROT_1))
                                     return;
-                                var _b = (pt[dw2][sl]) || [null, null], acteId = _b[0], salle = _b[1], _c = _b[2], a2x = _c === void 0 ? null : _c, _d = _b[3], s2x = _d === void 0 ? null : _d, _e = _b[4], a3x = _e === void 0 ? null : _e, _f = _b[5], s3x = _f === void 0 ? null : _f;
+                                var _b = (pt[dw2][sl]) || [null, null], acteId = _b[0], salle = _b[1], _c = _b[2], a2x = _c === void 0 ? null : _c, _d = _b[3], s2x = _d === void 0 ? null : _d, _e = _b[4], a3x = _e === void 0 ? null : _e, _f = _b[5], s3x = _f === void 0 ? null : _f, _g = _b[6], c1x = _g === void 0 ? null : _g;
                                 if (!acteId)
                                     return;
                                 if (!next[k])
                                     next[k] = {};
-                                next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[mid] = ptCell(acteId, salle, a2x, s2x, a3x, s3x), _a));
+                                next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[mid] = ptCell(acteId, salle, a2x, s2x, a3x, s3x, c1x), _a));
                             });
                         });
                 });
@@ -3155,8 +3171,8 @@ function TourTab(_a) {
     var _m = React.useState(3), cfgMinCoro = _m[0], setCfgMinCoro = _m[1];
     var _o = React.useState({}), cfgExcl = _o[0], setCfgExcl = _o[1]; // {medId: true = ne participe pas}
     var _q = React.useState({}), cfgWeeks = _q[0], setCfgWeeks = _q[1]; // {medId: nWeeks}
-    var _r = React.useState({}), cfgPref2HC = _r[0], setCfgPref2HC = _r[1]; // {medId: bool}
-    var _s = React.useState({}), cfgPref2USIC = _s[0], setCfgPref2USIC = _s[1]; // {medId: bool}
+    var _s = React.useState({}), cfgPref2HC = _s[0], setCfgPref2HC = _s[1]; // {medId: bool}
+    var _t = React.useState({}), cfgPref2USIC = _t[0], setCfgPref2USIC = _t[1]; // {medId: bool}
     var totalSlots = weeksT.length * 4; // 2 HC + 2 USIC per week
     var activeMeds = tourMeds.filter(function (m) { return !cfgExcl[m.id]; });
     var nominalW = activeMeds.length > 0 ? Math.ceil(totalSlots / activeMeds.length) : 0;
@@ -5335,12 +5351,12 @@ function CardioPlanning() {
                     }
                     if (!pt || !pt[dw2])
                         return;
-                    var _c = (pt[dw2][sl]) || [null, null], acteId = _c[0], salle = _c[1], a2x = _c[2] || null, s2x = _c[3] || null, a3x = _c[4] || null, s3x = _c[5] || null;
+                    var _c = (pt[dw2][sl]) || [null, null], acteId = _c[0], salle = _c[1], a2x = _c[2] || null, s2x = _c[3] || null, a3x = _c[4] || null, s3x = _c[5] || null, c1x = _c[6] || null;
                     if (!acteId)
                         return;
                     if (!next[k])
                         next[k] = {};
-                    next[k] = __assign(__assign({}, next[k]), (_b = {}, _b[medId] = ptCell(acteId, salle, a2x, s2x, a3x, s3x), _b));
+                    next[k] = __assign(__assign({}, next[k]), (_b = {}, _b[medId] = ptCell(acteId, salle, a2x, s2x, a3x, s3x, c1x), _b));
                 });
             };
             for (var i = 0; i < 5; i++) {
@@ -6357,12 +6373,12 @@ function CardioPlanning() {
                             var k = sk(ay, am, d, sl), ex = (next[k] || {})[med.id];
                             if (cellHasAny(ex, PROT_TOUR))
                                 return;
-                            var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null;
+                            var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null, c1x = _b[6] || null;
                             if (!acteId)
                                 return;
                             if (!next[k])
                                 next[k] = {};
-                            next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = ptCell(acteId, salle, a2x, s2x, a3x, s3x), _a));
+                            next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = ptCell(acteId, salle, a2x, s2x, a3x, s3x, c1x), _a));
                             nApplied++;
                         });
                     });
@@ -6471,12 +6487,12 @@ function CardioPlanning() {
                         var k = sk(year, month, d, sl), ex = (next[k] || {})[med.id];
                         if (cellHasAny(ex, PROT_TOUR))
                             return;
-                        var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null;
+                        var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null, c1x = _b[6] || null;
                         if (!acteId)
                             return;
                         if (!next[k])
                             next[k] = {};
-                        next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = ptCell(acteId, salle, a2x, s2x, a3x, s3x), _a));
+                        next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = ptCell(acteId, salle, a2x, s2x, a3x, s3x, c1x), _a));
                     });
                 });
             });
@@ -6507,12 +6523,12 @@ function CardioPlanning() {
                     var k = sk(year, month, d, sl), ex = (next[k] || {})[medId];
                     if (cellHasAny(ex, PROT_TOUR))
                         return;
-                    var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null;
+                    var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null, c1x = _b[6] || null;
                     if (!acteId)
                         return;
                     if (!next[k])
                         next[k] = {};
-                    next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[medId] = ptCell(acteId, salle, a2x, s2x, a3x, s3x), _a));
+                    next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[medId] = ptCell(acteId, salle, a2x, s2x, a3x, s3x, c1x), _a));
                 });
             });
             return next;
