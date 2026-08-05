@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.66 — 05/08/2026";
+var APP_VERSION = "v9.66.1 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -728,15 +728,14 @@ function GridH(_a) {
 /* ════ GRID V ════ */
 var _gvLpT = null, _gvLpF = false;
 function GridV(_a) {
-    var _pw = _a.printWk, printWk = _pw === void 0 ? null : _pw;
-    var allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _b = _a.notes, notes = _b === void 0 ? {} : _b, _pi = _a.planIssues, planIssues = _pi === void 0 ? {} : _pi, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _sg = _a.showGarde, showGarde = _sg === void 0 ? true : _sg, _gl = _a.gardeLocked, gardeLocked = _gl === void 0 ? false : _gl, _och = _a.onCellHistory, onCellHistory = _och === void 0 ? null : _och, getAstreinteForDay = _a.getAstreinteForDay;
+    var _b = _a.planIssues, planIssues = _b === void 0 ? {} : _b, allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _c = _a.notes, notes = _c === void 0 ? {} : _c, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _d = _a.showGarde, showGarde = _d === void 0 ? true : _d, _e = _a.gardeLocked, gardeLocked = _e === void 0 ? false : _e, _f = _a.onCellHistory, onCellHistory = _f === void 0 ? null : _f, getAstreinteForDay = _a.getAstreinteForDay, _g = _a.printWk, printWk = _g === void 0 ? null : _g;
     var today = new Date();
     var C0 = 42, C1 = 24, CG = 44;
     // Find garde med for a given day (slot N)
-    var _c = useState(null), pickGardeDayFull = _c[0], setPickGardeDayFull = _c[1];
+    var _h = useState(null), pickGardeDayFull = _h[0], setPickGardeDayFull = _h[1];
     var pickGardeDay = pickGardeDayFull ? pickGardeDayFull.d : null;
     var setPickGardeDay = function (v) { return setPickGardeDayFull(v ? { d: v, y: year, m: month } : null); };
-    var _d = useState(""), gardeSearch = _d[0], setGardeSearch = _d[1];
+    var _j = useState(""), gardeSearch = _j[0], setGardeSearch = _j[1];
     var gardePickMeds = (allMeds || meds).filter(function (m) { return m.garde === true; });
     // 4-month view: flatten allDays4 by month groups
     var today2 = new Date();
@@ -755,7 +754,7 @@ function GridV(_a) {
         }
         // Mode période
         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
-        var days = perDaysList(sy, sm).map(function (o) { return { y: o.y, m: o.m, d: o.d, label: null }; });
+        var days = perDaysList(sy, sm).map(function (o) { return ({ y: o.y, m: o.m, d: o.d, label: null }); });
         if (!showFull) {
             var tod_4 = new Date();
             tod_4.setHours(0, 0, 0, 0);
@@ -779,7 +778,7 @@ function GridV(_a) {
         }
         return null;
     };
-    var _e = React.useState(false), gardeSwapOpen = _e[0], setGardeSwapOpen = _e[1];
+    var _k = React.useState(false), gardeSwapOpen = _k[0], setGardeSwapOpen = _k[1];
     var gSlotOf = function (y2, m2, d2) { var dw2 = dow(y2, m2, d2); return (dw2 === 6 || dw2 === 0) ? "JOUR" : "N"; };
     var isAbsOn = function (mid, y2, m2, d2) {
         var sls = isWE(y2, m2, d2) ? ["JOUR"] : ["M", "AM"];
@@ -867,6 +866,8 @@ function GridV(_a) {
                     var filteredGM = gardePickMeds.filter(function (m) { return !gardeSearch || m.init.toUpperCase().startsWith(gardeSearch); });
                     var onEnter = function (e) { if (e.key === "Enter" && filteredGM.length === 1) {
                         var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
+                        if (isAbsOn(filteredGM[0].id, pgf.y, pgf.m, pgf.d))
+                            return;
                         applyGarde(filteredGM[0].id, pgf.y, pgf.m, pgf.d);
                         setPickGardeDayFull(null);
                     } };
@@ -877,13 +878,23 @@ function GridV(_a) {
                             var pgfCur = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
                             var gm = getGardeMed2(pgfCur.y, pgfCur.m, pgfCur.d);
                             var isOn = gm && gm.id === m.id;
-                            return React.createElement("button", { key: m.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid ".concat(isOn ? "#16a34a" : "var(--border)"), background: isOn ? "#f0fdf4" : "var(--bg2)", cursor: "pointer" }, onClick: function () { var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(m.id, pgf.y, pgf.m, pgf.d); setPickGardeDayFull(null); } },
+                            /* v9.66.1 : ce sélecteur n'avait AUCUN statut, contrairement à son jumeau de
+                               l'onglet Gardes. Absent ou FMC le jour même = non cliquable ; absence ou FMC
+                               le lendemain = garde permise mais annoncée sans repos (décision v9.65). */
+                            var dayAbs = !isOn && isAbsOn(m.id, pgfCur.y, pgfCur.m, pgfCur.d);
+                            var _nx = new Date(pgfCur.y, pgfCur.m, pgfCur.d + 1);
+                            var nxAbs = !dayAbs && isAbsOn(m.id, _nx.getFullYear(), _nx.getMonth(), _nx.getDate());
+                            return React.createElement("button", { key: m.id, disabled: dayAbs, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid ".concat(isOn ? "#16a34a" : "var(--border)"), background: isOn ? "#f0fdf4" : "var(--bg2)", cursor: dayAbs ? "not-allowed" : "pointer", opacity: dayAbs ? .45 : 1 }, onClick: function () { if (dayAbs)
+                                    return; var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(m.id, pgf.y, pgf.m, pgf.d); setPickGardeDayFull(null); } },
                                 React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
-                                React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
-                                    m.prenom,
-                                    " ",
-                                    m.nom),
-                                isOn && React.createElement("span", { style: { marginLeft: "auto", color: "#16a34a", fontSize: 12 } }, "\u2713 De garde"));
+                                React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-start", flex: 1 } },
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: dayAbs ? "#ef4444" : "var(--txt)" } },
+                                        m.prenom,
+                                        " ",
+                                        m.nom),
+                                    dayAbs && React.createElement("span", { style: { fontSize: 9, color: "#ef4444", fontWeight: 700 } }, "Absent / FMC ce jour"),
+                                    nxAbs && React.createElement("span", { style: { fontSize: 9, color: "#f59e0b", fontWeight: 700 } }, "\u26A0 Absence/FMC demain \u2014 garde possible, sans repos")),
+                                isOn && React.createElement("span", { style: { color: "#16a34a", fontSize: 12 } }, "\u2713 De garde"));
                         }))));
                 })())),
         React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)" } },
@@ -932,7 +943,13 @@ function GridV(_a) {
                                     parts.push("inset 0 -1px 0 var(--ast-bord)");
                                 astSh = parts.join(", ");
                             }
-                            return React.createElement("td", { key: med.id, title: (issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle", position: "relative" }), onContextMenu: onCellHistory ? function (e) { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onTouchMove: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onClick: bl || !isEdit ? undefined : function () { if (_gvLpF) { _gvLpF = false; return; } onCell(med.id, ey, em, d, sl); } }, issueT && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }), !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } }, React.createElement(CondBadges, { es: es, acteById: acteById, noteT: noteT })));
+                            return React.createElement("td", { key: med.id, title: (issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle", position: "relative" }), onContextMenu: onCellHistory ? function (e) { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onTouchMove: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onClick: bl || !isEdit ? undefined : function () { if (_gvLpF) {
+                                    _gvLpF = false;
+                                    return;
+                                } onCell(med.id, ey, em, d, sl); } },
+                                issueT && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }),
+                                !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } },
+                                    React.createElement(CondBadges, { es: es, acteById: acteById, noteT: noteT })));
                         }))); });
                 }))))));
 }

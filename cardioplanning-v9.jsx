@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.66 — 05/08/2026";
+const APP_VERSION="v9.66.1 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -675,7 +675,7 @@ function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
         })()}
         {(()=>{
           const filteredGM=gardePickMeds.filter(m=>!gardeSearch||m.init.toUpperCase().startsWith(gardeSearch));
-          const onEnter=e=>{if(e.key==="Enter"&&filteredGM.length===1){const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};applyGarde(filteredGM[0].id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}};
+          const onEnter=e=>{if(e.key==="Enter"&&filteredGM.length===1){const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};if(isAbsOn(filteredGM[0].id,pgf.y,pgf.m,pgf.d))return;applyGarde(filteredGM[0].id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}};
           return(<>
         <input
           autoFocus
@@ -691,12 +691,22 @@ function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
             const pgfCur=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};
             const gm=getGardeMed2(pgfCur.y,pgfCur.m,pgfCur.d);
             const isOn=gm&&gm.id===m.id;
-            return <button key={m.id}
-              style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,border:`1px solid ${isOn?"#16a34a":"var(--border)"}`,background:isOn?"#f0fdf4":"var(--bg2)",cursor:"pointer"}}
-              onClick={()=>{const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};applyGarde(m.id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}}>
+            /* v9.66.1 : ce sélecteur n'avait AUCUN statut, contrairement à son jumeau de
+               l'onglet Gardes. Absent ou FMC le jour même = non cliquable ; absence ou FMC
+               le lendemain = garde permise mais annoncée sans repos (décision v9.65). */
+            const dayAbs=!isOn&&isAbsOn(m.id,pgfCur.y,pgfCur.m,pgfCur.d);
+            const _nx=new Date(pgfCur.y,pgfCur.m,pgfCur.d+1);
+            const nxAbs=!dayAbs&&isAbsOn(m.id,_nx.getFullYear(),_nx.getMonth(),_nx.getDate());
+            return <button key={m.id} disabled={dayAbs}
+              style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,border:`1px solid ${isOn?"#16a34a":"var(--border)"}`,background:isOn?"#f0fdf4":"var(--bg2)",cursor:dayAbs?"not-allowed":"pointer",opacity:dayAbs?.45:1}}
+              onClick={()=>{if(dayAbs)return;const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};applyGarde(m.id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}}>
               <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
-              <span style={{fontSize:12,fontWeight:600,color:"var(--txt)"}}>{m.prenom} {m.nom}</span>
-              {isOn&&<span style={{marginLeft:"auto",color:"#16a34a",fontSize:12}}>✓ De garde</span>}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",flex:1}}>
+                <span style={{fontSize:12,fontWeight:600,color:dayAbs?"#ef4444":"var(--txt)"}}>{m.prenom} {m.nom}</span>
+                {dayAbs&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>Absent / FMC ce jour</span>}
+                {nxAbs&&<span style={{fontSize:9,color:"#f59e0b",fontWeight:700}}>⚠ Absence/FMC demain — garde possible, sans repos</span>}
+              </div>
+              {isOn&&<span style={{color:"#16a34a",fontSize:12}}>✓ De garde</span>}
             </button>;
           })}
         </div>
