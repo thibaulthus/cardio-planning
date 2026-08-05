@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.71 — 05/08/2026";
+var APP_VERSION = "v9.72 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -4833,6 +4833,10 @@ function CardioPlanning() {
     var planSynced = useRef(null);
     var planPending = useRef({});
     var planMigrated = useRef(false);
+    /* v9.72 : le planning type suit desormais le meme decoupage que le plan. */
+    var ptSynced = useRef(null);
+    var ptPending = useRef({});
+    var ptMigrated = useRef(false);
     /* ── v9.7 : écriture du plan en delta — seules les cases modifiées partent vers Firebase,
        la fusion se fait champ par champ côté serveur : zéro écrasement entre éditeurs simultanés ── */
     var flushPlan = useCallback(function (cur) {
@@ -4858,6 +4862,43 @@ function CardioPlanning() {
             mk(pairs.slice(i, i + 400));
         pr.catch(function (e) { console.log("sync plan:", e); setFbStatus("error"); if (setDoc)
             Promise.resolve(setDoc(PLANNING_DOC, { planV2: cur }, { merge: true })).then(function () { return setFbStatus("ok"); }).catch(function (e2) { console.error("sync plan (repli):", e2); setFbStatus("error"); }); });
+    }, []);
+    /* Ecriture du planning type, medecin par medecin (v9.72). */
+    var flushPT = useCallback(function (cur) {
+        if (!PLANNING_DOC || !updatePaths)
+            return;
+        if (!serverSeen.current)
+            return;
+        var prev = ptSynced.current || {};
+        var pairs = [];
+        Object.keys(cur || {}).forEach(function (k) {
+            var v = cur[k];
+            if (JSON.stringify(v) !== JSON.stringify(prev[k])) {
+                pairs.push([["planningTypeV2", k], v]);
+                ptPending.current[k] = v;
+            }
+        });
+        Object.keys(prev).forEach(function (k) {
+            if (!(k in (cur || {}))) {
+                pairs.push([["planningTypeV2", k], "__DELETE__"]);
+                ptPending.current[k] = null;
+            }
+        });
+        ptSynced.current = cur || {};
+        if (pairs.length === 0)
+            return;
+        localChange.current = true;
+        (function () {
+            var i = 0;
+            var step = function () {
+                if (i >= pairs.length)
+                    return Promise.resolve();
+                var chunk = pairs.slice(i, i + 400);
+                i += 400;
+                return Promise.resolve(updatePaths(PLANNING_DOC, chunk)).then(step);
+            };
+            step().catch(function (e) { console.log("sync PT:", e); setFbStatus("error"); });
+        })();
     }, []);
     useEffect(function () {
         if (!PLANNING_DOC || !onSnapshot) {
@@ -4901,6 +4942,33 @@ function CardioPlanning() {
                     if (setDoc)
                         Promise.resolve(setDoc(PLANNING_DOC, { planV2: legacy }, { merge: true })).catch(function (e) { return console.log("migration plan:", e); });
                 }
+                /* ── planning type V2 : meme mecanique que le plan ── */
+                if (data.planningTypeV2) {
+                    var incPT_1 = data.planningTypeV2;
+                    var mergedPT_1 = __assign({}, incPT_1);
+                    Object.keys(ptPending.current).forEach(function (k) {
+                        var pv = ptPending.current[k];
+                        var confirmed = pv === null ? !(k in incPT_1) : JSON.stringify(incPT_1[k]) === JSON.stringify(pv);
+                        if (confirmed)
+                            delete ptPending.current[k];
+                        else {
+                            if (pv === null)
+                                delete mergedPT_1[k];
+                            else
+                                mergedPT_1[k] = pv;
+                        }
+                    });
+                    ptSynced.current = mergedPT_1;
+                    setPlanningType(mergedPT_1);
+                }
+                else if (data.planningType && !ptMigrated.current) {
+                    var legacyPT = JSON.parse(data.planningType);
+                    ptSynced.current = legacyPT;
+                    setPlanningType(legacyPT);
+                    ptMigrated.current = true;
+                    if (serverSeen.current && setDoc)
+                        Promise.resolve(setDoc(PLANNING_DOC, { planningTypeV2: legacyPT }, { merge: true })).catch(function (e) { return console.log("migration PT:", e); });
+                }
                 /* v9.44 : rejet par champ et non plus global. */
                 {
                     var resend = {};
@@ -4927,8 +4995,6 @@ function CardioPlanning() {
                     }
                     if (data.tourMed)
                         setTourMed(JSON.parse(data.tourMed));
-                    if (data.planningType)
-                        setPlanningType(JSON.parse(data.planningType));
                     if (data.notes)
                         setNotes(JSON.parse(data.notes));
                     if (data.medecins)
@@ -5623,7 +5689,7 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
     useEffect(function () { if (!isFirstLoad.current)
-        saveToFirebase({ planningType: JSON.stringify(planningType) }); }, [planningType]);
+        flushPT(planningType); }, [planningType]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ notes: JSON.stringify(notes) }); }, [notes]);
     useEffect(function () { if (!isFirstLoad.current)

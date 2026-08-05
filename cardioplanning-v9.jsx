@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.71 — 05/08/2026";
+const APP_VERSION="v9.72 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -4551,6 +4551,13 @@ function CardioPlanning(){
   const planSynced=useRef(null);
   const planPending=useRef({});
   const planMigrated=useRef(false);
+  /* v9.72 : le planning type était enregistré d'un SEUL bloc — une écriture partant d'une
+     base périmée réécrivait tout et effaçait ce qui avait été ajouté depuis. Il suit
+     désormais le même découpage que le plan (v9.7) : un champ par médecin, écrit
+     séparément, et ré-appliqué tant que le serveur ne l'a pas confirmé. */
+  const ptSynced=useRef(null);
+  const ptPending=useRef({});
+  const ptMigrated=useRef(false);
   /* ── v9.7 : écriture du plan en delta — seules les cases modifiées partent vers Firebase,
      la fusion se fait champ par champ côté serveur : zéro écrasement entre éditeurs simultanés ── */
   const flushPlan=useCallback((cur)=>{
@@ -4565,6 +4572,26 @@ function CardioPlanning(){
     (async()=>{
       try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
       catch(e){console.log("sync plan:",e);setFbStatus("error");if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:cur},{merge:true})).then(()=>setFbStatus("ok")).catch(e2=>{console.error("sync plan (repli):",e2);setFbStatus("error");});}
+    })();
+  },[]);
+
+  /* Écriture du planning type, médecin par médecin (v9.72). */
+  const flushPT=useCallback((cur)=>{
+    if(!PLANNING_DOC||!updatePaths)return;
+    if(!serverSeen.current)return;                 // jamais sur une base venant du seul cache
+    const prev=ptSynced.current||{};
+    const pairs=[];
+    Object.keys(cur||{}).forEach(k=>{
+      const v=cur[k];
+      if(JSON.stringify(v)!==JSON.stringify(prev[k])){pairs.push([["planningTypeV2",k],v]);ptPending.current[k]=v;}
+    });
+    Object.keys(prev).forEach(k=>{if(!(k in (cur||{}))){pairs.push([["planningTypeV2",k],"__DELETE__"]);ptPending.current[k]=null;}});
+    ptSynced.current=cur||{};
+    if(pairs.length===0)return;
+    localChange.current=true;
+    (async()=>{
+      try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
+      catch(e){console.log("sync PT:",e);setFbStatus("error");}
     })();
   },[]);
 
@@ -4597,6 +4624,26 @@ function CardioPlanning(){
             planMigrated.current=true;
             if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:legacy},{merge:true})).catch(e=>console.log("migration plan:",e));
           }
+          /* ── planning type V2 : même mécanique que le plan ── */
+          if(data.planningTypeV2){
+            const incPT=data.planningTypeV2;
+            const mergedPT={...incPT};
+            Object.keys(ptPending.current).forEach(k=>{
+              const pv=ptPending.current[k];
+              const confirmed=pv===null?!(k in incPT):JSON.stringify(incPT[k])===JSON.stringify(pv);
+              if(confirmed)delete ptPending.current[k];
+              else{if(pv===null)delete mergedPT[k];else mergedPT[k]=pv;}
+            });
+            ptSynced.current=mergedPT;
+            setPlanningType(mergedPT);
+          }else if(data.planningType&&!ptMigrated.current){
+            /* migration douce : ancien bloc unique → écriture unique en V2, l'ancien champ
+               est CONSERVÉ (jamais purgé) comme filet de sécurité */
+            const legacyPT=JSON.parse(data.planningType);
+            ptSynced.current=legacyPT;setPlanningType(legacyPT);
+            ptMigrated.current=true;
+            if(serverSeen.current&&setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planningTypeV2:legacyPT},{merge:true})).catch(e=>console.log("migration PT:",e));
+          }
           /* ── v9.44 : on n'écarte plus le message entier dès qu'une sauvegarde locale est en
              vol — on n'écarte que les champs qu'on est justement en train d'écrire. Tout le
              reste est appliqué, y compris ce qui vient d'un autre poste. ── */
@@ -4615,7 +4662,6 @@ function CardioPlanning(){
             });return o;})();
             if(Object.keys(resend).length){Object.keys(resend).forEach(k=>{delete fieldSync.current[k];});setTimeout(()=>saveToFirebase(resend),400);}
             if(data.tourMed)setTourMed(JSON.parse(data.tourMed));
-            if(data.planningType)setPlanningType(JSON.parse(data.planningType));
             if(data.notes)setNotes(JSON.parse(data.notes));
             if(data.medecins)setMedecins(JSON.parse(data.medecins));
             if(data.actes){
@@ -5042,7 +5088,7 @@ function CardioPlanning(){
     });
   },[year,month,plan]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({periodCfg:JSON.stringify(periodCfg)});},[periodCfg]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({planningType:JSON.stringify(planningType)});},[planningType]);
+  useEffect(()=>{if(!isFirstLoad.current)flushPT(planningType);},[planningType]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({notes:JSON.stringify(notes)});},[notes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medecins:JSON.stringify(medecins)});},[medecins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({actes:JSON.stringify(actes)});},[actes]);
