@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.64 — 05/08/2026";
+var APP_VERSION = "v9.65 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2072,6 +2072,8 @@ function GardeView(_a) {
                 React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 360, overflowY: "auto" } }, medecins.filter(function (m) { return m.garde === true; }).map(function (m) {
                     var avail = isMedAvailable(m, pd.y, pd.m, pd.d, gardeSlot);
                     var isG = gMed && m.id === gMed.id;
+                    var _nx = new Date(pd.y, pd.m, pd.d + 1);
+                    var nxAbs = avail !== "blocked" && gvIsAbs(m.id, _nx.getFullYear(), _nx.getMonth(), _nx.getDate());
                     return (React.createElement("button", { key: m.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 7,
                             border: "1px solid ".concat(isG ? "var(--today-c)" : "var(--border)"),
                             cursor: avail !== "blocked" ? "pointer" : "not-allowed",
@@ -2084,7 +2086,7 @@ function GardeView(_a) {
                                 m.prenom,
                                 " ",
                                 m.nom),
-                            React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : "var(--txt3)" } }, avail === "blocked" ? "Absent / repos" : "Disponible")),
+                            React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : nxAbs ? "#f59e0b" : "var(--txt3)", fontWeight: nxAbs ? 700 : 400 } }, avail === "blocked" ? "Absent / repos" : nxAbs ? "⚠ Absence/FMC demain — garde possible, sans repos" : "Disponible")),
                         isG && React.createElement("span", { style: { fontSize: 10, color: "var(--today-c)" } }, "\u2713")));
                 }))));
         })()));
@@ -6024,6 +6026,11 @@ function CardioPlanning() {
         if (accessMode === "adminEdit")
             return;
         logCell("add", medId, y2, m2, d2, "N", "GARDE");
+        /* v9.65 : la garde la veille d'une absence ou d'une FMC reste PERMISE (décision
+           utilisateur), mais elle est signalée — le repos ne sera pas posé, la v9.64
+           interdisant au repos d'écraser une exclusive. La répartition automatique, elle,
+           ÉVITE ces gardes depuis toujours (canTake teste le lendemain). */
+        var nxWarn = false;
         var dw = dow(y2, m2, d2);
         var gardeSlot = (dw === 6 || dw === 0) ? "JOUR" : "N";
         var dt = new Date(y2, m2, d2 + 1);
@@ -6056,6 +6063,8 @@ function CardioPlanning() {
                 var k = sk(ny, nm, nd2, "JOUR"), dm = __assign({}, (next[k] || {}));
                 if (!cellHasAny(dm[medId], EXCL_IDS))
                     dm[medId] = { acteId: "REPOS_GARDE", salle: null };
+                else if (cellHasAny(dm[medId], ["ABSENCE", "FORM", "FORMATION"]))
+                    nxWarn = true;
                 next = __assign(__assign({}, next), (_c = {}, _c[k] = dm, _c));
             }
             else {
@@ -6064,12 +6073,19 @@ function CardioPlanning() {
                     var k = sk(ny, nm, nd2, sl), dm = __assign({}, (next[k] || {}));
                     if (!cellHasAny(dm[medId], EXCL_IDS))
                         dm[medId] = { acteId: "REPOS_GARDE", salle: null };
+                    else if (cellHasAny(dm[medId], ["ABSENCE", "FORM", "FORMATION"]))
+                        nxWarn = true;
                     next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
                 });
             }
             return next;
         });
-        toast("Garde + repos automatique", "info");
+        setTimeout(function () {
+            if (nxWarn)
+                toast("⚠ Absence ou FMC le lendemain — garde posée SANS repos", "warn");
+            else
+                toast("Garde + repos automatique", "info");
+        }, 0);
     }, []);
     /* ── applyAbsence ── */
     var applyAbsence = useCallback(function (_a) {

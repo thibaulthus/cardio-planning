@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.64 — 05/08/2026";
+const APP_VERSION="v9.65 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -1819,6 +1819,8 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
               {medecins.filter(m=>m.garde===true).map(m=>{
                 const avail=isMedAvailable(m,pd.y,pd.m,pd.d,gardeSlot);
                 const isG=gMed&&m.id===gMed.id;
+                const _nx=new Date(pd.y,pd.m,pd.d+1);
+                const nxAbs=avail!=="blocked"&&gvIsAbs(m.id,_nx.getFullYear(),_nx.getMonth(),_nx.getDate());
                 return(
                   <button key={m.id} disabled={avail==="blocked"}
                     style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:7,
@@ -1830,7 +1832,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
                     <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
                     <div style={{textAlign:"left",flex:1}}>
                       <div style={{fontSize:12,fontWeight:700,color:isG?"var(--today-c)":"var(--txt)"}}>{m.prenom} {m.nom}</div>
-                      <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":"var(--txt3)"}}>{avail==="blocked"?"Absent / repos":"Disponible"}</div>
+                      <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":nxAbs?"#f59e0b":"var(--txt3)",fontWeight:nxAbs?700:400}}>{avail==="blocked"?"Absent / repos":nxAbs?"⚠ Absence/FMC demain — garde possible, sans repos":"Disponible"}</div>
                     </div>
                     {isG&&<span style={{fontSize:10,color:"var(--today-c)"}}>✓</span>}
                   </button>
@@ -5400,6 +5402,11 @@ function CardioPlanning(){
   const applyGarde=useCallback((medId,y2,m2,d2)=>{
     if(accessMode==="adminEdit")return;
     logCell("add",medId,y2,m2,d2,"N","GARDE");
+    /* v9.65 : la garde la veille d'une absence ou d'une FMC reste PERMISE (décision
+       utilisateur), mais elle est signalée — le repos ne sera pas posé, la v9.64
+       interdisant au repos d'écraser une exclusive. La répartition automatique, elle,
+       ÉVITE ces gardes depuis toujours (canTake teste le lendemain). */
+    let nxWarn=false;
     const dw=dow(y2,m2,d2);
     const gardeSlot=(dw===6||dw===0)?"JOUR":"N";
     const dt=new Date(y2,m2,d2+1);
@@ -5422,13 +5429,17 @@ function CardioPlanning(){
       if(isWE(ny,nm,nd2)){
         const k=sk(ny,nm,nd2,"JOUR"),dm={...(next[k]||{})};
         if(!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};
+        else if(cellHasAny(dm[medId],["ABSENCE","FORM","FORMATION"]))nxWarn=true;
         next={...next,[k]:dm};
       } else {
-        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};next={...next,[k]:dm};});
+        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};else if(cellHasAny(dm[medId],["ABSENCE","FORM","FORMATION"]))nxWarn=true;next={...next,[k]:dm};});
       }
       return next;
     });
-    toast("Garde + repos automatique","info");
+    setTimeout(()=>{
+      if(nxWarn)toast("⚠ Absence ou FMC le lendemain — garde posée SANS repos","warn");
+      else toast("Garde + repos automatique","info");
+    },0);
   },[]);
 
   /* ── applyAbsence ── */
