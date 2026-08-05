@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.66.1 — 05/08/2026";
+const APP_VERSION="v9.67 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -1098,6 +1098,8 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           /* v9.45 : le segment gauche porte la SALLE si la ligne en propose, sinon
              le libellé de l'activité — jamais les deux, jamais de couleur de fond. */
           const lieu=(row.hasSalleChoice&&g.salle)?g.salle:(monoActe?null:(g.acte.short||g.acte.label||""));
+          /* v9.67 : option A — l'occupant sans salle est signalé sur sa ligne */
+          const noSalle=row.hasSalleChoice&&!g.salle&&g.acte&&g.acte.hasSalle&&g.meds.some(m=>m&&m.id!==IDE_MED.id);
           const dc=g.dif?((g.dif.c||"")+(g.dif.h?(g.dif.c?" — ":"")+g.dif.h:"")):"";
           /* v9.46 : un groupe porté par IDE_MED n'a pas d'occupant — pas de vignette,
              et le chiffre porte son unité puisque aucun nom ne l'éclaire. */
@@ -1111,8 +1113,9 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
                 <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}</span>
               ))}
             </div>}
-            {(lieu||showIde)&&
+            {(lieu||showIde||noSalle)&&
               <span title={g.dif?("Départ différé"+(dc?" — "+dc:"")):undefined} style={{...pillCols((g.acte&&g.acte.color)||"#888888",darkMode),display:"inline-flex",alignItems:"stretch",height:22,borderRadius:4,overflow:"hidden",fontFamily:"'JetBrains Mono',monospace",fontSize:9.5,fontWeight:800,whiteSpace:"nowrap",cursor:g.dif?"help":"inherit"}}>
+                {noSalle&&<span style={{display:"flex",alignItems:"center",padding:"0 6px",background:"#fff3cd",color:"#8a6100"}}>⚠ sans salle</span>}
                 {lieu&&<span style={{display:"flex",alignItems:"center",padding:"0 6px"}}>{lieu}</span>}
                 {showIde&&<span style={{display:"flex",alignItems:"center",padding:"0 5px",background:"#e0f4e3",color:"#2f9440",borderLeft:lieu?"1px solid #95d99f":"none"}}>{ideOnly?(ideN+" IDE"):ideN}{g.dif&&<span style={{marginLeft:4,fontSize:9}}>🕙</span>}</span>}
               </span>}
@@ -7143,7 +7146,8 @@ header::-webkit-scrollbar { display: none; }
           if(acteId==="GARDE"){doGarde();return;}
           /* v9.60 : une branche non tranchée n'est pas « déjà posée » — la reposer, c'est trancher */
           const _curA=getEntries(medId,y2,m2,d2,we?"JOUR":slot).filter(e2=>e2&&!e2.cond).map(e2=>e2.acteId);
-          if(_curA.includes(acteId)){toast("Cette activité est déjà posée sur ce créneau — retirez-la d'abord (×) si besoin","warn");return;}
+          /* v9.67 : reposer avec une salle explicite = ATTRIBUER la salle (addEntry remplace, v9.63) */
+          if(_curA.includes(acteId)&&!salle){toast("Cette activité est déjà posée sur ce créneau — retirez-la d'abord (×) si besoin","warn");return;}
           const acteObj=acteById(acteId);
           const finalSalle=salle||(acteObj&&acteObj.fixedSalle)||null;
           addEntry(medId,y2,m2,d2,we?"JOUR":slot,{acteId,salle:finalSalle});
@@ -7224,7 +7228,23 @@ header::-webkit-scrollbar { display: none; }
                       <div key={i} style={{display:"flex",alignItems:"center",gap:3}}>
                         <Badge a={a} hideSalle={true}/>
                         {e.salle&&<span style={{fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"var(--txt)",border:"1px solid var(--border)",background:"var(--bg2)",borderRadius:4,padding:"3px 7px",whiteSpace:"nowrap"}}>{e.salle}</span>}
-                        {a.hasSalle&&!e.salle&&<span style={{fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"#f85149",border:"1px solid rgba(248,81,73,.5)",background:"rgba(248,81,73,.10)",borderRadius:4,padding:"3px 7px",whiteSpace:"nowrap"}}>sans salle</span>}
+                        {a.hasSalle&&!e.salle&&(()=>{
+                          /* v9.67 : option A — disponibilité affichée et attribution sur place,
+                             via le sélecteur _pickSalle ; doAdd remplace la ferme (v9.63). */
+                          const busy={};
+                          actes.filter(ax=>ax.hasSalle||ax.fixedSalle).forEach(ax=>{
+                            const ao=salleOcc(ax.id,y2,m2,d2,slot);
+                            Object.keys(ao).forEach(s2=>{if(!busy[s2])busy[s2]=[];ao[s2].forEach(mm=>{if(!busy[s2].find(x=>x.id===mm.id))busy[s2].push(mm);});});
+                          });
+                          const fr=(a.salles||[]).filter(s2=>!((busy[s2]||[]).some(mm=>mm.id!==medId)));
+                          const tot=(a.salles||[]).length;
+                          return(<>
+                            <span style={{fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"#f85149",border:"1px solid rgba(248,81,73,.5)",background:"rgba(248,81,73,.10)",borderRadius:4,padding:"3px 7px",whiteSpace:"nowrap"}}>sans salle</span>
+                            {tot>0&&<span style={{fontSize:10,fontWeight:700,color:fr.length?"#2f9440":"#f85149"}}>{fr.length?fr.length+"/"+tot+" libre"+(fr.length>1?"s":"")+" : "+fr.join(", "):"aucune salle libre"}</span>}
+                            {canEditThisMed&&tot>0&&<button onClick={()=>setMData(p=>({...p,_pickSalle:a.id}))}
+                              style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>Choisir la salle…</button>}
+                          </>);
+                        })()}
                         {canEditThisMed&&(!isAdminEdit||a.adminOk===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
                           if(e.acteId==="GARDE"){
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);
