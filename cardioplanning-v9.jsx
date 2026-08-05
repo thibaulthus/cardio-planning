@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.67 — 05/08/2026";
+const APP_VERSION="v9.67.1 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -842,6 +842,8 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
             <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
               <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
               <span style={{fontSize:10,fontWeight:600,color:"var(--txt)",whiteSpace:"nowrap"}}>{med.nom}</span>
+              {rs?<span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg2)",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>{rs}</span>
+                :(bipActe.hasSalle?<span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>⚠ sans salle</span>:null)}
             </div>
           ))}
         </td>
@@ -1097,9 +1099,10 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           const ideN=(g.n===null||g.n===undefined)?(g.acte.ideN||0):g.n;
           /* v9.45 : le segment gauche porte la SALLE si la ligne en propose, sinon
              le libellé de l'activité — jamais les deux, jamais de couleur de fond. */
-          const lieu=(row.hasSalleChoice&&g.salle)?g.salle:(monoActe?null:(g.acte.short||g.acte.label||""));
+          const salleTrack=row.hasSalleChoice||(g.acte&&g.acte.hasSalle&&!g.acte.fixedSalle);
+          const lieu=(salleTrack&&g.salle)?g.salle:(monoActe?null:(g.acte.short||g.acte.label||""));
           /* v9.67 : option A — l'occupant sans salle est signalé sur sa ligne */
-          const noSalle=row.hasSalleChoice&&!g.salle&&g.acte&&g.acte.hasSalle&&g.meds.some(m=>m&&m.id!==IDE_MED.id);
+          const noSalle=salleTrack&&!g.salle&&g.acte&&g.acte.hasSalle&&g.meds.some(m=>m&&m.id!==IDE_MED.id);
           const dc=g.dif?((g.dif.c||"")+(g.dif.h?(g.dif.c?" — ":"")+g.dif.h:"")):"";
           /* v9.46 : un groupe porté par IDE_MED n'a pas d'occupant — pas de vignette,
              et le chiffre porte son unité puisque aucun nom ne l'éclaire. */
@@ -2562,7 +2565,8 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               <button key={a.id} style={{...S.actTog,background:a.color,color:"#111",outline:`1px solid ${a.color}55`}}
                 onClick={()=>{
                   /* une colonne de reprise ne demande une salle que si l'activité en a une */
-                  if(isBipCol&&a.hasSalle){setStep("salle");return;}
+                  /* v9.67.1 : TOUTE colonne de suivi dont l'activité déclare des salles passe par le choix de salle */
+                  if(isRecapCol&&a.hasSalle&&!a.fixedSalle){setStep("salle");return;}
                   if(isRecapCol){addEntry(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:a.fixedSalle||null});onClose();return;}
                   const fs=a.fixedSalle||salle;
                   addEntry(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:fs});
@@ -2576,7 +2580,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
           </div>
         </>
       )}
-      {step==="salle"&&selMed&&isBipCol&&(
+      {step==="salle"&&selMed&&isRecapCol&&(
         <>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
             <button onClick={()=>setStep("acte")} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 9px",cursor:"pointer",color:"var(--txt2)",fontSize:12}}>← Retour</button>
@@ -2585,9 +2589,9 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               <span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>{selMed.prenom} {selMed.nom}</span>
             </div>
           </div>
-          <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir la salle BIP</div>
+          <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir la salle {recapActe&&recapActe.short?recapActe.short:""}</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {["CHB-1","CHB-2","CHB-3"].map(s=>{
+            {((recapActe&&recapActe.salles&&recapActe.salles.length)?recapActe.salles:["CHB-1","CHB-2","CHB-3"]).map(s=>{
               // Check if salle is occupied by ANY activity
               const salleOccs=medecins.filter(m=>{
                 const es=getEntries(m.id,y2,m2,d,sl);
@@ -2601,8 +2605,8 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
                     color:occupied?"#dc2626":"#111",
                     fontWeight:700,fontSize:13,
                     border:occupied?"1px solid #fca5a5":"1px solid #46bdc6"}}
-                  onClick={()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId:"BIP",salle:s}); onClose(); }}>
-                  <span>Salle {s.replace("CHB-","")}</span>
+                  onClick={()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId:(recapId||"BIP"),salle:s}); onClose(); }}>
+                  <span>{recapId==="BIP"?("Salle "+s.replace("CHB-","")):s}</span>
                   {occupied&&<span style={{fontSize:10,fontWeight:400,marginLeft:6}}>
                     — {salleOccs.map(m=>m.init).join(", ")} déjà assigné
                   </span>}
