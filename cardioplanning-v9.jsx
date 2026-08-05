@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.67.2 — 05/08/2026";
+const APP_VERSION="v9.67.3 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2266,6 +2266,12 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
               <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
               {acte&&<span style={{padding:"2px 6px",borderRadius:4,background:acte.bg,color:acte.color,fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>}
+              {(()=>{const _rs=e&&e.salle;
+                if(_rs)return <span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>{_rs}</span>;
+                if(acte&&acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
+                return null;})()}
+              {row.hasSalleChoice&&acte&&acte.hasSalle&&(!adminOnly||acte.adminOk===true)&&<button onClick={()=>setSelMedId(med.id)}
+                style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
               {(!adminOnly||((actes.find(a2=>a2.id===acteId)||{}).adminOk===true))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
             </div>
             {canDif&&<div style={{margin:"-2px 0 7px 6px",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
@@ -2497,7 +2503,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
     <Ov onClose={onClose}>
       <div style={S.mHd}>
         <div>
-          <div style={S.mTit2}>{salle} — {JOURSL[dow(y2,m2,d)]} {d} {MOIS[m2]}</div>
+          <div style={S.mTit2}>{isRecapCol&&recapActe?("↩ "+(recapActe.label||recapActe.short)):salle} — {JOURSL[dow(y2,m2,d)]} {d} {MOIS[m2]}</div>
           <div style={{color:"var(--txt2)",fontSize:12,marginTop:2}}>{SLOTL[sl]}</div>
         </div>
         <button onClick={onClose} style={S.xBtn}>×</button>
