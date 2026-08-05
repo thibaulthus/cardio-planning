@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.63 — 05/08/2026";
+const APP_VERSION="v9.64 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -57,6 +57,17 @@ function perDaysList(sy,sm){
   return days;
 }
 const SYS=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE"];
+/* v9.64 : activités EXCLUSIVES — jamais en cohabitation dans une case. Soit l'une
+   d'elles est posée et c'est la seule entrée, soit elle n'y est pas. La liste est
+   définie UNE FOIS ; sept protections divergentes l'utilisaient chacune à sa façon,
+   et la Formation manquait dans plusieurs — c'est ainsi qu'une FMC a pu être écrasée
+   par la réapplication du planning type et effacée par son retrait. */
+const EXCL_IDS=["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TP"];
+const PROT_BASE=EXCL_IDS;                      // noyau protégé par TOUS les outils
+const PROT_TOUR=EXCL_IDS.concat(["TOUR_HC","TOUR_USIC"]); // + tour réel (remplaçants)
+const EXCL_LABEL={ABSENCE:"une absence",FORM:"une formation",FORMATION:"une formation",GARDE:"une garde",REPOS_GARDE:"un repos de garde",TP:"un temps partiel"};
+const cellEs=c=>c?(Array.isArray(c)?c:[c]):[];
+const cellHasAny=(c,ids)=>cellEs(c).some(e=>e&&ids.includes(e.acteId));
 const EDIT_PIN_DEFAULT="1234";
 
 /* ════ HELPERS ════ */
@@ -1239,9 +1250,8 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
   const gvIsAbs=(mid,y2,m2,d2)=>{
     const sls=isWE(y2,m2,d2)?["JOUR"]:["M","AM"];
     return sls.some(sl=>{
-      const e=getEntry(mid,y2,m2,d2,sl);
-      const a=e&&(Array.isArray(e)?(e[0]&&e[0].acteId):e.acteId);
-      return ["ABSENCE","FORM","FORMATION"].includes(a);
+      return cellHasAny((plan[sk(y2,m2,d2,sl)]||{})[mid],["ABSENCE","FORM","FORMATION"])
+        ||cellHasAny((plan[sk(y2,m2,d2,"JOUR")]||{})[mid],["ABSENCE","FORM","FORMATION"]);
     });
   };
   const [pickerDay,setPickerDay]=React.useState(null);
@@ -1271,7 +1281,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
   };
   const isAbsFor=(medId,y2,m2,d2)=>{
     const es=[...(getEntry?[]:[]),];
-    const check=(sl)=>{const dm=plan[sk(y2,m2,d2,sl)]||{};const e=dm[medId];const a=Array.isArray(e)?(e[0]&&e[0].acteId):(e&&e.acteId);return ["ABSENCE","FORM","FORMATION"].includes(a);};
+    const check=(sl)=>cellHasAny((plan[sk(y2,m2,d2,sl)]||{})[medId],["ABSENCE","FORM","FORMATION"]);
     return check("M")||check("AM")||check("JOUR");
   };
   const inTourWeek=(medId,y2,m2,d2)=>{
@@ -1431,8 +1441,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
           const rk=sk(ny,nm,nd,sl);
           const dm={...(next[rk]||{})};
           const ex=dm[best.assign[dk4]];
-          const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-          if(!["ABSENCE","GARDE"].includes(exA))dm[best.assign[dk4]]={acteId:"REPOS_GARDE",salle:null};
+          if(!cellHasAny(ex,EXCL_IDS))dm[best.assign[dk4]]={acteId:"REPOS_GARDE",salle:null};
           next[rk]=dm;
         });
       });
@@ -2874,7 +2883,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
         const[wy2,wm2,wd2]=wk2.split("-").map(Number);
         return [0,1,2,3,4].map(i=>{const dt=new Date(wy2,wm2,wd2+i);return[dt.getFullYear(),dt.getMonth(),dt.getDate()];});
       };
-      const PROT=["ABSENCE","GARDE","REPOS_GARDE","FORM","FORMATION","TOUR_HC","TOUR_USIC"];
+      const PROT=PROT_TOUR;
       setPlan(p=>{
         let next={...p};
         // Chaque personne : retirer ses activités sur sa semaine d'ARRIVÉE, ré-appliquer son PT sur sa semaine de DÉPART
@@ -2898,8 +2907,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
             ["M","AM"].forEach(sl=>{
               const k=sk(dy,dm,dd,sl);
               const ex=(next[k]||{})[mid];
-              const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-              if(PROT.includes(exA))return;
+              if(cellHasAny(ex,PROT))return;
               const[acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw2][sl])||[null,null];
               if(!acteId)return;
               if(!next[k])next[k]={};
@@ -4754,7 +4762,7 @@ function CardioPlanning(){
   /* ── Cohérence planning ↔ tour : retrait/réapplication à l'assignation ── */
   const clearWeekActivities=useCallback((pairs)=>{
     // pairs: [{medId,weekKey}] — retire les activités (dont TP) des nouveaux tourneurs, garde abs/gardes/formations
-    const PROT2=["ABSENCE","GARDE","REPOS_GARDE","FORM","FORMATION"];
+    const PROT2=["ABSENCE","GARDE","REPOS_GARDE","FORM","FORMATION"]; // sans TP : il est retiré exprès des nouveaux tourneurs
     setPlan(p=>{
       let next={...p};
       pairs.forEach(({medId,weekKey})=>{
@@ -4767,8 +4775,7 @@ function CardioPlanning(){
             const k=sk(dy,dm3,dd,sl);
             if(!next[k]||!next[k][medId])return;
             const e=next[k][medId];
-            const a=Array.isArray(e)?(e[0]&&e[0].acteId):(e&&e.acteId);
-            if(PROT2.includes(a))return;
+            if(cellHasAny(e,PROT2))return;
             const dm2={...next[k]};delete dm2[medId];next[k]=dm2;
           });
         }
@@ -4779,7 +4786,7 @@ function CardioPlanning(){
   const reapplyPTWeek=useCallback((medId,weekKey)=>{
     const med=medecins.find(m=>m.id===medId);if(!med)return;
     const pt=planningType[medId];
-    const PROT2=["ABSENCE","GARDE","REPOS_GARDE","FORM","FORMATION","TOUR_HC","TOUR_USIC"];
+    const PROT2=PROT_TOUR;
     const[wy2,wm2,wd2]=weekKey.split("-").map(Number);
     setPlan(p=>{
       let next={...p};
@@ -4792,8 +4799,7 @@ function CardioPlanning(){
         ["M","AM"].forEach(sl=>{
           const k=sk(dy,dm3,dd,sl);
           const ex=(next[k]||{})[medId];
-          const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-          if(PROT2.includes(exA))return;
+          if(cellHasAny(ex,PROT2))return;
           if(isOff){
             if(!next[k])next[k]={};
             next[k]={...next[k],[medId]:{acteId:"TP",salle:null}};
@@ -5109,8 +5115,8 @@ function CardioPlanning(){
   const getEntries=useCallback((medId,y2,m2,d2,slot)=>{
     const _p=Object.keys(archPlan).length>0?{...archPlan,...plan}:plan;
     if(slot!=="JOUR"){
-      const abs=(_p[sk(y2,m2,d2,"JOUR")]||{})[medId];
-      if((abs&&abs.acteId)==="ABSENCE") return slot==="M"?[{...abs,_fullDay:true}]:slot==="AM"?[{_blocked:true}]:[];
+      const absE=cellEs((_p[sk(y2,m2,d2,"JOUR")]||{})[medId]).find(e=>e&&["ABSENCE","FORM","FORMATION"].includes(e.acteId));
+      if(absE) return slot==="M"?[{...absE,_fullDay:true}]:slot==="AM"?[{_blocked:true}]:[];
     }
     if(slot==="JOUR"){const e=(_p[sk(y2,m2,d2,"JOUR")]||{})[medId];return e?(Array.isArray(e)?e:[e]):[];}
     const entries=(_p[sk(y2,m2,d2,slot)]||{})[medId];
@@ -5152,9 +5158,22 @@ function CardioPlanning(){
      choix si on la retire ensuite. */
   const addEntry=useCallback((medId,y2,m2,d2,slot,entry)=>{
     const key=sk(y2,m2,d2,slot);
+    let refusedBy=null;
     setPlan(p=>{
       const dm={...(p[key]||{})};const ex=dm[medId];
       const prev=ex?(Array.isArray(ex)?ex:[ex]):[];
+      /* v9.64 : les activités exclusives ne cohabitent avec rien. En poser une
+         remplace la case entière (mémoire des branches conservée) ; poser une
+         activité normale sur une case qui en porte une est refusé. */
+      if(entry&&!entry.cond){
+        if(EXCL_IDS.includes(entry.acteId)){
+          const drC=prev.filter(e=>e&&e.cond);
+          dm[medId]=drC.length?{...entry,wasCond:drC.map(e=>e.acteId)}:entry;
+          return{...p,[key]:dm};
+        }
+        const bl=prev.find(e=>e&&!e.cond&&EXCL_IDS.includes(e.acteId));
+        if(bl){refusedBy=bl.acteId;return p;}
+      }
       const dropped=(entry&&!entry.cond)?prev.filter(e=>e&&e.cond):[];
       let kept=dropped.length?prev.filter(e=>!(e&&e.cond)):prev;
       /* v9.63 : reposer une activité DÉJÀ ferme sur la case la remplace au lieu de la
@@ -5174,7 +5193,11 @@ function CardioPlanning(){
       dm[medId]=nx.length===1?nx[0]:nx;
       return{...p,[key]:dm};
     });
-    logCell("add",medId,y2,m2,d2,slot,entry.acteId);
+    /* le refus se constate dans le réducteur ; le message part après son passage */
+    setTimeout(()=>{
+      if(refusedBy){toast("Ce créneau porte "+(EXCL_LABEL[refusedBy]||refusedBy)+" — retirez-la d'abord (×)","warn");return;}
+      logCell("add",medId,y2,m2,d2,slot,entry.acteId);
+    },0);
   },[]);
 
   /* Trancher depuis la modale de case : la branche choisie devient ferme, les autres
@@ -5398,10 +5421,10 @@ function CardioPlanning(){
       next[gk]={...next[gk],[medId]:{acteId:"GARDE",salle:null}};
       if(isWE(ny,nm,nd2)){
         const k=sk(ny,nm,nd2,"JOUR"),dm={...(next[k]||{})};
-        if(!dm[medId]||dm[medId].acteId!=="ABSENCE")dm[medId]={acteId:"REPOS_GARDE",salle:null};
+        if(!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};
         next={...next,[k]:dm};
       } else {
-        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!dm[medId]||dm[medId].acteId!=="ABSENCE")dm[medId]={acteId:"REPOS_GARDE",salle:null};next={...next,[k]:dm};});
+        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};next={...next,[k]:dm};});
       }
       return next;
     });
@@ -5510,8 +5533,7 @@ function CardioPlanning(){
             if(med.partTime&&(med.workDays||{})[String(dw)]===false){
               ["M","AM"].forEach(sl=>{
                 const k=sk(ay,am,d,sl),ex=(next[k]||{})[med.id];
-                const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-                if(["ABSENCE","GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"].includes(exA))return;
+                if(cellHasAny(ex,PROT_TOUR))return;
                 if(!next[k])next[k]={};
                 next[k]={...next[k],[med.id]:{acteId:"TP",salle:null}};
                 nApplied++;
@@ -5521,8 +5543,7 @@ function CardioPlanning(){
             const pt=planningType[med.id];if(!pt||!pt[dw])return;
             ["M","AM"].forEach(sl=>{
               const k=sk(ay,am,d,sl),ex=(next[k]||{})[med.id];
-              const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-              if(["ABSENCE","GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","TP"].includes(exA))return;
+              if(cellHasAny(ex,PROT_TOUR))return;
               const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
               if(!next[k])next[k]={};
               next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
@@ -5603,8 +5624,7 @@ function CardioPlanning(){
           const pt=planningType[med.id];if(!pt||!pt[dw])return;
           ["M","AM"].forEach(sl=>{
             const k=sk(year,month,d,sl),ex=(next[k]||{})[med.id];
-            const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-            if(["ABSENCE","GARDE","REPOS_GARDE"].includes(exA))return;
+            if(cellHasAny(ex,PROT_TOUR))return;
             const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
             if(!next[k])next[k]={};
             next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
@@ -5631,8 +5651,7 @@ function CardioPlanning(){
         const pt=planningType[medId];if(!pt||!pt[dw])return;
         ["M","AM"].forEach(sl=>{
           const k=sk(year,month,d,sl),ex=(next[k]||{})[medId];
-          const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-          if(["ABSENCE","GARDE","REPOS_GARDE"].includes(exA))return;
+          if(cellHasAny(ex,PROT_TOUR))return;
           const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
           if(!next[k])next[k]={};
           next[k]={...next[k],[medId]:ptCell(acteId,salle,a2x,s2x,a3x,s3x)};
@@ -5656,14 +5675,12 @@ function CardioPlanning(){
           if(medId!==null){
             // Clear only for this med (except ABSENCE/GARDE/REPOS)
             const ex=newSlot[medId];
-            const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-            if(!["ABSENCE","GARDE","REPOS_GARDE"].includes(exA)) delete newSlot[medId];
+            if(!cellHasAny(ex,["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"])) delete newSlot[medId];
           } else {
             // Clear all meds (except ABSENCE/GARDE/REPOS)
             Object.keys(newSlot).forEach(mid=>{
               const ex=newSlot[mid];
-              const exA=Array.isArray(ex)?(ex[0]&&ex[0].acteId):(ex&&ex.acteId);
-              if(!["ABSENCE","GARDE","REPOS_GARDE"].includes(exA)) delete newSlot[mid];
+              if(!cellHasAny(ex,["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"])) delete newSlot[mid];
             });
           }
           next={...next,[k]:newSlot};
@@ -5694,7 +5711,7 @@ function CardioPlanning(){
 
   const isAbsentInWeek=useCallback((medId,wk)=>{
     const[wy,wm2,wd]=wk.split("-").map(Number);
-    return[0,1,2,3,4].some(i=>{const dt=new Date(wy,wm2,wd+i);return["M","AM","JOUR"].some(sl=>{const e=(plan[sk(dt.getFullYear(),dt.getMonth(),dt.getDate(),sl)]||{})[medId];const ae=Array.isArray(e)?e[0]:e;return ae&&ae.acteId==="ABSENCE";});});
+    return[0,1,2,3,4].some(i=>{const dt=new Date(wy,wm2,wd+i);return["M","AM","JOUR"].some(sl=>cellHasAny((plan[sk(dt.getFullYear(),dt.getMonth(),dt.getDate(),sl)]||{})[medId],["ABSENCE","FORM","FORMATION"]));});
   },[plan]);
 
   const tmCount=medId=>Object.values(tourMed).reduce((n,w)=>((w.HC||[]).includes(medId)||(w.USIC||[]).includes(medId))?n+1:n,0);

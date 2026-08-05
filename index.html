@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.63 — 05/08/2026";
+var APP_VERSION = "v9.64 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -180,6 +180,13 @@ function perDaysList(sy, sm) {
     return days;
 }
 var SYS = ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE"];
+var EXCL_IDS = ["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE", "TP"];
+var PROT_BASE = EXCL_IDS; // noyau protégé par TOUS les outils
+var PROT_TOUR = EXCL_IDS.concat(["TOUR_HC", "TOUR_USIC"]); // + tour réel (remplaçants)
+var EXCL_LABEL = { ABSENCE: "une absence", FORM: "une formation", FORMATION: "une formation", GARDE: "une garde", REPOS_GARDE: "un repos de garde", TP: "un temps partiel" };
+var cellEs = function (c) { return c ? (Array.isArray(c) ? c : [c]) : []; };
+var cellHasAny = function (c, ids) { return cellEs(c).some(function (e) { return e && ids.includes(e.acteId); }); };
+
 var EDIT_PIN_DEFAULT = "1234";
 /* ════ HELPERS ════ */
 var dIM = function (y, m) { return new Date(y, m + 1, 0).getDate(); };
@@ -1341,9 +1348,7 @@ function ActTabView(_a) {
 }
 /* ════ GARDE VIEW ════ */
 function GardeView(_a) {
-    var _pwg = _a.printWk, printWk = _pwg === void 0 ? null : _pwg;
-    var _opg = _a.onPrint, onPrint = _opg === void 0 ? null : _opg;
-    var year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
+    var _b = _a.printWk, printWk = _b === void 0 ? null : _b, _c = _a.onPrint, onPrint = _c === void 0 ? null : _c, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
     var removeGarde = function (d3, y3, m3) {
         setPlan(function (p) {
             var next = __assign({}, p);
@@ -1353,14 +1358,11 @@ function GardeView(_a) {
                 var k = sk(y3, m3, d3, sl);
                 var dm = __assign({}, (next[k] || {}));
                 var ch = false;
-                Object.keys(dm).forEach(function (mid) {
-                    var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
-                    if (e && e.acteId === "GARDE") {
-                        gIds.push(mid);
-                        delete dm[mid];
-                        ch = true;
-                    }
-                });
+                Object.keys(dm).forEach(function (mid) { var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid]; if (e && e.acteId === "GARDE") {
+                    gIds.push(mid);
+                    delete dm[mid];
+                    ch = true;
+                } });
                 if (ch)
                     next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
             });
@@ -1371,24 +1373,20 @@ function GardeView(_a) {
                 var k = sk(ny, nm, nd, sl);
                 var dm = __assign({}, (next[k] || {}));
                 var ch = false;
-                gIds.forEach(function (mid) {
-                    var e = dm[mid];
-                    var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
-                    if (a === "REPOS_GARDE") {
-                        delete dm[mid];
-                        ch = true;
-                    }
-                });
+                gIds.forEach(function (mid) { var e = dm[mid]; var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId); if (a === "REPOS_GARDE") {
+                    delete dm[mid];
+                    ch = true;
+                } });
                 if (ch)
                     next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
             });
             return next;
         });
-        toast("Garde et repos retir\u00E9s", "info");
+        toast("Garde et repos retir\u00e9s", "info");
     };
     var today = new Date();
     // Période globale pour les gardes
-    var _b = perStart(year, month), gvSy = _b.sy, gvSm = _b.sm;
+    var _d = perStart(year, month), gvSy = _d.sy, gvSm = _d.sm;
     var gvEffDays = useMemo(function () {
         var days = perDaysList(gvSy, gvSm);
         if (!showFull) {
@@ -1401,7 +1399,7 @@ function GardeView(_a) {
         }
         return days;
     }, [gvSm, gvSy, showFull, PCFG.len]);
-    var _c = React.useState(false), gvSwapOpen = _c[0], setGvSwapOpen = _c[1];
+    var _e = React.useState(false), gvSwapOpen = _e[0], setGvSwapOpen = _e[1];
     var exportGardesCSV = function () {
         var rows = [["Date", "Jour", "Garde"]];
         var JX = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
@@ -1420,16 +1418,15 @@ function GardeView(_a) {
     var gvIsAbs = function (mid, y2, m2, d2) {
         var sls = isWE(y2, m2, d2) ? ["JOUR"] : ["M", "AM"];
         return sls.some(function (sl) {
-            var e = getEntry(mid, y2, m2, d2, sl);
-            var a = e && (Array.isArray(e) ? (e[0] && e[0].acteId) : e.acteId);
-            return ["ABSENCE", "FORM", "FORMATION"].includes(a);
+            return cellHasAny((plan[sk(y2, m2, d2, sl)] || {})[mid], ["ABSENCE", "FORM", "FORMATION"])
+                || cellHasAny((plan[sk(y2, m2, d2, "JOUR")] || {})[mid], ["ABSENCE", "FORM", "FORMATION"]);
         });
     };
-    var _d = React.useState(null), pickerDay = _d[0], setPickerDay = _d[1];
+    var _f = React.useState(null), pickerDay = _f[0], setPickerDay = _f[1];
     /* ═══ Répartition automatique des gardes ═══ */
-    var _e = React.useState(false), gardeModal = _e[0], setGardeModal = _e[1];
-    var _f = React.useState(null), lastGReport = _f[0], setLastGReport = _f[1];
-    var _g = React.useState({}), gMax = _g[0], setGMax = _g[1]; // {medId: maxGardes} optionnel
+    var _g = React.useState(false), gardeModal = _g[0], setGardeModal = _g[1];
+    var _h = React.useState(null), lastGReport = _h[0], setLastGReport = _h[1];
+    var _j = React.useState({}), gMax = _j[0], setGMax = _j[1]; // {medId: maxGardes} optionnel
     var gardeMeds = medecins.filter(function (m) { return m.garde; });
     var FACT = { less: 0.75, normal: 1, more: 1.25 };
     // Tous les jours de la période (complets, indépendants de showFull)
@@ -1456,7 +1453,7 @@ function GardeView(_a) {
     };
     var isAbsFor = function (medId, y2, m2, d2) {
         var es = __spreadArray([], (getEntry ? [] : []), true);
-        var check = function (sl) { var dm = plan[sk(y2, m2, d2, sl)] || {}; var e = dm[medId]; var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId); return ["ABSENCE", "FORM", "FORMATION"].includes(a); };
+        var check = function (sl) { return cellHasAny((plan[sk(y2, m2, d2, sl)] || {})[medId], ["ABSENCE", "FORM", "FORMATION"]); };
         return check("M") || check("AM") || check("JOUR");
     };
     var inTourWeek = function (medId, y2, m2, d2) {
@@ -1705,8 +1702,7 @@ function GardeView(_a) {
                     var rk = sk(ny, nm, nd, sl);
                     var dm = __assign({}, (next[rk] || {}));
                     var ex = dm[best.assign[dk4]];
-                    var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                    if (!["ABSENCE", "GARDE"].includes(exA))
+                    if (!cellHasAny(ex, EXCL_IDS))
                         dm[best.assign[dk4]] = { acteId: "REPOS_GARDE", salle: null };
                     next[rk] = dm;
                 });
@@ -1798,7 +1794,7 @@ function GardeView(_a) {
                     MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy),
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                React.createElement("button", { onClick: onPrint, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\ud83d\udda8\ufe0f"),
+                onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                 React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
         React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
@@ -1834,20 +1830,17 @@ function GardeView(_a) {
                         if (gvAllDays.length) {
                             var last = gvAllDays[gvAllDays.length - 1];
                             var dtN = new Date(last.y, last.m, last.d + 1);
-                            var nyN = dtN.getFullYear(), nmN = dtN.getMonth(), ndN = dtN.getDate();
+                            var nyN_1 = dtN.getFullYear(), nmN_1 = dtN.getMonth(), ndN_1 = dtN.getDate();
                             ["JOUR", "M", "AM"].forEach(function (sl) {
-                                var k = sk(nyN, nmN, ndN, sl);
+                                var k = sk(nyN_1, nmN_1, ndN_1, sl);
                                 if (!next[k])
                                     return;
                                 var dm = __assign({}, next[k]);
                                 var changed = false;
-                                Object.keys(dm).forEach(function (mid) {
-                                    var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
-                                    if ((e && e.acteId) === "REPOS_GARDE") {
-                                        delete dm[mid];
-                                        changed = true;
-                                    }
-                                });
+                                Object.keys(dm).forEach(function (mid) { var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid]; if ((e && e.acteId) === "REPOS_GARDE") {
+                                    delete dm[mid];
+                                    changed = true;
+                                } });
                                 if (changed)
                                     next[k] = dm;
                             });
@@ -2970,7 +2963,7 @@ function TourTab(_a) {
                 var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
                 return [0, 1, 2, 3, 4].map(function (i) { var dt = new Date(wy2, wm2, wd2 + i); return [dt.getFullYear(), dt.getMonth(), dt.getDate()]; });
             };
-            var PROT_1 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION", "TOUR_HC", "TOUR_USIC"];
+            var PROT_1 = PROT_TOUR;
             setPlan(function (p) {
                 var next = __assign({}, p);
                 // Chaque personne : retirer ses activités sur sa semaine d'ARRIVÉE, ré-appliquer son PT sur sa semaine de DÉPART
@@ -3006,10 +2999,9 @@ function TourTab(_a) {
                                 var _a;
                                 var k = sk(dy, dm, dd, sl);
                                 var ex = (next[k] || {})[mid];
-                                var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                                if (PROT_1.includes(exA))
+                                if (cellHasAny(ex, PROT_1))
                                     return;
-                                var _b = (pt[dw2][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null;
+                                var _b = (pt[dw2][sl]) || [null, null], acteId = _b[0], salle = _b[1], _c = _b[2], a2x = _c === void 0 ? null : _c, _d = _b[3], s2x = _d === void 0 ? null : _d, _e = _b[4], a3x = _e === void 0 ? null : _e, _f = _b[5], s3x = _f === void 0 ? null : _f;
                                 if (!acteId)
                                     return;
                                 if (!next[k])
@@ -5195,7 +5187,7 @@ function CardioPlanning() {
     /* ── Cohérence planning ↔ tour : retrait/réapplication à l'assignation ── */
     var clearWeekActivities = useCallback(function (pairs) {
         // pairs: [{medId,weekKey}] — retire les activités (dont TP) des nouveaux tourneurs, garde abs/gardes/formations
-        var PROT2 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION"];
+        var PROT2 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION"]; // sans TP : retire expres des nouveaux tourneurs
         setPlan(function (p) {
             var next = __assign({}, p);
             pairs.forEach(function (_a) {
@@ -5211,8 +5203,7 @@ function CardioPlanning() {
                         if (!next[k] || !next[k][medId])
                             return;
                         var e = next[k][medId];
-                        var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
-                        if (PROT2.includes(a))
+                        if (cellHasAny(e, PROT2))
                             return;
                         var dm2 = __assign({}, next[k]);
                         delete dm2[medId];
@@ -5231,7 +5222,7 @@ function CardioPlanning() {
         if (!med)
             return;
         var pt = planningType[medId];
-        var PROT2 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION", "TOUR_HC", "TOUR_USIC"];
+        var PROT2 = PROT_TOUR;
         var _a = weekKey.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
         setPlan(function (p) {
             var next = __assign({}, p);
@@ -5246,8 +5237,7 @@ function CardioPlanning() {
                     var _a, _b;
                     var k = sk(dy, dm3, dd, sl);
                     var ex = (next[k] || {})[medId];
-                    var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                    if (PROT2.includes(exA))
+                    if (cellHasAny(ex, PROT2))
                         return;
                     if (isOff) {
                         if (!next[k])
@@ -5686,9 +5676,9 @@ function CardioPlanning() {
     var getEntries = useCallback(function (medId, y2, m2, d2, slot) {
         var _p = Object.keys(archPlan).length > 0 ? __assign(__assign({}, archPlan), plan) : plan;
         if (slot !== "JOUR") {
-            var abs = (_p[sk(y2, m2, d2, "JOUR")] || {})[medId];
-            if ((abs && abs.acteId) === "ABSENCE")
-                return slot === "M" ? [__assign(__assign({}, abs), { _fullDay: true })] : slot === "AM" ? [{ _blocked: true }] : [];
+            var absE = cellEs((_p[sk(y2, m2, d2, "JOUR")] || {})[medId]).find(function (e) { return e && ["ABSENCE", "FORM", "FORMATION"].includes(e.acteId); });
+            if (absE)
+                return slot === "M" ? [__assign(__assign({}, absE), { _fullDay: true })] : slot === "AM" ? [{ _blocked: true }] : [];
         }
         if (slot === "JOUR") {
             var e = (_p[sk(y2, m2, d2, "JOUR")] || {})[medId];
@@ -5742,11 +5732,27 @@ function CardioPlanning() {
        quel que soit le chemin. `wasCond` garde la memoire des branches ecartees. */
     var addEntry = useCallback(function (medId, y2, m2, d2, slot, entry) {
         var key = sk(y2, m2, d2, slot);
+        var refusedBy = null;
         setPlan(function (p) {
-            var _a;
+            var _a, _b;
             var dm = __assign({}, (p[key] || {}));
             var ex = dm[medId];
             var prev = ex ? (Array.isArray(ex) ? ex : [ex]) : [];
+            /* v9.64 : les activités exclusives ne cohabitent avec rien. En poser une
+               remplace la case entière (mémoire des branches conservée) ; poser une
+               activité normale sur une case qui en porte une est refusé. */
+            if (entry && !entry.cond) {
+                if (EXCL_IDS.includes(entry.acteId)) {
+                    var drC = prev.filter(function (e) { return e && e.cond; });
+                    dm[medId] = drC.length ? __assign(__assign({}, entry), { wasCond: drC.map(function (e) { return e.acteId; }) }) : entry;
+                    return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
+                }
+                var bl = prev.find(function (e) { return e && !e.cond && EXCL_IDS.includes(e.acteId); });
+                if (bl) {
+                    refusedBy = bl.acteId;
+                    return p;
+                }
+            }
             var dropped = (entry && !entry.cond) ? prev.filter(function (e) { return e && e.cond; }) : [];
             var kept = dropped.length ? prev.filter(function (e) { return !(e && e.cond); }) : prev;
             /* v9.63 : reposer une activité DÉJÀ ferme sur la case la remplace au lieu de la
@@ -5767,9 +5773,16 @@ function CardioPlanning() {
                 ent = __assign(__assign({}, ent), { wasCond: dup[0].wasCond });
             var nx = kept.concat([ent]);
             dm[medId] = nx.length === 1 ? nx[0] : nx;
-            return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
+            return __assign(__assign({}, p), (_b = {}, _b[key] = dm, _b));
         });
-        logCell("add", medId, y2, m2, d2, slot, entry.acteId);
+        /* le refus se constate dans le réducteur ; le message part après son passage */
+        setTimeout(function () {
+            if (refusedBy) {
+                toast("Ce créneau porte " + (EXCL_LABEL[refusedBy] || refusedBy) + " — retirez-la d'abord (×)", "warn");
+                return;
+            }
+            logCell("add", medId, y2, m2, d2, slot, entry.acteId);
+        }, 0);
     }, []);
     /* Trancher depuis la modale de case : la branche choisie devient ferme, les autres
        partent dans son wasCond. Indispensable pour la Scintigraphie, qui n'a pas de salle. */
@@ -6041,7 +6054,7 @@ function CardioPlanning() {
             next[gk] = __assign(__assign({}, next[gk]), (_b = {}, _b[medId] = { acteId: "GARDE", salle: null }, _b));
             if (isWE(ny, nm, nd2)) {
                 var k = sk(ny, nm, nd2, "JOUR"), dm = __assign({}, (next[k] || {}));
-                if (!dm[medId] || dm[medId].acteId !== "ABSENCE")
+                if (!cellHasAny(dm[medId], EXCL_IDS))
                     dm[medId] = { acteId: "REPOS_GARDE", salle: null };
                 next = __assign(__assign({}, next), (_c = {}, _c[k] = dm, _c));
             }
@@ -6049,7 +6062,7 @@ function CardioPlanning() {
                 ["M", "AM"].forEach(function (sl) {
                     var _a;
                     var k = sk(ny, nm, nd2, sl), dm = __assign({}, (next[k] || {}));
-                    if (!dm[medId] || dm[medId].acteId !== "ABSENCE")
+                    if (!cellHasAny(dm[medId], EXCL_IDS))
                         dm[medId] = { acteId: "REPOS_GARDE", salle: null };
                     next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
                 });
@@ -6217,8 +6230,7 @@ function CardioPlanning() {
                             ["M", "AM"].forEach(function (sl) {
                                 var _a;
                                 var k = sk(ay, am, d, sl), ex = (next[k] || {})[med.id];
-                                var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                                if (["ABSENCE", "GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"].includes(exA))
+                                if (cellHasAny(ex, PROT_TOUR))
                                     return;
                                 if (!next[k])
                                     next[k] = {};
@@ -6233,8 +6245,7 @@ function CardioPlanning() {
                         ["M", "AM"].forEach(function (sl) {
                             var _a;
                             var k = sk(ay, am, d, sl), ex = (next[k] || {})[med.id];
-                            var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                            if (["ABSENCE", "GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "TP"].includes(exA))
+                            if (cellHasAny(ex, PROT_TOUR))
                                 return;
                             var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null;
                             if (!acteId)
@@ -6348,8 +6359,7 @@ function CardioPlanning() {
                     ["M", "AM"].forEach(function (sl) {
                         var _a;
                         var k = sk(year, month, d, sl), ex = (next[k] || {})[med.id];
-                        var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                        if (["ABSENCE", "GARDE", "REPOS_GARDE"].includes(exA))
+                        if (cellHasAny(ex, PROT_TOUR))
                             return;
                         var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null;
                         if (!acteId)
@@ -6385,8 +6395,7 @@ function CardioPlanning() {
                 ["M", "AM"].forEach(function (sl) {
                     var _a;
                     var k = sk(year, month, d, sl), ex = (next[k] || {})[medId];
-                    var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                    if (["ABSENCE", "GARDE", "REPOS_GARDE"].includes(exA))
+                    if (cellHasAny(ex, PROT_TOUR))
                         return;
                     var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null;
                     if (!acteId)
@@ -6417,16 +6426,14 @@ function CardioPlanning() {
                     if (medId !== null) {
                         // Clear only for this med (except ABSENCE/GARDE/REPOS)
                         var ex = newSlot[medId];
-                        var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                        if (!["ABSENCE", "GARDE", "REPOS_GARDE"].includes(exA))
+                        if (!cellHasAny(ex, ["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"]))
                             delete newSlot[medId];
                     }
                     else {
                         // Clear all meds (except ABSENCE/GARDE/REPOS)
                         Object.keys(newSlot).forEach(function (mid) {
                             var ex = newSlot[mid];
-                            var exA = Array.isArray(ex) ? (ex[0] && ex[0].acteId) : (ex && ex.acteId);
-                            if (!["ABSENCE", "GARDE", "REPOS_GARDE"].includes(exA))
+                            if (!cellHasAny(ex, ["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"]))
                                 delete newSlot[mid];
                         });
                     }
@@ -6464,7 +6471,7 @@ function CardioPlanning() {
     }, [year, month, allDays]);
     var isAbsentInWeek = useCallback(function (medId, wk) {
         var _a = wk.split("-").map(Number), wy = _a[0], wm2 = _a[1], wd = _a[2];
-        return [0, 1, 2, 3, 4].some(function (i) { var dt = new Date(wy, wm2, wd + i); return ["M", "AM", "JOUR"].some(function (sl) { var e = (plan[sk(dt.getFullYear(), dt.getMonth(), dt.getDate(), sl)] || {})[medId]; var ae = Array.isArray(e) ? e[0] : e; return ae && ae.acteId === "ABSENCE"; }); });
+        return [0, 1, 2, 3, 4].some(function (i) { var dt = new Date(wy, wm2, wd + i); return ["M", "AM", "JOUR"].some(function (sl) { var e = (plan[sk(dt.getFullYear(), dt.getMonth(), dt.getDate(), sl)] || {})[medId]; return cellHasAny(e, ["ABSENCE", "FORM", "FORMATION"]); }); });
     }, [plan]);
     var tmCount = function (medId) { return Object.values(tourMed).reduce(function (n, w) { return ((w.HC || []).includes(medId) || (w.USIC || []).includes(medId)) ? n + 1 : n; }, 0); };
     var getPeriodStart = function (y, m) { var p = perStart(y, m); return { sy: p.sy, sm: p.sm }; };
