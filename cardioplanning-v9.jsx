@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.65.1 — 05/08/2026";
+const APP_VERSION="v9.66 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2032,7 +2032,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
 }
 
 
-function PTOccRooms({medecins,planningType,actes,acteById,salleReg}){
+function PTOccRooms({medecins,planningType,actes,acteById,salleReg,darkMode}){
   const jours=["","Lun","Mar","Mer","Jeu","Ven"];
   const reg=site=>(salleReg||[]).filter(x=>Array.isArray(x.s)?x.s.indexOf(site)>=0:x.s===site).map(x=>x.n);
   const uniq=arr=>arr.filter((s,i2,a2)=>s&&a2.indexOf(s)===i2);
@@ -2042,7 +2042,7 @@ function PTOccRooms({medecins,planningType,actes,acteById,salleReg}){
     {key:"CHB",titre:"🏥 CHB — occupation type des salles",color:"#3fb950",salles:uniq(["CHB-1","CHB-2","CHB-3","CHB-VASC","EE-CHB","Rythmo-CHB"].concat(reg("CHB"))).filter(s=>s!=="CHB-BIP")},
     {key:"ANGIO",titre:"🩸 PT Angio — occupation type des salles",color:"#76a5af",salles:angioAll.length?angioAll:["Angio-1","Angio-2","Angio-3"]}
   ];
-  const occ=(dw,sl,salle)=>medecins.filter(m=>{const e=((planningType[m.id]||{})[dw]||{})[sl];return e&&((e[0]&&e[1]===salle)||(e[2]&&e[3]===salle));});
+  const occ=(dw,sl,salle)=>medecins.filter(m=>{const e=((planningType[m.id]||{})[dw]||{})[sl];return e&&((e[0]&&e[1]===salle)||(e[2]&&e[3]===salle)||(e[4]&&e[5]===salle));});
   return(
     <div style={{marginTop:26}}>
       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:2}}>Occupation théorique des salles si tout le monde est présent — reflète uniquement le planning type ci-dessus, jamais le planning réel.</div>
@@ -2063,16 +2063,31 @@ function PTOccRooms({medecins,planningType,actes,acteById,salleReg}){
                     <td style={{...S.td,fontSize:9,color:"var(--txt3)",textAlign:"center",padding:"2px 1px"}}>{sl}</td>
                     {sec.salles.map(salle=>{
                       const ms=occ(dw,sl,salle);
-                      return(<td key={salle} style={{...S.td,padding:2,verticalAlign:"middle",textAlign:"center"}}>
-                        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:2}}>
-                          {ms.map(m=>{
-                            const e=((planningType[m.id]||{})[dw]||{})[sl]||[null,null];
-                            const aidC=(e[1]===salle&&e[0])?e[0]:e[2];const acte=aidC?acteById(aidC):null;
-                            return(<div key={m.id} style={{display:"flex",alignItems:"center",gap:2}}>
-                              <div style={{...S.av,background:m.color}}>{m.init}</div>
-                              {acte?<Badge a={acte}/>:null}
-                            </div>);
-                          })}
+                      /* v9.66 : même présentation que les onglets salles (v9.54) — activité
+                         écrite une fois par groupe, ronds empilés, pointillé entre groupes,
+                         fond rouge seulement si deux ACTIVITÉS différentes dans la salle. */
+                      const grps=[];
+                      ms.forEach(m=>{
+                        const e=((planningType[m.id]||{})[dw]||{})[sl]||[null,null];
+                        const aidC=(e[1]===salle&&e[0])?e[0]:(e[3]===salle&&e[2])?e[2]:e[4];
+                        let g=grps.find(x=>x.aid===aidC);
+                        if(!g){g={aid:aidC,acte:aidC?acteById(aidC):null,meds:[]};grps.push(g);}
+                        if(!g.meds.find(x=>x.id===m.id))g.meds.push(m);
+                      });
+                      const confl=grps.length>1;
+                      return(<td key={salle} style={{...S.td,padding:2,verticalAlign:"middle",textAlign:"center",background:confl?conflBg(darkMode):undefined}}>
+                        <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                          {grps.map((g,gi)=>(
+                            <div key={g.aid||gi} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,padding:"2px 0",
+                              borderTop:gi?"1px dashed "+(confl?conflSep(darkMode):"var(--border)"):"none"}}>
+                              <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                                {g.meds.map(m=>(
+                                  <div key={m.id} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{width:22,height:22,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{m.init}</div>
+                                ))}
+                              </div>
+                              <ActPill a={g.acte} night={darkMode}/>
+                            </div>
+                          ))}
                         </div>
                       </td>);
                     })}
@@ -6062,7 +6077,7 @@ header::-webkit-scrollbar { display: none; }
           </div>}
           <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Semaine type par médecin. Le bouton ▶ PT l'applique aux mois de la période affichée (choix des mois et du point de départ dans la fenêtre). TM exclus automatiquement. Clic sur une case pour définir.</div>
           <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit||isInterEdit} orient={orient} acteById={acteById} setMData={setMData} setModal={setModal}/>
-          <PTOccRooms medecins={medecins} planningType={planningType} actes={actes} acteById={acteById} salleReg={salleReg}/>
+          <PTOccRooms medecins={medecins} planningType={planningType} actes={actes} acteById={acteById} salleReg={salleReg} darkMode={darkMode}/>
         </div>
       )}
 
@@ -7264,7 +7279,12 @@ header::-webkit-scrollbar { display: none; }
                   </button>);
                 })()}
                 {isEdit&&<button style={{...S.qBtn,borderColor:"#dc2626",background:"#fee2e2",color:"#991b1b"}} onClick={()=>clearPlanningType(medId)}>🗑 Effacer mois {med&&med.nom}</button>}
-                {(isNight||we)&&canGarde&&canEditThisMed&&<button style={{...S.qBtn,borderColor:"#388bfd",background:"#0c1a2e",color:"#388bfd"}} onClick={doGarde}>🌙 Garde + repos auto</button>}
+                {(isNight||we)&&canGarde&&canEditThisMed&&(()=>{
+                  /* v9.66 : même avertissement préalable que le sélecteur de l'onglet Gardes */
+                  const _gn=new Date(y2,m2,d2+1);
+                  const gNx=["M","AM","JOUR"].some(sl2=>cellHasAny((plan[sk(_gn.getFullYear(),_gn.getMonth(),_gn.getDate(),sl2)]||{})[medId],["ABSENCE","FORM","FORMATION"]));
+                  return <button style={{...S.qBtn,borderColor:gNx?"#f59e0b":"#388bfd",background:gNx?"rgba(245,158,11,.12)":"#0c1a2e",color:gNx?"#b45309":"#388bfd"}} onClick={doGarde}>{gNx?"🌙 Garde — ⚠ absence/FMC demain, sans repos":"🌙 Garde + repos auto"}</button>;
+                })()}
                 {isNight&&!canGarde&&<span style={{color:"var(--txt3)",fontSize:12}}>Ce médecin ne participe pas aux gardes.</span>}
               </div>
             )}
