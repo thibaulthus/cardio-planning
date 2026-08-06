@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.80 — 06/08/2026";
+const APP_VERSION="v9.81 — 06/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -1864,20 +1864,26 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
               {medecins.filter(m=>m.garde===true).map(m=>{
                 const avail=isMedAvailable(m,pd.y,pd.m,pd.d,gardeSlot);
                 const isG=gMed&&m.id===gMed.id;
+                /* v9.81 : le statut venait d'isMedAvailable sur le créneau de GARDE ("N" en
+                   semaine), qui ne lit que N et JOUR — une absence posée sur M et AM lui était
+                   donc INVISIBLE, et un praticien absent apparaissait « Disponible ». Le
+                   sélecteur de l'onglet Planning, lui, lisait bien M/AM/JOUR : deux écrans
+                   contradictoires pour le même jour. On lit désormais la journée entière. */
+                const dayAbs=avail==="blocked"||gvIsAbs(m.id,pd.y,pd.m,pd.d);
                 const _nx=new Date(pd.y,pd.m,pd.d+1);
-                const nxAbs=avail!=="blocked"&&gvIsAbs(m.id,_nx.getFullYear(),_nx.getMonth(),_nx.getDate());
+                const nxAbs=!dayAbs&&gvIsAbs(m.id,_nx.getFullYear(),_nx.getMonth(),_nx.getDate());
                 return(
-                  <button key={m.id} disabled={avail==="blocked"}
+                  <button key={m.id} disabled={dayAbs}
                     style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:7,
                       border:`1px solid ${isG?"var(--today-c)":"var(--border)"}`,
-                      cursor:avail!=="blocked"?"pointer":"not-allowed",
-                      background:isG?"var(--bg-td)":avail==="blocked"?"var(--bg)":"var(--bg2)",
-                      opacity:avail==="blocked"?.3:1}}
-                    onClick={()=>{ if(avail==="blocked")return; applyGarde(m.id,pd.y,pd.m,pd.d); setPickerDay(null); }}>
+                      cursor:dayAbs?"not-allowed":"pointer",
+                      background:isG?"var(--bg-td)":dayAbs?"var(--bg)":"var(--bg2)",
+                      opacity:dayAbs?.3:1}}
+                    onClick={()=>{ if(dayAbs)return; applyGarde(m.id,pd.y,pd.m,pd.d); setPickerDay(null); }}>
                     <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
                     <div style={{textAlign:"left",flex:1}}>
                       <div style={{fontSize:12,fontWeight:700,color:isG?"var(--today-c)":"var(--txt)"}}>{m.prenom} {m.nom}</div>
-                      <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":nxAbs?"#f59e0b":"var(--txt3)",fontWeight:nxAbs?700:400}}>{avail==="blocked"?"Absent / repos":nxAbs?"⚠ Absence/FMC demain — garde possible, sans repos":"Disponible"}</div>
+                      <div style={{fontSize:9,color:dayAbs?"#ef4444":nxAbs?"#f59e0b":"var(--txt3)",fontWeight:nxAbs?700:400}}>{dayAbs?"Absent / FMC ce jour":nxAbs?"⚠ Absence/FMC demain — garde possible, sans repos":"Disponible"}</div>
                     </div>
                     {isG&&<span style={{fontSize:10,color:"var(--today-c)"}}>✓</span>}
                   </button>
