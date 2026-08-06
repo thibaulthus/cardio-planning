@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.72 — 05/08/2026";
+var APP_VERSION = "v9.73 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -186,6 +186,8 @@ var PROT_TOUR = EXCL_IDS.concat(["TOUR_HC", "TOUR_USIC"]); // + tour réel (remp
 var EXCL_LABEL = { ABSENCE: "une absence", FORM: "une formation", FORMATION: "une formation", GARDE: "une garde", REPOS_GARDE: "un repos de garde", TP: "un temps partiel" };
 var cellEs = function (c) { return c ? (Array.isArray(c) ? c : [c]) : []; };
 var cellHasAny = function (c, ids) { return cellEs(c).some(function (e) { return e && ids.includes(e.acteId); }); };
+var cellDrop = function (c, ids) { var r = cellEs(c).filter(function (e) { return e && !ids.includes(e.acteId); }); return r.length ? (r.length === 1 ? r[0] : r) : null; };
+
 
 var EDIT_PIN_DEFAULT = "1234";
 /* ════ HELPERS ════ */
@@ -1405,9 +1407,13 @@ function GardeView(_a) {
                 var k = sk(y3, m3, d3, sl);
                 var dm = __assign({}, (next[k] || {}));
                 var ch = false;
-                Object.keys(dm).forEach(function (mid) { var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid]; if (e && e.acteId === "GARDE") {
+                Object.keys(dm).forEach(function (mid) { if (cellHasAny(dm[mid], ["GARDE"])) {
                     gIds.push(mid);
-                    delete dm[mid];
+                    var r = cellDrop(dm[mid], ["GARDE"]);
+                    if (r)
+                        dm[mid] = r;
+                    else
+                        delete dm[mid];
                     ch = true;
                 } });
                 if (ch)
@@ -1496,7 +1502,7 @@ function GardeView(_a) {
         var dw = dow(y2, m2, d2);
         var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
         var dm = plan[sk(y2, m2, d2, slot)] || {};
-        return Object.keys(dm).some(function (mid) { var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid]; return e && e.acteId === "GARDE"; });
+        return Object.keys(dm).some(function (mid) { return cellHasAny(dm[mid], ["GARDE"]); });
     };
     var isAbsFor = function (medId, y2, m2, d2) {
         var es = __spreadArray([], (getEntry ? [] : []), true);
@@ -1579,8 +1585,7 @@ function GardeView(_a) {
             var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
             var dm = plan[sk(y2, m2, d2, slot)] || {};
             Object.keys(dm).forEach(function (mid) {
-                var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
-                if (!e || e.acteId !== "GARDE")
+                if (!cellHasAny(dm[mid], ["GARDE"]))
                     return;
                 if (!exG[mid])
                     exG[mid] = new Set();
@@ -1597,8 +1602,7 @@ function GardeView(_a) {
             var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
             var dm = plan[sk(y2, m2, d2, slot)] || {};
             Object.keys(dm).forEach(function (mid) {
-                var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
-                if (!e || e.acteId !== "GARDE")
+                if (!cellHasAny(dm[mid], ["GARDE"]))
                     return;
                 var wk = wKey(y2, m2, d2);
                 if (dw === 4) {
@@ -1863,10 +1867,12 @@ function GardeView(_a) {
                                 var dm = __assign({}, next[k]);
                                 var changed = false;
                                 Object.keys(dm).forEach(function (mid) {
-                                    var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid];
-                                    var a = e && e.acteId;
-                                    if (a === "GARDE" || a === "REPOS_GARDE") {
-                                        delete dm[mid];
+                                    if (cellHasAny(dm[mid], ["GARDE", "REPOS_GARDE"])) {
+                                        var r = cellDrop(dm[mid], ["GARDE", "REPOS_GARDE"]);
+                                        if (r)
+                                            dm[mid] = r;
+                                        else
+                                            delete dm[mid];
                                         changed = true;
                                     }
                                 });
@@ -1884,8 +1890,12 @@ function GardeView(_a) {
                                     return;
                                 var dm = __assign({}, next[k]);
                                 var changed = false;
-                                Object.keys(dm).forEach(function (mid) { var e = Array.isArray(dm[mid]) ? dm[mid][0] : dm[mid]; if ((e && e.acteId) === "REPOS_GARDE") {
-                                    delete dm[mid];
+                                Object.keys(dm).forEach(function (mid) { if (cellHasAny(dm[mid], ["REPOS_GARDE"])) {
+                                    var r = cellDrop(dm[mid], ["REPOS_GARDE"]);
+                                    if (r)
+                                        dm[mid] = r;
+                                    else
+                                        delete dm[mid];
                                     changed = true;
                                 } });
                                 if (changed)
@@ -2033,8 +2043,7 @@ function GardeView(_a) {
                             var dwR = dow(ry, rm, rd);
                             var slotR = (dwR === 6 || dwR === 0) ? "JOUR" : "N";
                             var dmR = plan[sk(ry, rm, rd, slotR)] || {};
-                            var eR = Array.isArray(dmR[m2.id]) ? dmR[m2.id][0] : dmR[m2.id];
-                            if (eR && eR.acteId === "GARDE")
+                            if (cellHasAny(dmR[m2.id], ["GARDE"]))
                                 cn[catOf(ry, rm, rd)]++;
                         });
                         var totR = cn.sem + cn.jeu + cn.ven + cn.sam + cn.dim;
@@ -3152,8 +3161,7 @@ function TourTab(_a) {
             var dm2 = (plan || {})[sk(dy, dm3, dd, "M")] || {};
             var derogMeds = Object.keys((tourDerog || {})[dk2] || {});
             Object.keys(dm2).forEach(function (mid) {
-                var e = Array.isArray(dm2[mid]) ? dm2[mid][0] : dm2[mid];
-                if (e && e.acteId === "TOUR_USIC") {
+                if (cellHasAny(dm2[mid], ["TOUR_USIC"])) {
                     var jr = medecins.find(function (m2) { return String(m2.id) === String(mid); });
                     var tp = derogMeds.length > 0 ? medecins.find(function (m2) { return String(m2.id) === String(derogMeds[0]); }) : null;
                     infos.push((jr ? jr.init : "?") + " remplace " + (tp ? tp.init : "?") + " (" + JOURS_TP[dt.getDay()] + " " + dd + " " + MOIS[dm3].slice(0, 4) + (MOIS[dm3].length > 4 ? "." : "") + ")");
@@ -5168,8 +5176,7 @@ function CardioPlanning() {
             var mKey = k.slice(0, 7); // "2026-07"
             byMonth[mKey] = (byMonth[mKey] || 0) + n;
             Object.keys(dm2).forEach(function (mid) {
-                var e = Array.isArray(dm2[mid]) ? dm2[mid][0] : dm2[mid];
-                if (e && e.acteId === "GARDE")
+                if (cellHasAny(dm2[mid], ["GARDE"]))
                     nGardes++;
             });
         });
@@ -5367,9 +5374,12 @@ function CardioPlanning() {
                     var dm2 = __assign({}, next[k]);
                     var ch = false;
                     Object.keys(dm2).forEach(function (mid) {
-                        var e = Array.isArray(dm2[mid]) ? dm2[mid][0] : dm2[mid];
-                        if (e && (e.acteId === "TOUR_HC" || e.acteId === "TOUR_USIC")) {
-                            delete dm2[mid];
+                        if (cellHasAny(dm2[mid], ["TOUR_HC", "TOUR_USIC"])) {
+                            var rT = cellDrop(dm2[mid], ["TOUR_HC", "TOUR_USIC"]);
+                            if (rT)
+                                dm2[mid] = rT;
+                            else
+                                delete dm2[mid];
                             ch = true;
                         }
                     });
@@ -5473,8 +5483,7 @@ function CardioPlanning() {
         Object.keys(plan).forEach(function (k) {
             var dm2 = plan[k] || {};
             juniors.forEach(function (j) {
-                var e = Array.isArray(dm2[j.id]) ? dm2[j.id][0] : dm2[j.id];
-                if (e && e.acteId === "TOUR_USIC")
+                if (cellHasAny(dm2[j.id], ["TOUR_USIC"]))
                     replCount[j.id]++;
             });
         });
@@ -5560,15 +5569,21 @@ function CardioPlanning() {
                 var dm2 = __assign({}, next[k]);
                 var ch = false;
                 // retirer le TP du médecin + les remplacements junior TOUR_USIC posés ce jour
-                var eM = Array.isArray(dm2[medId]) ? dm2[medId][0] : dm2[medId];
-                if (eM && eM.acteId === "TP") {
-                    delete dm2[medId];
+                if (cellHasAny(dm2[medId], ["TP"])) {
+                    var rM = cellDrop(dm2[medId], ["TP"]);
+                    if (rM)
+                        dm2[medId] = rM;
+                    else
+                        delete dm2[medId];
                     ch = true;
                 }
                 Object.keys(dm2).forEach(function (mid) {
-                    var e = Array.isArray(dm2[mid]) ? dm2[mid][0] : dm2[mid];
-                    if (e && e.acteId === "TOUR_USIC") {
-                        delete dm2[mid];
+                    if (cellHasAny(dm2[mid], ["TOUR_USIC"])) {
+                        var rU = cellDrop(dm2[mid], ["TOUR_USIC"]);
+                        if (rU)
+                            dm2[mid] = rU;
+                        else
+                            delete dm2[mid];
                         ch = true;
                     }
                 });
@@ -6234,20 +6249,27 @@ function CardioPlanning() {
             var gk = sk(y2, m2, d2, gardeSlot);
             var gdm = __assign({}, (next[gk] || {}));
             Object.keys(gdm).forEach(function (mid) {
-                var e = Array.isArray(gdm[mid]) ? gdm[mid][0] : gdm[mid];
-                if ((e && e.acteId) === "GARDE") {
+                if (cellHasAny(gdm[mid], ["GARDE"])) {
                     var prevId_1 = parseInt(mid);
                     var rSlots = isWE(ny, nm, nd2) ? ["JOUR"] : ["M", "AM"];
                     rSlots.forEach(function (sl) {
                         var _a;
                         var rk = sk(ny, nm, nd2, sl);
                         var rdm = __assign({}, (next[rk] || {}));
-                        if (rdm[prevId_1] && rdm[prevId_1].acteId === "REPOS_GARDE") {
-                            delete rdm[prevId_1];
+                        if (cellHasAny(rdm[prevId_1], ["REPOS_GARDE"])) {
+                            var rr = cellDrop(rdm[prevId_1], ["REPOS_GARDE"]);
+                            if (rr)
+                                rdm[prevId_1] = rr;
+                            else
+                                delete rdm[prevId_1];
                             next = __assign(__assign({}, next), (_a = {}, _a[rk] = rdm, _a));
                         }
                     });
-                    delete gdm[mid];
+                    var rg = cellDrop(gdm[mid], ["GARDE"]);
+                    if (rg)
+                        gdm[mid] = rg;
+                    else
+                        delete gdm[mid];
                 }
             });
             next = __assign(__assign({}, next), (_a = {}, _a[gk] = gdm, _a));
@@ -8249,9 +8271,12 @@ function CardioPlanning() {
                                             var dm3 = __assign({}, next[k]);
                                             var ch = false;
                                             Object.keys(dm3).forEach(function (mid2) {
-                                                var e2 = Array.isArray(dm3[mid2]) ? dm3[mid2][0] : dm3[mid2];
-                                                if (e2 && e2.acteId === "TOUR_" + unitC) {
-                                                    delete dm3[mid2];
+                                                if (cellHasAny(dm3[mid2], ["TOUR_" + unitC])) {
+                                                    var rD = cellDrop(dm3[mid2], ["TOUR_" + unitC]);
+                                                    if (rD)
+                                                        dm3[mid2] = rD;
+                                                    else
+                                                        delete dm3[mid2];
                                                     ch = true;
                                                 }
                                             });

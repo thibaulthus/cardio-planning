@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.72 — 05/08/2026";
+const APP_VERSION="v9.73 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -68,6 +68,11 @@ const PROT_TOUR=EXCL_IDS.concat(["TOUR_HC","TOUR_USIC"]); // + tour réel (rempl
 const EXCL_LABEL={ABSENCE:"une absence",FORM:"une formation",FORMATION:"une formation",GARDE:"une garde",REPOS_GARDE:"un repos de garde",TP:"un temps partiel"};
 const cellEs=c=>c?(Array.isArray(c)?c:[c]):[];
 const cellHasAny=(c,ids)=>cellEs(c).some(e=>e&&ids.includes(e.acteId));
+/* v9.73 : retire d'une case les seules entrées visées et rend ce qu'il reste (null si
+   plus rien). Quinze endroits lisaient la PREMIÈRE entrée puis supprimaient la case
+   ENTIÈRE : sûr tant qu'une garde ou un tour y est forcément seul, mais faux dès qu'une
+   activité les accompagnerait — et la suppression emportait alors aussi cette activité. */
+const cellDrop=(c,ids)=>{const r=cellEs(c).filter(e=>e&&!ids.includes(e.acteId));return r.length?(r.length===1?r[0]:r):null;};
 const EDIT_PIN_DEFAULT="1234";
 
 /* ════ HELPERS ════ */
@@ -1230,7 +1235,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
     setPlan(p=>{
       let next={...p};const gIds=[];
       ["N","JOUR"].forEach(sl=>{const k=sk(y3,m3,d3,sl);const dm={...(next[k]||{})};let ch=false;
-        Object.keys(dm).forEach(mid=>{const e=Array.isArray(dm[mid])?dm[mid][0]:dm[mid];if(e&&e.acteId==="GARDE"){gIds.push(mid);delete dm[mid];ch=true;}});
+        Object.keys(dm).forEach(mid=>{if(cellHasAny(dm[mid],["GARDE"])){gIds.push(mid);const r=cellDrop(dm[mid],["GARDE"]);if(r)dm[mid]=r;else delete dm[mid];ch=true;}});
         if(ch)next={...next,[k]:dm};});
       const dt=new Date(y3,m3,d3+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd=dt.getDate();
       ["JOUR","M","AM"].forEach(sl=>{const k=sk(ny,nm,nd,sl);const dm={...(next[k]||{})};let ch=false;
@@ -1294,7 +1299,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
   const hasGardeAlready=(y2,m2,d2)=>{
     const dw=dow(y2,m2,d2);const slot=(dw===6||dw===0)?"JOUR":"N";
     const dm=plan[sk(y2,m2,d2,slot)]||{};
-    return Object.keys(dm).some(mid=>{const e=Array.isArray(dm[mid])?dm[mid][0]:dm[mid];return e&&e.acteId==="GARDE";});
+    return Object.keys(dm).some(mid=>cellHasAny(dm[mid],["GARDE"]));
   };
   const isAbsFor=(medId,y2,m2,d2)=>{
     const es=[...(getEntry?[]:[]),];
@@ -1354,8 +1359,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
       const slot=(dw===6||dw===0)?"JOUR":"N";
       const dm=plan[sk(y2,m2,d2,slot)]||{};
       Object.keys(dm).forEach(mid=>{
-        const e=Array.isArray(dm[mid])?dm[mid][0]:dm[mid];
-        if(!e||e.acteId!=="GARDE")return;
+        if(!cellHasAny(dm[mid],["GARDE"]))return;
         if(!exG[mid])exG[mid]=new Set();
         exG[mid].add(y2+"-"+m2+"-"+d2);
       });
@@ -1368,8 +1372,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
       const slot=(dw===6||dw===0)?"JOUR":"N";
       const dm=plan[sk(y2,m2,d2,slot)]||{};
       Object.keys(dm).forEach(mid=>{
-        const e=Array.isArray(dm[mid])?dm[mid][0]:dm[mid];
-        if(!e||e.acteId!=="GARDE")return;
+        if(!cellHasAny(dm[mid],["GARDE"]))return;
         const wk=wKey(y2,m2,d2);
         if(dw===4){if(!exJeu[mid])exJeu[mid]={};exJeu[mid][wk]=true;}
         else{if(!exWE[mid])exWE[mid]={};exWE[mid][wk]=true;}
@@ -1587,9 +1590,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
                   if(!next[k])return;
                   const dm={...next[k]};let changed=false;
                   Object.keys(dm).forEach(mid=>{
-                    const e=Array.isArray(dm[mid])?dm[mid][0]:dm[mid];
-                    const a=e&&e.acteId;
-                    if(a==="GARDE"||a==="REPOS_GARDE"){delete dm[mid];changed=true;}
+                    if(cellHasAny(dm[mid],["GARDE","REPOS_GARDE"])){const r=cellDrop(dm[mid],["GARDE","REPOS_GARDE"]);if(r)dm[mid]=r;else delete dm[mid];changed=true;}
                   });
                   if(changed)next[k]=dm;
                 });
@@ -1599,7 +1600,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
                       const dtN=new Date(last.y,last.m,last.d+1);
                       const nyN=dtN.getFullYear(),nmN=dtN.getMonth(),ndN=dtN.getDate();
                       ["JOUR","M","AM"].forEach(sl=>{const k=sk(nyN,nmN,ndN,sl);if(!next[k])return;const dm={...next[k]};let changed=false;
-                        Object.keys(dm).forEach(mid=>{const e=Array.isArray(dm[mid])?dm[mid][0]:dm[mid];if((e&&e.acteId)==="REPOS_GARDE"){delete dm[mid];changed=true;}});
+                        Object.keys(dm).forEach(mid=>{if(cellHasAny(dm[mid],["REPOS_GARDE"])){const r=cellDrop(dm[mid],["REPOS_GARDE"]);if(r)dm[mid]=r;else delete dm[mid];changed=true;}});
                         if(changed)next[k]=dm;});
                     }
                     return next;
@@ -1742,8 +1743,7 @@ function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,ge
                     const dwR=dow(ry,rm,rd);
                     const slotR=(dwR===6||dwR===0)?"JOUR":"N";
                     const dmR=plan[sk(ry,rm,rd,slotR)]||{};
-                    const eR=Array.isArray(dmR[m2.id])?dmR[m2.id][0]:dmR[m2.id];
-                    if(eR&&eR.acteId==="GARDE")cn[catOf(ry,rm,rd)]++;
+                    if(cellHasAny(dmR[m2.id],["GARDE"]))cn[catOf(ry,rm,rd)]++;
                   });
                   const totR=cn.sem+cn.jeu+cn.ven+cn.sam+cn.dim;
                   return(
@@ -3000,8 +3000,7 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
       const dm2=(plan||{})[sk(dy,dm3,dd,"M")]||{};
       const derogMeds=Object.keys((tourDerog||{})[dk2]||{});
       Object.keys(dm2).forEach(mid=>{
-        const e=Array.isArray(dm2[mid])?dm2[mid][0]:dm2[mid];
-        if(e&&e.acteId==="TOUR_USIC"){
+        if(cellHasAny(dm2[mid],["TOUR_USIC"])){
           const jr=medecins.find(m2=>String(m2.id)===String(mid));
           const tp=derogMeds.length>0?medecins.find(m2=>String(m2.id)===String(derogMeds[0])):null;
           infos.push((jr?jr.init:"?")+" remplace "+(tp?tp.init:"?")+" ("+JOURS_TP[dt.getDay()]+" "+dd+" "+MOIS[dm3].slice(0,4)+(MOIS[dm3].length>4?".":"")+")");
@@ -4757,8 +4756,7 @@ function CardioPlanning(){
       const mKey=k.slice(0,7); // "2026-07"
       byMonth[mKey]=(byMonth[mKey]||0)+n;
       Object.keys(dm2).forEach(mid=>{
-        const e=Array.isArray(dm2[mid])?dm2[mid][0]:dm2[mid];
-        if(e&&e.acteId==="GARDE")nGardes++;
+        if(cellHasAny(dm2[mid],["GARDE"]))nGardes++;
       });
     });
     const nTourW=Object.keys(tourObj||{}).filter(k=>{
@@ -4865,8 +4863,7 @@ function CardioPlanning(){
           if(!next[k])return;
           const dm2={...next[k]};let ch=false;
           Object.keys(dm2).forEach(mid=>{
-            const e=Array.isArray(dm2[mid])?dm2[mid][0]:dm2[mid];
-            if(e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC")){delete dm2[mid];ch=true;}
+            if(cellHasAny(dm2[mid],["TOUR_HC","TOUR_USIC"])){const r=cellDrop(dm2[mid],["TOUR_HC","TOUR_USIC"]);if(r)dm2[mid]=r;else delete dm2[mid];ch=true;}
           });
           if(ch)next[k]=dm2;
         });
@@ -4945,8 +4942,7 @@ function CardioPlanning(){
     Object.keys(plan).forEach(k=>{
       const dm2=plan[k]||{};
       juniors.forEach(j=>{
-        const e=Array.isArray(dm2[j.id])?dm2[j.id][0]:dm2[j.id];
-        if(e&&e.acteId==="TOUR_USIC")replCount[j.id]++;
+        if(cellHasAny(dm2[j.id],["TOUR_USIC"]))replCount[j.id]++;
       });
     });
     const newDerog={},planPatch={},choices=[];
@@ -5014,11 +5010,9 @@ function CardioPlanning(){
         if(!next[k])return;
         const dm2={...next[k]};let ch=false;
         // retirer le TP du médecin + les remplacements junior TOUR_USIC posés ce jour
-        const eM=Array.isArray(dm2[medId])?dm2[medId][0]:dm2[medId];
-        if(eM&&eM.acteId==="TP"){delete dm2[medId];ch=true;}
+        if(cellHasAny(dm2[medId],["TP"])){const r=cellDrop(dm2[medId],["TP"]);if(r)dm2[medId]=r;else delete dm2[medId];ch=true;}
         Object.keys(dm2).forEach(mid=>{
-          const e=Array.isArray(dm2[mid])?dm2[mid][0]:dm2[mid];
-          if(e&&e.acteId==="TOUR_USIC"){delete dm2[mid];ch=true;}
+          if(cellHasAny(dm2[mid],["TOUR_USIC"])){const r=cellDrop(dm2[mid],["TOUR_USIC"]);if(r)dm2[mid]=r;else delete dm2[mid];ch=true;}
         });
         if(ch)next[k]=dm2;
       });
@@ -5535,12 +5529,11 @@ function CardioPlanning(){
       const gk=sk(y2,m2,d2,gardeSlot);
       const gdm={...(next[gk]||{})};
       Object.keys(gdm).forEach(mid=>{
-        const e=Array.isArray(gdm[mid])?gdm[mid][0]:gdm[mid];
-        if((e&&e.acteId)==="GARDE"){
+        if(cellHasAny(gdm[mid],["GARDE"])){
           const prevId=parseInt(mid);
           const rSlots=isWE(ny,nm,nd2)?["JOUR"]:["M","AM"];
-          rSlots.forEach(sl=>{const rk=sk(ny,nm,nd2,sl);const rdm={...(next[rk]||{})};if(rdm[prevId]&&rdm[prevId].acteId==="REPOS_GARDE"){delete rdm[prevId];next={...next,[rk]:rdm};}});
-          delete gdm[mid];
+          rSlots.forEach(sl=>{const rk=sk(ny,nm,nd2,sl);const rdm={...(next[rk]||{})};if(cellHasAny(rdm[prevId],["REPOS_GARDE"])){const rr=cellDrop(rdm[prevId],["REPOS_GARDE"]);if(rr)rdm[prevId]=rr;else delete rdm[prevId];next={...next,[rk]:rdm};}});
+          const rg=cellDrop(gdm[mid],["GARDE"]);if(rg)gdm[mid]=rg;else delete gdm[mid];
         }
       });
       next={...next,[gk]:gdm};
@@ -7382,8 +7375,7 @@ header::-webkit-scrollbar { display: none; }
                           const k=sk(y2,m2,d2,sl);if(!next[k])return;
                           const dm3={...next[k]};let ch=false;
                           Object.keys(dm3).forEach(mid2=>{
-                            const e2=Array.isArray(dm3[mid2])?dm3[mid2][0]:dm3[mid2];
-                            if(e2&&e2.acteId==="TOUR_"+unitC){delete dm3[mid2];ch=true;}
+                            if(cellHasAny(dm3[mid2],["TOUR_"+unitC])){const r=cellDrop(dm3[mid2],["TOUR_"+unitC]);if(r)dm3[mid2]=r;else delete dm3[mid2];ch=true;}
                           });
                           if(ch)next[k]=dm3;
                         });
