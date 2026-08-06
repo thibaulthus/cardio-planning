@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.74 — 05/08/2026";
+var APP_VERSION = "v9.75 — 06/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -184,6 +184,7 @@ var EXCL_IDS = ["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE", "TP"];
 var PROT_BASE = EXCL_IDS; // noyau protégé par TOUS les outils
 var PROT_TOUR = EXCL_IDS.concat(["TOUR_HC", "TOUR_USIC"]); // + tour réel (remplaçants)
 var EXCL_LABEL = { ABSENCE: "une absence", FORM: "une formation", FORMATION: "une formation", GARDE: "une garde", REPOS_GARDE: "un repos de garde", TP: "un temps partiel" };
+var uniqArr = function (a) { return (a || []).filter(function (v, i, arr) { return arr.indexOf(v) === i; }); };
 var cellEs = function (c) { return c ? (Array.isArray(c) ? c : [c]) : []; };
 var cellHasAny = function (c, ids) { return cellEs(c).some(function (e) { return e && ids.includes(e.acteId); }); };
 var cellDrop = function (c, ids) { var r = cellEs(c).filter(function (e) { return e && !ids.includes(e.acteId); }); return r.length ? (r.length === 1 ? r[0] : r) : null; };
@@ -993,7 +994,7 @@ function SiteView(_a) {
     var _regS = (salleReg || []).filter(function (x) { return Array.isArray(x.s) ? x.s.indexOf(site) >= 0 : x.s === site; }).map(function (x) { return x.n; });
     var _uniq = function (arr) { return arr.filter(function (s, i2, a2) { return s && a2.indexOf(s) === i2; }); };
     var _recapCols = actes.filter(function (a) { return acteRecapIn(a, site); }).map(function (a) { return a.id === "BIP" ? "CHB-BIP" : "RECAP:" + a.id; });
-    var _legacy = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }) : (_robustSalles || __spreadArray([], new Set(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles || []; })), true));
+    var _legacy = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }) : (_robustSalles || uniqArr(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles || []; })));
     var _allSallesBase = _uniq(_regS.concat(_legacy).filter(function (s) { return s !== "CHB-BIP"; }));
     /* v9.74 : ordre des colonnes réglable, comme dans PT Cardio (les 4 onglets traités
        pareil). Une colonne absente de l'ordre enregistré garde sa place d'origine, à la
@@ -2546,10 +2547,10 @@ function PickMedActModal(_a) {
                     var avail = isMedAvailable(med, y2, m2, d, sl);
                     // v9.52 : la salle occupée est annoncée UNE fois dans le bandeau au-dessus.
                     // La ligne du médecin ne dit plus que ce qui le concerne LUI, et nomme son activité.
-                    var busyLabs = __spreadArray([], new Set((sl === "JOUR" ? ["JOUR", "M", "AM"] : [sl, "JOUR"])
+                    var busyLabs = uniqArr((sl === "JOUR" ? ["JOUR", "M", "AM"] : [sl, "JOUR"])
                         .flatMap(function (s2) { return getEntries(med.id, y2, m2, d, s2) || []; })
                         .filter(function (e) { return e && e.acteId && !e._blocked && !["TOUR_HC", "TOUR_USIC"].includes(e.acteId); })
-                        .map(function (e) { var ax = actes.find(function (x) { return x.id === e.acteId; }); return ax ? ax.short : e.acteId; })), true);
+                        .map(function (e) { var ax = actes.find(function (x) { return x.id === e.acteId; }); return (ax && (ax.short || ax.label)) || e.acteId; }).filter(Boolean));
                     var borderCol = avail === "cond" ? COND_C : avail === "warning" ? "#f59e0b44" : "var(--border)";
                     var bgCol = avail === "cond" ? COND_BG : avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)";
                     var cIds = avail === "cond" ? condOn(getEntries, med.id, y2, m2, d, sl) : [];
@@ -2716,10 +2717,10 @@ function PickMedSiteModal(_a) {
                     var cIds = avail === "cond" ? condOn(getEntries, med.id, y2, m2, d, sl) : [];
                     var cLab = cIds.map(function (id) { var a = actes.find(function (x) { return x.id === id; }); return a ? a.short : id; }).join(" / ");
                     /* v9.74 : même formulation que la modale de PT Cardio — dire LAQUELLE. */
-                    var busyLabs = __spreadArray([], new Set((sl === "JOUR" ? ["JOUR", "M", "AM"] : [sl, "JOUR"])
+                    var busyLabs = uniqArr((sl === "JOUR" ? ["JOUR", "M", "AM"] : [sl, "JOUR"])
                         .flatMap(function (s2) { return getEntries(med.id, y2, m2, d, s2) || []; })
                         .filter(function (e) { return e && e.acteId && !e._blocked && !e.cond && !["TOUR_HC", "TOUR_USIC"].includes(e.acteId); })
-                        .map(function (e) { var ax = actes.find(function (x) { return x.id === e.acteId; }); return ax ? ax.short : e.acteId; })), true);
+                        .map(function (e) { var ax = actes.find(function (x) { return x.id === e.acteId; }); return (ax && (ax.short || ax.label)) || e.acteId; }).filter(Boolean));
                     return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px ".concat(avail === "cond" ? "dashed " + COND_C : "solid " + (avail === "warning" ? "#f59e0b44" : "var(--border)")),
                             cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "cond" ? COND_BG : avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: function () { if (avail === "blocked")
                             return; setSelMedId(med.id); setStep("acte"); } },
@@ -6464,7 +6465,7 @@ function CardioPlanning() {
                     }
                     /* deux salles DÉDIÉES dans deux hôpitaux sur la même demi-journée : les sites sont
                        proches et on passe de l'un à l'autre, mais pas quand les deux lieux sont fixés. */
-                    var sts = __spreadArray([], new Set(allF.filter(function (e) { return e.salle; }).map(function (e) { var a = acteById(e.acteId); return a && a.site; }).filter(Boolean)), true);
+                    var sts = uniqArr(allF.filter(function (e) { return e.salle; }).map(function (e) { var a = acteById(e.acteId); return a && a.site; }).filter(Boolean));
                     if (sts.length >= 2) {
                         msgs.push("deux hôpitaux : " + sts.join(" + "));
                         counts.hop++;
@@ -8398,7 +8399,7 @@ function CardioPlanning() {
                                 var isFull = a.maxParSalle && selfOccs.length >= a.maxParSalle;
                                 var hasOther = roomOccs.length > 0 && !roomOccs.every(function (m) { return m.id === medId; });
                                 var warn = isFull || hasOther;
-                                var allOccs = __spreadArray([], new Set(__spreadArray(__spreadArray([], roomOccs, true), selfOccs, true).map(function (m) { return m.init; })), true);
+                                var allOccs = uniqArr(roomOccs.concat(selfOccs).map(function (m) { return m.init; }));
                                 return React.createElement("button", { key: s, style: { padding: "5px 9px", borderRadius: 5,
                                         border: "1px solid ".concat(warn ? "#f59e0b" : "var(--border)"),
                                         cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700,

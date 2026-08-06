@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.74 — 05/08/2026";
+const APP_VERSION="v9.75 — 06/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -66,6 +66,11 @@ const EXCL_IDS=["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TP"];
 const PROT_BASE=EXCL_IDS;                      // noyau protégé par TOUS les outils
 const PROT_TOUR=EXCL_IDS.concat(["TOUR_HC","TOUR_USIC"]); // + tour réel (remplaçants)
 const EXCL_LABEL={ABSENCE:"une absence",FORM:"une formation",FORMATION:"une formation",GARDE:"une garde",REPOS_GARDE:"un repos de garde",TP:"un temps partiel"};
+/* v9.75 : ne jamais étaler un Set avec la syntaxe des trois points. Compilé pour la
+   cible ES5 sans l'option downlevelIteration, cela devient __spreadArray([], new Set(x),
+   true), qui rend un tableau VIDE — un ensemble n'ayant ni longueur ni index. Le fichier
+   lisible marchait, le fichier exécuté renvoyait du vide, en silence. D'où ce helper. */
+const uniqArr=(a)=>(a||[]).filter((v,i,arr)=>arr.indexOf(v)===i);
 const cellEs=c=>c?(Array.isArray(c)?c:[c]):[];
 const cellHasAny=(c,ids)=>cellEs(c).some(e=>e&&ids.includes(e.acteId));
 /* v9.73 : retire d'une case les seules entrées visées et rend ce qu'il reste (null si
@@ -822,7 +827,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
   const _regS=(salleReg||[]).filter(x=>Array.isArray(x.s)?x.s.indexOf(site)>=0:x.s===site).map(x=>x.n);
   const _uniq=(arr)=>arr.filter((s,i2,a2)=>s&&a2.indexOf(s)===i2);
   const _recapCols=actes.filter(a=>acteRecapIn(a,site)).map(a=>a.id==="BIP"?"CHB-BIP":"RECAP:"+a.id);
-  const _legacy=site==="ANGIO"?siteActes.flatMap(a=>a.salles||[]).filter(s=>String(s).startsWith("Angio")):(_robustSalles||[...new Set(siteActes.filter(a=>a.id!=="BIP").flatMap(a=>a.salles||[]))]);
+  const _legacy=site==="ANGIO"?siteActes.flatMap(a=>a.salles||[]).filter(s=>String(s).startsWith("Angio")):(_robustSalles||uniqArr(siteActes.filter(a=>a.id!=="BIP").flatMap(a=>a.salles||[])));
   const _allSallesBase=_uniq(_regS.concat(_legacy).filter(s=>s!=="CHB-BIP"));
   /* v9.74 : ordre des colonnes réglable, comme dans PT Cardio (les 4 onglets traités
      pareil). Une colonne absente de l'ordre enregistré garde sa place d'origine, à la
@@ -2346,10 +2351,10 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
               const avail=isMedAvailable(med,y2,m2,d,sl);
               // v9.52 : la salle occupée est annoncée UNE fois dans le bandeau au-dessus.
               // La ligne du médecin ne dit plus que ce qui le concerne LUI, et nomme son activité.
-              const busyLabs=[...new Set((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
+              const busyLabs=uniqArr((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
                 .flatMap(s2=>getEntries(med.id,y2,m2,d,s2)||[])
                 .filter(e=>e&&e.acteId&&!e._blocked&&!["TOUR_HC","TOUR_USIC"].includes(e.acteId))
-                .map(e=>{const ax=actes.find(x=>x.id===e.acteId);return ax?ax.short:e.acteId;}))];
+                .map(e=>{const ax=actes.find(x=>x.id===e.acteId);return (ax&&(ax.short||ax.label))||e.acteId;}).filter(Boolean));
               const borderCol=avail==="cond"?COND_C:avail==="warning"?"#f59e0b44":"var(--border)";
               const bgCol=avail==="cond"?COND_BG:avail==="warning"?"rgba(245,158,11,.15)":"var(--bg2)";
               const cIds=avail==="cond"?condOn(getEntries,med.id,y2,m2,d,sl):[];
@@ -2550,10 +2555,10 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               const cIds=avail==="cond"?condOn(getEntries,med.id,y2,m2,d,sl):[];
               const cLab=cIds.map(id=>{const a=actes.find(x=>x.id===id);return a?a.short:id;}).join(" / ");
               /* v9.74 : même formulation que la modale de PT Cardio — dire LAQUELLE. */
-              const busyLabs=[...new Set((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
+              const busyLabs=uniqArr((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
                 .flatMap(s2=>getEntries(med.id,y2,m2,d,s2)||[])
                 .filter(e=>e&&e.acteId&&!e._blocked&&!e.cond&&!["TOUR_HC","TOUR_USIC"].includes(e.acteId))
-                .map(e=>{const ax=actes.find(x=>x.id===e.acteId);return ax?ax.short:e.acteId;}))];
+                .map(e=>{const ax=actes.find(x=>x.id===e.acteId);return (ax&&(ax.short||ax.label))||e.acteId;}).filter(Boolean));
               return(
                 <button key={med.id} disabled={avail==="blocked"}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px ${avail==="cond"?"dashed "+COND_C:"solid "+(avail==="warning"?"#f59e0b44":"var(--border)")}`,
@@ -5665,7 +5670,7 @@ function CardioPlanning(){
       if(met.length>=1&&ab.length>=1){const a0=acteById(ab[0].acteId);msgs.push("activité sur "+(a0?a0.label:ab[0].acteId));counts.abs++;}
       /* deux salles DÉDIÉES dans deux hôpitaux sur la même demi-journée : les sites sont
          proches et on passe de l'un à l'autre, mais pas quand les deux lieux sont fixés. */
-      const sts=[...new Set(allF.filter(e=>e.salle).map(e=>{const a=acteById(e.acteId);return a&&a.site;}).filter(Boolean))];
+      const sts=uniqArr(allF.filter(e=>e.salle).map(e=>{const a=acteById(e.acteId);return a&&a.site;}).filter(Boolean));
       if(sts.length>=2){msgs.push("deux hôpitaux : "+sts.join(" + "));counts.hop++;}
       if(msgs.length){map[med.id+"|"+dd.y+"|"+dd.m+"|"+dd.d+"|"+sl]="⚠ "+msgs.join(" · ");list.push({y:dd.y,m:dd.m,d:dd.d,sl,med,label:msgs.join(" · "),dw:JRS[new Date(dd.y,dd.m,dd.d).getDay()]});}
     });});});
@@ -7491,7 +7496,7 @@ header::-webkit-scrollbar { display: none; }
                       const isFull=a.maxParSalle&&selfOccs.length>=a.maxParSalle;
                       const hasOther=roomOccs.length>0&&!roomOccs.every(m=>m.id===medId);
                       const warn=isFull||hasOther;
-                      const allOccs=[...new Set([...roomOccs,...selfOccs].map(m=>m.init))];
+                      const allOccs=uniqArr(roomOccs.concat(selfOccs).map(m=>m.init));
                       return <button key={s}
                         style={{padding:"5px 9px",borderRadius:5,
                           border:`1px solid ${warn?"#f59e0b":"var(--border)"}`,
