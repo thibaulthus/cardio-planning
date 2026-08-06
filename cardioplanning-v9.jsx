@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.73 — 05/08/2026";
+const APP_VERSION="v9.74 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -796,7 +796,7 @@ function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
 }
 
 /* ════ SITE VIEW (CHL/CHB) ════ */
-function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,orient,setOrient,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod}){
+function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,orient,setOrient,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -824,7 +824,16 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
   const _recapCols=actes.filter(a=>acteRecapIn(a,site)).map(a=>a.id==="BIP"?"CHB-BIP":"RECAP:"+a.id);
   const _legacy=site==="ANGIO"?siteActes.flatMap(a=>a.salles||[]).filter(s=>String(s).startsWith("Angio")):(_robustSalles||[...new Set(siteActes.filter(a=>a.id!=="BIP").flatMap(a=>a.salles||[]))]);
   const _allSallesBase=_uniq(_regS.concat(_legacy).filter(s=>s!=="CHB-BIP"));
-  const allSalles=_allSallesBase.concat(_recapCols);
+  /* v9.74 : ordre des colonnes réglable, comme dans PT Cardio (les 4 onglets traités
+     pareil). Une colonne absente de l'ordre enregistré garde sa place d'origine, à la
+     fin — une salle ajoutée plus tard n'est donc jamais perdue. */
+  const _allCols=_allSallesBase.concat(_recapCols);
+  const allSalles=(()=>{
+    const ord=colOrder||[];
+    if(!ord.length)return _allCols;
+    const rank=k=>{const i=ord.indexOf(k);return i<0?9999:i;};
+    return _allCols.map((c,i)=>({c,i})).sort((a,b)=>(rank(a.c)-rank(b.c))||(a.i-b.i)).map(x=>x.c);
+  })();
   const wdays=printWk?svEffDays.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):svEffDays; // keep full {y,m,d} objects
   const siteColor=site==="CHL"?"#388bfd":site==="ANGIO"?"#76a5af":"#3fb950";
 
@@ -903,6 +912,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
         <button onClick={nextM} style={S.arr}>›</button>
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
+        {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↕</button>}
         {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
@@ -1147,6 +1157,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
         {orderCtl&&<button onClick={onOrder} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↕</button>}
         {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
         {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
+        {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↕</button>}
         {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
@@ -2538,6 +2549,11 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               const avail=isMedAvailable(med,y2,m2,d,sl);
               const cIds=avail==="cond"?condOn(getEntries,med.id,y2,m2,d,sl):[];
               const cLab=cIds.map(id=>{const a=actes.find(x=>x.id===id);return a?a.short:id;}).join(" / ");
+              /* v9.74 : même formulation que la modale de PT Cardio — dire LAQUELLE. */
+              const busyLabs=[...new Set((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
+                .flatMap(s2=>getEntries(med.id,y2,m2,d,s2)||[])
+                .filter(e=>e&&e.acteId&&!e._blocked&&!e.cond&&!["TOUR_HC","TOUR_USIC"].includes(e.acteId))
+                .map(e=>{const ax=actes.find(x=>x.id===e.acteId);return ax?ax.short:e.acteId;}))];
               return(
                 <button key={med.id} disabled={avail==="blocked"}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px ${avail==="cond"?"dashed "+COND_C:"solid "+(avail==="warning"?"#f59e0b44":"var(--border)")}`,
@@ -2546,7 +2562,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
                   <div style={{width:28,height:28,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
                   <div style={{textAlign:"left"}}>
                     <div style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{med.prenom} {med.nom}</div>
-                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="cond"?COND_C:avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent/repos":avail==="cond"?("◇ Choix ouvert — "+cLab+", non tranché"):avail==="warning"?"⚠ Déjà une activité":"Disponible"}</div>
+                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="cond"?COND_C:avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent/repos":avail==="cond"?("◇ Choix ouvert — "+cLab+", non tranché"):avail==="warning"?("⚠ Déjà : "+(busyLabs.join(", ")||"une activité")):"Disponible"}</div>
                   </div>
                 </button>
               );
@@ -4340,6 +4356,8 @@ function CardioPlanning(){
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
   const [ptOrder,setPtOrder]=useState([]);
+  const [colOrder,setColOrder]=useState({});
+  const [colModal,setColModal]=useState(null);
   /* ── v9.40 : impression ── */
   const [printWk,setPrintWk]=useState(null);
   const [printWhat,setPrintWhat]=useState("plateau");
@@ -4674,6 +4692,7 @@ function CardioPlanning(){
           if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
           if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
+          if(data.colOrder){try{setColOrder(JSON.parse(data.colOrder)||{});}catch(e){}}
             if(data.adminEnabled!==undefined)setAdminEnabled(data.adminEnabled);
             if(data.adminCanReports!==undefined)setAdminCanReports(data.adminCanReports);
             if(data.adminCanNotes!==undefined)setAdminCanNotes(data.adminCanNotes);
@@ -5108,6 +5127,15 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({colOrder:JSON.stringify(colOrder)});},[colOrder]);
+  const moveCol=(siteKey,key,dir)=>{
+    const cur=(colOrder[siteKey]&&colOrder[siteKey].length)?colOrder[siteKey].slice():((colModal&&colModal.cols)?colModal.cols.slice():[]);
+    const i=cur.indexOf(key),j=i+dir;
+    if(i<0||j<0||j>=cur.length)return;
+    const nx=cur.slice();nx[i]=cur[j];nx[j]=cur[i];
+    setColOrder(p=>({...p,[siteKey]:nx}));
+    setColModal(m=>m?{...m,cols:nx}:m);
+  };
   /* Les lignes de PT Cardio, fixes et automatiques réunies, rangées selon ptOrder. */
   const ptRows=useMemo(()=>{
     const used={};PT_FIXED_ROWS.forEach(r=>(r.ids||[]).forEach(i=>{used[i]=1;}));
@@ -6117,13 +6145,13 @@ header::-webkit-scrollbar { display: none; }
       {/* TOUR MÉDICAL */}
       {tab==="tourmedical"&&<TourTab tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
 
-      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
+      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
         {isEdit&&<div style={{marginBottom:6}}><button style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}} onClick={bipOpen}>📟 Répartition du Bip</button></div>}
-        <SiteView printWk={printWk} onPrint={()=>setModal("print")} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
+        <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           const full=bip&&["CHB-1","CHB-2","CHB-3"].includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
@@ -6135,7 +6163,7 @@ header::-webkit-scrollbar { display: none; }
         getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -6577,7 +6605,7 @@ header::-webkit-scrollbar { display: none; }
                       {on&&<span style={{color:"#7c3aed",fontSize:11,flexShrink:0}}>✓</span>}
                     </button>
                   );
-                })
+                })}
               </div>
               {!isWeek&&dayKey&&astreinte[dayKey]!==undefined&&(
                 <button onClick={()=>{setAstreinte(p=>{const n={...p};delete n[dayKey];return n;});setAstPickModal(null);}}
@@ -7431,7 +7459,7 @@ header::-webkit-scrollbar { display: none; }
                       {salleWarn&&<span style={{fontSize:9,fontWeight:800,color:"#b45309",background:"#fff8e6",border:"1px solid #f59e0b",borderRadius:4,padding:"1px 5px",marginTop:2,alignSelf:"flex-start",lineHeight:1.35}}>⚠ {fixedSalleOcc.map(m=>m.init).join(", ")} déjà assigné</span>}
                     </button>
                   );
-                })
+                })}
               </div>
             )}
 
@@ -7570,6 +7598,26 @@ header::-webkit-scrollbar { display: none; }
   onApply={p=>{applyAbsence(p);setModal(null);}}
   onRemove={p=>{removeAbsence(p);setModal(null);}}
   onClose={()=>setModal(null)}/></Ov>}
+      {modal==="colOrder"&&colModal&&<div style={S.ov} onClick={()=>{setModal(null);setColModal(null);}}>
+        <div style={{...S.mb,width:330}} onClick={e=>e.stopPropagation()}>
+          <div style={S.mHd}><div style={S.mTit2}>↕ Ordre des colonnes — {colModal.site}</div><button style={S.xBtn} onClick={()=>{setModal(null);setColModal(null);}}>×</button></div>
+          <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>Cet ordre est partagé par toute l'équipe. Une colonne ajoutée plus tard se place en dernier.</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
+            {(colModal.cols||[]).map((c,i)=>{
+              const lab=c==="CHB-BIP"?"BIP":(String(c).indexOf("RECAP:")===0?((actes.find(a2=>a2.id===c.slice(6))||{}).label||c.slice(6)):c);
+              const isRec=c==="CHB-BIP"||String(c).indexOf("RECAP:")===0;
+              return(
+                <div key={c} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 6px",border:"1px solid var(--border)",borderRadius:6,background:"var(--bg2)"}}>
+                  <span style={{fontSize:10,color:"var(--txt3)",width:14}}>{isRec?"↩":"🚪"}</span>
+                  <span style={{flex:1,fontSize:12,fontWeight:700}}>{lab}</span>
+                  <button disabled={i===0} title="Monter" style={{...S.icnBtn,fontSize:11,fontWeight:800,opacity:i===0?.3:1}} onClick={()=>moveCol(colModal.site,c,-1)}>▲</button>
+                  <button disabled={i===(colModal.cols||[]).length-1} title="Descendre" style={{...S.icnBtn,fontSize:11,fontWeight:800,opacity:i===(colModal.cols||[]).length-1?.3:1}} onClick={()=>moveCol(colModal.site,c,1)}>▼</button>
+                </div>);
+            })}
+          </div>
+          <button style={{...S.icnBtn,width:"100%",marginTop:10}} onClick={()=>{setColOrder(p=>({...p,[colModal.site]:[]}));setModal(null);setColModal(null);}}>↩ Ordre par défaut</button>
+        </div>
+      </div>}
       {modal==="ptOrder"&&<div style={S.ov} onClick={()=>setModal(null)}>
         <div style={{...S.mb,width:330}} onClick={e=>e.stopPropagation()}>
           <div style={S.mHd}><div style={S.mTit2}>↕ Ordre des colonnes — PT Cardio</div><button style={S.xBtn} onClick={()=>setModal(null)}>×</button></div>

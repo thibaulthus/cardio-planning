@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.73 — 05/08/2026";
+var APP_VERSION = "v9.74 — 05/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -959,7 +959,7 @@ function GridV(_a) {
 }
 /* ════ SITE VIEW (CHL/CHB) ════ */
 function SiteView(_a) {
-    var _b = _a.printWk, printWk = _b === void 0 ? null : _b, _c = _a.onPrint, onPrint = _c === void 0 ? null : _c, site = _a.site, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, actes = _a.actes, medecins = _a.medecins, getEntries = _a.getEntries, salleOcc = _a.salleOcc, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, onPickSite = _a.onPickSite, _d = _a.notes, notes = _d === void 0 ? {} : _d, _e = _a.salleReg, salleReg = _e === void 0 ? [] : _e, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod;
+    var _b = _a.printWk, printWk = _b === void 0 ? null : _b, _c = _a.onPrint, onPrint = _c === void 0 ? null : _c, site = _a.site, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, actes = _a.actes, medecins = _a.medecins, getEntries = _a.getEntries, salleOcc = _a.salleOcc, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, onPickSite = _a.onPickSite, _d = _a.notes, notes = _d === void 0 ? {} : _d, _e = _a.salleReg, salleReg = _e === void 0 ? [] : _e, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, _f = _a.colOrder, colOrder = _f === void 0 ? null : _f, _g = _a.onOrder, onOrder = _g === void 0 ? null : _g;
     var today = new Date();
     var ANGIO_SALLES_ALL = ["Angio-1", "Angio-2", "Angio-3"];
     var EXCL_SALLES = site === "CHL" ? __spreadArray([S_STIM, S_EEP, S_EE_CHB], ANGIO_SALLES_ALL, true) : site === "ANGIO" ? [] : __spreadArray([S_STIM, S_EEP, S_EE_CHL], ANGIO_SALLES_ALL, true);
@@ -995,7 +995,17 @@ function SiteView(_a) {
     var _recapCols = actes.filter(function (a) { return acteRecapIn(a, site); }).map(function (a) { return a.id === "BIP" ? "CHB-BIP" : "RECAP:" + a.id; });
     var _legacy = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }) : (_robustSalles || __spreadArray([], new Set(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles || []; })), true));
     var _allSallesBase = _uniq(_regS.concat(_legacy).filter(function (s) { return s !== "CHB-BIP"; }));
-    var allSalles = _allSallesBase.concat(_recapCols);
+    /* v9.74 : ordre des colonnes réglable, comme dans PT Cardio (les 4 onglets traités
+       pareil). Une colonne absente de l'ordre enregistré garde sa place d'origine, à la
+       fin — une salle ajoutée plus tard n'est donc jamais perdue. */
+    var _allCols = _allSallesBase.concat(_recapCols);
+    var allSalles = (function () {
+        var ord = colOrder || [];
+        if (!ord.length)
+            return _allCols;
+        var rank = function (k) { var i = ord.indexOf(k); return i < 0 ? 9999 : i; };
+        return _allCols.map(function (c, i) { return ({ c: c, i: i }); }).sort(function (a, b) { return (rank(a.c) - rank(b.c)) || (a.i - b.i); }).map(function (x) { return x.c; });
+    })();
     var wdays = printWk ? svEffDays.filter(function (o) { return inPrintRange(printWk, o.y, o.m, o.d); }) : svEffDays; // keep full {y,m,d} objects
     var siteColor = site === "CHL" ? "#388bfd" : site === "ANGIO" ? "#76a5af" : "#3fb950";
     function renderCell(salle, d, sl, ry, rm) {
@@ -1065,6 +1075,7 @@ function SiteView(_a) {
                 (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
+            onOrder && isEdit && React.createElement("button", { onClick: function () { return onOrder(allSalles); }, title: "Ordre des colonnes", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\u2195"),
             onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
             React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
@@ -2704,6 +2715,11 @@ function PickMedSiteModal(_a) {
                     var avail = isMedAvailable(med, y2, m2, d, sl);
                     var cIds = avail === "cond" ? condOn(getEntries, med.id, y2, m2, d, sl) : [];
                     var cLab = cIds.map(function (id) { var a = actes.find(function (x) { return x.id === id; }); return a ? a.short : id; }).join(" / ");
+                    /* v9.74 : même formulation que la modale de PT Cardio — dire LAQUELLE. */
+                    var busyLabs = __spreadArray([], new Set((sl === "JOUR" ? ["JOUR", "M", "AM"] : [sl, "JOUR"])
+                        .flatMap(function (s2) { return getEntries(med.id, y2, m2, d, s2) || []; })
+                        .filter(function (e) { return e && e.acteId && !e._blocked && !e.cond && !["TOUR_HC", "TOUR_USIC"].includes(e.acteId); })
+                        .map(function (e) { var ax = actes.find(function (x) { return x.id === e.acteId; }); return ax ? ax.short : e.acteId; })), true);
                     return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px ".concat(avail === "cond" ? "dashed " + COND_C : "solid " + (avail === "warning" ? "#f59e0b44" : "var(--border)")),
                             cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "cond" ? COND_BG : avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: function () { if (avail === "blocked")
                             return; setSelMedId(med.id); setStep("acte"); } },
@@ -2713,7 +2729,7 @@ function PickMedSiteModal(_a) {
                                 med.prenom,
                                 " ",
                                 med.nom),
-                            React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : avail === "cond" ? COND_C : avail === "warning" ? "#f59e0b" : "var(--txt3)" } }, avail === "blocked" ? "Absent/repos" : avail === "cond" ? ("◇ Choix ouvert — " + cLab + ", non tranché") : avail === "warning" ? "⚠ Déjà une activité" : "Disponible"))));
+                            React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : avail === "cond" ? COND_C : avail === "warning" ? "#f59e0b" : "var(--txt3)" } }, avail === "blocked" ? "Absent/repos" : avail === "cond" ? ("◇ Choix ouvert — " + cLab + ", non tranché") : avail === "warning" ? ("⚠ Déjà : " + (busyLabs.join(", ") || "une activité")) : "Disponible"))));
                 })))),
         step === "acte" && selMed && (React.createElement(React.Fragment, null,
             eligActes.length === 1 && eligActes[0].fixedSalle && (function () { addEntry(selMed.id, y2, m2, d, sl, { acteId: eligActes[0].id, salle: eligActes[0].fixedSalle }); onClose(); return null; })(),
@@ -4573,6 +4589,8 @@ function CardioPlanning() {
     /* ── v9.35 : effectifs IDE ── */
     var _icf = useState({ def: {}, ov: {} }), ideCfg = _icf[0], setIdeCfg = _icf[1];
     var _pto = useState([]), ptOrder = _pto[0], setPtOrder = _pto[1];
+    var _colO = useState({}), colOrder = _colO[0], setColOrder = _colO[1];
+    var _colM = useState(null), colModal = _colM[0], setColModal = _colM[1];
     /* v9.40 : impression */
     var _pw2 = useState(null), printWk = _pw2[0], setPrintWk = _pw2[1];
     var _pwh = useState("plateau"), printWhat = _pwh[0], setPrintWhat = _pwh[1];
@@ -5023,6 +5041,7 @@ function CardioPlanning() {
                         setCadrePin(data.cadrePin);
                     if (data.ideCfg) { try { setIdeCfg(JSON.parse(data.ideCfg)); } catch (e) { } }
                     if (data.ptOrder) { try { setPtOrder(JSON.parse(data.ptOrder) || []); } catch (e) { } }
+                    if (data.colOrder) { try { setColOrder(JSON.parse(data.colOrder) || {}); } catch (e) { } }
                     if (data.adminEnabled !== undefined)
                         setAdminEnabled(data.adminEnabled);
                     if (data.adminCanReports !== undefined)
@@ -5740,6 +5759,22 @@ function CardioPlanning() {
         saveToFirebase({ ideCfg: JSON.stringify(ideCfg) }); }, [ideCfg]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ ptOrder: JSON.stringify(ptOrder) }); }, [ptOrder]);
+    useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ colOrder: JSON.stringify(colOrder) }); }, [colOrder]);
+    var moveCol = function (siteKey, key, dir) {
+        var cur = (colOrder[siteKey] && colOrder[siteKey].length) ? colOrder[siteKey].slice() : ((colModal && colModal.cols) ? colModal.cols.slice() : []);
+        var i = cur.indexOf(key), j = i + dir;
+        if (i < 0 || j < 0 || j >= cur.length)
+            return;
+        var nx = cur.slice();
+        nx[i] = cur[j];
+        nx[j] = cur[i];
+        setColOrder(function (p) {
+            var _a;
+            return (__assign(__assign({}, p), (_a = {}, _a[siteKey] = nx, _a)));
+        });
+        setColModal(function (m) { return m ? __assign(__assign({}, m), { cols: nx }) : m; });
+    };
     var ptRows = useMemo(function () {
         var used = {};
         PT_FIXED_ROWS.forEach(function (r) { (r.ids || []).forEach(function (i) { used[i] = 1; }); });
@@ -6922,7 +6957,7 @@ function CardioPlanning() {
                     ? React.createElement(GridH, { planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
-            tab === "chl" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "chl" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
@@ -6930,7 +6965,7 @@ function CardioPlanning() {
             tab === "chb" && React.createElement("div", null,
                 isEdit && React.createElement("div", { style: { marginBottom: 6 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #46bdc6", background: "rgba(70,189,198,.10)", color: "#46bdc6", fontWeight: 800, cursor: "pointer" }, onClick: bipOpen }, "\uD83D\uDCDF R\u00E9partition du Bip")),
-                React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, site: "CHB", darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+                React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHB"] || null, onOrder: function (cols) { setColModal({ site: "CHB", cols: cols }); setModal("colOrder"); }, site: "CHB", darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
                     var full = bip && ["CHB-1", "CHB-2", "CHB-3"].includes(salle) ? __spreadArray(__spreadArray([], siteActes.filter(function (a) { return a.id !== "BIP"; }), true), [bip], false) : siteActes;
@@ -6942,7 +6977,7 @@ function CardioPlanning() {
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "angio" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, site: "ANGIO", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
+            tab === "angio" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["ANGIO"] || null, onOrder: function (cols) { setColModal({ site: "ANGIO", cols: cols }); setModal("colOrder"); }, site: "ANGIO", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
@@ -8458,6 +8493,27 @@ function CardioPlanning() {
                 }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
+        modal === "colOrder" && colModal && React.createElement("div", { style: S.ov, onClick: function () { setModal(null); setColModal(null); } },
+            React.createElement("div", { style: __assign(__assign({}, S.mb), { width: 330 }), onClick: function (e) { return e.stopPropagation(); } },
+                React.createElement("div", { style: S.mHd },
+                    React.createElement("div", { style: S.mTit2 },
+                        "\u2195 Ordre des colonnes \u2014 ",
+                        colModal.site),
+                    React.createElement("button", { style: S.xBtn, onClick: function () { setModal(null); setColModal(null); } }, "\u00D7")),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8 } }, "Cet ordre est partag\u00E9 par toute l'\u00E9quipe. Une colonne ajout\u00E9e plus tard se place en dernier."),
+                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 340, overflowY: "auto" } }, (colModal.cols || []).map(function (c, i) {
+                    var lab = c === "CHB-BIP" ? "BIP" : (String(c).indexOf("RECAP:") === 0 ? ((actes.find(function (a2) { return a2.id === c.slice(6); }) || {}).label || c.slice(6)) : c);
+                    var isRec = c === "CHB-BIP" || String(c).indexOf("RECAP:") === 0;
+                    return (React.createElement("div", { key: c, style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg2)" } },
+                        React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", width: 14 } }, isRec ? "↩" : "🚪"),
+                        React.createElement("span", { style: { flex: 1, fontSize: 12, fontWeight: 700 } }, lab),
+                        React.createElement("button", { disabled: i === 0, title: "Monter", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800, opacity: i === 0 ? .3 : 1 }), onClick: function () { return moveCol(colModal.site, c, -1); } }, "\u25B2"),
+                        React.createElement("button", { disabled: i === (colModal.cols || []).length - 1, title: "Descendre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800, opacity: i === (colModal.cols || []).length - 1 ? .3 : 1 }), onClick: function () { return moveCol(colModal.site, c, 1); } }, "\u25BC")));
+                })),
+                React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { width: "100%", marginTop: 10 }), onClick: function () { setColOrder(function (p) {
+                        var _a;
+                        return (__assign(__assign({}, p), (_a = {}, _a[colModal.site] = [], _a)));
+                    }); setModal(null); setColModal(null); } }, "\u21A9 Ordre par d\u00E9faut"))),
         modal === "ptOrder" && React.createElement("div", { style: S.ov, onClick: function () { return setModal(null); } },
             React.createElement("div", { style: __assign(__assign({}, S.mb), { width: 330 }), onClick: function (e) { return e.stopPropagation(); } },
                 React.createElement("div", { style: S.mHd },
