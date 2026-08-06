@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.81 — 06/08/2026";
+const APP_VERSION="v9.82 — 06/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -603,7 +603,7 @@ function GridH({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
 
 /* ════ GRID V ════ */
 let _gvLpT=null,_gvLpF=false;
-function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
   const today=new Date();
   const C0=42,C1=24,CG=44;
   // Find garde med for a given day (slot N)
@@ -654,12 +654,22 @@ function GridV({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
     {pickGardeDay&&<Ov onClose={()=>setPickGardeDay(null)}>
       <div style={{minWidth:280}}>
         <div style={S.mHd}><div style={S.mTit2}>🌙 Garde — {(()=>{const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const dw=dow(pgf.y,pgf.m,pgf.d);return ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw]+" "+pgf.d+" "+MOIS[pgf.m]+" "+pgf.y;})()}</div><button onClick={()=>setPickGardeDay(null)} style={S.xBtn}>×</button></div>
-        {(()=>{const pgf2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const cgm=getGardeMed2(pgf2.y,pgf2.m,pgf2.d);return cgm?(<div style={{marginBottom:10,display:"flex",alignItems:"center",gap:6,padding:"6px 10px",background:"var(--garde-bg)",borderRadius:7,border:"1px solid #86efac"}}>
-          <div style={{width:26,height:26,borderRadius:"50%",background:cgm.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{cgm.init}</div>
-          <span style={{fontSize:12,fontWeight:600}}>Garde actuelle : {cgm.prenom} {cgm.nom}</span>
-          <button onClick={()=>setGardeSwapOpen(v=>!v)} style={{marginLeft:"auto",fontSize:11,padding:"3px 8px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}}>⇄ Échanger</button>
-          <button onClick={()=>{const pgf3=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const dwB=dow(pgf3.y,pgf3.m,pgf3.d);onCell(cgm.id,pgf3.y,pgf3.m,pgf3.d,(dwB===6||dwB===0)?"JOUR":"N");setPickGardeDay(null);}} style={{...S.btnP,fontSize:11,padding:"3px 8px"}}>Modifier</button>
-        </div>):null;})()}
+        {/* v9.82 : même présentation que la modale de l'onglet Gardes — échange et retrait
+            visibles d'emblée, un seul clic chacun. Une seule façon de faire dans les deux écrans. */}
+        <div style={{color:"var(--txt2)",fontSize:12,marginTop:-6,marginBottom:8}}>Le repos post-garde est posé automatiquement.</div>
+        {(()=>{const pgf2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const cgm=getGardeMed2(pgf2.y,pgf2.m,pgf2.d);return cgm?(
+          <div style={{marginBottom:12,padding:"8px 10px",background:"var(--garde-bg)",borderRadius:7,border:"1px solid #86efac"}}>
+            <div style={{fontSize:10,color:"#16a34a",fontWeight:700,marginBottom:5}}>✓ Garde assignée</div>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:cgm.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{cgm.init}</div>
+              <span style={{color:"var(--txt)",fontSize:13,fontWeight:700}}>{cgm.prenom} {cgm.nom}</span>
+            </div>
+            <button onClick={()=>setGardeSwapOpen(v=>!v)} style={{width:"100%",padding:"6px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer",fontSize:11,marginBottom:6}}>⇄ Échanger cette garde…</button>
+            <button style={{width:"100%",padding:"6px",borderRadius:6,border:"none",background:"#fef2f2",color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:700}}
+              onClick={()=>{const pgf3=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};if(onRemoveGarde)onRemoveGarde(pgf3.y,pgf3.m,pgf3.d);setPickGardeDay(null);}}>
+              Retirer la garde + repos
+            </button>
+          </div>):null;})()}
         {gardeSwapOpen&&(()=>{
           const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};
           const medA=getGardeMed2(pgf.y,pgf.m,pgf.d);
@@ -1258,21 +1268,10 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
 }
 
 /* ════ GARDE VIEW ════ */
-function GardeView({printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orient,setOrient,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
-  const removeGarde=(d3,y3,m3)=>{
-    setPlan(p=>{
-      let next={...p};const gIds=[];
-      ["N","JOUR"].forEach(sl=>{const k=sk(y3,m3,d3,sl);const dm={...(next[k]||{})};let ch=false;
-        Object.keys(dm).forEach(mid=>{if(cellHasAny(dm[mid],["GARDE"])){gIds.push(mid);const r=cellDrop(dm[mid],["GARDE"]);if(r)dm[mid]=r;else delete dm[mid];ch=true;}});
-        if(ch)next={...next,[k]:dm};});
-      const dt=new Date(y3,m3,d3+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd=dt.getDate();
-      ["JOUR","M","AM"].forEach(sl=>{const k=sk(ny,nm,nd,sl);const dm={...(next[k]||{})};let ch=false;
-        gIds.forEach(mid=>{const e=dm[mid];const a=Array.isArray(e)?(e[0]&&e[0].acteId):(e&&e.acteId);if(a==="REPOS_GARDE"){delete dm[mid];ch=true;}});
-        if(ch)next={...next,[k]:dm};});
-      return next;
-    });
-    toast("Garde et repos retir\u00e9s","info");
-  };
+function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orient,setOrient,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
+  /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
+     l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
+  const removeGarde=(d3,y3,m3)=>{ if(onRemoveGarde)onRemoveGarde(y3,m3,d3); };
   const today=new Date();
   // Période globale pour les gardes
   const {sy:gvSy,sm:gvSm}=perStart(year,month);
@@ -5641,6 +5640,23 @@ function CardioPlanning(){
           RE2("button",{onClick:bipRun,style:{fontSize:12,padding:"6px 13px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.12)",color:"#46bdc6"}},"▶ Répartir les bips manquants"),
           RE2("button",{onClick:bipClear,style:{fontSize:12,padding:"6px 13px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.10)",color:"#dc2626"}},"🗑 Effacer les bips de la période"))));
   };
+  const removeGardeDay=(y3,m3,d3)=>{
+    setPlan(p=>{
+      let next={...p};const gIds=[];
+      ["N","JOUR"].forEach(sl=>{const k=sk(y3,m3,d3,sl);const dm={...(next[k]||{})};let ch=false;
+        Object.keys(dm).forEach(mid=>{if(cellHasAny(dm[mid],["GARDE"])){gIds.push(mid);const r=cellDrop(dm[mid],["GARDE"]);if(r)dm[mid]=r;else delete dm[mid];ch=true;}});
+        if(ch)next={...next,[k]:dm};});
+      const dt=new Date(y3,m3,d3+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd=dt.getDate();
+      ["JOUR","M","AM"].forEach(sl=>{const k=sk(ny,nm,nd,sl);const dm={...(next[k]||{})};let ch=false;
+        /* v9.82 : le repos n'est retiré que s'il est présent, où qu'il soit dans la case,
+           et sans emporter ce qui l'accompagnerait (même règle que v9.73). */
+        gIds.forEach(mid=>{if(cellHasAny(dm[mid],["REPOS_GARDE"])){const r=cellDrop(dm[mid],["REPOS_GARDE"]);if(r)dm[mid]=r;else delete dm[mid];ch=true;}});
+        if(ch)next={...next,[k]:dm};});
+      return next;
+    });
+    toast("Garde et repos retir\u00e9s","info");
+  };
+
   const applyGarde=useCallback((medId,y2,m2,d2)=>{
     if(accessMode==="adminEdit")return;
     logCell("add",medId,y2,m2,d2,"N","GARDE");
@@ -6246,7 +6262,7 @@ header::-webkit-scrollbar { display: none; }
           </div>
           {orient==="H"
             ?<GridH planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+            :<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -6286,7 +6302,7 @@ header::-webkit-scrollbar { display: none; }
         getEntries={getEntries} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="garde"&&<GardeView printWk={printWk} onPrint={()=>setModal("print")} year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} getEntry={getEntry} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} applyGarde={applyGarde} isMedAvailable={isMedAvailable} plan={plan} setPlan={setPlan} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod} tourMed={tourMed} gardeAvoid={gardeAvoid} gardeWish={gardeWish} toast={toast}/>}
+      {tab==="garde"&&<GardeView onRemoveGarde={removeGardeDay} printWk={printWk} onPrint={()=>setModal("print")} year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} getEntry={getEntry} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} applyGarde={applyGarde} isMedAvailable={isMedAvailable} plan={plan} setPlan={setPlan} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod} tourMed={tourMed} gardeAvoid={gardeAvoid} gardeWish={gardeWish} toast={toast}/>}
 
       {tab==="bip"&&<BipTab year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} allDays={allDays} isEdit={isEdit} actes={actes} getEntries={getEntries} salleOcc={salleOcc} addEntry={addEntry} removeEntry={removeEntry} isMedAvailable={isMedAvailable} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull}/>}
 
@@ -6326,7 +6342,7 @@ header::-webkit-scrollbar { display: none; }
            </div>}
           {orient==="H"
             ?<GridH planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+            :<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
