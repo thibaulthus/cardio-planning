@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.75 — 06/08/2026";
+const APP_VERSION="v9.80 — 06/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -192,6 +192,18 @@ const MEDECINS_INIT=[
 ];
 
 const lightenHex=(hex,amt)=>{try{const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);const f=(v)=>Math.round(v+(255-v)*amt);return "rgb("+f(r)+","+f(g)+","+f(b)+")";}catch(e){return hex;}};
+/* v9.79 : une salle portait UNE seule étiquette servant à la fois de LIEU (CHL, CHB) et
+   d'ONGLET d'affichage (PT Angio, PT Cardio) — deux notions de nature différente au même
+   endroit. Conséquence : la liste des salles d'une activité, filtrée par le site, masquait
+   toute salle étiquetée PT Angio ou PT Cardio. D'où sept activités (Coro, Tavi, FOP/FAG,
+   Stim, StimAG, EEP, EEP AG) dont les salles existaient sans être modifiables.
+   Désormais : `site` = lieu physique (CHL ou CHB), `s` = onglets d'apparition. */
+const salleSite=(x)=>{
+  if(!x)return "CHL";
+  if(x.site==="CHL"||x.site==="CHB")return x.site;
+  const t=Array.isArray(x.s)?x.s:(x.s?[x.s]:[]);
+  return t.indexOf("CHB")>=0?"CHB":"CHL";   // Angio, Stim et EEP sont à Lens
+};
 const acteRecapIn=(a,site)=>{if(!a)return false;const arr=a.recapSites||[];return arr.includes(site)||a.recapSite===site||(site==="PLATEAU"&&!!a.ptCardio);};
 /* ════ THEME ════ */
 function applyTheme(dark){
@@ -4598,6 +4610,51 @@ function CardioPlanning(){
   },[]);
 
   /* Écriture du planning type, médecin par médecin (v9.72). */
+  /* v9.78 : les LISTES (activités, médecins) étaient enregistrées d'un seul bloc, donc
+     vulnérables au même effacement que le planning type : une écriture partant d'une base
+     incomplète réécrivait tout. Elles suivent désormais le même découpage — un
+     enregistrement par élément, plus un champ d'ordre — via `flushList`. */
+  const listSynced=useRef({});
+  const listPending=useRef({});
+  const listMigrated=useRef({});
+  const flushList=useCallback((field,arr)=>{
+    if(!PLANNING_DOC||!updatePaths)return;
+    if(!serverSeen.current)return;
+    const cur={};(arr||[]).forEach(x=>{if(x&&x.id!==undefined&&x.id!==null)cur[String(x.id)]=x;});
+    const prev=listSynced.current[field]||{};
+    const pend=listPending.current[field]||(listPending.current[field]={});
+    const pairs=[];
+    Object.keys(cur).forEach(k=>{
+      if(JSON.stringify(cur[k])!==JSON.stringify(prev[k])){pairs.push([[field,k],cur[k]]);pend[k]=cur[k];}
+    });
+    Object.keys(prev).forEach(k=>{if(!(k in cur)){pairs.push([[field,k],"__DELETE__"]);pend[k]=null;}});
+    const ordK=field+"Order",ord=(arr||[]).map(x=>String(x&&x.id));
+    if(JSON.stringify(ord)!==JSON.stringify(listSynced.current[ordK]))pairs.push([[ordK],ord]);
+    listSynced.current[field]=cur;listSynced.current[ordK]=ord;
+    if(pairs.length===0)return;
+    localChange.current=true;
+    (async()=>{
+      try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
+      catch(e){console.log("sync "+field+":",e);setFbStatus("error");}
+    })();
+  },[]);
+  /* Réception d'une liste découpée : on ré-applique nos modifications non confirmées. */
+  const readList=useCallback((field,incMap,incOrder)=>{
+    const merged={...(incMap||{})};
+    const pend=listPending.current[field]||{};
+    Object.keys(pend).forEach(k=>{
+      const pv=pend[k];
+      const okc=pv===null?!(k in merged):JSON.stringify(merged[k])===JSON.stringify(pv);
+      if(okc)delete pend[k];
+      else{if(pv===null)delete merged[k];else merged[k]=pv;}
+    });
+    listSynced.current[field]=merged;
+    const ord=(incOrder||[]).filter(k=>k in merged);
+    Object.keys(merged).forEach(k=>{if(ord.indexOf(k)<0)ord.push(k);});
+    listSynced.current[field+"Order"]=ord;
+    return ord.map(k=>merged[k]).filter(Boolean);
+  },[]);
+
   const flushPT=useCallback((cur)=>{
     if(!PLANNING_DOC||!updatePaths)return;
     if(!serverSeen.current)return;                 // jamais sur une base venant du seul cache
@@ -4685,12 +4742,23 @@ function CardioPlanning(){
             if(Object.keys(resend).length){Object.keys(resend).forEach(k=>{delete fieldSync.current[k];});setTimeout(()=>saveToFirebase(resend),400);}
             if(data.tourMed)setTourMed(JSON.parse(data.tourMed));
             if(data.notes)setNotes(JSON.parse(data.notes));
-            if(data.medecins)setMedecins(JSON.parse(data.medecins));
-            if(data.actes){
-            const arrA=JSON.parse(data.actes);
+            /* ── médecins : version découpée si elle existe, sinon migration ── */
+            if(data.medecinsV2){setMedecins(readList("medecinsV2",data.medecinsV2,data.medecinsV2Order));}
+            else if(data.medecins&&!listMigrated.current.medecinsV2){
+              const arrM=JSON.parse(data.medecins);listMigrated.current.medecinsV2=1;setMedecins(arrM);
+              if(serverSeen.current&&setDoc){const mp={};arrM.forEach(x=>{if(x&&x.id!==undefined)mp[String(x.id)]=x;});
+                Promise.resolve(setDoc(PLANNING_DOC,{medecinsV2:mp,medecinsV2Order:arrM.map(x=>String(x.id))},{merge:true})).catch(e=>console.log("migration medecins:",e));}
+            }
+            if(data.actesV2||data.actes){
+            const arrA=data.actesV2?readList("actesV2",data.actesV2,data.actesV2Order):JSON.parse(data.actes);
             arrA.forEach(a=>{if(a&&a.id==="BIP"&&a.recapSite===undefined&&!(a.recapSites&&a.recapSites.length))a.recapSites=["CHB"];});
             if(!arrA.some(a=>a&&a.id==="TP"))arrA.push({id:"TP",label:"Temps partiel",short:"TP",color:"#8b949e",bg:"#8b949e",hasSalle:false,salles:[]});
             setActes(arrA);
+            if(!data.actesV2&&!listMigrated.current.actesV2){
+              listMigrated.current.actesV2=1;
+              if(serverSeen.current&&setDoc){const mp={};arrA.forEach(x=>{if(x&&x.id!==undefined)mp[String(x.id)]=x;});
+                Promise.resolve(setDoc(PLANNING_DOC,{actesV2:mp,actesV2Order:arrA.map(x=>String(x.id))},{merge:true})).catch(e=>console.log("migration actes:",e));}
+            }
           }
             if(data.editPin)setEditPin(data.editPin);
             if(data.adminPin!==undefined)setAdminPin(data.adminPin);
@@ -5108,8 +5176,8 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({periodCfg:JSON.stringify(periodCfg)});},[periodCfg]);
   useEffect(()=>{if(!isFirstLoad.current)flushPT(planningType);},[planningType]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({notes:JSON.stringify(notes)});},[notes]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medecins:JSON.stringify(medecins)});},[medecins]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({actes:JSON.stringify(actes)});},[actes]);
+  useEffect(()=>{if(!isFirstLoad.current)flushList("medecinsV2",medecins);},[medecins]);
+  useEffect(()=>{if(!isFirstLoad.current)flushList("actesV2",actes);},[actes]);
   // ── Source de vérité : coche "Garde" de l'onglet Équipe → médecins autorisés des activités GARDE et REPOS_GARDE ──
   useEffect(()=>{
     const gInits=medecins.filter(m=>m.garde===true).map(m=>m.init);
@@ -5142,16 +5210,38 @@ function CardioPlanning(){
     setColModal(m=>m?{...m,cols:nx}:m);
   };
   /* Les lignes de PT Cardio, fixes et automatiques réunies, rangées selon ptOrder. */
+  /* v9.77 — SOURCE DES COLONNES DE PT CARDIO. Jusqu'ici PT Cardio était le seul
+     onglet dont 6 colonnes étaient écrites en dur ; les 3 autres déduisent tout des
+     données. Désormais lui aussi : une colonne par salle déclarée (les activités qui
+     partagent une salle se regroupent), une colonne par activité à plusieurs salles.
+     Vérifié au préalable sur les données réelles : résultat identique aux 6 colonnes. */
+  const ptRowsDerived=useMemo(()=>{
+    const cand=actes.filter(a=>!a.isSystem&&(acteRecapIn(a,"PLATEAU")||PT_FIXED_ROWS.some(r=>(r.ids||[]).includes(a.id))));
+    const bySalle={},out=[];
+    cand.forEach(a=>{
+      const sl=a.salles||[];
+      if(sl.length===1){
+        const k="SALLE:"+sl[0];
+        if(!bySalle[k]){bySalle[k]={key:k,label:sl[0],ids:[],color:a.color,salle:sl[0]};out.push(bySalle[k]);}
+        bySalle[k].ids.push(a.id);
+      } else if(sl.length>1){
+        out.push({key:a.id,label:a.label,ids:[a.id],color:a.color,salle:null,hasSalleChoice:true,sallesDisp:sl});
+      } else {
+        out.push({key:a.id,label:a.label,ids:[a.id],color:a.color,salle:null});
+      }
+    });
+    return out;
+  },[actes]);
+  /* PT_FIXED_ROWS ne sert plus qu'à retrouver le NOM, la COULEUR et la CLÉ d'ordre des
+     six colonnes historiques : l'ordre enregistré (clés ROW_*) est ainsi conservé. */
   const ptRows=useMemo(()=>{
-    const used={};PT_FIXED_ROWS.forEach(r=>(r.ids||[]).forEach(i=>{used[i]=1;}));
-    const auto=actes.filter(a=>acteRecapIn(a,"PLATEAU")&&!a.isSystem&&!used[a.id]).map(a=>(
-      (a.salles||[]).length>1
-        ?{key:a.id,label:a.label,ids:[a.id],color:a.color,salle:null,hasSalleChoice:true,sallesDisp:a.salles}
-        :{key:a.id,label:a.label,ids:[a.id],color:a.color,salle:(a.salles&&a.salles[0])||null}));
-    const all=PT_FIXED_ROWS.concat(auto);
+    const all=ptRowsDerived.map(r=>{
+      const fx=PT_FIXED_ROWS.find(f=>(f.ids||[]).some(i=>(r.ids||[]).includes(i)));
+      return fx?{...r,key:fx.key,label:fx.label,color:fx.color}:r;
+    });
     const rank=k=>{const i=(ptOrder||[]).indexOf(k);return i<0?9999:i;};
     return all.map((r,i)=>({r,i})).sort((a,b)=>(rank(a.r.key)-rank(b.r.key))||(a.i-b.i)).map(x=>x.r);
-  },[actes,ptOrder]);
+  },[ptRowsDerived,ptOrder]);
   const movePtRow=(key,dir)=>{
     const cur=ptRows.map(r=>r.key);
     const i=cur.indexOf(key),j=i+dir;
@@ -5670,12 +5760,19 @@ function CardioPlanning(){
       if(met.length>=1&&ab.length>=1){const a0=acteById(ab[0].acteId);msgs.push("activité sur "+(a0?a0.label:ab[0].acteId));counts.abs++;}
       /* deux salles DÉDIÉES dans deux hôpitaux sur la même demi-journée : les sites sont
          proches et on passe de l'un à l'autre, mais pas quand les deux lieux sont fixés. */
-      const sts=uniqArr(allF.filter(e=>e.salle).map(e=>{const a=acteById(e.acteId);return a&&a.site;}).filter(Boolean));
-      if(sts.length>=2){msgs.push("deux hôpitaux : "+sts.join(" + "));counts.hop++;}
+      /* v9.80 : le lieu vient désormais de la SALLE POSÉE, plus du site de l'activité.
+         Une Coro en Angio-2 est à Lens même si l'activité est cochée « tous », et une
+         salle déplacée d'un hôpital à l'autre est suivie sans rien changer ici. */
+      const sts=uniqArr(allF.filter(e=>e.salle).map(e=>{
+        const rg=(salleReg||[]).find(x=>x&&x.n===e.salle);
+        if(rg)return salleSite(rg);
+        const a=acteById(e.acteId);return a&&a.site;
+      }).filter(x=>x==="CHL"||x==="CHB"));
+      if(sts.length>=2){msgs.push("deux hôpitaux : "+sts.map(x=>x==="CHL"?"Lens":"Béthune").join(" + "));counts.hop++;}
       if(msgs.length){map[med.id+"|"+dd.y+"|"+dd.m+"|"+dd.d+"|"+sl]="⚠ "+msgs.join(" · ");list.push({y:dd.y,m:dd.m,d:dd.d,sl,med,label:msgs.join(" · "),dw:JRS[new Date(dd.y,dd.m,dd.d).getDay()]});}
     });});});
     return {map,list,condList,counts};
-  },[getEntries,acteById,allDays4,actes]);
+  },[getEntries,acteById,allDays4,actes,salleReg]);
   /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
   const applyPTFlex=useCallback((medId,monthsList,fromToday)=>{
     const tod=new Date();tod.setHours(0,0,0,0);
@@ -7638,6 +7735,7 @@ header::-webkit-scrollbar { display: none; }
             ))}
           </div>
           <button style={{...S.icnBtn,width:"100%",marginTop:10}} onClick={()=>setPtOrder([])}>↩ Ordre par défaut</button>
+          <div style={{fontSize:9,color:"var(--txt3)",marginTop:8,lineHeight:1.45}}>Les colonnes se déduisent des activités : la salle indiquée sur chaque fiche d'activité décide de la colonne où elle apparaît. Modifier une salle dans l'onglet Activités déplace donc la colonne ici.</div>
         </div>
       </div>}
       {modal==="print"&&(()=>{
@@ -7719,10 +7817,11 @@ header::-webkit-scrollbar { display: none; }
                 const inSite=(x,site3)=>Array.isArray(x.s)?x.s.indexOf(site3)>=0:x.s===site3;
                 const regN=salleReg.map(x=>x.n);
                 const orph=actes.flatMap(a2=>a2.salles||[]).filter(s=>regN.indexOf(s)<0);
-                const groups=[["CHL",salleReg.filter(x=>inSite(x,"CHL")).map(x=>x.n)],
-                              ["CHB",salleReg.filter(x=>inSite(x,"CHB")).map(x=>x.n)],
-                              ["Autres",salleReg.filter(x=>!inSite(x,"CHL")&&!inSite(x,"CHB")).map(x=>x.n).concat(orph)]];
-                return groups.filter(([g0])=>mData.site==="CHL"?g0==="CHL":mData.site==="CHB"?g0==="CHB":true).map(([g,list3])=>{
+                /* v9.79 : regroupement par LIEU réel, plus par onglet d'affichage */
+                const groups=[["Lens (CHL)",salleReg.filter(x=>salleSite(x)==="CHL").map(x=>x.n)],
+                              ["Béthune (CHB)",salleReg.filter(x=>salleSite(x)==="CHB").map(x=>x.n)],
+                              ["Hors registre",orph]];
+                return groups.filter(([g0])=>mData.site==="CHL"?g0!=="Béthune (CHB)":mData.site==="CHB"?g0!=="Lens (CHL)":true).map(([g,list3])=>{
                   const uniq=list3.filter((s,ix,arr)=>arr.indexOf(s)===ix).sort();
                   if(uniq.length===0)return null;
                   return <div key={g} style={{marginBottom:6}}>
@@ -7784,7 +7883,17 @@ header::-webkit-scrollbar { display: none; }
           <div style={{padding:"4px 2px"}}>
             <label style={S.fl}>Nom de la salle</label>
             <input value={mData.n||""} onChange={e=>setMData(p=>({...p,n:e.target.value}))} style={{...S.fi,width:"100%",fontSize:14,padding:"8px"}} placeholder="ex : CHL-5"/>
-            <label style={{...S.fl,marginTop:10,display:"block"}}>Onglet</label>
+            <label style={{...S.fl,marginTop:10,display:"block"}}>Lieu (hôpital où se trouve la salle)</label>
+            <div style={{display:"flex",gap:6}}>
+              {[["CHL","🏥 Lens"],["CHB","🏥 Béthune"]].map(([v3,l3])=>(
+                <button key={v3} onClick={()=>setMData(p=>({...p,site:v3}))}
+                  style={{flex:1,fontSize:12,padding:"7px 10px",borderRadius:8,cursor:"pointer",fontWeight:700,
+                    border:salleSite(mData)===v3?"1.5px solid #388bfd":"1px solid var(--border)",
+                    background:salleSite(mData)===v3?"rgba(56,139,253,.15)":"var(--bg2)",color:"var(--txt)"}}>{l3}</button>
+              ))}
+            </div>
+            <div style={{fontSize:9,color:"var(--txt3)",marginTop:3}}>Sert à proposer la salle aux activités du bon hôpital et à repérer un praticien attendu sur les deux sites.</div>
+            <label style={{...S.fl,marginTop:10,display:"block"}}>Onglets où la salle s'affiche</label>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {[["CHL","\ud83c\udfe5 CHL"],["CHB","\ud83c\udfe5 CHB"],["ANGIO","\ud83d\udd2c PT Angio"],["PLATEAU","\u2764\ufe0f PT Cardio"]].map(([v2,l2])=>(
                 <button key={v2} onClick={()=>setMData(p=>{const cur=Array.isArray(p.s)?p.s:(p.s?[p.s]:[]);const nx=cur.includes(v2)?cur.filter(x=>x!==v2):cur.concat([v2]);return {...p,s:nx};})} style={{flex:"1 1 40%",padding:"9px 6px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:(Array.isArray(mData.s)?mData.s:[mData.s]).includes(v2)?"#1d4ed8":"var(--bg2)",color:(Array.isArray(mData.s)?mData.s:[mData.s]).includes(v2)?"#fff":"var(--txt2)"}}>{l2}</button>
@@ -7810,11 +7919,7 @@ header::-webkit-scrollbar { display: none; }
               </div>);
               })}
             </div>
-            {!mData._new&&<div style={{marginTop:12,display:"flex",gap:8,alignItems:"center"}}>
-              <span style={{fontSize:12,color:"var(--txt2)"}}>Position dans l'onglet :</span>
-              <button onClick={()=>setSalleReg(p=>{const idx=p.findIndex(x=>x.n===mData._origN);if(idx<=0)return p;let k2=idx-1;while(k2>=0&&p[k2].s!==p[idx].s)k2--;if(k2<0)return p;const n2=p.slice();const t2=n2[idx];n2[idx]=n2[k2];n2[k2]=t2;return n2;})} style={{...S.arr,fontSize:14}}>◀</button>
-              <button onClick={()=>setSalleReg(p=>{const idx=p.findIndex(x=>x.n===mData._origN);if(idx<0)return p;let k2=idx+1;while(k2<p.length&&p[k2].s!==p[idx].s)k2++;if(k2>=p.length)return p;const n2=p.slice();const t2=n2[idx];n2[idx]=n2[k2];n2[k2]=t2;return n2;})} style={{...S.arr,fontSize:14}}>▶</button>
-            </div>}
+            {/* v9.79 : bouton de position retiré — une salle pouvant vivre dans plusieurs onglets, l'ordre se règle désormais dans chaque onglet (bouton ↕). */}
             <div style={{display:"flex",gap:8,marginTop:14}}>
               {!mData._new&&<button onClick={()=>{
                   if(!window.confirm("Supprimer la salle "+mData._origN+" du registre ?\n(Retirée aussi des activités ; les cases déjà posées la gardent.)"))return;
