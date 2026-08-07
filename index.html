@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.90 — 07/08/2026";
+var APP_VERSION = "v9.91 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1001,7 +1001,7 @@ function SiteView(_a) {
                 (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-            onOrder && isEdit && React.createElement("button", { onClick: function () { return onOrder(allSalles); }, title: "Ordre des colonnes", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\u2195"),
+            onOrder && isEdit && React.createElement("button", { onClick: function () { return onOrder(allSalles); }, title: "Ordre des colonnes", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\u2194"),
             onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
             React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
@@ -1219,10 +1219,9 @@ function ActTabView(_a) {
                 (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
         React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-            orderCtl && React.createElement("button", { onClick: onOrder, title: "Ordre des colonnes", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\u2195"),
+            orderCtl && React.createElement("button", { onClick: onOrder, title: "Ordre des colonnes", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\u2194"),
             ideFeature && React.createElement("button", { onClick: function () { return setIdeOn(function (v) { return !v; }); }, title: "Afficher les effectifs IDE", style: __assign(__assign({}, S.arr), { width: "auto", padding: "0 8px", fontSize: 11, fontWeight: 800, color: ideOn ? "#3fb950" : "var(--txt2)", border: "1px solid ".concat(ideOn ? "#3fb950" : "var(--border)") }) }, "\uD83E\uDE7A IDE"),
             ideFeature && ideOn && canIde && React.createElement("button", { onClick: function () { return setIdePanel(function (p) { return !p; }); }, title: "R\u00E9gler les effectifs par d\u00E9faut", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30, color: idePanel ? "#3fb950" : "var(--txt2)" }) }, "\u2699\uFE0F"),
-            onOrder && isEdit && React.createElement("button", { onClick: function () { return onOrder(allSalles); }, title: "Ordre des colonnes", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\u2195"),
             onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
             React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
@@ -8467,7 +8466,7 @@ function CardioPlanning() {
             React.createElement("div", { style: __assign(__assign({}, S.mb), { width: 330 }), onClick: function (e) { return e.stopPropagation(); } },
                 React.createElement("div", { style: S.mHd },
                     React.createElement("div", { style: S.mTit2 },
-                        "\u2195 Ordre des colonnes \u2014 ",
+                        "\u2194 Ordre des colonnes \u2014 ",
                         colModal.site),
                     React.createElement("button", { style: S.xBtn, onClick: function () { setModal(null); setColModal(null); } }, "\u00D7")),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8 } }, "Cet ordre est partag\u00E9 par toute l'\u00E9quipe. Une colonne ajout\u00E9e plus tard se place en dernier."),
@@ -8487,7 +8486,7 @@ function CardioPlanning() {
         modal === "ptOrder" && React.createElement("div", { style: S.ov, onClick: function () { return setModal(null); } },
             React.createElement("div", { style: __assign(__assign({}, S.mb), { width: 330 }), onClick: function (e) { return e.stopPropagation(); } },
                 React.createElement("div", { style: S.mHd },
-                    React.createElement("div", { style: S.mTit2 }, "\u2195 Ordre des colonnes \u2014 PT Cardio"),
+                    React.createElement("div", { style: S.mTit2 }, "\u2194 Ordre des colonnes \u2014 PT Cardio"),
                     React.createElement("button", { style: S.xBtn, onClick: function () { return setModal(null); } }, "\u00d7")),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8 } }, "Cet ordre est partag\u00e9 par toute l'\u00e9quipe. Une activit\u00e9 que l'on vient de cocher \u00ab \u2764\ufe0f PT Cardio \u00bb se place en dernier."),
                 React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 340, overflowY: "auto" } }, ptRows.map(function (r, i) {

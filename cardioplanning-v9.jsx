@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.90 — 07/08/2026";
+const APP_VERSION="v9.91 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -875,7 +875,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
         <button onClick={nextM} style={S.arr}>›</button>
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-        {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↕</button>}
+        {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↔</button>}
         {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
@@ -1087,10 +1087,10 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
         <button onClick={nextM} style={S.arr}>›</button>
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-        {orderCtl&&<button onClick={onOrder} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↕</button>}
+        {orderCtl&&<button onClick={onOrder} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↔</button>}
         {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
         {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
-        {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↕</button>}
+        {/* v9.91 : PT Cardio a déjà son bouton d'ordre (orderCtl) — le second, ajouté par erreur en v9.74, est retiré */}
         {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
@@ -7562,7 +7562,7 @@ header::-webkit-scrollbar { display: none; }
   onClose={()=>setModal(null)}/></Ov>}
       {modal==="colOrder"&&colModal&&<div style={S.ov} onClick={()=>{setModal(null);setColModal(null);}}>
         <div style={{...S.mb,width:330}} onClick={e=>e.stopPropagation()}>
-          <div style={S.mHd}><div style={S.mTit2}>↕ Ordre des colonnes — {colModal.site}</div><button style={S.xBtn} onClick={()=>{setModal(null);setColModal(null);}}>×</button></div>
+          <div style={S.mHd}><div style={S.mTit2}>↔ Ordre des colonnes — {colModal.site}</div><button style={S.xBtn} onClick={()=>{setModal(null);setColModal(null);}}>×</button></div>
           <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>Cet ordre est partagé par toute l'équipe. Une colonne ajoutée plus tard se place en dernier.</div>
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
             {(colModal.cols||[]).map((c,i)=>{
@@ -7582,7 +7582,7 @@ header::-webkit-scrollbar { display: none; }
       </div>}
       {modal==="ptOrder"&&<div style={S.ov} onClick={()=>setModal(null)}>
         <div style={{...S.mb,width:330}} onClick={e=>e.stopPropagation()}>
-          <div style={S.mHd}><div style={S.mTit2}>↕ Ordre des colonnes — PT Cardio</div><button style={S.xBtn} onClick={()=>setModal(null)}>×</button></div>
+          <div style={S.mHd}><div style={S.mTit2}>↔ Ordre des colonnes — PT Cardio</div><button style={S.xBtn} onClick={()=>setModal(null)}>×</button></div>
           <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>Cet ordre est partagé par toute l'équipe. Une activité que l'on vient de cocher « ❤️ PT Cardio » se place en dernier.</div>
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
             {ptRows.map((r,i)=>(
