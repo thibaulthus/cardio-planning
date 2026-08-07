@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.87.2 — 07/08/2026";
+const APP_VERSION="v9.87.3 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -819,7 +819,12 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
    estimation. Correction : le cadre ne défile plus verticalement (rendu à la page) et ses
    en-têtes se figent par rapport à L'ÉCRAN, sous la barre de navigation. Les bandeaux et
    les filtres remontent donc toujours, mais les en-têtes ne peuvent plus partir. */
-function TableScroll({children,style,mh=110}){
+/* v9.87.3 : le seul réglage qui restait à ajuster. Le cadre était trop haut de quelques
+   dizaines de pixels : arrivé en bas de page, son sommet passait DERRIÈRE la barre de
+   navigation, emportant la ligne des initiales avec lui. En le raccourcissant, son sommet
+   se pose juste en dessous et les en-têtes restent lisibles jusqu'à la dernière ligne.
+   Valeur unique et facile à retoucher : c'est tout l'intérêt du composant partagé. */
+function TableScroll({children,style,mh=150}){
   /* v9.87.2 : RETOUR au comportement d'avant la v9.87, à sa demande.
      Mes deux tentatives ont empiré les choses : la première laissait les en-têtes partir,
      la seconde a créé DEUX barres de défilement à droite dans un ordre inversé, réduisant

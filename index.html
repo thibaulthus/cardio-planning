@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.87.2 — 07/08/2026";
+var APP_VERSION = "v9.87.3 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -956,7 +956,7 @@ function GridV(_a) {
 }
 /* ════ SITE VIEW (CHL/CHB) ════ */
 function TableScroll(_a) {
-    var children = _a.children, style = _a.style, _b = _a.mh, mh = _b === void 0 ? 110 : _b;
+    var children = _a.children, style = _a.style, _b = _a.mh, mh = _b === void 0 ? 150 : _b;
     /* v9.87.2 : RETOUR au comportement d'avant la v9.87, à sa demande.
        Mes deux tentatives ont empiré les choses : la première laissait les en-têtes partir,
        la seconde a créé DEUX barres de défilement à droite dans un ordre inversé, réduisant
