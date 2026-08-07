@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.87.1 — 07/08/2026";
+const APP_VERSION="v9.87.2 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -819,23 +819,20 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
    estimation. Correction : le cadre ne défile plus verticalement (rendu à la page) et ses
    en-têtes se figent par rapport à L'ÉCRAN, sous la barre de navigation. Les bandeaux et
    les filtres remontent donc toujours, mais les en-têtes ne peuvent plus partir. */
-function TableScroll({children,style,top=HDR_H}){
-  /* v9.87.1 : la tentative précédente (rendre le défilement vertical à la page) était
-     INOPÉRANTE — un conteneur en overflowX:auto reste un conteneur de défilement, donc
-     les en-têtes restaient collés à lui, mais sans limite de hauteur ils se retrouvaient
-     parqués au milieu du tableau. C'était pire.
-     Vraie solution : les en-têtes restent collés au CADRE (top:0), et c'est LE CADRE qui
-     devient collant sous la barre de navigation. Les bandeaux et les filtres remontent
-     donc toujours ; ensuite le cadre se cale sous la barre et ne bouge plus, ses en-têtes
-     avec lui, quel que soit l'ordre dans lequel on fait défiler. */
+function TableScroll({children,style,mh=110}){
+  /* v9.87.2 : RETOUR au comportement d'avant la v9.87, à sa demande.
+     Mes deux tentatives ont empiré les choses : la première laissait les en-têtes partir,
+     la seconde a créé DEUX barres de défilement à droite dans un ordre inversé, réduisant
+     la zone visible. Le cadre retrouve donc exactement ses réglages d'origine.
+     Le composant unique est conservé : il n'y a plus qu'un seul endroit à modifier si on
+     reprend ce sujet, au lieu des dix cadres identiques d'avant. */
   return(
-    <div style={{position:"sticky",top,maxHeight:"calc(100vh - "+top+"px - 6px)",
-      overflowX:"auto",overflowY:"auto",borderRadius:8,border:"1px solid var(--border)",...(style||{})}}>
+    <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - "+mh+"px)",
+      borderRadius:8,border:"1px solid var(--border)",...(style||{})}}>
       {children}
     </div>
   );
 }
-
 function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,orient,setOrient,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
@@ -2236,7 +2233,7 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
   );
 
   return(
-    <TableScroll>
+    <TableScroll mh={150}>
       <table style={{borderCollapse:"collapse"}}>
         <thead>
           <tr>
@@ -3830,7 +3827,7 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
               background:on?m.color:"var(--bg2)",color:on?"#111":"var(--txt2)"}}>{m.init}</button>;
         })}
       </div>
-      <TableScroll>
+      <TableScroll mh={190}>
         <table style={{borderCollapse:"collapse",fontSize:11}}>
           <thead>
             <tr>
