@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.84 — 07/08/2026";
+const APP_VERSION="v9.85 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3486,7 +3486,7 @@ function TourTab({specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,apply
                       <button key={m.id} disabled={dis||!isEdit}
                         style={{padding:"3px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:44,
                           background:on?({coro:"rgba(118,165,175,.82)",pace:"rgba(227,179,65,.82)",eep:"rgba(139,92,246,.82)",ett:"rgba(236,72,153,.82)"}[m.surSpec]||"rgba(56,139,253,.82)"):"var(--bg2)",color:on?"#fff":"var(--txt2)",fontWeight:on?800:600,opacity:dis?.3:1,
-                           outline:on?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"#388bfd"):m.surSpec&&!blocked?"2px solid "+({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
+                           outline:on?"2px solid "+(SPEC_COLORS[m.surSpec]||"#388bfd"):m.surSpec&&!blocked?"2px solid "+(SPEC_COLORS[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
                         onClick={()=>{if(dis||!isEdit)return;
                         const wasOn=on;
                         setTourMed(p=>{const cur={...(p[w.key]||{HC:[],USIC:[]})};const l=cur[unit]||[];if(!wasOn&&l.length>=2){toast("Maximum 2 médecins par unité","info");return p;}cur[unit]=wasOn?l.filter(x=>x!==m.id):[...l,m.id];return{...p,[w.key]:cur};});
@@ -3498,7 +3498,7 @@ function TourTab({specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,apply
                           setTimeout(()=>reapplyPTWeek(m.id,w.key),60);
                         }}}>
                         <div style={{fontWeight:800,fontSize:10}} title={avoidW?"Préfère ne pas tourner cette semaine":wishW?"Souhaite tourner cette semaine":""}>{m.init}{avoidW?" 🚫":wishW?" ⭐":""}</div>
-                        <div style={{fontSize:8,color:blocked?"inherit":m.surSpec&&!on?({coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"}[m.surSpec]):"inherit"}}>
+                        <div style={{fontSize:8,color:blocked?"inherit":m.surSpec&&!on?(SPEC_COLORS[m.surSpec]):"inherit"}}>
                           {blocked?"indispo":inOther?"≠":""}
                         </div>
                       </button>
@@ -8073,13 +8073,14 @@ header::-webkit-scrollbar { display: none; }
             {(mData.role||"medecin")==="medecin"&&<div style={{gridColumn:"1/-1"}}>
               <label style={{...S.fl,display:"none"}}>Surspécialité (Tour médical)</label>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
-                {[["coro","Coro","#76a5af"],["pace","Pace","#e3b341"],["eep","EEP","#8b5cf6"],["ett","ETT","#ec4899"]].map(([v,l,c])=>(
+                {/* v9.85 : couleurs prises dans les paramètres, plus écrites ici */}
+                {SPEC_LIST.map(([v,l])=>{const c=(specColors&&specColors[v])||SPEC_COLORS_DEF[v];return(
                   <button key={v} onClick={()=>setMData(p=>({...p,surSpec:p.surSpec===v?null:v}))}
                     style={{padding:"5px 12px",borderRadius:6,border:"1px solid "+c,cursor:"pointer",fontWeight:700,fontSize:12,
                       background:mData.surSpec===v?c:"var(--bg2)",color:mData.surSpec===v?"#fff":c}}>
                     {l}
                   </button>
-                ))}
+                );})}
               </div>
             </div>}
             <div style={{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,fontSize:10,fontWeight:800,color:"#e3b341",textTransform:"uppercase",letterSpacing:.5}}>🔐 Niveau de droits (avec son PIN personnel)</div>
