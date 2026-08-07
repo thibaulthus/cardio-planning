@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.82 — 06/08/2026";
+const APP_VERSION="v9.83 — 06/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -709,7 +709,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
         })()}
         {(()=>{
           const filteredGM=gardePickMeds.filter(m=>!gardeSearch||m.init.toUpperCase().startsWith(gardeSearch));
-          const onEnter=e=>{if(e.key==="Enter"&&filteredGM.length===1){const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};if(isAbsOn(filteredGM[0].id,pgf.y,pgf.m,pgf.d))return;applyGarde(filteredGM[0].id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}};
+          const onEnter=e=>{if(e.key==="Enter"&&filteredGM.length===1){const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};if(isAbsOn(filteredGM[0].id,pgf.y,pgf.m,pgf.d)){toast("Absent / FMC ce jour — utilisez « Assigner quand même »","warn");return;}applyGarde(filteredGM[0].id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}};
           return(<>
         <input
           autoFocus
@@ -720,30 +720,13 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
           style={{width:"100%",padding:"8px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:14,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:2,marginBottom:8,boxSizing:"border-box"}}
         />
         {filteredGM.length===1&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:4,textAlign:"center"}}>↵ Entrée pour confirmer</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:320,overflowY:"auto"}}>
-          {filteredGM.map(m=>{
-            const pgfCur=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};
-            const gm=getGardeMed2(pgfCur.y,pgfCur.m,pgfCur.d);
-            const isOn=gm&&gm.id===m.id;
-            /* v9.66.1 : ce sélecteur n'avait AUCUN statut, contrairement à son jumeau de
-               l'onglet Gardes. Absent ou FMC le jour même = non cliquable ; absence ou FMC
-               le lendemain = garde permise mais annoncée sans repos (décision v9.65). */
-            const dayAbs=!isOn&&isAbsOn(m.id,pgfCur.y,pgfCur.m,pgfCur.d);
-            const _nx=new Date(pgfCur.y,pgfCur.m,pgfCur.d+1);
-            const nxAbs=!dayAbs&&isAbsOn(m.id,_nx.getFullYear(),_nx.getMonth(),_nx.getDate());
-            return <button key={m.id} disabled={dayAbs}
-              style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,border:`1px solid ${isOn?"#16a34a":"var(--border)"}`,background:isOn?"#f0fdf4":"var(--bg2)",cursor:dayAbs?"not-allowed":"pointer",opacity:dayAbs?.45:1}}
-              onClick={()=>{if(dayAbs)return;const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};applyGarde(m.id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}}>
-              <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",flex:1}}>
-                <span style={{fontSize:12,fontWeight:600,color:dayAbs?"#ef4444":"var(--txt)"}}>{m.prenom} {m.nom}</span>
-                {dayAbs&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>Absent / FMC ce jour</span>}
-                {nxAbs&&<span style={{fontSize:9,color:"#f59e0b",fontWeight:700}}>⚠ Absence/FMC demain — garde possible, sans repos</span>}
-              </div>
-              {isOn&&<span style={{color:"#16a34a",fontSize:12}}>✓ De garde</span>}
-            </button>;
-          })}
-        </div>
+        <GardeCandidateList
+          meds={filteredGM}
+          isAbsDay={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};return isAbsOn(mid,p2.y,p2.m,p2.d);}}
+          isAbsNext={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const nx=new Date(p2.y,p2.m,p2.d+1);return isAbsOn(mid,nx.getFullYear(),nx.getMonth(),nx.getDate());}}
+          currentId={(()=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const gm=getGardeMed2(p2.y,p2.m,p2.d);return gm?gm.id:null;})()}
+          onPick={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};applyGarde(mid,p2.y,p2.m,p2.d);setPickGardeDayFull(null);}}
+          maxHeight={320}/>
         </>);})()}
       </div>
     </Ov>}
@@ -1268,6 +1251,48 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
 }
 
 /* ════ GARDE VIEW ════ */
+/* v9.83 : la LISTE DES CANDIDATS à une garde était écrite deux fois — une par écran.
+   C'est cette duplication qui a produit deux jours de contradictions entre l'onglet
+   Gardes et l'onglet Planning. Elle devient un composant unique.
+   TROIS ÉTATS, volontairement distincts :
+     • gris   : disponible ;
+     • orange : absence ou FMC DEMAIN — garde normale, seul le repos saute, un clic ;
+     • rouge  : absent ou en FMC LE JOUR MÊME — non cliquable, mais un bouton
+                « Assigner quand même » permet le cas rare (garde du soir après une
+                journée de FMC). Le geste rare coûte un clic de plus, le geste
+                fréquent est protégé de l'erreur. */
+function GardeCandidateList({meds,isAbsDay,isAbsNext,currentId,onPick,maxHeight=340}){
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight,overflowY:"auto"}}>
+      {meds.map(m=>{
+        const isOn=currentId!=null&&m.id===currentId;
+        const dayAbs=!isOn&&isAbsDay(m.id);
+        const nxAbs=!dayAbs&&!isOn&&isAbsNext(m.id);
+        const bord=isOn?"#16a34a":dayAbs?"#ef444455":nxAbs?"#f59e0b55":"var(--border)";
+        const bg=isOn?"#f0fdf4":dayAbs?"rgba(239,68,68,.06)":nxAbs?"rgba(245,158,11,.08)":"var(--bg2)";
+        return(
+          <div key={m.id} style={{border:`1px solid ${bord}`,background:bg,borderRadius:8,padding:"7px 10px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,cursor:dayAbs?"default":"pointer"}}
+                 onClick={()=>{if(!dayAbs)onPick(m.id);}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0,opacity:dayAbs?.5:1}}>{m.init}</div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",flex:1}}>
+                <span style={{fontSize:12,fontWeight:600,color:dayAbs?"#ef4444":"var(--txt)"}}>{m.prenom} {m.nom}</span>
+                {dayAbs&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>⛔ Absent / FMC ce jour</span>}
+                {nxAbs&&<span style={{fontSize:9,color:"#b45309",fontWeight:700}}>⚠ Absence/FMC demain — garde possible, sans repos</span>}
+                {!dayAbs&&!nxAbs&&!isOn&&<span style={{fontSize:9,color:"var(--txt3)"}}>Disponible</span>}
+              </div>
+              {isOn&&<span style={{color:"#16a34a",fontSize:12,fontWeight:700}}>✓ De garde</span>}
+            </div>
+            {dayAbs&&<button onClick={()=>onPick(m.id)}
+              style={{marginTop:6,width:"100%",padding:"4px",borderRadius:6,border:"1px solid #ef444488",background:"transparent",color:"#ef4444",cursor:"pointer",fontSize:10,fontWeight:800}}>
+              Assigner quand même
+            </button>}
+          </div>);
+      })}
+      {meds.length===0&&<div style={{fontSize:11,color:"var(--txt3)",textAlign:"center",padding:"8px 0"}}>Aucun médecin de garde configuré.</div>}
+    </div>);
+}
+
 function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orient,setOrient,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
   /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
      l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
@@ -1859,36 +1884,13 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
               </div>
             )}
             <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>{gMed?"Changer :":"Assigner :"}</div>
-            <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:360,overflowY:"auto"}}>
-              {medecins.filter(m=>m.garde===true).map(m=>{
-                const avail=isMedAvailable(m,pd.y,pd.m,pd.d,gardeSlot);
-                const isG=gMed&&m.id===gMed.id;
-                /* v9.81 : le statut venait d'isMedAvailable sur le créneau de GARDE ("N" en
-                   semaine), qui ne lit que N et JOUR — une absence posée sur M et AM lui était
-                   donc INVISIBLE, et un praticien absent apparaissait « Disponible ». Le
-                   sélecteur de l'onglet Planning, lui, lisait bien M/AM/JOUR : deux écrans
-                   contradictoires pour le même jour. On lit désormais la journée entière. */
-                const dayAbs=avail==="blocked"||gvIsAbs(m.id,pd.y,pd.m,pd.d);
-                const _nx=new Date(pd.y,pd.m,pd.d+1);
-                const nxAbs=!dayAbs&&gvIsAbs(m.id,_nx.getFullYear(),_nx.getMonth(),_nx.getDate());
-                return(
-                  <button key={m.id} disabled={dayAbs}
-                    style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:7,
-                      border:`1px solid ${isG?"var(--today-c)":"var(--border)"}`,
-                      cursor:dayAbs?"not-allowed":"pointer",
-                      background:isG?"var(--bg-td)":dayAbs?"var(--bg)":"var(--bg2)",
-                      opacity:dayAbs?.3:1}}
-                    onClick={()=>{ if(dayAbs)return; applyGarde(m.id,pd.y,pd.m,pd.d); setPickerDay(null); }}>
-                    <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
-                    <div style={{textAlign:"left",flex:1}}>
-                      <div style={{fontSize:12,fontWeight:700,color:isG?"var(--today-c)":"var(--txt)"}}>{m.prenom} {m.nom}</div>
-                      <div style={{fontSize:9,color:dayAbs?"#ef4444":nxAbs?"#f59e0b":"var(--txt3)",fontWeight:nxAbs?700:400}}>{dayAbs?"Absent / FMC ce jour":nxAbs?"⚠ Absence/FMC demain — garde possible, sans repos":"Disponible"}</div>
-                    </div>
-                    {isG&&<span style={{fontSize:10,color:"var(--today-c)"}}>✓</span>}
-                  </button>
-                );
-              })}
-            </div>
+            <GardeCandidateList
+              meds={medecins.filter(m=>m.garde===true)}
+              isAbsDay={mid=>isMedAvailable(medecins.find(x=>x.id===mid),pd.y,pd.m,pd.d,gardeSlot)==="blocked"||gvIsAbs(mid,pd.y,pd.m,pd.d)}
+              isAbsNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);return gvIsAbs(mid,nx.getFullYear(),nx.getMonth(),nx.getDate());}}
+              currentId={gMed?gMed.id:null}
+              onPick={mid=>{applyGarde(mid,pd.y,pd.m,pd.d);setPickerDay(null);}}
+              maxHeight={360}/>
           </Ov>
         );
       })()}

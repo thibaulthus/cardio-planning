@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.82 — 06/08/2026";
+var APP_VERSION = "v9.83 — 06/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -882,36 +882,17 @@ function GridV(_a) {
                     var filteredGM = gardePickMeds.filter(function (m) { return !gardeSearch || m.init.toUpperCase().startsWith(gardeSearch); });
                     var onEnter = function (e) { if (e.key === "Enter" && filteredGM.length === 1) {
                         var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
-                        if (isAbsOn(filteredGM[0].id, pgf.y, pgf.m, pgf.d))
+                        if (isAbsOn(filteredGM[0].id, pgf.y, pgf.m, pgf.d)) {
+                            toast("Absent / FMC ce jour — utilisez « Assigner quand même »", "warn");
                             return;
+                        }
                         applyGarde(filteredGM[0].id, pgf.y, pgf.m, pgf.d);
                         setPickGardeDayFull(null);
                     } };
                     return (React.createElement(React.Fragment, null,
                         React.createElement("input", { autoFocus: true, value: gardeSearch, onChange: function (e) { return setGardeSearch(e.target.value.toUpperCase()); }, onKeyDown: onEnter, placeholder: "Initiales ou nom...", style: { width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", fontSize: 14, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, letterSpacing: 2, marginBottom: 8, boxSizing: "border-box" } }),
                         filteredGM.length === 1 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 4, textAlign: "center" } }, "\u21B5 Entr\u00E9e pour confirmer"),
-                        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, maxHeight: 320, overflowY: "auto" } }, filteredGM.map(function (m) {
-                            var pgfCur = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
-                            var gm = getGardeMed2(pgfCur.y, pgfCur.m, pgfCur.d);
-                            var isOn = gm && gm.id === m.id;
-                            /* v9.66.1 : ce sélecteur n'avait AUCUN statut, contrairement à son jumeau de
-                               l'onglet Gardes. Absent ou FMC le jour même = non cliquable ; absence ou FMC
-                               le lendemain = garde permise mais annoncée sans repos (décision v9.65). */
-                            var dayAbs = !isOn && isAbsOn(m.id, pgfCur.y, pgfCur.m, pgfCur.d);
-                            var _nx = new Date(pgfCur.y, pgfCur.m, pgfCur.d + 1);
-                            var nxAbs = !dayAbs && isAbsOn(m.id, _nx.getFullYear(), _nx.getMonth(), _nx.getDate());
-                            return React.createElement("button", { key: m.id, disabled: dayAbs, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid ".concat(isOn ? "#16a34a" : "var(--border)"), background: isOn ? "#f0fdf4" : "var(--bg2)", cursor: dayAbs ? "not-allowed" : "pointer", opacity: dayAbs ? .45 : 1 }, onClick: function () { if (dayAbs)
-                                    return; var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(m.id, pgf.y, pgf.m, pgf.d); setPickGardeDayFull(null); } },
-                                React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
-                                React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-start", flex: 1 } },
-                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: dayAbs ? "#ef4444" : "var(--txt)" } },
-                                        m.prenom,
-                                        " ",
-                                        m.nom),
-                                    dayAbs && React.createElement("span", { style: { fontSize: 9, color: "#ef4444", fontWeight: 700 } }, "Absent / FMC ce jour"),
-                                    nxAbs && React.createElement("span", { style: { fontSize: 9, color: "#f59e0b", fontWeight: 700 } }, "\u26A0 Absence/FMC demain \u2014 garde possible, sans repos")),
-                                isOn && React.createElement("span", { style: { color: "#16a34a", fontSize: 12 } }, "\u2713 De garde"));
-                        }))));
+                        React.createElement(GardeCandidateList, { meds: filteredGM, isAbsDay: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; return isAbsOn(mid, p2.y, p2.m, p2.d); }, isAbsNext: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var nx = new Date(p2.y, p2.m, p2.d + 1); return isAbsOn(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, currentId: (function () { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var gm = getGardeMed2(p2.y, p2.m, p2.d); return gm ? gm.id : null; })(), onPick: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(mid, p2.y, p2.m, p2.d); setPickGardeDayFull(null); }, maxHeight: 320 })));
                 })())),
         React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 110px)", borderRadius: 8, border: "1px solid var(--border)" } },
             React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
@@ -1419,6 +1400,32 @@ function ActTabView(_a) {
                 }))))));
 }
 /* ════ GARDE VIEW ════ */
+function GardeCandidateList(_a) {
+    var meds = _a.meds, isAbsDay = _a.isAbsDay, isAbsNext = _a.isAbsNext, currentId = _a.currentId, onPick = _a.onPick, _b = _a.maxHeight, maxHeight = _b === void 0 ? 340 : _b;
+    return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, maxHeight: maxHeight, overflowY: "auto" } },
+        meds.map(function (m) {
+            var isOn = currentId != null && m.id === currentId;
+            var dayAbs = !isOn && isAbsDay(m.id);
+            var nxAbs = !dayAbs && !isOn && isAbsNext(m.id);
+            var bord = isOn ? "#16a34a" : dayAbs ? "#ef444455" : nxAbs ? "#f59e0b55" : "var(--border)";
+            var bg = isOn ? "#f0fdf4" : dayAbs ? "rgba(239,68,68,.06)" : nxAbs ? "rgba(245,158,11,.08)" : "var(--bg2)";
+            return (React.createElement("div", { key: m.id, style: { border: "1px solid ".concat(bord), background: bg, borderRadius: 8, padding: "7px 10px" } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, cursor: dayAbs ? "default" : "pointer" }, onClick: function () { if (!dayAbs)
+                        onPick(m.id); } },
+                    React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0, opacity: dayAbs ? .5 : 1 } }, m.init),
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-start", flex: 1 } },
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: dayAbs ? "#ef4444" : "var(--txt)" } },
+                            m.prenom,
+                            " ",
+                            m.nom),
+                        dayAbs && React.createElement("span", { style: { fontSize: 9, color: "#ef4444", fontWeight: 700 } }, "\u26D4 Absent / FMC ce jour"),
+                        nxAbs && React.createElement("span", { style: { fontSize: 9, color: "#b45309", fontWeight: 700 } }, "\u26A0 Absence/FMC demain \u2014 garde possible, sans repos"),
+                        !dayAbs && !nxAbs && !isOn && React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "Disponible")),
+                    isOn && React.createElement("span", { style: { color: "#16a34a", fontSize: 12, fontWeight: 700 } }, "\u2713 De garde")),
+                dayAbs && React.createElement("button", { onClick: function () { return onPick(m.id); }, style: { marginTop: 6, width: "100%", padding: "4px", borderRadius: 6, border: "1px solid #ef444488", background: "transparent", color: "#ef4444", cursor: "pointer", fontSize: 10, fontWeight: 800 } }, "Assigner quand m\u00EAme")));
+        }),
+        meds.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", textAlign: "center", padding: "8px 0" } }, "Aucun m\u00E9decin de garde configur\u00E9.")));
+}
 function GardeView(_a) {
     var _b = _a.onRemoveGarde, onRemoveGarde = _b === void 0 ? null : _b, _c = _a.printWk, printWk = _c === void 0 ? null : _c, _d = _a.onPrint, onPrint = _d === void 0 ? null : _d, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, orient = _a.orient, setOrient = _a.setOrient, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
     /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
@@ -2113,32 +2120,7 @@ function GardeView(_a) {
                     })(),
                     React.createElement("button", { style: { width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { removeGarde(typeof pickerDay === "object" ? pickerDay.d : pickerDay, pd && pd.y, pd && pd.m); setPickerDay(null); } }, "Retirer la garde + repos"))),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, gMed ? "Changer :" : "Assigner :"),
-                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 360, overflowY: "auto" } }, medecins.filter(function (m) { return m.garde === true; }).map(function (m) {
-                    var avail = isMedAvailable(m, pd.y, pd.m, pd.d, gardeSlot);
-                    var isG = gMed && m.id === gMed.id;
-                    /* v9.81 : le statut venait d'isMedAvailable sur le créneau de GARDE ("N" en
-                       semaine), qui ne lit que N et JOUR — une absence posée sur M et AM lui était
-                       donc INVISIBLE, et un praticien absent apparaissait « Disponible ». Le
-                       sélecteur de l'onglet Planning, lui, lisait bien M/AM/JOUR : deux écrans
-                       contradictoires pour le même jour. On lit désormais la journée entière. */
-                    var dayAbs = avail === "blocked" || gvIsAbs(m.id, pd.y, pd.m, pd.d);
-                    var _nx = new Date(pd.y, pd.m, pd.d + 1);
-                    var nxAbs = !dayAbs && gvIsAbs(m.id, _nx.getFullYear(), _nx.getMonth(), _nx.getDate());
-                    return (React.createElement("button", { key: m.id, disabled: dayAbs, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 7,
-                            border: "1px solid ".concat(isG ? "var(--today-c)" : "var(--border)"),
-                            cursor: dayAbs ? "not-allowed" : "pointer",
-                            background: isG ? "var(--bg-td)" : dayAbs ? "var(--bg)" : "var(--bg2)",
-                            opacity: dayAbs ? .3 : 1 }, onClick: function () { if (dayAbs)
-                            return; applyGarde(m.id, pd.y, pd.m, pd.d); setPickerDay(null); } },
-                        React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
-                        React.createElement("div", { style: { textAlign: "left", flex: 1 } },
-                            React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: isG ? "var(--today-c)" : "var(--txt)" } },
-                                m.prenom,
-                                " ",
-                                m.nom),
-                            React.createElement("div", { style: { fontSize: 9, color: dayAbs ? "#ef4444" : nxAbs ? "#f59e0b" : "var(--txt3)", fontWeight: nxAbs ? 700 : 400 } }, dayAbs ? "Absent / FMC ce jour" : nxAbs ? "⚠ Absence/FMC demain — garde possible, sans repos" : "Disponible")),
-                        isG && React.createElement("span", { style: { fontSize: 10, color: "var(--today-c)" } }, "\u2713")));
-                }))));
+                React.createElement(GardeCandidateList, { meds: medecins.filter(function (m) { return m.garde === true; }), isAbsDay: function (mid) { return isMedAvailable(medecins.find(function (x) { return x.id === mid; }), pd.y, pd.m, pd.d, gardeSlot) === "blocked" || gvIsAbs(mid, pd.y, pd.m, pd.d); }, isAbsNext: function (mid) { var nx = new Date(pd.y, pd.m, pd.d + 1); return gvIsAbs(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, currentId: gMed ? gMed.id : null, onPick: function (mid) { applyGarde(mid, pd.y, pd.m, pd.d); setPickerDay(null); }, maxHeight: 360 })));
         })()));
 }
 /* ════ BIP TAB ════ */
