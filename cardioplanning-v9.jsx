@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.86 — 07/08/2026";
+const APP_VERSION="v9.87 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -205,6 +205,7 @@ const salleSite=(x)=>{
   const t=Array.isArray(x.s)?x.s:(x.s?[x.s]:[]);
   return t.indexOf("CHB")>=0?"CHB":"CHL";   // Angio, Stim et EEP sont à Lens
 };
+const HDR_H=50;   /* v9.87 : hauteur de la barre de navigation — les en-têtes des tableaux se figent juste en dessous, par rapport à l'écran */
 const SPEC_COLORS_DEF={coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"};
 const SPEC_LIST=[["coro","Coro"],["pace","Pace"],["eep","EEP"],["ett","ETT"]];
 const acteRecapIn=(a,site)=>{if(!a)return false;const arr=a.recapSites||[];return arr.includes(site)||a.recapSite===site||(site==="PLATEAU"&&!!a.ptCardio);};
@@ -310,7 +311,7 @@ const printWeekList=(y,m)=>{
 
 const S={
   app:{minHeight:"100vh",background:"var(--bg)",fontFamily:"'Sora','Segoe UI',sans-serif",color:"var(--txt)"},
-  hdr:{background:"var(--hdr)",borderBottom:"1px solid var(--border)",padding:"0 10px",display:"flex",alignItems:"center",height:50,position:"sticky",top:0,zIndex:100,gap:6},
+  hdr:{background:"var(--hdr)",borderBottom:"1px solid var(--border)",padding:"0 10px",display:"flex",alignItems:"center",height:HDR_H,position:"sticky",top:0,zIndex:100,gap:6},
   nav:{display:"flex",gap:1,flex:1,overflowX:"auto",flexWrap:"nowrap",scrollbarWidth:"none",msOverflowStyle:"none",WebkitOverflowScrolling:"touch"},
   nb:{padding:"4px 9px",borderRadius:6,border:"none",background:"transparent",cursor:"pointer",fontSize:11,fontWeight:500,color:"rgba(255,255,255,.65)",whiteSpace:"nowrap",flexShrink:0},
   nba:{background:"var(--nav-act)",color:"var(--nav-act-c)",fontWeight:700},
@@ -535,15 +536,15 @@ function GridH({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
     return base;
   },[year,month,viewPeriod,allDays,showFull]);
   return(
-    <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+    <TableScroll>
       <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
         <thead>
           <tr>
-            <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:58}} rowSpan={2}>Méd.</th>
+            <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:58}} rowSpan={2}>Méd.</th>
             {ghEffDays.map(({y:ghY,m:ghM,d})=>{
               const we=isWE(ghY,ghM,d),isT=d===today.getDate()&&ghM===today.getMonth()&&ghY===today.getFullYear();
               const cols=showGarde?3:2;
-              return <th key={d+ghM+ghY} colSpan={we?1:cols} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?32:cols*28,position:"sticky",top:0,zIndex:20}}>
+              return <th key={d+ghM+ghY} colSpan={we?1:cols} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?32:cols*28,position:"sticky",top:HDR_H,zIndex:20}}>
                 <div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700}}>{MOIS[ghM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(ghY,ghM,d)]}</div>
               </th>;
             })}
@@ -600,7 +601,7 @@ function GridH({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }
 
@@ -733,14 +734,14 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
         </>);})()}
       </div>
     </Ov>}
-    <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+    <TableScroll>
       <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
         <thead>
           <tr>
-            <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:C0}}>Jour</th>
-            <th style={{...S.thFix,position:"sticky",top:0,left:C0,zIndex:40,minWidth:C1}}>Sl</th>
-            {showGarde&&<th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#93c47d"}}>Garde</th>}
-            {meds.map(m=><th key={m.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20}} title={`Dr. ${m.prenom} ${m.nom}`}>
+            <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:C0}}>Jour</th>
+            <th style={{...S.thFix,position:"sticky",top:HDR_H,left:C0,zIndex:40,minWidth:C1}}>Sl</th>
+            {showGarde&&<th style={{...S.thFix,position:"sticky",top:HDR_H,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#93c47d"}}>Garde</th>}
+            {meds.map(m=><th key={m.id} style={{...S.th,minWidth:46,position:"sticky",top:HDR_H,zIndex:20}} title={`Dr. ${m.prenom} ${m.nom}`}>
               <div style={{...S.avT,background:m.color,margin:"0 auto"}}>{m.init}</div>
             </th>)}
           </tr>
@@ -803,12 +804,29 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
           })}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
     </>
   );
 }
 
 /* ════ SITE VIEW (CHL/CHB) ════ */
+/* v9.87 : LE CADRE DE DÉFILEMENT DES TABLEAUX, écrit 10 fois dans 7 composants.
+   Défaut corrigé au passage : DEUX défilements imbriqués — celui de la page et celui de
+   ce cadre. Les en-têtes (initiales, salles, dates) étaient figés par rapport au CADRE ;
+   or, en faisant défiler le tableau d'abord, la page se mettait ensuite à monter en
+   emportant le cadre, en-têtes compris. D'où des en-têtes qui s'échappaient — et
+   invisibles sur un écran où le bandeau du haut est plus grand, les 110px n'étant qu'une
+   estimation. Correction : le cadre ne défile plus verticalement (rendu à la page) et ses
+   en-têtes se figent par rapport à L'ÉCRAN, sous la barre de navigation. Les bandeaux et
+   les filtres remontent donc toujours, mais les en-têtes ne peuvent plus partir. */
+function TableScroll({children,style}){
+  return(
+    <div style={{overflowX:"auto",overflowY:"visible",borderRadius:8,border:"1px solid var(--border)",...(style||{})}}>
+      {children}
+    </div>
+  );
+}
+
 function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,orient,setOrient,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
@@ -935,12 +953,12 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
 
   if(orient==="H")return(
     <div>{hdr}
-      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+      <TableScroll>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:110}}>Salle</th>
-              {wdays.map(({y:wY,m:wM,d})=>{const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();const we=isWE(wY,wM,d);return <th key={d+wM+wY} colSpan={we?1:2} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:58,position:"sticky",top:0,zIndex:20}}><div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(wY,wM,d)]}</div></th>;})}
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:110}}>Salle</th>
+              {wdays.map(({y:wY,m:wM,d})=>{const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();const we=isWE(wY,wM,d);return <th key={d+wM+wY} colSpan={we?1:2} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:58,position:"sticky",top:HDR_H,zIndex:20}}><div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(wY,wM,d)]}</div></th>;})}
             </tr>
             <tr>
               <th style={{...S.thFix,position:"sticky",top:"24px",left:0,zIndex:39}}></th>
@@ -959,19 +977,19 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 
   return(
     <div>{hdr}
-      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+      <TableScroll>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:42}}>Jour</th>
-              <th style={{...S.thFix,position:"sticky",top:0,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
-              {allSalles.map(salle=><th key={salle} style={{...S.th,minWidth:80,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:10,color:"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{salle==="CHB-BIP"?"BIP":String(salle).indexOf("RECAP:")===0?((actes.find(a2=>a2.id===salle.slice(6))||{}).short||salle.slice(6)):salle}</div></th>)}
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:42}}>Jour</th>
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
+              {allSalles.map(salle=><th key={salle} style={{...S.th,minWidth:80,position:"sticky",top:HDR_H,zIndex:20}}><div style={{fontWeight:800,fontSize:10,color:"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{salle==="CHB-BIP"?"BIP":String(salle).indexOf("RECAP:")===0?((actes.find(a2=>a2.id===salle.slice(6))||{}).short||salle.slice(6)):salle}</div></th>)}
             </tr>
           </thead>
           <tbody>
@@ -999,7 +1017,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
             })}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 }
@@ -1181,12 +1199,12 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
 
   if(orient==="H")return(
     <div>{hdr}
-      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+      <TableScroll>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:120}}>Activité</th>
-              {wdays.map(({y:wY,m:wM,d})=>{const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();const we=isWE(wY,wM,d);return <th key={d+wM+wY} colSpan={we?1:2} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:68,position:"sticky",top:0,zIndex:20}}><div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(wY,wM,d)]}</div></th>;})}
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:120}}>Activité</th>
+              {wdays.map(({y:wY,m:wM,d})=>{const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();const we=isWE(wY,wM,d);return <th key={d+wM+wY} colSpan={we?1:2} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:68,position:"sticky",top:HDR_H,zIndex:20}}><div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(wY,wM,d)]}</div></th>;})}
             </tr>
             <tr>
               <th style={{...S.thFix,position:"sticky",top:"24px",left:0,zIndex:39}}></th>
@@ -1208,19 +1226,19 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 
   return(
     <div>{hdr}
-      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+      <TableScroll>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:42}}>Jour</th>
-              <th style={{...S.thFix,position:"sticky",top:0,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
-              {rows.map(row=><th key={row.label} style={{...S.th,minWidth:105,maxWidth:150,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:13,color:darkMode?lightenHex(row.color,.55):row.color,fontFamily:"'JetBrains Mono',monospace"}}>{row.label}</div></th>)}
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:42}}>Jour</th>
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
+              {rows.map(row=><th key={row.label} style={{...S.th,minWidth:105,maxWidth:150,position:"sticky",top:HDR_H,zIndex:20}}><div style={{fontWeight:800,fontSize:13,color:darkMode?lightenHex(row.color,.55):row.color,fontFamily:"'JetBrains Mono',monospace"}}>{row.label}</div></th>)}
             </tr>
           </thead>
           <tbody>
@@ -1248,7 +1266,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
             })}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 }
@@ -1557,12 +1575,12 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
   const wdays=printWk?gvEffDays.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):gvEffDays; // keep full objects
 
   const viewV=(
-    <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+    <TableScroll>
       <table key={showFull?"gvfull":"gvpart"} style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
         <thead>
           <tr>
-            <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:80}}>Date</th>
-            <th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:150}}>Garde</th>
+            <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:80}}>Date</th>
+            <th style={{...S.thFix,position:"sticky",top:HDR_H,zIndex:20,minWidth:150}}>Garde</th>
           </tr>
         </thead>
         <tbody>
@@ -1587,19 +1605,19 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
           })}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 
   const viewH=(
-    <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+    <TableScroll>
       <table style={{borderCollapse:"collapse"}}>
         <thead>
           <tr>
-            <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:58}}>Garde</th>
+            <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:58}}>Garde</th>
             {wdays.map(({y:wY,m:wM,d})=>{
               const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();
               const we=isWE(wY,wM,d);
-              return <th key={d+wM+wY} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:50,position:"sticky",top:0,zIndex:20}}>
+              return <th key={d+wM+wY} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:50,position:"sticky",top:HDR_H,zIndex:20}}>
                 <div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(year,month,d)]}</div>
               </th>;
             })}
@@ -1614,7 +1632,7 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
           </tr>
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 
   return(
@@ -1962,13 +1980,13 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
   return(
     <div>
       {hdr}
-      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+      <TableScroll>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:42}}>Jour</th>
-              <th style={{...S.thFix,position:"sticky",top:0,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
-              <th style={{...S.th,minWidth:120,position:"sticky",top:0,zIndex:20}}>
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:42}}>Jour</th>
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
+              <th style={{...S.th,minWidth:120,position:"sticky",top:HDR_H,zIndex:20}}>
                 <div style={{fontWeight:800,fontSize:10,color:"#111",fontFamily:"'JetBrains Mono',monospace"}}>BIP CHB</div>
                 <div style={{fontSize:8,color:"var(--txt3)"}}>{bipSalles.join(", ")}</div>
               </th>
@@ -2000,7 +2018,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
             })}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
 
       {/* Picker modal */}
       {pickerData&&isEdit&&(()=>{
@@ -2213,9 +2231,9 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient
       <table style={{borderCollapse:"collapse"}}>
         <thead>
           <tr>
-            <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:48}}>Jour</th>
-            <th style={{...S.thFix,position:"sticky",top:0,left:48,zIndex:40,minWidth:26,borderRight:"2px solid var(--border)"}}>Sl</th>
-            {medecins.map(med=><th key={med.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20}} title={`Dr. ${med.prenom} ${med.nom}`}>
+            <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:48}}>Jour</th>
+            <th style={{...S.thFix,position:"sticky",top:HDR_H,left:48,zIndex:40,minWidth:26,borderRight:"2px solid var(--border)"}}>Sl</th>
+            {medecins.map(med=><th key={med.id} style={{...S.th,minWidth:46,position:"sticky",top:HDR_H,zIndex:20}} title={`Dr. ${med.prenom} ${med.nom}`}>
               <div style={{...S.avT,background:med.color,margin:"0 auto"}}>{med.init}</div>
             </th>)}
           </tr>
@@ -3807,7 +3825,7 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
         <table style={{borderCollapse:"collapse",fontSize:11}}>
           <thead>
             <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:120,textAlign:"left",padding:"6px 10px"}}>Médecin</th>
+              <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:120,textAlign:"left",padding:"6px 10px"}}>Médecin</th>
               {usedActes.map(a=>{
                 const isSorted=sortCol&&sortCol.col===a.id;
                 return(
@@ -3817,7 +3835,7 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
                     return null;
                   })}
                   title={!isSorted?"Trier par "+a.label+" (décroissant)":sortCol.dir==="desc"?"Trier croissant":"Revenir à l'ordre initial"}
-                  style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:44,textAlign:"center",padding:"4px 2px",cursor:"pointer"}}>
+                  style={{...S.thFix,position:"sticky",top:HDR_H,zIndex:20,minWidth:44,textAlign:"center",padding:"4px 2px",cursor:"pointer"}}>
                   <div style={{background:a.color,color:"#111",borderRadius:4,padding:"2px 4px",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",outline:isSorted?"2px solid var(--txt)":"none"}}>{a.short}{isSorted?(sortCol.dir==="desc"?" ▼":" ▲"):""}</div>
                 </th>
                 );
@@ -6626,12 +6644,12 @@ header::-webkit-scrollbar { display: none; }
               <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,border:"2px solid #7c3aed",marginRight:4,verticalAlign:"middle"}}/>exception jour · période affichée</div>
             </div>
             {/* Tableau des jours — style onglet Gardes */}
-            <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 110px)",borderRadius:8,border:"1px solid var(--border)"}}>
+            <TableScroll>
               <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
                 <thead>
                   <tr>
-                    <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:80}}>Date</th>
-                    <th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:150}}>Astreinte</th>
+                    <th style={{...S.thFix,position:"sticky",top:HDR_H,left:0,zIndex:40,minWidth:80}}>Date</th>
+                    <th style={{...S.thFix,position:"sticky",top:HDR_H,zIndex:20,minWidth:150}}>Astreinte</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -6664,7 +6682,7 @@ header::-webkit-scrollbar { display: none; }
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           </div>
         );
       })()}
