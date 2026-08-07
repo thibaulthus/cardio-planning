@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.89 — 07/08/2026";
+const APP_VERSION="v9.90 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -522,91 +522,6 @@ function MedBtn({med,avail,onClick,extra}){
 }
 
 /* ════ GRID H ════ */
-function GridH({planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,getAstreinteForDay}){ 
-  const today=new Date();
-  const ghEffDays=useMemo(()=>{
-    if(viewPeriod){
-      const {sy,sm}=perStart(year,month);
-      const days=perDaysList(sy,sm);
-      if(!showFull){const tod=new Date();tod.setHours(0,0,0,0);return days.filter(({y:ey,m:em,d})=>new Date(ey,em,d)>=tod);}
-      return days;
-    }
-    const base=allDays.map(d=>({y:year,m:month,d}));
-    if(!showFull){const tod=new Date();tod.setHours(0,0,0,0);return base.filter(({y:ey,m:em,d})=>new Date(ey,em,d)>=tod);}
-    return base;
-  },[year,month,viewPeriod,allDays,showFull]);
-  return(
-    <TableScroll>
-      <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
-        <thead>
-          <tr>
-            <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:58}} rowSpan={2}>Méd.</th>
-            {ghEffDays.map(({y:ghY,m:ghM,d})=>{
-              const we=isWE(ghY,ghM,d),isT=d===today.getDate()&&ghM===today.getMonth()&&ghY===today.getFullYear();
-              const cols=showGarde?3:2;
-              return <th key={d+ghM+ghY} colSpan={we?1:cols} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?32:cols*28,position:"sticky",top:0,zIndex:20}}>
-                <div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700}}>{MOIS[ghM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(ghY,ghM,d)]}</div>
-              </th>;
-            })}
-          </tr>
-          <tr>
-            {ghEffDays.map(({y:ghY,m:ghM,d})=>{
-              if(isWE(ghY,ghM,d))return null;
-              const slots=showGarde?["M","AM","N"]:["M","AM"];
-              return slots.map(sl=><th key={d+sl+ghM+ghY} style={{...S.th,fontSize:8,padding:"2px 1px",background:sl==="N"?"var(--bg-n)":"var(--th)",color:"var(--txt3)",position:"sticky",top:"24px",zIndex:19}}>{SLOTS[sl]}</th>);
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {meds.map(med=>(
-            <tr key={med.id} style={{borderBottom:"1px solid var(--border2)",height:32}}>
-              <td style={{...S.tdFix,position:"sticky",left:0,zIndex:10}} title={`Dr. ${med.prenom} ${med.nom}`}>
-                <div style={{display:"flex",alignItems:"center",gap:5}}><Av med={med}/><span style={{fontSize:10,fontWeight:800,color:"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{med.init}</span></div>
-              </td>
-              {ghEffDays.map(({y:ghY,m:ghM,d})=>{
-                const we=isWE(ghY,ghM,d);
-                if(we){
-                  const es=getEntries(med.id,year,month,d,"JOUR");
-                  const noteT=notes[nk(med.id,year,month,d,"JOUR")];
-                  return <td key={d} title={noteT||undefined} style={{...S.td,...S.tdWE,cursor:isEdit?"pointer":"default"}} onClick={()=>onCell(med.id,year,month,d,"JOUR")}>
-                    <CondBadges es={es} acteById={acteById} noteT={noteT}/>
-                  </td>;
-                }
-                return["M","AM","N"].map(sl=>{
-                  const es=getEntries(med.id,year,month,d,sl);
-                  const bl=es[0]&&es[0]._blocked;
-                  const noteT=notes[nk(med.id,ghY,ghM,d,sl)];const issueT=planIssues[med.id+"|"+ghY+"|"+ghM+"|"+d+"|"+sl];
-                  const astIdH=getAstreinteForDay?getAstreinteForDay(ghY,ghM,d):null;
-                  const isAstH=astIdH!==null&&String(astIdH)===String(med.id);
-                  let astShH=null;
-                  if(isAstH){
-                    const pdH=new Date(ghY,ghM,d-1),ndH=new Date(ghY,ghM,d+1);
-                    const paH=getAstreinteForDay(pdH.getFullYear(),pdH.getMonth(),pdH.getDate()),naH=getAstreinteForDay(ndH.getFullYear(),ndH.getMonth(),ndH.getDate());
-                    const contPrevH=paH!==null&&String(paH)===String(med.id),contNextH=naH!==null&&String(naH)===String(med.id);
-                    const partsH=["inset 0 1px 0 var(--ast-bord)","inset 0 -1px 0 var(--ast-bord)"];
-                    if(sl==="M"&&!contPrevH)partsH.push("inset 1px 0 0 var(--ast-bord)");
-                    if(sl==="N"&&!contNextH)partsH.push("inset -1px 0 0 var(--ast-bord)");
-                    astShH=partsH.join(", ");
-                  }
-                  return <td key={d+sl+ghM+ghY} title={(issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined}
-                    style={{...S.td,...(sl==="N"?S.tdN:{}),...(isAstH?{background:"var(--ast-bg)",boxShadow:astShH}:{}),...(isTgh?{background:"var(--bg-td)"}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle",position:"relative"}}
-                    onClick={bl||!isEdit?undefined:()=>onCell(med.id,ghY,ghM,d,sl)}>
-                    {issueT&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}{!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
-                      <CondBadges es={es} acteById={acteById} noteT={noteT}/>
-                    </div>}
-                  </td>;
-                });
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </TableScroll>
-  );
-}
-
-/* ════ GRID V ════ */
-let _gvLpT=null,_gvLpF=false;
 function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
   const today=new Date();
   const C0=42,C1=24,CG=44;
@@ -838,7 +753,7 @@ function TableScroll({children,style,mh=150}){
     </div>
   );
 }
-function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,orient,setOrient,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null}){
+function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -968,37 +883,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
     </div>
   );
 
-  if(orient==="H")return(
-    <div>{hdr}
-      <TableScroll>
-        <table style={{borderCollapse:"collapse"}}>
-          <thead>
-            <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:110}}>Salle</th>
-              {wdays.map(({y:wY,m:wM,d})=>{const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();const we=isWE(wY,wM,d);return <th key={d+wM+wY} colSpan={we?1:2} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:58,position:"sticky",top:0,zIndex:20}}><div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(wY,wM,d)]}</div></th>;})}
-            </tr>
-            <tr>
-              <th style={{...S.thFix,position:"sticky",top:"24px",left:0,zIndex:39}}></th>
-              {wdays.map(({y:wY,m:wM,d})=>isWE(wY,wM,d)?<th key={d+wM+wY} style={{...S.th,...S.thWE,fontSize:8,padding:"2px 1px",position:"sticky",top:"24px",zIndex:19}}></th>:["M","AM"].map(sl=><th key={wY+"-"+wM+"-"+d+sl} style={{...S.th,fontSize:8,color:"var(--txt3)",padding:"2px 1px",position:"sticky",top:"24px",zIndex:19}}>{SLOTS[sl]}</th>))}
-            </tr>
-          </thead>
-          <tbody>
-            {allSalles.map(salle=>(
-              <tr key={salle} style={{borderBottom:"1px solid var(--border2)"}}>
-                <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5}}>
-                  <div style={{fontWeight:700,fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:"var(--txt)"}}>{salle==="CHB-BIP"?"BIP":String(salle).indexOf("RECAP:")===0?((actes.find(a2=>a2.id===salle.slice(6))||{}).short||salle.slice(6)):salle}</div>
-                  <div style={{fontSize:8,color:"var(--txt3)"}}>{(salle==="CHB-BIP"||String(salle).indexOf("RECAP:")===0)?"↩ reprise activité":siteActes.filter(a=>a.id!=="BIP"&&a.salles.includes(salle)).map(a=>a.short).join(", ")}</div>
-                </td>
-                {wdays.map(({y:wY,m:wM,d})=>isWE(wY,wM,d)?<td key={d+wM+wY} style={{...S.td,...S.tdWE,padding:2}}/>:["M","AM"].map(sl=>renderCell(salle,d,sl,wY,wM)))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableScroll>
-    </div>
-  );
-
-  return(
+    return(
     <div>{hdr}
       <TableScroll>
         <table style={{borderCollapse:"collapse"}}>
@@ -1040,7 +925,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,orient,setOrient,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint}){
+function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1214,40 +1099,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
   );
   hdr=<React.Fragment>{hdr}{ideExtra}</React.Fragment>;
 
-  if(orient==="H")return(
-    <div>{hdr}
-      <TableScroll>
-        <table style={{borderCollapse:"collapse"}}>
-          <thead>
-            <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:120}}>Activité</th>
-              {wdays.map(({y:wY,m:wM,d})=>{const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();const we=isWE(wY,wM,d);return <th key={d+wM+wY} colSpan={we?1:2} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:68,position:"sticky",top:0,zIndex:20}}><div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(wY,wM,d)]}</div></th>;})}
-            </tr>
-            <tr>
-              <th style={{...S.thFix,position:"sticky",top:"24px",left:0,zIndex:39}}></th>
-              {wdays.map(({y:wY,m:wM,d})=>isWE(wY,wM,d)?<th key={d+wM+wY} style={{...S.th,...S.thWE,padding:"2px 1px",position:"sticky",top:"24px",zIndex:19}}></th>:["M","AM"].map(sl=><th key={wY+"-"+wM+"-"+d+sl} style={{...S.th,fontSize:8,color:"var(--txt3)",padding:"2px 1px",position:"sticky",top:"24px",zIndex:19}}>{SLOTS[sl]}</th>))}
-            </tr>
-          </thead>
-          <tbody>
-            {ideActive&&<tr style={{borderBottom:"2px solid var(--border)"}}>
-              <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5}}><div style={{fontWeight:800,fontSize:11,color:"#3fb950"}}>🩺 IDE</div></td>
-              {wdays.map(({y:wY,m:wM,d})=>isWE(wY,wM,d)?<td key={"ide"+d+wM+wY} style={{...S.td,...S.tdWE,padding:2}}/>:["M","AM"].map(sl=><td key={"ide"+wY+"-"+wM+"-"+d+sl} style={{...S.td,padding:2,textAlign:"center"}}>{idePill(wY,wM,d,sl)}</td>))}
-            </tr>}
-            {rows.map(row=>(
-              <tr key={row.label} style={{borderBottom:"1px solid var(--border2)"}}>
-                <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5}}>
-                  <div style={{fontWeight:700,fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:darkMode?lightenHex(row.color,.55):row.color}}>{row.label}</div>
-                </td>
-                {wdays.map(({y:wY,m:wM,d})=>isWE(wY,wM,d)?<td key={d+wM+wY} style={{...S.td,...S.tdWE,padding:2}}/>:["M","AM"].map(sl=>renderActCell(row,d,sl,wY,wM)))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableScroll>
-    </div>
-  );
-
-  return(
+    return(
     <div>{hdr}
       <TableScroll>
         <table style={{borderCollapse:"collapse"}}>
@@ -1331,7 +1183,7 @@ function GardeCandidateList({meds,isAbsDay,isAbsNext,currentId,onPick,maxHeight=
     </div>);
 }
 
-function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,orient,setOrient,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
+function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
   /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
      l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
   const removeGarde=(d3,y3,m3)=>{ if(onRemoveGarde)onRemoveGarde(y3,m3,d3); };
@@ -1625,34 +1477,7 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
     </TableScroll>
   );
 
-  const viewH=(
-    <TableScroll>
-      <table style={{borderCollapse:"collapse"}}>
-        <thead>
-          <tr>
-            <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:58}}>Garde</th>
-            {wdays.map(({y:wY,m:wM,d})=>{
-              const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();
-              const we=isWE(wY,wM,d);
-              return <th key={d+wM+wY} style={{...S.th,...(we?S.thWE:{}),...(isT?S.thTD:{}),minWidth:we?22:50,position:"sticky",top:0,zIndex:20}}>
-                <div style={S.thN}>{d}</div>{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}<div style={S.thJ}>{["D","L","Ma","Me","J","V","S"][dow(year,month,d)]}</div>
-              </th>;
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5}}>
-              <div style={{fontWeight:800,fontSize:11,color:"#f85149",fontFamily:"'JetBrains Mono',monospace"}}>🌙 Garde</div>
-            </td>
-            {wdays.map(({y:wY,m:wM,d})=>renderGardeCell(d,wY,wM))}
-          </tr>
-        </tbody>
-      </table>
-    </TableScroll>
-  );
-
-  return(
+    return(
     <div>
       <div style={S.bar}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -1857,7 +1682,7 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
         );
       })()}
 
-      {orient==="V"?viewV:viewH}
+      {viewV}
 
       {/* Picker modal */}
       {pickerDay!==null&&isEdit&&(()=>{
@@ -1938,7 +1763,7 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
 
 
 /* ════ BIP TAB ════ */
-function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries,salleOcc,addEntry,removeEntry,isMedAvailable,orient,setOrient,darkMode,setDarkMode,showFull,setShowFull}){
+function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries,salleOcc,addEntry,removeEntry,isMedAvailable,darkMode,setDarkMode,showFull,setShowFull}){
   const bipActe=actes.find(a=>a.id==="BIP");
   const bipSalles=(bipActe&&bipActe.salles)||["CHB-1","CHB-2","CHB-3"];
   const wdays=allDays.map(d=>({y:year,m:month,d}));
@@ -2192,58 +2017,10 @@ function PTOccRooms({medecins,planningType,actes,acteById,salleReg,darkMode}){
   );
 }
 
-function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,orient,acteById,setMData,setModal}){
+function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteById,setMData,setModal}){
   const jours=["","Lun","Mar","Mer","Jeu","Ven"];
 
-  if(orient==="H") return(
-    <div style={{overflowX:"auto",borderRadius:8,border:"1px solid var(--border)"}}>
-      <table style={{borderCollapse:"collapse",width:"100%"}}>
-        <thead>
-          <tr>
-            <th style={{...S.thFix,position:"sticky",left:0,zIndex:20,minWidth:130}} rowSpan={2}>Médecin</th>
-            {[1,2,3,4,5].map(d=><th key={d} colSpan={2} style={{...S.th,minWidth:100,fontWeight:700,fontSize:11}}>{jours[d]}</th>)}
-          </tr>
-          <tr>
-            {[1,2,3,4,5].map(d=>["M","AM"].map(sl=><th key={d+sl} style={{...S.th,fontSize:9,padding:"2px 1px",color:"var(--txt3)"}}>{sl}</th>))}
-          </tr>
-        </thead>
-        <tbody>
-          {medecins.map(med=>{
-            const pt=planningType[med.id]||{};
-            return(
-              <tr key={med.id} style={{borderBottom:"1px solid var(--border2)"}}>
-                <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7}}>
-                    <Av med={med}/>
-                    <div>
-                      <div style={{fontSize:11,fontWeight:700,color:"var(--txt)"}}>{med.prenom} {med.nom}</div>
-                      {med.role==="attache"&&<span style={{fontSize:8,color:"#fb923c"}}>Attaché</span>}
-                      {med.role==="ide"&&<span style={{fontSize:8,color:"#a5b4fc"}}>IDE</span>}
-                    </div>
-                  </div>
-                </td>
-                {[1,2,3,4,5].map(dw=>["M","AM"].map(sl=>{
-                  const [acteId,salle,acteId2,salle2,acteId3,salle3,c1f]=(pt[dw]||{})[sl]||[null,null];
-                  const acte=acteId?acteById(acteId):null;const acte2=acteId2?acteById(acteId2):null;const acte3=acteId3?acteById(acteId3):null;
-                  const _isC=!!c1f||[acteId,acteId2,acteId3].filter(Boolean).length>1;const ptIss=!_isC&&((acte&&acte.hasSalle&&!salle)||(acte2&&acte2.hasSalle&&!salle2)||(acte3&&acte3.hasSalle&&!salle3));
-                  const ptEs=[{acteId,salle},{acteId:acteId2,salle:salle2},{acteId:acteId3,salle:salle3}].filter(x=>x.acteId);
-                  if(ptEs.length>1||c1f)ptEs.forEach(x=>{x.cond=1;});
-                  return(
-                    <td key={dw+sl} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative"}} title={ptIss?"⚠ salle non attribuée":undefined}
-                      onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>{ptIss&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}
-                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}><CondBadges es={ptEs} acteById={acteById} noteT={null}/></div>
-                    </td>
-                  );
-                }))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  return(
+    return(
     <TableScroll mh={150}>
       <table style={{borderCollapse:"collapse"}}>
         <thead>
@@ -4466,7 +4243,8 @@ function CardioPlanning(){
   const setYear=y=>setYM(p=>({...p,year:typeof y==="function"?y(p.year):y}));
   const setMonth=m=>setYM(p=>({...p,month:typeof m==="function"?m(p.month):m}));
   const setYearMonth=(y,m)=>setYM({year:y,month:m});
-  const [orient,setOrient]=useState("V"); // H/V toggle removed - V only
+  /* v9.90 : l'affichage horizontal, inutilisé, a été supprimé — il ne reste que la vue
+     « jours en lignes ». Le réglage d'orientation n'a donc plus lieu d'être. */
   const [darkMode,setDarkModeRaw]=useState(()=>{
     try{const v=localStorage.getItem("cp6_theme");if(v==="dark")return true;if(v==="light")return false;}catch(e){}
     try{return window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;}catch(e){return false;} // auto : reglage clair/sombre du telephone
@@ -6304,22 +6082,20 @@ header::-webkit-scrollbar { display: none; }
             <button onClick={()=>setPlanFilter([])} style={{padding:"2px 8px",borderRadius:10,border:"1px solid var(--border)",background:planFilter.length===0?"#1d4ed8":"var(--bg2)",color:planFilter.length===0?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:600}}>Tous</button>
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
           </div>
-          {orient==="H"
-            ?<GridH planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
       {/* TOUR MÉDICAL */}
       {tab==="tourmedical"&&<TourTab specColors={specColors} tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
 
-      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
+      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
         {isEdit&&<div style={{marginBottom:6}}><button style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}} onClick={bipOpen}>📟 Répartition du Bip</button></div>}
-        <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
+        <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -6332,12 +6108,12 @@ header::-webkit-scrollbar { display: none; }
       {tab==="plateau"&&<ActTabView title="❤️ PT Cardio" titleColor="#e3b341"
         rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
-        getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc}
-        allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
+        allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
       {false&&null&&<ActTabView title="🔬 PT Angio" titleColor="#c084fc"
@@ -6347,12 +6123,12 @@ header::-webkit-scrollbar { display: none; }
           {label:"FOP / FAG",ids:["FOP"],color:"#34d399",salle:null},
         ]}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
-        getEntries={getEntries} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} isEdit={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="garde"&&<GardeView onRemoveGarde={removeGardeDay} printWk={printWk} onPrint={()=>setModal("print")} year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} getEntry={getEntry} allDays={allDays} isEdit={isEdit} orient={orient} setOrient={setOrient} applyGarde={applyGarde} isMedAvailable={isMedAvailable} plan={plan} setPlan={setPlan} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod} tourMed={tourMed} gardeAvoid={gardeAvoid} gardeWish={gardeWish} toast={toast}/>}
+      {tab==="garde"&&<GardeView onRemoveGarde={removeGardeDay} printWk={printWk} onPrint={()=>setModal("print")} year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} getEntry={getEntry} allDays={allDays} isEdit={isEdit} applyGarde={applyGarde} isMedAvailable={isMedAvailable} plan={plan} setPlan={setPlan} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod} tourMed={tourMed} gardeAvoid={gardeAvoid} gardeWish={gardeWish} toast={toast}/>}
 
-      {tab==="bip"&&<BipTab year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} allDays={allDays} isEdit={isEdit} actes={actes} getEntries={getEntries} salleOcc={salleOcc} addEntry={addEntry} removeEntry={removeEntry} isMedAvailable={isMedAvailable} orient={orient} setOrient={setOrient} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull}/>}
+      {tab==="bip"&&<BipTab year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} allDays={allDays} isEdit={isEdit} actes={actes} getEntries={getEntries} salleOcc={salleOcc} addEntry={addEntry} removeEntry={removeEntry} isMedAvailable={isMedAvailable} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull}/>}
 
       {tab==="plantype"&&(
         <div>
@@ -6373,7 +6149,7 @@ header::-webkit-scrollbar { display: none; }
             <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}} onClick={()=>openPtModal(null,"remove")}>🗑 Retirer</button>
           </div>}
           <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Semaine type par médecin. Le bouton ▶ PT l'applique aux mois de la période affichée (choix des mois et du point de départ dans la fenêtre). TM exclus automatiquement. Clic sur une case pour définir.</div>
-          <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit||isInterEdit} orient={orient} acteById={acteById} setMData={setMData} setModal={setModal}/>
+          <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit||isInterEdit} acteById={acteById} setMData={setMData} setModal={setModal}/>
           <PTOccRooms medecins={medecins} planningType={planningType} actes={actes} acteById={acteById} salleReg={salleReg} darkMode={darkMode}/>
         </div>
       )}
@@ -6388,9 +6164,7 @@ header::-webkit-scrollbar { display: none; }
            {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
              <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
            </div>}
-          {orient==="H"
-            ?<GridH planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} getAstreinteForDay={getAstreinteForDay}/>
-            :<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
