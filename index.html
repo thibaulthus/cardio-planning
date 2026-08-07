@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.87.3 — 07/08/2026";
+var APP_VERSION = "v9.88 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -3090,9 +3090,8 @@ function TourTab(_a) {
                             var k = sk(dy, dm, dd, sl);
                             if (!next[k] || !next[k][mid])
                                 return;
-                            var e = next[k][mid];
-                            var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
-                            if (PROT_1.includes(a))
+                            /* v9.88 : lecture de TOUTE la case, et retrait ciblé (même règle que v9.73) */
+                            if (cellHasAny(next[k][mid], PROT_1))
                                 return;
                             var dm3 = __assign({}, next[k]);
                             delete dm3[mid];
@@ -5609,8 +5608,7 @@ function CardioPlanning() {
                 var avail = juniors.filter(function (j) {
                     if (busyIds.includes(j.id))
                         return false;
-                    var es = __spreadArray([], (["M", "AM"].map(function (sl) { var e = (plan[sk(dy, dm3, dd, sl)] || {})[j.id]; return Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId); })), true);
-                    return !es.some(function (a) { return ["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE"].includes(a); });
+                    return !["M", "AM"].some(function (sl) { return cellHasAny((plan[sk(dy, dm3, dd, sl)] || {})[j.id], ABS_IDS.concat(["GARDE", "REPOS_GARDE"])); });
                 });
                 var shuffled = avail.map(function (j) { return ({ j: j, r: Math.random() }); }).sort(function (a, b) { return a.r - b.r; }).map(function (x) { return x.j; });
                 shuffled.sort(function (a, b) { return replCount[a.id] - replCount[b.id]; });
@@ -6551,10 +6549,13 @@ function CardioPlanning() {
                         if (!next[k] || !next[k][medId])
                             return;
                         var e = next[k][medId];
-                        var acteId = Array.isArray(e) ? e[0] && e[0].acteId : e && e.acteId;
-                        if (acteId === "ABSENCE" || acteId === "FORMATION") {
+                        if (cellHasAny(e, ["ABSENCE", "FORMATION"])) {
+                            var _rA = cellDrop(e, ["ABSENCE", "FORMATION"]);
                             var dm = __assign({}, next[k]);
-                            delete dm[medId];
+                            if (_rA)
+                                dm[medId] = _rA;
+                            else
+                                delete dm[medId];
                             next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
                         }
                     });
@@ -6735,8 +6736,7 @@ function CardioPlanning() {
                             var e = dm[mid];
                             if (!e)
                                 return;
-                            var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
-                            if (!KEEP.includes(a)) {
+                            if (!cellHasAny(e, KEEP)) {
                                 delete dm[mid];
                                 changed = true;
                             }
@@ -7788,8 +7788,7 @@ function CardioPlanning() {
                                             return (__assign(__assign({}, p), (_a = {}, _a[k2] = v, _a)));
                                         }); }, style: { width: 30, height: 26, padding: 0, border: "1px solid var(--border)", borderRadius: 5, background: "transparent", cursor: "pointer" } }),
                                     React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: cur } }, lb2)));
-                            }),
-                            React.createElement("button", { onClick: function () { return setSpecColors({}); }, style: { marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer" } }, "\u21A9 Couleurs par d\u00E9faut")),
+                            })),
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 5 } }, "Utilis\u00E9es dans l'onglet Tour pour la sursp\u00E9cialit\u00E9 de chaque praticien et le d\u00E9compte des disponibles."))),
 
                 React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
@@ -8112,8 +8111,8 @@ function CardioPlanning() {
                 var blockedBy = [];
                 slots.forEach(function (sl) {
                     var e = (plan[sk(y2, m2, d2, sl)] || {})[mc.id];
-                    var a = Array.isArray(e) ? (e[0] && e[0].acteId) : (e && e.acteId);
-                    if (["ABSENCE", "FORM", "FORMATION", "GARDE", "REPOS_GARDE", "TP"].includes(a))
+                    var a = (cellEs(e).find(function (x) { return x && EXCL_IDS.includes(x.acteId); }) || {}).acteId;
+                    if (a)
                         blockedBy.push(a === "ABSENCE" ? "absent" : a === "TP" ? "temps partiel" : a === "GARDE" ? "garde" : a === "REPOS_GARDE" ? "repos de garde" : "formation");
                 });
                 return { m: mc, blocked: blockedBy.length > 0, reason: blockedBy[0] || "" };

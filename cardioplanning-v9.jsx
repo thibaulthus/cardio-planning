@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.87.3 — 07/08/2026";
+const APP_VERSION="v9.88 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -3020,9 +3020,8 @@ function TourTab({specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,apply
             ["M","AM"].forEach(sl=>{
               const k=sk(dy,dm,dd,sl);
               if(!next[k]||!next[k][mid])return;
-              const e=next[k][mid];
-              const a=Array.isArray(e)?(e[0]&&e[0].acteId):(e&&e.acteId);
-              if(PROT.includes(a))return;
+              /* v9.88 : lecture de TOUTE la case, et retrait ciblé (même règle que v9.73) */
+              if(cellHasAny(next[k][mid],PROT))return;
               const dm3={...next[k]};delete dm3[mid];next[k]=dm3;
             });
           });
@@ -5095,8 +5094,7 @@ function CardioPlanning(){
       const busyIds=[...(wmW.HC||[]),...(wmW.USIC||[])];
       const avail=juniors.filter(j=>{
         if(busyIds.includes(j.id))return false;
-        const es=[...(["M","AM"].map(sl=>{const e=(plan[sk(dy,dm3,dd,sl)]||{})[j.id];return Array.isArray(e)?(e[0]&&e[0].acteId):(e&&e.acteId);}))];
-        return !es.some(a=>["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE"].includes(a));
+        return !["M","AM"].some(sl=>cellHasAny((plan[sk(dy,dm3,dd,sl)]||{})[j.id],ABS_IDS.concat(["GARDE","REPOS_GARDE"])));
       });
       const shuffled=avail.map(j=>({j,r:Math.random()})).sort((a,b)=>a.r-b.r).map(x=>x.j);
       shuffled.sort((a,b)=>replCount[a.id]-replCount[b.id]);
@@ -5779,10 +5777,9 @@ function CardioPlanning(){
           ["M","AM","JOUR","N"].forEach(sl=>{
             const k=sk(cy,cm,d,sl);
             if(!next[k]||!next[k][medId])return;
-            const e=next[k][medId];
-            const acteId=Array.isArray(e)?e[0]&&e[0].acteId:e&&e.acteId;
-            if(acteId==="ABSENCE"||acteId==="FORMATION"){
-              const dm={...next[k]};delete dm[medId];next={...next,[k]:dm};
+            if(cellHasAny(next[k][medId],["ABSENCE","FORMATION"])){
+              const r=cellDrop(next[k][medId],["ABSENCE","FORMATION"]);
+              const dm={...next[k]};if(r)dm[medId]=r;else delete dm[medId];next={...next,[k]:dm};
             }
           });
         }
@@ -5905,8 +5902,7 @@ function CardioPlanning(){
             const dm={...next[k]};let changed=false;
             targetIds.forEach(mid=>{
               const e=dm[mid];if(!e)return;
-              const a=Array.isArray(e)?(e[0]&&e[0].acteId):(e&&e.acteId);
-              if(!KEEP.includes(a)){delete dm[mid];changed=true;}
+              if(!cellHasAny(e,KEEP)){delete dm[mid];changed=true;}
             });
             if(changed)next[k]=dm;
           });
@@ -6935,8 +6931,6 @@ header::-webkit-scrollbar { display: none; }
                       <span style={{fontSize:12,fontWeight:800,color:cur}}>{lb2}</span>
                     </div>);
                 })}
-                <button onClick={()=>setSpecColors({})}
-                  style={{marginLeft:"auto",fontSize:10,fontWeight:700,padding:"4px 9px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer"}}>↩ Couleurs par défaut</button>
               </div>
               <div style={{fontSize:9,color:"var(--txt3)",marginTop:5}}>Utilisées dans l'onglet Tour pour la surspécialité de chaque praticien et le décompte des disponibles.</div>
             </div>
@@ -7244,8 +7238,8 @@ header::-webkit-scrollbar { display: none; }
           const blockedBy=[];
           slots.forEach(sl=>{
             const e=(plan[sk(y2,m2,d2,sl)]||{})[mc.id];
-            const a=Array.isArray(e)?(e[0]&&e[0].acteId):(e&&e.acteId);
-            if(["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TP"].includes(a))blockedBy.push(a==="ABSENCE"?"absent":a==="TP"?"temps partiel":a==="GARDE"?"garde":a==="REPOS_GARDE"?"repos de garde":"formation");
+            const a=(cellEs(e).find(x=>x&&EXCL_IDS.includes(x.acteId))||{}).acteId;
+            if(a)blockedBy.push(a==="ABSENCE"?"absent":a==="TP"?"temps partiel":a==="GARDE"?"garde":a==="REPOS_GARDE"?"repos de garde":"formation");
           });
           return {m:mc,blocked:blockedBy.length>0,reason:blockedBy[0]||""};
         });
