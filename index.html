@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.83 — 06/08/2026";
+var APP_VERSION = "v9.84 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -319,6 +319,8 @@ var salleSite = function (x) {
     var t = Array.isArray(x.s) ? x.s : (x.s ? [x.s] : []);
     return t.indexOf("CHB") >= 0 ? "CHB" : "CHL"; // Angio, Stim et EEP sont à Lens
 };
+var SPEC_COLORS_DEF = { coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" };
+var SPEC_LIST = [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]];
 var acteRecapIn = function (a, site) { if (!a)
     return false; var arr = a.recapSites || []; return arr.includes(site) || a.recapSite === site || (site === "PLATEAU" && !!a.ptCardio); };
 /* ════ THEME ════ */
@@ -2973,7 +2975,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var _b = _a.specColors, specColors = _b === void 0 ? null : _b, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -3006,12 +3008,12 @@ function TourTab(_a) {
         return false;
     };
     /* ═══ Échange de semaines de tour ═══ */
-    var _b = React.useState(false), swapOpen = _b[0], setSwapOpen = _b[1];
-    var _c = React.useState(null), swapSrcKey = _c[0], setSwapSrcKey = _c[1];
-    var _d = React.useState(null), swapSrcMed = _d[0], setSwapSrcMed = _d[1];
-    var _e = React.useState(null), swapDstKey = _e[0], setSwapDstKey = _e[1];
-    var _f = React.useState(null), swapDstMed = _f[0], setSwapDstMed = _f[1];
-    var _g = React.useState(true), swapUpdPlan = _g[0], setSwapUpdPlan = _g[1];
+    var _c = React.useState(false), swapOpen = _c[0], setSwapOpen = _c[1];
+    var _d = React.useState(null), swapSrcKey = _d[0], setSwapSrcKey = _d[1];
+    var _e = React.useState(null), swapSrcMed = _e[0], setSwapSrcMed = _e[1];
+    var _f = React.useState(null), swapDstKey = _f[0], setSwapDstKey = _f[1];
+    var _g = React.useState(null), swapDstMed = _g[0], setSwapDstMed = _g[1];
+    var _h = React.useState(true), swapUpdPlan = _h[0], setSwapUpdPlan = _h[1];
     var JOURS_SW = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
     var absDaysOf = function (medId, wk2) {
         if (!medId || !wk2)
@@ -3156,17 +3158,20 @@ function TourTab(_a) {
     };
     var tourMeds = medecins.filter(function (m) { return m.tourMed; });
     var horsTourSpecMeds = medecins.filter(function (m) { return m.role === "medecin" && !m.tourMed && m.surSpec; });
-    var SPEC_COLORS = { coro: "#76a5af", pace: "#e3b341", eep: "#8b5cf6", ett: "#ec4899" };
+    /* v9.84 : couleurs des surspécialités réglables. Elles étaient écrites en dur ici —
+       une information dans le code que l'utilisateur ne pouvait pas atteindre. Elles
+       viennent maintenant des paramètres, avec repli sur les valeurs historiques. */
+    var SPEC_COLORS = __assign(__assign({}, SPEC_COLORS_DEF), (specColors || {}));
     // ─── Auto-répartition ───
-    var _h = React.useState(false), autoModal = _h[0], setAutoModal = _h[1];
-    var _j = React.useState(1), cfgMinEEP = _j[0], setCfgMinEEP = _j[1];
-    var _k = React.useState(1), cfgMinPace = _k[0], setCfgMinPace = _k[1];
-    var _l = React.useState(1), cfgMinETT = _l[0], setCfgMinETT = _l[1];
-    var _m = React.useState(3), cfgMinCoro = _m[0], setCfgMinCoro = _m[1];
-    var _o = React.useState({}), cfgExcl = _o[0], setCfgExcl = _o[1]; // {medId: true = ne participe pas}
-    var _q = React.useState({}), cfgWeeks = _q[0], setCfgWeeks = _q[1]; // {medId: nWeeks}
-    var _s = React.useState({}), cfgPref2HC = _s[0], setCfgPref2HC = _s[1]; // {medId: bool}
-    var _t = React.useState({}), cfgPref2USIC = _t[0], setCfgPref2USIC = _t[1]; // {medId: bool}
+    var _j = React.useState(false), autoModal = _j[0], setAutoModal = _j[1];
+    var _k = React.useState(1), cfgMinEEP = _k[0], setCfgMinEEP = _k[1];
+    var _l = React.useState(1), cfgMinPace = _l[0], setCfgMinPace = _l[1];
+    var _m = React.useState(1), cfgMinETT = _m[0], setCfgMinETT = _m[1];
+    var _o = React.useState(3), cfgMinCoro = _o[0], setCfgMinCoro = _o[1];
+    var _q = React.useState({}), cfgExcl = _q[0], setCfgExcl = _q[1]; // {medId: true = ne participe pas}
+    var _s = React.useState({}), cfgWeeks = _s[0], setCfgWeeks = _s[1]; // {medId: nWeeks}
+    var _t = React.useState({}), cfgPref2HC = _t[0], setCfgPref2HC = _t[1]; // {medId: bool}
+    var _u = React.useState({}), cfgPref2USIC = _u[0], setCfgPref2USIC = _u[1]; // {medId: bool}
     var totalSlots = weeksT.length * 4; // 2 HC + 2 USIC per week
     var activeMeds = tourMeds.filter(function (m) { return !cfgExcl[m.id]; });
     var nominalW = activeMeds.length > 0 ? Math.ceil(totalSlots / activeMeds.length) : 0;
@@ -4554,6 +4559,7 @@ function CardioPlanning() {
     /* ── v9.35 : effectifs IDE ── */
     var _icf = useState({ def: {}, ov: {} }), ideCfg = _icf[0], setIdeCfg = _icf[1];
     var _pto = useState([]), ptOrder = _pto[0], setPtOrder = _pto[1];
+    var _spc = useState({}), specColors = _spc[0], setSpecColors = _spc[1];
     var _colO = useState({}), colOrder = _colO[0], setColOrder = _colO[1];
     var _colM = useState(null), colModal = _colM[0], setColModal = _colM[1];
     /* v9.40 : impression */
@@ -5110,6 +5116,7 @@ function CardioPlanning() {
                         setCadrePin(data.cadrePin);
                     if (data.ideCfg) { try { setIdeCfg(JSON.parse(data.ideCfg)); } catch (e) { } }
                     if (data.ptOrder) { try { setPtOrder(JSON.parse(data.ptOrder) || []); } catch (e) { } }
+                    if (data.specColors) { try { setSpecColors(JSON.parse(data.specColors) || {}); } catch (e) { } }
                     if (data.colOrder) { try { setColOrder(JSON.parse(data.colOrder) || {}); } catch (e) { } }
                     if (data.adminEnabled !== undefined)
                         setAdminEnabled(data.adminEnabled);
@@ -5828,6 +5835,8 @@ function CardioPlanning() {
         saveToFirebase({ ideCfg: JSON.stringify(ideCfg) }); }, [ideCfg]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ ptOrder: JSON.stringify(ptOrder) }); }, [ptOrder]);
+    useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ specColors: JSON.stringify(specColors) }); }, [specColors]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ colOrder: JSON.stringify(colOrder) }); }, [colOrder]);
     var moveCol = function (siteKey, key, dir) {
@@ -7094,7 +7103,7 @@ function CardioPlanning() {
                 orient === "H"
                     ? React.createElement(GridH, { planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, getAstreinteForDay: getAstreinteForDay })
                     : React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && React.createElement(TourTab, { tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, { specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
             tab === "chl" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, orient: orient, setOrient: setOrient, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
@@ -7754,7 +7763,23 @@ function CardioPlanning() {
                                     React.createElement("input", { type: "number", min: 0, max: 9, value: tourMinsHard[k], onChange: function (e) { return setTourMinsHard(function (p) {
                                             var _a;
                                             return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
-                                        }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); }))))),
+                                        }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); })))),
+                    React.createElement("div", { style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" } },
+                        React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", fontWeight: 700, marginBottom: 6 } }, "\uD83C\uDFA8 Couleurs des sursp\u00E9cialit\u00E9s"),
+                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" } },
+                            SPEC_LIST.map(function (_a) {
+                                var k2 = _a[0], lb2 = _a[1];
+                                var cur = (specColors && specColors[k2]) || SPEC_COLORS_DEF[k2];
+                                return (React.createElement("div", { key: k2, style: { display: "flex", alignItems: "center", gap: 5 } },
+                                    React.createElement("input", { type: "color", value: cur, onChange: function (e) { var v = e.target.value; setSpecColors(function (p) {
+                                            var _a;
+                                            return (__assign(__assign({}, p), (_a = {}, _a[k2] = v, _a)));
+                                        }); }, style: { width: 30, height: 26, padding: 0, border: "1px solid var(--border)", borderRadius: 5, background: "transparent", cursor: "pointer" } }),
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: cur } }, lb2)));
+                            }),
+                            React.createElement("button", { onClick: function () { return setSpecColors({}); }, style: { marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer" } }, "\u21A9 Couleurs par d\u00E9faut")),
+                        React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 5 } }, "Utilis\u00E9es dans l'onglet Tour pour la sursp\u00E9cialit\u00E9 de chaque praticien et le d\u00E9compte des disponibles."))),
+
                 React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDFE5 Salles"),
                         ["CHL", "CHB", "ANGIO", "PLATEAU"].map(function (site2) {

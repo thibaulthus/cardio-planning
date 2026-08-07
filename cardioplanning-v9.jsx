@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.83 — 06/08/2026";
+const APP_VERSION="v9.84 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -204,6 +204,8 @@ const salleSite=(x)=>{
   const t=Array.isArray(x.s)?x.s:(x.s?[x.s]:[]);
   return t.indexOf("CHB")>=0?"CHB":"CHL";   // Angio, Stim et EEP sont à Lens
 };
+const SPEC_COLORS_DEF={coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"};
+const SPEC_LIST=[["coro","Coro"],["pace","Pace"],["eep","EEP"],["ett","ETT"]];
 const acteRecapIn=(a,site)=>{if(!a)return false;const arr=a.recapSites||[];return arr.includes(site)||a.recapSite===site||(site==="PLATEAU"&&!!a.ptCardio);};
 /* ════ THEME ════ */
 function applyTheme(dark){
@@ -2900,7 +2902,7 @@ function AbsModal({medecins,onApply,onRemove,onClose,initMedId=null,initDate=nul
 /* ════════════════════════════════════════════════════════════
    MAIN APP
 ════════════════════════════════════════════════════════════ */
-function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast}){
+function TourTab({specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast}){
   const _psT=perStart(tourYear,tourMonth);
   const perT={pi:_psT.sm,startY:_psT.sy,startM:_psT.sm};
   const perKeyT=perT.startY+"_"+perT.startM;
@@ -3051,7 +3053,10 @@ function TourTab({tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanT
   };
   const tourMeds=medecins.filter(m=>m.tourMed);
   const horsTourSpecMeds=medecins.filter(m=>m.role==="medecin"&&!m.tourMed&&m.surSpec);
-  const SPEC_COLORS={coro:"#76a5af",pace:"#e3b341",eep:"#8b5cf6",ett:"#ec4899"};
+  /* v9.84 : couleurs des surspécialités réglables. Elles étaient écrites en dur ici —
+     une information dans le code que l'utilisateur ne pouvait pas atteindre. Elles
+     viennent maintenant des paramètres, avec repli sur les valeurs historiques. */
+  const SPEC_COLORS={...SPEC_COLORS_DEF,...(specColors||{})};
   // ─── Auto-répartition ───
   const [autoModal,setAutoModal]=React.useState(false);
   const [cfgMinEEP,setCfgMinEEP]=React.useState(1);
@@ -4380,6 +4385,7 @@ function CardioPlanning(){
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
   const [ptOrder,setPtOrder]=useState([]);
+  const [specColors,setSpecColors]=useState({});
   const [colOrder,setColOrder]=useState({});
   const [colModal,setColModal]=useState(null);
   /* ── v9.40 : impression ── */
@@ -4772,6 +4778,7 @@ function CardioPlanning(){
           if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
           if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
+          if(data.specColors){try{setSpecColors(JSON.parse(data.specColors)||{});}catch(e){}}
           if(data.colOrder){try{setColOrder(JSON.parse(data.colOrder)||{});}catch(e){}}
             if(data.adminEnabled!==undefined)setAdminEnabled(data.adminEnabled);
             if(data.adminCanReports!==undefined)setAdminCanReports(data.adminCanReports);
@@ -5207,6 +5214,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({specColors:JSON.stringify(specColors)});},[specColors]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({colOrder:JSON.stringify(colOrder)});},[colOrder]);
   const moveCol=(siteKey,key,dir)=>{
     const cur=(colOrder[siteKey]&&colOrder[siteKey].length)?colOrder[siteKey].slice():((colModal&&colModal.cols)?colModal.cols.slice():[]);
@@ -6269,7 +6277,7 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {/* TOUR MÉDICAL */}
-      {tab==="tourmedical"&&<TourTab tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
+      {tab==="tourmedical"&&<TourTab specColors={specColors} tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
 
       {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -6880,6 +6888,24 @@ header::-webkit-scrollbar { display: none; }
                 </tr>
               </tbody>
             </table>
+            {/* v9.84 : couleurs des surspécialités, réglables ici */}
+            <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+              <div style={{fontSize:11,color:"var(--txt2)",fontWeight:700,marginBottom:6}}>🎨 Couleurs des surspécialités</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
+                {SPEC_LIST.map(([k2,lb2])=>{
+                  const cur=(specColors&&specColors[k2])||SPEC_COLORS_DEF[k2];
+                  return(
+                    <div key={k2} style={{display:"flex",alignItems:"center",gap:5}}>
+                      <input type="color" value={cur} onChange={e=>{const v=e.target.value;setSpecColors(p=>({...p,[k2]:v}));}}
+                        style={{width:30,height:26,padding:0,border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer"}}/>
+                      <span style={{fontSize:12,fontWeight:800,color:cur}}>{lb2}</span>
+                    </div>);
+                })}
+                <button onClick={()=>setSpecColors({})}
+                  style={{marginLeft:"auto",fontSize:10,fontWeight:700,padding:"4px 9px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer"}}>↩ Couleurs par défaut</button>
+              </div>
+              <div style={{fontSize:9,color:"var(--txt3)",marginTop:5}}>Utilisées dans l'onglet Tour pour la surspécialité de chaque praticien et le décompte des disponibles.</div>
+            </div>
           </div>}
 
           <div style={{...S.card,marginBottom:10}}>
