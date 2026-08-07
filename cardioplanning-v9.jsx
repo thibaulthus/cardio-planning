@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.88 — 07/08/2026";
+const APP_VERSION="v9.89 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -865,7 +865,13 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
   const _uniq=(arr)=>arr.filter((s,i2,a2)=>s&&a2.indexOf(s)===i2);
   const _recapCols=actes.filter(a=>acteRecapIn(a,site)).map(a=>a.id==="BIP"?"CHB-BIP":"RECAP:"+a.id);
   const _legacy=site==="ANGIO"?siteActes.flatMap(a=>a.salles||[]).filter(s=>String(s).startsWith("Angio")):(_robustSalles||uniqArr(siteActes.filter(a=>a.id!=="BIP").flatMap(a=>a.salles||[])));
-  const _allSallesBase=_uniq(_regS.concat(_legacy).filter(s=>s!=="CHB-BIP"));
+  /* v9.89 : les salles écrites dans le code étaient AJOUTÉES au registre, pas seulement
+     un repli — supprimer une salle du registre ne la faisait donc pas disparaître de
+     l'onglet. Désormais le registre FAIT FOI dès qu'il contient quelque chose ; les
+     valeurs d'amorçage ne servent plus qu'à une installation vierge. Vider un site
+     signifie « ce site n'a plus de salles », et non « pas encore configuré ». */
+  const _regVide=!(salleReg&&salleReg.length);
+  const _allSallesBase=_uniq((_regVide?_legacy:_regS).filter(s=>s!=="CHB-BIP"));
   /* v9.74 : ordre des colonnes réglable, comme dans PT Cardio (les 4 onglets traités
      pareil). Une colonne absente de l'ordre enregistré garde sa place d'origine, à la
      fin — une salle ajoutée plus tard n'est donc jamais perdue. */
@@ -4833,7 +4839,9 @@ function CardioPlanning(){
           if(data.tourDerog)setTourDerog(JSON.parse(data.tourDerog));
           if(data.tourReport!==undefined&&data.tourReport!=="")setTourReport(data.tourReport);
           if(data.astReport!==undefined&&data.astReport!=="")setAstReport(data.astReport);
-          if(data.salleReg&&JSON.parse(data.salleReg).length>0){setSalleReg(JSON.parse(data.salleReg));}
+          /* v9.89 : le champ ABSENT signifie « jamais configuré » (on déduit alors les
+             salles des activités) ; un champ PRÉSENT, même vide, est un choix délibéré. */
+          if(data.salleReg!==undefined&&data.salleReg!==null&&data.salleReg!==""){setSalleReg(JSON.parse(data.salleReg)||[]);}
           else{
             const acts=data.actes?JSON.parse(data.actes):[];
             const found=acts.flatMap(a=>a.salles||[]).filter((s,i2,arr)=>arr.indexOf(s)===i2);

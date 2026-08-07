@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.88 — 07/08/2026";
+var APP_VERSION = "v9.89 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -1001,7 +1001,13 @@ function SiteView(_a) {
     var _uniq = function (arr) { return arr.filter(function (s, i2, a2) { return s && a2.indexOf(s) === i2; }); };
     var _recapCols = actes.filter(function (a) { return acteRecapIn(a, site); }).map(function (a) { return a.id === "BIP" ? "CHB-BIP" : "RECAP:" + a.id; });
     var _legacy = site === "ANGIO" ? siteActes.flatMap(function (a) { return a.salles || []; }).filter(function (s) { return String(s).startsWith("Angio"); }) : (_robustSalles || uniqArr(siteActes.filter(function (a) { return a.id !== "BIP"; }).flatMap(function (a) { return a.salles || []; })));
-    var _allSallesBase = _uniq(_regS.concat(_legacy).filter(function (s) { return s !== "CHB-BIP"; }));
+    /* v9.89 : les salles écrites dans le code étaient AJOUTÉES au registre, pas seulement
+       un repli — supprimer une salle du registre ne la faisait donc pas disparaître de
+       l'onglet. Désormais le registre FAIT FOI dès qu'il contient quelque chose ; les
+       valeurs d'amorçage ne servent plus qu'à une installation vierge. Vider un site
+       signifie « ce site n'a plus de salles », et non « pas encore configuré ». */
+    var _regVide = !(salleReg && salleReg.length);
+    var _allSallesBase = _uniq((_regVide ? _legacy : _regS).filter(function (s) { return s !== "CHB-BIP"; }));
     /* v9.74 : ordre des colonnes réglable, comme dans PT Cardio (les 4 onglets traités
        pareil). Une colonne absente de l'ordre enregistré garde sa place d'origine, à la
        fin — une salle ajoutée plus tard n'est donc jamais perdue. */
@@ -5174,8 +5180,8 @@ function CardioPlanning() {
                         setTourReport(data.tourReport);
                     if (data.astReport !== undefined && data.astReport !== "")
                         setAstReport(data.astReport);
-                    if (data.salleReg && JSON.parse(data.salleReg).length > 0) {
-                        setSalleReg(JSON.parse(data.salleReg));
+                    if (data.salleReg !== undefined && data.salleReg !== null && data.salleReg !== "") {
+                        setSalleReg(JSON.parse(data.salleReg) || []);
                     }
                     else {
                         var acts = data.actes ? JSON.parse(data.actes) : [];
