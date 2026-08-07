@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.85 — 07/08/2026";
+const APP_VERSION="v9.86 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -62,6 +62,7 @@ const SYS=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE"];
    définie UNE FOIS ; sept protections divergentes l'utilisaient chacune à sa façon,
    et la Formation manquait dans plusieurs — c'est ainsi qu'une FMC a pu être écrasée
    par la réapplication du planning type et effacée par son retrait. */
+const ABS_IDS=["ABSENCE","FORM","FORMATION"];   /* v9.86 : « absent ou en formation », défini UNE fois — 14 copies éparpillées dans 5 composants, la famille exacte qui avait fait disparaître une FMC */
 const EXCL_IDS=["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TP"];
 const PROT_BASE=EXCL_IDS;                      // noyau protégé par TOUS les outils
 const PROT_TOUR=EXCL_IDS.concat(["TOUR_HC","TOUR_USIC"]); // + tour réel (remplaçants)
@@ -643,7 +644,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
   const gSlotOf=(y2,m2,d2)=>{const dw2=dow(y2,m2,d2);return (dw2===6||dw2===0)?"JOUR":"N";};
   const isAbsOn=(mid,y2,m2,d2)=>{
     const sls=isWE(y2,m2,d2)?["JOUR"]:["M","AM"];
-    return sls.some(sl=>getEntries(mid,y2,m2,d2,sl).some(e=>["ABSENCE","FORM","FORMATION"].includes(e.acteId)));
+    return sls.some(sl=>getEntries(mid,y2,m2,d2,sl).some(e=>ABS_IDS.includes(e.acteId)));
   };
   const runGardeSwap=(A,B)=>{
     // applyGarde retire la garde existante du jour + son repos, puis pose garde + repos du nouveau titulaire
@@ -1326,8 +1327,8 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
   const gvIsAbs=(mid,y2,m2,d2)=>{
     const sls=isWE(y2,m2,d2)?["JOUR"]:["M","AM"];
     return sls.some(sl=>{
-      return cellHasAny((plan[sk(y2,m2,d2,sl)]||{})[mid],["ABSENCE","FORM","FORMATION"])
-        ||cellHasAny((plan[sk(y2,m2,d2,"JOUR")]||{})[mid],["ABSENCE","FORM","FORMATION"]);
+      return cellHasAny((plan[sk(y2,m2,d2,sl)]||{})[mid],ABS_IDS)
+        ||cellHasAny((plan[sk(y2,m2,d2,"JOUR")]||{})[mid],ABS_IDS);
     });
   };
   const [pickerDay,setPickerDay]=React.useState(null);
@@ -1357,7 +1358,7 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
   };
   const isAbsFor=(medId,y2,m2,d2)=>{
     const es=[...(getEntry?[]:[]),];
-    const check=(sl)=>cellHasAny((plan[sk(y2,m2,d2,sl)]||{})[medId],["ABSENCE","FORM","FORMATION"]);
+    const check=(sl)=>cellHasAny((plan[sk(y2,m2,d2,sl)]||{})[medId],ABS_IDS);
     return check("M")||check("AM")||check("JOUR");
   };
   const inTourWeek=(medId,y2,m2,d2)=>{
@@ -2928,7 +2929,7 @@ function TourTab({specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,apply
       const dy=dt.getFullYear(),dm=dt.getMonth(),dd=dt.getDate();
       const es1=getEntries(medId,dy,dm,dd,"M");
       const es2=getEntries(medId,dy,dm,dd,"AM");
-      if([...es1,...es2].some(e=>["ABSENCE","FORM","FORMATION"].includes(e.acteId)))return true;
+      if([...es1,...es2].some(e=>ABS_IDS.includes(e.acteId)))return true;
     }
     return false;
   };
@@ -2948,7 +2949,7 @@ function TourTab({specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,apply
       const dt=new Date(wy2,wm2,wd2+i);
       const dy=dt.getFullYear(),dm=dt.getMonth(),dd=dt.getDate();
       const es=[...getEntries(medId,dy,dm,dd,"M"),...getEntries(medId,dy,dm,dd,"AM")];
-      if(es.some(e=>["ABSENCE","FORM","FORMATION"].includes(e.acteId)))days.push(JOURS_SW[dt.getDay()]+" "+dd);
+      if(es.some(e=>ABS_IDS.includes(e.acteId)))days.push(JOURS_SW[dt.getDay()]+" "+dd);
     }
     return days;
   };
@@ -4045,7 +4046,7 @@ function ReportsView(p){
   const inTour=(y,m,d)=>{const wm=tourMed[wkOf(y,m,d)]||{};return((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid));};
   const slotState=(y,m,d,sl)=>{
     const es=getEntries(mid,y,m,d,sl);
-    if(es.some(e=>["ABSENCE","FORM","FORMATION"].includes(e.acteId))||(es[0]&&es[0]._blocked))return "abs";
+    if(es.some(e=>ABS_IDS.includes(e.acteId))||(es[0]&&es[0]._blocked))return "abs";
     if(es.length>0)return "busy";
     return "free";
   };
@@ -5368,7 +5369,7 @@ function CardioPlanning(){
   const getEntries=useCallback((medId,y2,m2,d2,slot)=>{
     const _p=Object.keys(archPlan).length>0?{...archPlan,...plan}:plan;
     if(slot!=="JOUR"){
-      const absE=cellEs((_p[sk(y2,m2,d2,"JOUR")]||{})[medId]).find(e=>e&&["ABSENCE","FORM","FORMATION"].includes(e.acteId));
+      const absE=cellEs((_p[sk(y2,m2,d2,"JOUR")]||{})[medId]).find(e=>e&&ABS_IDS.includes(e.acteId));
       if(absE) return slot==="M"?[{...absE,_fullDay:true}]:slot==="AM"?[{_blocked:true}]:[];
     }
     if(slot==="JOUR"){const e=(_p[sk(y2,m2,d2,"JOUR")]||{})[medId];return e?(Array.isArray(e)?e:[e]):[];}
@@ -5696,7 +5697,7 @@ function CardioPlanning(){
       if(isWE(ny,nm,nd2)){
         const k=sk(ny,nm,nd2,"JOUR"),dm={...(next[k]||{})};
         if(!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};
-        else if(cellHasAny(dm[medId],["ABSENCE","FORM","FORMATION"]))nxWarn=true;
+        else if(cellHasAny(dm[medId],ABS_IDS))nxWarn=true;
         next={...next,[k]:dm};
       } else {
         /* v9.65.1 : une absence ou FMC « journée entière » vit dans la case JOUR du
@@ -5705,8 +5706,8 @@ function CardioPlanning(){
            et si la journée est bloquée, aucun repos n'est posé. */
         const jC=(next[sk(ny,nm,nd2,"JOUR")]||{})[medId];
         const jBlk=cellHasAny(jC,EXCL_IDS);
-        if(cellHasAny(jC,["ABSENCE","FORM","FORMATION"]))nxWarn=true;
-        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!jBlk&&!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};else if(cellHasAny(dm[medId],["ABSENCE","FORM","FORMATION"]))nxWarn=true;next={...next,[k]:dm};});
+        if(cellHasAny(jC,ABS_IDS))nxWarn=true;
+        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!jBlk&&!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};else if(cellHasAny(dm[medId],ABS_IDS))nxWarn=true;next={...next,[k]:dm};});
       }
       return next;
     });
@@ -6003,7 +6004,7 @@ function CardioPlanning(){
 
   const isAbsentInWeek=useCallback((medId,wk)=>{
     const[wy,wm2,wd]=wk.split("-").map(Number);
-    return[0,1,2,3,4].some(i=>{const dt=new Date(wy,wm2,wd+i);return["M","AM","JOUR"].some(sl=>cellHasAny((plan[sk(dt.getFullYear(),dt.getMonth(),dt.getDate(),sl)]||{})[medId],["ABSENCE","FORM","FORMATION"]));});
+    return[0,1,2,3,4].some(i=>{const dt=new Date(wy,wm2,wd+i);return["M","AM","JOUR"].some(sl=>cellHasAny((plan[sk(dt.getFullYear(),dt.getMonth(),dt.getDate(),sl)]||{})[medId],ABS_IDS));});
   },[plan]);
 
   const tmCount=medId=>Object.values(tourMed).reduce((n,w)=>((w.HC||[]).includes(medId)||(w.USIC||[]).includes(medId))?n+1:n,0);
@@ -6288,7 +6289,11 @@ header::-webkit-scrollbar { display: none; }
         <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} orient={orient} setOrient={setOrient} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
-          const full=bip&&["CHB-1","CHB-2","CHB-3"].includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
+          /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
+             figée. Une salle ajoutée à Béthune et autorisée pour le BIP est reconnue sans
+             modification du code — dernier endroit où un nom de salle était comparé à une
+             liste écrite en dur. */
+          const full=bip&&(bip.salles||[]).includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
       {tab==="plateau"&&<ActTabView title="❤️ PT Cardio" titleColor="#e3b341"
@@ -6485,7 +6490,7 @@ header::-webkit-scrollbar { display: none; }
         const astWeekDays=(mon)=>[0,1,2,3,4,5,6].map(i=>{const dt=new Date(mon.y,mon.m,mon.d+i);return{y:dt.getFullYear(),m:dt.getMonth(),d:dt.getDate()};});
         const astAbsPart=(mid,days)=>days.some(({y,m,d})=>{
           const sls=isWE(y,m,d)?["JOUR"]:["M","AM"];
-          return sls.some(sl=>getEntries(mid,y,m,d,sl).some(e=>["ABSENCE","FORM","FORMATION"].includes(e.acteId)));
+          return sls.some(sl=>getEntries(mid,y,m,d,sl).some(e=>ABS_IDS.includes(e.acteId)));
         });
         const runAstAuto=()=>{
           if(astMeds.length===0){toast("Aucun médecin d'astreinte (cochez-le dans l'onglet Équipe)","warn");return;}
@@ -7575,7 +7580,7 @@ header::-webkit-scrollbar { display: none; }
                 {(isNight||we)&&canGarde&&canEditThisMed&&(()=>{
                   /* v9.66 : même avertissement préalable que le sélecteur de l'onglet Gardes */
                   const _gn=new Date(y2,m2,d2+1);
-                  const gNx=["M","AM","JOUR"].some(sl2=>cellHasAny((plan[sk(_gn.getFullYear(),_gn.getMonth(),_gn.getDate(),sl2)]||{})[medId],["ABSENCE","FORM","FORMATION"]));
+                  const gNx=["M","AM","JOUR"].some(sl2=>cellHasAny((plan[sk(_gn.getFullYear(),_gn.getMonth(),_gn.getDate(),sl2)]||{})[medId],ABS_IDS));
                   return <button style={{...S.qBtn,borderColor:gNx?"#f59e0b":"#388bfd",background:gNx?"rgba(245,158,11,.12)":"#0c1a2e",color:gNx?"#b45309":"#388bfd"}} onClick={doGarde}>{gNx?"🌙 Garde — ⚠ absence/FMC demain, sans repos":"🌙 Garde + repos auto"}</button>;
                 })()}
                 {isNight&&!canGarde&&<span style={{color:"var(--txt3)",fontSize:12}}>Ce médecin ne participe pas aux gardes.</span>}
