@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.94 — 07/08/2026";
+const APP_VERSION="v9.96 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2604,7 +2604,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
    (matin → après-midi), le cas courant restant « deux dates et je valide ».
    Un week-end n'ayant qu'une case JOUR, les demi-journées y sont ignorées : c'est déjà
    le comportement de toutes les fonctions appelées ici. */
-function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,compter,onPose,onRetraitAbs,onEffacer,onClose}){
+function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],allowActs=true,compter,onPose,onRetraitAbs,onEffacer,onClose}){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const [action,setAction]=useState("poser");        // poser | retirer
   const [cible,setCible]=useState("abs");            // abs | activites   (si retirer)
@@ -2615,11 +2615,16 @@ function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,comp
   const [slDeb,setSlDeb]=useState("M");
   const [slFin,setSlFin]=useState("AM");
   const [moisEntier,setMoisEntier]=useState(false);
+  /* v9.96 : « mois entier » ne se limite plus au mois affiché — on choisit parmi les
+     mois de la période, ce qui évite de naviguer avant d'effacer. */
+  const moisList=(mois&&mois.length)?mois:[{y:year,m:month}];
+  const [moisIdx,setMoisIdx]=useState(()=>{const i=moisList.findIndex(x=>x.y===year&&x.m===month);return i<0?0:i;});
+  const moisSel=moisList[Math.min(moisIdx,moisList.length-1)]||{y:year,m:month};
   const [keepAbs,setKeepAbs]=useState(true);
   const [confirm,setConfirm]=useState(null);
   const med=medecins.find(m=>m.id===medId);
 
-  const moisDeb=fmt(new Date(year,month,1)), moisFin=fmt(new Date(year,month+1,0));
+  const moisDeb=fmt(new Date(moisSel.y,moisSel.m,1)), moisFin=fmt(new Date(moisSel.y,moisSel.m+1,0));
   const rDf=moisEntier?moisDeb:df, rDt=moisEntier?moisFin:dt;
   const rDeb=moisEntier?"M":slDeb, rFin=moisEntier?"AM":slFin;
   const nbJours=(()=>{ if(!rDf||!rDt)return 0;
@@ -2631,7 +2636,7 @@ function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,comp
     ? (absType==="FORMATION"?"Poser une formation":"Poser une absence")
     : (cible==="abs"?"Retirer les absences et FMC":"Effacer les activités");
   const libPeriode=!ok?"—":(moisEntier
-    ? `${MOIS[month]} ${year} entier · ${nbJours} jours`
+    ? `${MOIS[moisSel.m]} ${moisSel.y} entier · ${nbJours} jours`
     : `du ${rDf} ${rDeb==="M"?"matin":"après-midi"} au ${rDt} ${rFin==="M"?"matin":"après-midi"} · ${nbJours} jour${nbJours>1?"s":""}`);
 
   /* les demi-journées d'extrémité : un jour au milieu de la période est toujours entier */
@@ -2652,7 +2657,8 @@ function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,comp
   /* v9.94 : la confirmation annonce le nombre RÉEL d'activités qui vont disparaître.
      « tout le reste sur la période » ne permettait pas de juger : effacer 3 activités et
      en effacer 120 ne se décident pas de la même façon. */
-  const nEff=(confirm==="activites"&&compter)?compter({medId,dateFrom:rDf,dateTo:rDt,keepAbs,slotDebut:rDeb,slotFin:rFin}):0;
+  const rEff=(confirm==="activites"&&compter)?compter({medId,dateFrom:rDf,dateTo:rDt,keepAbs,slotDebut:rDeb,slotFin:rFin}):{n:0,det:[]};
+  const nEff=rEff.n;
   if(confirm) return(
     <div style={{minWidth:320,maxWidth:400}}>
       <div style={S.mHd}><div style={{...S.mTit2,color:"#991b1b"}}>⚠ Confirmer</div></div>
@@ -2662,6 +2668,12 @@ function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,comp
         {confirm==="activites"&&<>
           <div style={{marginTop:9,color:"#16a34a",fontWeight:700}}>✓ Conservés : {keepAbs?"absences, FMC, gardes, repos, tour":"gardes, repos, tour"}</div>
           <div style={{color:"#991b1b",fontWeight:700}}>✗ Effacé : {nEff===0?"aucune activité — rien à retirer":nEff+" activité"+(nEff>1?"s":"")+" posée"+(nEff>1?"s":"")}</div>
+          {nEff>0&&<div style={{marginTop:5,display:"flex",flexWrap:"wrap",gap:4}}>
+            {rEff.det.map(x=>(
+              <span key={x.lab} style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:11,
+                background:"rgba(220,38,38,.10)",border:"1px solid #fca5a5",color:"#991b1b"}}>{x.n} × {x.lab}</span>
+            ))}
+          </div>}
         </>}
       </div>
       <div style={{display:"flex",gap:6,marginTop:13}}>
@@ -2724,9 +2736,15 @@ function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,comp
           <button style={miniBtn(slFin==="AM")} onClick={()=>setSlFin("AM")}>Après-midi</button>
         </div>
       </>:<>
-        <label style={{...S.fl,marginTop:10,display:"block"}}>Période</label>
-        <div style={{padding:"8px 10px",borderRadius:7,border:"1.5px solid #1d4ed8",background:"#eff6ff",fontSize:12.5,fontWeight:700,color:"#1e40af"}}>
-          📆 {MOIS[month]} {year} — mois entier
+        <label style={{...S.fl,marginTop:10,display:"block"}}>Quel mois</label>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+          {moisList.map((x,i)=>(
+            <button key={x.y+"-"+x.m} onClick={()=>setMoisIdx(i)}
+              style={{flex:"1 1 auto",minWidth:78,padding:"7px 6px",borderRadius:7,cursor:"pointer",fontWeight:800,fontSize:11.5,
+                border:"1.5px solid "+(i===moisIdx?"#1d4ed8":"var(--border)"),
+                background:i===moisIdx?"#eff6ff":"var(--bg2)",color:i===moisIdx?"#1e40af":"var(--txt2)"}}>
+              {MOIS[x.m].slice(0,4)} {String(x.y).slice(2)}
+            </button>))}
         </div>
       </>}
       <button onClick={()=>setMoisEntier(v=>!v)}
@@ -5959,20 +5977,24 @@ function CardioPlanning(){
     const sp=perSlots({medId,dateFrom,dateTo,slotDebut,slotFin}).slotsParJour;
     const [fy,fm,fd]=parseDate(dateFrom);
     const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
-    let n=0,cy=fy,cm=fm;
+    let n=0,cy=fy,cm=fm;const par={};
     while(new Date(cy,cm,1).getTime()<=toT){
       for(let d=1;d<=dIM(cy,cm);d++){
         const t=new Date(cy,cm,d).getTime();
         if(t<fromT||t>toT)continue;
         (isWE(cy,cm,d)?["JOUR"]:sp(cy,cm,d).concat(["JOUR"])).forEach(sl=>{
           const c=(plan[sk(cy,cm,d,sl)]||{})[medId];
-          n+=cellEs(c).filter(e=>e&&e.acteId&&KEEP.indexOf(e.acteId)<0).length;
+          cellEs(c).forEach(e=>{if(e&&e.acteId&&KEEP.indexOf(e.acteId)<0){n++;par[e.acteId]=(par[e.acteId]||0)+1;}});
         });
       }
       if(cm===11){cy++;cm=0;}else cm++;
     }
-    return n;
-  },[plan]);
+    /* v9.95 : le détail par activité, du plus fréquent au plus rare — « 12 CS-L, 4 Coro »
+       est plus parlant qu'un total, et permet de repérer une erreur de période. */
+    const det=Object.keys(par).map(id=>{const a=acteById(id);return {lab:(a&&(a.short||a.label))||id,n:par[id]};})
+      .sort((x,y)=>y.n-x.n||String(x.lab).localeCompare(String(y.lab)));
+    return {n,det};
+  },[plan,acteById]);
 
   const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,slotsParJour=null})=>{
     const KEEP=keepAbs?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"]:["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"];
@@ -7794,7 +7816,7 @@ header::-webkit-scrollbar { display: none; }
           medecins={medecins}
           initMedId={mData.medId}
           initDate={`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`}
-          year={year} month={month} allowActs={!isAdminEdit} compter={countPeriodActs}
+          year={year} month={month} mois={ptPeriodMonths} allowActs={!isAdminEdit} compter={countPeriodActs}
           onPose={p=>{applyAbsence(perSlots(p));setModal(null);}}
           onRetraitAbs={p=>{removeAbsence(perSlots(p));setModal(null);}}
           onEffacer={p=>{clearPeriodActs(perSlots(p));setModal(null);}}
