@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.99 — 07/08/2026";
+var APP_VERSION = "v10.0 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -186,6 +186,7 @@ var PROT_BASE = EXCL_IDS; // noyau protégé par TOUS les outils
 var PROT_TOUR = EXCL_IDS.concat(["TOUR_HC", "TOUR_USIC"]); // + tour réel (remplaçants)
 var EXCL_LABEL = { ABSENCE: "une absence", FORM: "une formation", FORMATION: "une formation", GARDE: "une garde", REPOS_GARDE: "un repos de garde", TP: "un temps partiel" };
 var uniqArr = function (a) { return (a || []).filter(function (v, i, arr) { return arr.indexOf(v) === i; }); };
+var BK_KEEP = 45; /* nombre de sauvegardes automatiques conservées */
 var cellEs = function (c) { return c ? (Array.isArray(c) ? c : [c]) : []; };
 var cellHasAny = function (c, ids) { return cellEs(c).some(function (e) { return e && ids.includes(e.acteId); }); };
 var cellDrop = function (c, ids) { var r = cellEs(c).filter(function (e) { return e && !ids.includes(e.acteId); }); return r.length ? (r.length === 1 ? r[0] : r) : null; };
@@ -2737,6 +2738,38 @@ function EditPTModal(_a) {
         })()));
 }
 /* ════ ABS MODAL ════ */
+function BkCibleForm(_a) {
+    var medecins = _a.medecins, ts = _a.ts, defFrom = _a.defFrom, defTo = _a.defTo, onGo = _a.onGo, onClose = _a.onClose;
+    var _b = useState(null), medId = _b[0], setMedId = _b[1];
+    var _c = useState(defFrom || ""), df = _c[0], setDf = _c[1];
+    var _d = useState(defTo || ""), dt = _d[0], setDt = _d[1];
+    var ok = medId && df && dt && dt >= df;
+    var med = medecins.find(function (m) { return m.id === medId; });
+    return (React.createElement("div", { style: { minWidth: 320, maxWidth: 380 } },
+        React.createElement("div", { style: S.mHd },
+            React.createElement("div", { style: S.mTit2 }, "\uD83C\uDFAF Restaurer un m\u00E9decin"),
+            React.createElement("button", { onClick: onClose, style: S.xBtn }, "\u00D7")),
+        React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt2)", marginBottom: 10, lineHeight: 1.5 } },
+            "Depuis la sauvegarde du ",
+            React.createElement("b", null, new Date(ts).toLocaleString("fr-FR", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })),
+            ".",
+            React.createElement("br", null),
+            "Seules les cases de ce m\u00E9decin, sur ces dates, seront remises dans l'\u00E9tat de la sauvegarde. Le reste du planning n'est pas touch\u00E9."),
+        React.createElement("label", { style: S.fl }, "M\u00E9decin"),
+        React.createElement("select", { value: medId || "", onChange: function (e) { return setMedId(parseInt(e.target.value)); }, style: __assign(__assign({}, S.fi), { width: "100%" }) },
+            React.createElement("option", { value: "" }, "\u2014 Choisir \u2014"),
+            medecins.map(function (m) { return React.createElement("option", { key: m.id, value: m.id },
+                m.prenom,
+                " ",
+                m.nom); })),
+        React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Du"),
+        React.createElement("input", { type: "date", value: df, onChange: function (e) { return setDf(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }),
+        React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Au"),
+        React.createElement("input", { type: "date", value: dt, onChange: function (e) { return setDt(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }),
+        React.createElement("button", { disabled: !ok, onClick: function () { return ok && onGo(medId, df, dt); }, style: __assign(__assign({}, S.btnP), { width: "100%", marginTop: 13, background: "#16a34a", opacity: ok ? 1 : .5 }) },
+            "\u21A9 Restaurer ",
+            med ? med.prenom + " " + med.nom : "ce médecin")));
+}
 function PeriodModal(_a) {
     var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, _b = _a.mois, mois = _b === void 0 ? [] : _b, _c = _a.finPer, finPer = _c === void 0 ? null : _c, _d = _a.allowActs, allowActs = _d === void 0 ? true : _d, compter = _a.compter, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
     var fmt = function (d) { return "".concat(d.getFullYear(), "-").concat(String(d.getMonth() + 1).padStart(2, "0"), "-").concat(String(d.getDate()).padStart(2, "0")); };
@@ -5236,7 +5269,9 @@ function CardioPlanning() {
         return function () { return unsub(); };
     }, []);
     /* ── Sauvegardes automatiques (72h, 10 conservées) ── */
-    var _28 = useState([]), backupList = _28[0], setBackupList = _28[1]; // [{id,ts}]
+    var _28 = useState([]), backupList = _28[0], setBackupList = _28[1];
+    var _bko = useState(""), bkOpen = _bko[0], setBkOpen = _bko[1];
+    var _bkc = useState(null), bkCible = _bkc[0], setBkCible = _bkc[1]; // [{id,ts}]
     var refreshBackupList = useCallback(function () { return __awaiter(_this, void 0, void 0, function () {
         var snap, items_1, e_1;
         return __generator(this, function (_a) {
@@ -5279,7 +5314,7 @@ function CardioPlanning() {
                     return [4 /*yield*/, refreshBackupList()];
                 case 4:
                     items = _b.sent();
-                    _i = 0, _a = items.slice(10);
+                    _i = 0, _a = items.slice(BK_KEEP);
                     _b.label = 5;
                 case 5:
                     if (!(_i < _a.length)) return [3 /*break*/, 8];
@@ -5425,6 +5460,83 @@ function CardioPlanning() {
             });
         }); })();
     }, [tab]);
+    var restoreMedPeriod = useCallback(function (id, medId, dateFrom, dateTo) { return __awaiter(_this, void 0, void 0, function () {
+        var d, data, old_1, _a, fy, fm, fd, fromT_1, toT_1, pairs_1, n_1, i, e_9;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    _b.trys.push([0, 6, , 7]);
+                    return [4 /*yield*/, window.firebaseDB.collection("backups").doc(id).get()];
+                case 1:
+                    d = _b.sent();
+                    data = d.data();
+                    if (!data) {
+                        toast("Sauvegarde introuvable", "warn");
+                        return [2 /*return*/, 0];
+                    }
+                    old_1 = data.planV2 ? data.planV2 : (data.plan ? JSON.parse(data.plan) : null);
+                    if (!old_1) {
+                        toast("Cette sauvegarde ne contient pas de planning", "warn");
+                        return [2 /*return*/, 0];
+                    }
+                    _a = parseDate(dateFrom), fy = _a[0], fm = _a[1], fd = _a[2];
+                    fromT_1 = new Date(fy, fm, fd).getTime(), toT_1 = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+                    pairs_1 = [];
+                    n_1 = 0;
+                    setPlan(function (p) {
+                        var next = __assign({}, p);
+                        Object.keys(old_1).forEach(function (k) {
+                            var _a;
+                            var parts = k.split("|");
+                            if (parts.length < 2)
+                                return;
+                            var _b = parts[0].split("-").map(Number), yy = _b[0], mm = _b[1], dd = _b[2];
+                            var t = new Date(yy, mm, dd).getTime();
+                            if (t < fromT_1 || t > toT_1)
+                                return;
+                            var av = (old_1[k] || {})[medId];
+                            var dm = __assign({}, (next[k] || {}));
+                            if (av === undefined || av === null) {
+                                if (dm[medId] !== undefined) {
+                                    delete dm[medId];
+                                    n_1++;
+                                }
+                            }
+                            else if (JSON.stringify(dm[medId]) !== JSON.stringify(av)) {
+                                dm[medId] = av;
+                                n_1++;
+                            }
+                            else
+                                return;
+                            next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
+                            pairs_1.push([["planV2", k], dm]);
+                        });
+                        return next;
+                    });
+                    if (!(pairs_1.length && updatePaths)) return [3 /*break*/, 5];
+                    i = 0;
+                    _b.label = 2;
+                case 2:
+                    if (!(i < pairs_1.length)) return [3 /*break*/, 5];
+                    return [4 /*yield*/, updatePaths(PLANNING_DOC, pairs_1.slice(i, i + 400))];
+                case 3:
+                    _b.sent();
+                    _b.label = 4;
+                case 4:
+                    i += 400;
+                    return [3 /*break*/, 2];
+                case 5:
+                    toast(n_1 ? (n_1 + " case" + (n_1 > 1 ? "s" : "") + " restaurée" + (n_1 > 1 ? "s" : "")) : "Rien à restaurer — déjà identique", "info");
+                    return [2 /*return*/, n_1];
+                case 6:
+                    e_9 = _b.sent();
+                    console.log("restore ciblee:", e_9);
+                    toast("Échec de la restauration", "warn");
+                    return [2 /*return*/, 0];
+                case 7: return [2 /*return*/];
+            }
+        });
+    }); }, []);
     var restoreBackup = useCallback(function (id) { return __awaiter(_this, void 0, void 0, function () {
         var d, data, _ts, rest, e_6;
         return __generator(this, function (_a) {
@@ -5468,7 +5580,7 @@ function CardioPlanning() {
                     case 1:
                         d = _a.sent();
                         last = (d.data() || {})._lastBackupAt || 0;
-                        if (!(Date.now() - last > 72 * 3600 * 1000)) return [3 /*break*/, 3];
+                        if (!(Date.now() - last > 24 * 3600 * 1000)) return [3 /*break*/, 3];
                         return [4 /*yield*/, makeBackup(false)];
                     case 2:
                         _a.sent();
@@ -7963,15 +8075,23 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde des donn\u00E9es"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "T\u00E9l\u00E9chargez une copie de toutes vos donn\u00E9es. En cas de probl\u00E8me, importez ce fichier pour tout restaurer."),
                     React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } }, "\uD83D\uDD50 Sauvegardes automatiques (toutes les 72 h, 10 conserv\u00E9es)"),
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } }, "\uD83D\uDD50 Sauvegardes automatiques (une par jour, 45 conserv\u00E9es)"),
                         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "Restaurer \u00E9crase les donn\u00E9es actuelles par celles de la sauvegarde choisie."),
                         React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 } },
                             backupList.length === 0 && React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune sauvegarde pour l'instant."),
-                            backupList.map(function (b) { return (React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--txt)" } },
+                            backupList.length > 5 && React.createElement("select", { value: "", onChange: function (e) { if (e.target.value)
+                                    setBkOpen(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%", marginBottom: 6, fontSize: 11 }) },
+                                React.createElement("option", { value: "" },
+                                    "\uD83D\uDCDC ",
+                                    backupList.length - 5,
+                                    " sauvegardes plus anciennes\u2026"),
+                                backupList.slice(5).map(function (b) { return (React.createElement("option", { key: b.id, value: b.id }, new Date(b.ts).toLocaleString("fr-FR", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }))); })),
+                            backupList.filter(function (b) { return backupList.indexOf(b) < 5 || b.id === bkOpen; }).map(function (b) { return (React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--txt)" } },
                                 React.createElement("span", { style: { flex: 1 } }, new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })),
                                 React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #388bfd", background: "var(--bg2)", color: "#388bfd", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { return previewBackup(b.id, b.ts); } }, "\uD83D\uDC41 Aper\u00E7u"),
                                 React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(b.ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?"))
-                                        restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
+                                        restoreBackup(b.id); } }, "\u21A9 Restaurer"),
+                                    React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #16a34a", background: "var(--bg2)", color: "#16a34a", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { setBkCible({ id: b.id, ts: b.ts }); setModal("bkCible"); } }, "\uD83C\uDFAF Un m\u00E9decin"))); })),
                         React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
                         React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#e3b341", color: "#111" }), onClick: function () {
@@ -8792,6 +8912,12 @@ function CardioPlanning() {
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
+        modal === "bkCible" && bkCible && React.createElement(Ov, { onClose: function () { return setModal(null); } }, (function () {
+            var fmt2 = function (d) { return "".concat(d.getFullYear(), "-").concat(String(d.getMonth() + 1).padStart(2, "0"), "-").concat(String(d.getDate()).padStart(2, "0")); };
+            var p0 = perStart(year, month);
+            var e0 = perEnd(p0.sy, p0.sm);
+            return (React.createElement(BkCibleForm, { medecins: medecins, ts: bkCible.ts, defFrom: fmt2(new Date(p0.sy, p0.sm, 1)), defTo: fmt2(e0), onClose: function () { return setModal(null); }, onGo: function (mid, df, dt) { restoreMedPeriod(bkCible.id, mid, df, dt); setModal(null); } }));
+        })()),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, finPer: (function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm); return "".concat(e.getFullYear(), "-").concat(String(e.getMonth() + 1).padStart(2, "0"), "-").concat(String(e.getDate()).padStart(2, "0")); })(), allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },

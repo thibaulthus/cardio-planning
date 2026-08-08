@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.99 — 07/08/2026";
+const APP_VERSION="v10.0 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -72,6 +72,7 @@ const EXCL_LABEL={ABSENCE:"une absence",FORM:"une formation",FORMATION:"une form
    true), qui rend un tableau VIDE — un ensemble n'ayant ni longueur ni index. Le fichier
    lisible marchait, le fichier exécuté renvoyait du vide, en silence. D'où ce helper. */
 const uniqArr=(a)=>(a||[]).filter((v,i,arr)=>arr.indexOf(v)===i);
+const BK_KEEP=45;   /* nombre de sauvegardes automatiques conservées */
 const cellEs=c=>c?(Array.isArray(c)?c:[c]):[];
 const cellHasAny=(c,ids)=>cellEs(c).some(e=>e&&ids.includes(e.acteId));
 /* v9.73 : retire d'une case les seules entrées visées et rend ce qu'il reste (null si
@@ -2632,6 +2633,41 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
    (matin → après-midi), le cas courant restant « deux dates et je valide ».
    Un week-end n'ayant qu'une case JOUR, les demi-journées y sont ignorées : c'est déjà
    le comportement de toutes les fonctions appelées ici. */
+/* v10.0 : le formulaire de restauration ciblée. Volontairement minimal — un médecin,
+   deux dates — parce qu'il sert dans un moment de stress : on vient de perdre du travail. */
+function BkCibleForm({medecins,ts,defFrom,defTo,onGo,onClose}){
+  const [medId,setMedId]=useState(null);
+  const [df,setDf]=useState(defFrom||"");
+  const [dt,setDt]=useState(defTo||"");
+  const ok=medId&&df&&dt&&dt>=df;
+  const med=medecins.find(m=>m.id===medId);
+  return(
+    <div style={{minWidth:320,maxWidth:380}}>
+      <div style={S.mHd}>
+        <div style={S.mTit2}>🎯 Restaurer un médecin</div>
+        <button onClick={onClose} style={S.xBtn}>×</button>
+      </div>
+      <div style={{fontSize:11.5,color:"var(--txt2)",marginBottom:10,lineHeight:1.5}}>
+        Depuis la sauvegarde du <b>{new Date(ts).toLocaleString("fr-FR",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}</b>.<br/>
+        Seules les cases de ce médecin, sur ces dates, seront remises dans l'état de la sauvegarde. Le reste du planning n'est pas touché.
+      </div>
+      <label style={S.fl}>Médecin</label>
+      <select value={medId||""} onChange={e=>setMedId(parseInt(e.target.value))} style={{...S.fi,width:"100%"}}>
+        <option value="">— Choisir —</option>
+        {medecins.map(m=><option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>)}
+      </select>
+      <label style={{...S.fl,marginTop:10,display:"block"}}>Du</label>
+      <input type="date" value={df} onChange={e=>setDf(e.target.value)} style={{...S.fi,width:"100%"}}/>
+      <label style={{...S.fl,marginTop:10,display:"block"}}>Au</label>
+      <input type="date" value={dt} onChange={e=>setDt(e.target.value)} style={{...S.fi,width:"100%"}}/>
+      <button disabled={!ok} onClick={()=>ok&&onGo(medId,df,dt)}
+        style={{...S.btnP,width:"100%",marginTop:13,background:"#16a34a",opacity:ok?1:.5}}>
+        ↩ Restaurer {med?med.prenom+" "+med.nom:"ce médecin"}
+      </button>
+    </div>
+  );
+}
+
 function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null,allowActs=true,compter,onPose,onRetraitAbs,onEffacer,onClose}){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const [action,setAction]=useState("poser");        // poser | retirer
@@ -3962,7 +3998,7 @@ const HELP_SECTIONS=[
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
   HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée. En naviguant vers un mois archivé, il se recharge automatiquement en consultation. Désarchivage possible mois par mois."]}),
-  HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète toutes les 72 h, les 10 dernières conservées, avec aperçu avant restauration."]}),
+  HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({last:true,children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}))},
 
@@ -4874,8 +4910,13 @@ function CardioPlanning(){
     return()=>unsub();
   },[]);
 
-  /* ── Sauvegardes automatiques (72h, 10 conservées) ── */
+  /* ── Sauvegardes automatiques : une par jour, 45 conservées (v10.0) ──
+     Coût vérifié avant de changer : le document pèse ~227 Ko, donc 45 copies ≈ 10 Mo,
+     soit 1 % du gigaoctet gratuit. La contrainte n'est pas le stockage. Règle unique
+     et facile à expliquer : « les 45 derniers jours ». */
   const [backupList,setBackupList]=useState([]); // [{id,ts}]
+  const [bkOpen,setBkOpen]=useState("");        // sauvegarde ancienne dépliée
+  const [bkCible,setBkCible]=useState(null);    // restauration ciblée en cours
   const refreshBackupList=useCallback(async()=>{
     try{
       const snap=await window.firebaseDB.collection("backups").get();
@@ -4894,7 +4935,7 @@ function CardioPlanning(){
       await window.firebaseDB.collection("planning").doc("main").set({_lastBackupAt:ts},{merge:true});
       // Purge au-delà de 10
       const items=await refreshBackupList();
-      for(const it of items.slice(10)){
+      for(const it of items.slice(BK_KEEP)){
         await window.firebaseDB.collection("backups").doc(it.id).delete();
       }
       await refreshBackupList();
@@ -4972,6 +5013,46 @@ function CardioPlanning(){
       }catch(e){setDocSize(null);}
     })();
   },[tab]);
+  /* v10.0 : RESTAURATION CIBLÉE — un médecin, sur une période. La restauration globale
+     existante remplace TOUT : utilisable après une catastrophe, pas après une maladresse,
+     car elle écrase aussi le travail des autres depuis la sauvegarde. Ici on ne touche
+     qu'aux cases du médecin choisi, sur les dates choisies : ce qui a été fait ailleurs
+     est préservé. C'est le filet qui manquait maintenant qu'effacer une période est facile. */
+  const restoreMedPeriod=useCallback(async(id,medId,dateFrom,dateTo)=>{
+    try{
+      const d=await window.firebaseDB.collection("backups").doc(id).get();
+      const data=d.data();
+      if(!data){toast("Sauvegarde introuvable","warn");return 0;}
+      const old=data.planV2?data.planV2:(data.plan?JSON.parse(data.plan):null);
+      if(!old){toast("Cette sauvegarde ne contient pas de planning","warn");return 0;}
+      const [fy,fm,fd]=parseDate(dateFrom);
+      const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
+      const pairs=[];let n=0;
+      setPlan(p=>{
+        let next={...p};
+        Object.keys(old).forEach(k=>{
+          const parts=k.split("|");if(parts.length<2)return;
+          const [yy,mm,dd]=parts[0].split("-").map(Number);
+          const t=new Date(yy,mm,dd).getTime();
+          if(t<fromT||t>toT)return;
+          const av=(old[k]||{})[medId];
+          const dm={...(next[k]||{})};
+          if(av===undefined||av===null){if(dm[medId]!==undefined){delete dm[medId];n++;}}
+          else if(JSON.stringify(dm[medId])!==JSON.stringify(av)){dm[medId]=av;n++;}
+          else return;
+          next={...next,[k]:dm};
+          pairs.push([["planV2",k],dm]);
+        });
+        return next;
+      });
+      if(pairs.length&&updatePaths){
+        for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));
+      }
+      toast(n?(n+" case"+(n>1?"s":"")+" restaurée"+(n>1?"s":"")):"Rien à restaurer — déjà identique","info");
+      return n;
+    }catch(e){console.log("restore ciblee:",e);toast("Échec de la restauration","warn");return 0;}
+  },[]);
+
   const restoreBackup=useCallback(async(id)=>{
     try{
       const d=await window.firebaseDB.collection("backups").doc(id).get();
@@ -4989,7 +5070,7 @@ function CardioPlanning(){
       try{
         const d=await window.firebaseDB.collection("planning").doc("main").get();
         const last=(d.data()||{})._lastBackupAt||0;
-        if(Date.now()-last>72*3600*1000)await makeBackup(false);
+        if(Date.now()-last>24*3600*1000)await makeBackup(false);   /* v10.0 : une par jour au lieu d'une tous les 3 jours */
         else refreshBackupList();
       }catch(e){console.log("backup check:",e);}
     },6000);
@@ -7185,11 +7266,19 @@ header::-webkit-scrollbar { display: none; }
               Téléchargez une copie de toutes vos données. En cas de problème, importez ce fichier pour tout restaurer.
             </div>
             <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>🕐 Sauvegardes automatiques (toutes les 72 h, 10 conservées)</div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>🕐 Sauvegardes automatiques (une par jour, 45 conservées)</div>
               <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Restaurer écrase les données actuelles par celles de la sauvegarde choisie.</div>
               <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
                 {backupList.length===0&&<span style={{fontSize:11,color:"var(--txt3)"}}>Aucune sauvegarde pour l'instant.</span>}
-                {backupList.map(b=>(
+                {/* v10.0 : avec 45 sauvegardes, une liste à plat devient illisible. On la
+                    replie sur les 5 plus récentes, le reste derrière un menu déroulant. */}
+                {backupList.length>5&&<select value="" onChange={e=>{if(e.target.value)setBkOpen(e.target.value);}}
+                  style={{...S.fi,width:"100%",marginBottom:6,fontSize:11}}>
+                  <option value="">📜 {backupList.length-5} sauvegardes plus anciennes…</option>
+                  {backupList.slice(5).map(b=>(
+                    <option key={b.id} value={b.id}>{new Date(b.ts).toLocaleString("fr-FR",{weekday:"short",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</option>))}
+                </select>}
+                {backupList.filter(b=>backupList.indexOf(b)<5||b.id===bkOpen).map(b=>(
                   <div key={b.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"var(--txt)"}}>
                     <span style={{flex:1}}>{new Date(b.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
                     <button style={{padding:"3px 10px",borderRadius:6,border:"1px solid #388bfd",background:"var(--bg2)",color:"#388bfd",fontSize:10,fontWeight:700,cursor:"pointer"}}
@@ -7199,6 +7288,10 @@ header::-webkit-scrollbar { display: none; }
                     <button style={{padding:"3px 10px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontSize:10,fontWeight:700,cursor:"pointer"}}
                       onClick={()=>{if(window.confirm("Restaurer la sauvegarde du "+new Date(b.ts).toLocaleString("fr-FR")+" ?\nLes données actuelles seront remplacées.")&&window.confirm("Confirmer définitivement la restauration ?"))restoreBackup(b.id);}}>
                       ↩ Restaurer
+                    </button>
+                    <button style={{padding:"3px 10px",borderRadius:6,border:"1px solid #16a34a",background:"var(--bg2)",color:"#16a34a",fontSize:10,fontWeight:700,cursor:"pointer"}}
+                      onClick={()=>{setBkCible({id:b.id,ts:b.ts});setModal("bkCible");}}>
+                      🎯 Un médecin
                     </button>
                   </div>
                 ))}
@@ -7865,6 +7958,17 @@ header::-webkit-scrollbar { display: none; }
         />
       </Ov>}
 
+      {modal==="bkCible"&&bkCible&&<Ov onClose={()=>setModal(null)}>
+        {(()=>{
+          const fmt2=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+          const p0=perStart(year,month);const e0=perEnd(p0.sy,p0.sm);
+          return(
+            <BkCibleForm medecins={medecins} ts={bkCible.ts}
+              defFrom={fmt2(new Date(p0.sy,p0.sm,1))} defTo={fmt2(e0)}
+              onClose={()=>setModal(null)}
+              onGo={(mid,df,dt)=>{restoreMedPeriod(bkCible.id,mid,df,dt);setModal(null);}}/>);
+        })()}
+      </Ov>}
       {modal==="periode"&&mData&&<Ov onClose={()=>setModal(null)}>
         <PeriodModal
           medecins={medecins}
