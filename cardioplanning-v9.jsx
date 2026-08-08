@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.96 — 07/08/2026";
+const APP_VERSION="v9.97 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2604,7 +2604,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
    (matin → après-midi), le cas courant restant « deux dates et je valide ».
    Un week-end n'ayant qu'une case JOUR, les demi-journées y sont ignorées : c'est déjà
    le comportement de toutes les fonctions appelées ici. */
-function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],allowActs=true,compter,onPose,onRetraitAbs,onEffacer,onClose}){
+function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null,allowActs=true,compter,onPose,onRetraitAbs,onEffacer,onClose}){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const [action,setAction]=useState("poser");        // poser | retirer
   const [cible,setCible]=useState("abs");            // abs | activites   (si retirer)
@@ -2618,13 +2618,22 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],allowActs=t
   /* v9.96 : « mois entier » ne se limite plus au mois affiché — on choisit parmi les
      mois de la période, ce qui évite de naviguer avant d'effacer. */
   const moisList=(mois&&mois.length)?mois:[{y:year,m:month}];
-  const [moisIdx,setMoisIdx]=useState(()=>{const i=moisList.findIndex(x=>x.y===year&&x.m===month);return i<0?0:i;});
-  const moisSel=moisList[Math.min(moisIdx,moisList.length-1)]||{y:year,m:month};
+  /* v9.97 : plusieurs mois à la fois — on peut déjà couvrir plusieurs mois avec deux
+     dates, autant pouvoir le faire par mois. */
+  const [moisSel,setMoisSel]=useState(()=>{const i=moisList.findIndex(x=>x.y===year&&x.m===month);return [i<0?0:i];});
+  const togMois=(i)=>setMoisSel(p=>p.includes(i)?(p.length>1?p.filter(x=>x!==i):p):p.concat([i]).sort((a,b)=>a-b));
+  const iDeb=moisSel.length?Math.min(...moisSel):0, iFin=moisSel.length?Math.max(...moisSel):0;
+  const mDeb=moisList[iDeb]||{y:year,m:month}, mFin=moisList[iFin]||{y:year,m:month};
+  /* La période ne s'arrête pas au dernier jour du mois : elle court jusqu'au dimanche qui
+     clôt la dernière semaine, et rattache le lundi suivant s'il est férié. Choisir le
+     DERNIER mois de la période doit donc effacer jusqu'à cette fin réelle — sinon un
+     1er ou 2 novembre appartenant à la période resterait en place. */
+  const finReelle=(iFin===moisList.length-1&&finPer)?finPer:fmt(new Date(mFin.y,mFin.m+1,0));
   const [keepAbs,setKeepAbs]=useState(true);
   const [confirm,setConfirm]=useState(null);
   const med=medecins.find(m=>m.id===medId);
 
-  const moisDeb=fmt(new Date(moisSel.y,moisSel.m,1)), moisFin=fmt(new Date(moisSel.y,moisSel.m+1,0));
+  const moisDeb=fmt(new Date(mDeb.y,mDeb.m,1)), moisFin=finReelle;
   const rDf=moisEntier?moisDeb:df, rDt=moisEntier?moisFin:dt;
   const rDeb=moisEntier?"M":slDeb, rFin=moisEntier?"AM":slFin;
   const nbJours=(()=>{ if(!rDf||!rDt)return 0;
@@ -2636,7 +2645,9 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],allowActs=t
     ? (absType==="FORMATION"?"Poser une formation":"Poser une absence")
     : (cible==="abs"?"Retirer les absences et FMC":"Effacer les activités");
   const libPeriode=!ok?"—":(moisEntier
-    ? `${MOIS[moisSel.m]} ${moisSel.y} entier · ${nbJours} jours`
+    ? (moisSel.length===1
+        ? `${MOIS[mDeb.m]} ${mDeb.y}${iFin===moisList.length-1&&finPer?" (jusqu'à la fin de la période)":" entier"} · ${nbJours} jours`
+        : `${MOIS[mDeb.m]} → ${MOIS[mFin.m]} ${mFin.y}${iFin===moisList.length-1&&finPer?" (jusqu'à la fin de la période)":""} · ${nbJours} jours`)
     : `du ${rDf} ${rDeb==="M"?"matin":"après-midi"} au ${rDt} ${rFin==="M"?"matin":"après-midi"} · ${nbJours} jour${nbJours>1?"s":""}`);
 
   /* les demi-journées d'extrémité : un jour au milieu de la période est toujours entier */
@@ -2736,14 +2747,14 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],allowActs=t
           <button style={miniBtn(slFin==="AM")} onClick={()=>setSlFin("AM")}>Après-midi</button>
         </div>
       </>:<>
-        <label style={{...S.fl,marginTop:10,display:"block"}}>Quel mois</label>
+        <label style={{...S.fl,marginTop:10,display:"block"}}>Quels mois (plusieurs possibles)</label>
         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
           {moisList.map((x,i)=>(
-            <button key={x.y+"-"+x.m} onClick={()=>setMoisIdx(i)}
+            <button key={x.y+"-"+x.m} onClick={()=>togMois(i)}
               style={{flex:"1 1 auto",minWidth:78,padding:"7px 6px",borderRadius:7,cursor:"pointer",fontWeight:800,fontSize:11.5,
-                border:"1.5px solid "+(i===moisIdx?"#1d4ed8":"var(--border)"),
-                background:i===moisIdx?"#eff6ff":"var(--bg2)",color:i===moisIdx?"#1e40af":"var(--txt2)"}}>
-              {MOIS[x.m].slice(0,4)} {String(x.y).slice(2)}
+                border:"1.5px solid "+(moisSel.includes(i)?"#1d4ed8":"var(--border)"),
+                background:moisSel.includes(i)?"#eff6ff":"var(--bg2)",color:moisSel.includes(i)?"#1e40af":"var(--txt2)"}}>
+              {moisSel.includes(i)?"✓ ":""}{MOIS[x.m].slice(0,4)} {String(x.y).slice(2)}
             </button>))}
         </div>
       </>}
@@ -7816,7 +7827,7 @@ header::-webkit-scrollbar { display: none; }
           medecins={medecins}
           initMedId={mData.medId}
           initDate={`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`}
-          year={year} month={month} mois={ptPeriodMonths} allowActs={!isAdminEdit} compter={countPeriodActs}
+          year={year} month={month} mois={ptPeriodMonths} finPer={(()=>{const p=perStart(year,month);const e=perEnd(p.sy,p.sm);return `${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,"0")}-${String(e.getDate()).padStart(2,"0")}`;})()} allowActs={!isAdminEdit} compter={countPeriodActs}
           onPose={p=>{applyAbsence(perSlots(p));setModal(null);}}
           onRetraitAbs={p=>{removeAbsence(perSlots(p));setModal(null);}}
           onEffacer={p=>{clearPeriodActs(perSlots(p));setModal(null);}}

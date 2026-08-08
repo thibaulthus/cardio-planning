@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.96 — 07/08/2026";
+var APP_VERSION = "v9.97 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2684,26 +2684,35 @@ function EditPTModal(_a) {
 }
 /* ════ ABS MODAL ════ */
 function PeriodModal(_a) {
-    var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, _b = _a.mois, mois = _b === void 0 ? [] : _b, _c = _a.allowActs, allowActs = _c === void 0 ? true : _c, compter = _a.compter, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
+    var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, _b = _a.mois, mois = _b === void 0 ? [] : _b, _c = _a.finPer, finPer = _c === void 0 ? null : _c, _d = _a.allowActs, allowActs = _d === void 0 ? true : _d, compter = _a.compter, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
     var fmt = function (d) { return "".concat(d.getFullYear(), "-").concat(String(d.getMonth() + 1).padStart(2, "0"), "-").concat(String(d.getDate()).padStart(2, "0")); };
-    var _d = useState("poser"), action = _d[0], setAction = _d[1]; // poser | retirer
-    var _e = useState("abs"), cible = _e[0], setCible = _e[1]; // abs | activites   (si retirer)
-    var _f = useState("ABSENCE"), absType = _f[0], setAbsType = _f[1]; // ABSENCE | FORMATION
-    var _g = useState(initMedId || null), medId = _g[0], setMedId = _g[1];
-    var _h = useState(initDate || ""), df = _h[0], setDf = _h[1];
-    var _j = useState(initDate || ""), dt = _j[0], setDt = _j[1];
-    var _k = useState("M"), slDeb = _k[0], setSlDeb = _k[1];
-    var _l = useState("AM"), slFin = _l[0], setSlFin = _l[1];
-    var _m = useState(false), moisEntier = _m[0], setMoisEntier = _m[1];
+    var _e = useState("poser"), action = _e[0], setAction = _e[1]; // poser | retirer
+    var _f = useState("abs"), cible = _f[0], setCible = _f[1]; // abs | activites   (si retirer)
+    var _g = useState("ABSENCE"), absType = _g[0], setAbsType = _g[1]; // ABSENCE | FORMATION
+    var _h = useState(initMedId || null), medId = _h[0], setMedId = _h[1];
+    var _j = useState(initDate || ""), df = _j[0], setDf = _j[1];
+    var _k = useState(initDate || ""), dt = _k[0], setDt = _k[1];
+    var _l = useState("M"), slDeb = _l[0], setSlDeb = _l[1];
+    var _m = useState("AM"), slFin = _m[0], setSlFin = _m[1];
+    var _o = useState(false), moisEntier = _o[0], setMoisEntier = _o[1];
     /* v9.96 : « mois entier » ne se limite plus au mois affiché — on choisit parmi les
        mois de la période, ce qui évite de naviguer avant d'effacer. */
     var moisList = (mois && mois.length) ? mois : [{ y: year, m: month }];
-    var _o = useState(function () { var i = moisList.findIndex(function (x) { return x.y === year && x.m === month; }); return i < 0 ? 0 : i; }), moisIdx = _o[0], setMoisIdx = _o[1];
-    var moisSel = moisList[Math.min(moisIdx, moisList.length - 1)] || { y: year, m: month };
-    var _q = useState(true), keepAbs = _q[0], setKeepAbs = _q[1];
-    var _s = useState(null), confirm = _s[0], setConfirm = _s[1];
+    /* v9.97 : plusieurs mois à la fois — on peut déjà couvrir plusieurs mois avec deux
+       dates, autant pouvoir le faire par mois. */
+    var _q = useState(function () { var i = moisList.findIndex(function (x) { return x.y === year && x.m === month; }); return [i < 0 ? 0 : i]; }), moisSel = _q[0], setMoisSel = _q[1];
+    var togMois = function (i) { return setMoisSel(function (p) { return p.includes(i) ? (p.length > 1 ? p.filter(function (x) { return x !== i; }) : p) : p.concat([i]).sort(function (a, b) { return a - b; }); }); };
+    var iDeb = moisSel.length ? Math.min.apply(Math, moisSel) : 0, iFin = moisSel.length ? Math.max.apply(Math, moisSel) : 0;
+    var mDeb = moisList[iDeb] || { y: year, m: month }, mFin = moisList[iFin] || { y: year, m: month };
+    /* La période ne s'arrête pas au dernier jour du mois : elle court jusqu'au dimanche qui
+       clôt la dernière semaine, et rattache le lundi suivant s'il est férié. Choisir le
+       DERNIER mois de la période doit donc effacer jusqu'à cette fin réelle — sinon un
+       1er ou 2 novembre appartenant à la période resterait en place. */
+    var finReelle = (iFin === moisList.length - 1 && finPer) ? finPer : fmt(new Date(mFin.y, mFin.m + 1, 0));
+    var _s = useState(true), keepAbs = _s[0], setKeepAbs = _s[1];
+    var _t = useState(null), confirm = _t[0], setConfirm = _t[1];
     var med = medecins.find(function (m) { return m.id === medId; });
-    var moisDeb = fmt(new Date(moisSel.y, moisSel.m, 1)), moisFin = fmt(new Date(moisSel.y, moisSel.m + 1, 0));
+    var moisDeb = fmt(new Date(mDeb.y, mDeb.m, 1)), moisFin = finReelle;
     var rDf = moisEntier ? moisDeb : df, rDt = moisEntier ? moisFin : dt;
     var rDeb = moisEntier ? "M" : slDeb, rFin = moisEntier ? "AM" : slFin;
     var nbJours = (function () {
@@ -2719,7 +2728,9 @@ function PeriodModal(_a) {
         ? (absType === "FORMATION" ? "Poser une formation" : "Poser une absence")
         : (cible === "abs" ? "Retirer les absences et FMC" : "Effacer les activités");
     var libPeriode = !ok ? "—" : (moisEntier
-        ? "".concat(MOIS[moisSel.m], " ").concat(moisSel.y, " entier \u00B7 ").concat(nbJours, " jours")
+        ? (moisSel.length === 1
+            ? "".concat(MOIS[mDeb.m], " ").concat(mDeb.y).concat(iFin === moisList.length - 1 && finPer ? " (jusqu'à la fin de la période)" : " entier", " \u00B7 ").concat(nbJours, " jours")
+            : "".concat(MOIS[mDeb.m], " \u2192 ").concat(MOIS[mFin.m], " ").concat(mFin.y).concat(iFin === moisList.length - 1 && finPer ? " (jusqu'à la fin de la période)" : "", " \u00B7 ").concat(nbJours, " jours"))
         : "du ".concat(rDf, " ").concat(rDeb === "M" ? "matin" : "après-midi", " au ").concat(rDt, " ").concat(rFin === "M" ? "matin" : "après-midi", " \u00B7 ").concat(nbJours, " jour").concat(nbJours > 1 ? "s" : ""));
     /* les demi-journées d'extrémité : un jour au milieu de la période est toujours entier */
     var lancer = function () {
@@ -2816,10 +2827,11 @@ function PeriodModal(_a) {
             React.createElement("div", { style: { display: "flex", gap: 4, marginTop: 5 } },
                 React.createElement("button", { style: miniBtn(slFin === "M"), onClick: function () { return setSlFin("M"); } }, "Matin"),
                 React.createElement("button", { style: miniBtn(slFin === "AM"), onClick: function () { return setSlFin("AM"); } }, "Apr\u00E8s-midi"))) : React.createElement(React.Fragment, null,
-            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Quel mois"),
-            React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, moisList.map(function (x, i) { return (React.createElement("button", { key: x.y + "-" + x.m, onClick: function () { return setMoisIdx(i); }, style: { flex: "1 1 auto", minWidth: 78, padding: "7px 6px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 11.5,
-                    border: "1.5px solid " + (i === moisIdx ? "#1d4ed8" : "var(--border)"),
-                    background: i === moisIdx ? "#eff6ff" : "var(--bg2)", color: i === moisIdx ? "#1e40af" : "var(--txt2)" } },
+            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Quels mois (plusieurs possibles)"),
+            React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, moisList.map(function (x, i) { return (React.createElement("button", { key: x.y + "-" + x.m, onClick: function () { return togMois(i); }, style: { flex: "1 1 auto", minWidth: 78, padding: "7px 6px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 11.5,
+                    border: "1.5px solid " + (moisSel.includes(i) ? "#1d4ed8" : "var(--border)"),
+                    background: moisSel.includes(i) ? "#eff6ff" : "var(--bg2)", color: moisSel.includes(i) ? "#1e40af" : "var(--txt2)" } },
+                moisSel.includes(i) ? "✓ " : "",
                 MOIS[x.m].slice(0, 4),
                 " ",
                 String(x.y).slice(2))); }))),
@@ -8715,7 +8727,7 @@ function CardioPlanning() {
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
-            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
+            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, finPer: (function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm); return "".concat(e.getFullYear(), "-").concat(String(e.getMonth() + 1).padStart(2, "0"), "-").concat(String(e.getDate()).padStart(2, "0")); })(), allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "colOrder" && colModal && React.createElement("div", { style: S.ov, onClick: function () { setModal(null); setColModal(null); } },
