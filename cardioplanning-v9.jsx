@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.2 — 07/08/2026";
+const APP_VERSION="v10.3 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5086,32 +5086,30 @@ function CardioPlanning(){
       if(!old){toast("Cette sauvegarde ne contient pas de planning","warn");return 0;}
       const [fy,fm,fd]=parseDate(dateFrom);
       const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
-      const pairs=[];let n=0;
-      setPlan(p=>{
-        let next={...p};
-        Object.keys(old).forEach(k=>{
-          const parts=k.split("|");if(parts.length<2)return;
-          const [yy,mm,dd]=parts[0].split("-").map(Number);
-          const t=new Date(yy,mm,dd).getTime();
-          if(t<fromT||t>toT)return;
-          const av=(old[k]||{})[medId];
-          const dm={...(next[k]||{})};
-          if(av===undefined||av===null){if(dm[medId]!==undefined){delete dm[medId];n++;}}
-          else if(JSON.stringify(dm[medId])!==JSON.stringify(av)){dm[medId]=av;n++;}
-          else return;
-          next={...next,[k]:dm};
-          pairs.push([["planV2",k],dm]);
-        });
-        return next;
+      /* calcul synchrone sur l'état courant : setPlan ne s'exécute pas immédiatement */
+      const cles={};Object.keys(old).forEach(k=>cles[k]=1);Object.keys(plan).forEach(k=>cles[k]=1);
+      const maj={};const pairs=[];let n=0;
+      Object.keys(cles).forEach(k=>{
+        const parts=k.split("|");if(parts.length<2)return;
+        const [yy,mm,dd]=parts[0].split("-").map(Number);
+        const t=new Date(yy,mm,dd).getTime();
+        if(t<fromT||t>toT)return;
+        const av=(old[k]||{})[medId], mt=(plan[k]||{})[medId];
+        if(cellKey(av)===cellKey(mt))return;
+        const dm={...(plan[k]||{})};
+        if(av===undefined||av===null||cellEs(av).length===0)delete dm[medId];
+        else dm[medId]=av;
+        maj[k]=dm;pairs.push([["planV2",k],dm]);n++;
       });
-      if(pairs.length&&updatePaths){
-        for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));
+      if(n===0){toast("Rien à restaurer — déjà identique","info");return 0;}
+      setPlan(p=>{const next={...p};Object.keys(maj).forEach(k=>{next[k]=maj[k];});return next;});
+      if(updatePaths){
+        for(let i2=0;i2<pairs.length;i2+=400)await updatePaths(PLANNING_DOC,pairs.slice(i2,i2+400));
       }
-      toast(n?(n+" case"+(n>1?"s":"")+" restaurée"+(n>1?"s":"")):"Rien à restaurer — déjà identique","info");
+      toast(n+" case"+(n>1?"s":"")+" restaurée"+(n>1?"s":""),"info");
       return n;
     }catch(e){console.log("restore ciblee:",e);toast("Échec de la restauration","warn");return 0;}
-  },[]);
-
+  },[plan]);
   const restoreBackup=useCallback(async(id)=>{
     try{
       const d=await window.firebaseDB.collection("backups").doc(id).get();
@@ -6194,6 +6192,20 @@ function CardioPlanning(){
      aussi ce qui a été posé depuis la sauvegarde. On compte donc trois choses : ce qui
      sera remis, ce qui sera supprimé, ce qui ne bouge pas. Trois zéros = mauvaise
      sauvegarde, autant le savoir avant de cliquer. */
+  /* v10.3 : deux bugs corrigés d'un coup, révélés par ses tests.
+     (a) COMPARAISON. Une case vaut soit un objet, soit un tableau — `{acteId:"ABSENCE"}`
+         et `[{acteId:"ABSENCE"}]` décrivent la même chose mais ne se sérialisent pas
+         pareil. Le bilan comptait donc « 7 remises ET 7 supprimées » sur des cases
+         pourtant identiques. On compare désormais la forme normalisée.
+     (b) ÉCRITURE. `setPlan(p=>{…})` n'exécute PAS sa fonction tout de suite : le tableau
+         des modifications était encore vide quand on l'envoyait à Firestore, donc rien
+         n'était enregistré et l'écran revenait à l'état précédent. Les changements sont
+         maintenant calculés AVANT, sur l'état courant. */
+  const cellKey=(c)=>JSON.stringify(cellEs(c)
+    .filter(e=>e&&e.acteId)
+    .map(e=>({a:e.acteId,s:e.salle||null,c:e.cond?1:0}))
+    .sort((x,y)=>String(x.a+x.s).localeCompare(String(y.a+y.s))));
+
   const diffMedPeriod=useCallback(async(id,medId,dateFrom,dateTo)=>{
     try{
       const d=await window.firebaseDB.collection("backups").doc(id).get();
@@ -6213,7 +6225,7 @@ function CardioPlanning(){
         const t=new Date(yy,mm,dd).getTime();
         if(t<fromT||t>toT)return;
         const av=(old[k]||{})[medId], mt=(plan[k]||{})[medId];
-        if(JSON.stringify(av)===JSON.stringify(mt)){if(mt!==undefined)nSame++;return;}
+        if(cellKey(av)===cellKey(mt)){if(mt!==undefined)nSame++;return;}
         cellEs(av).forEach(e=>{if(e&&e.acteId){nAdd++;parA[e.acteId]=(parA[e.acteId]||0)+1;}});
         cellEs(mt).forEach(e=>{if(e&&e.acteId){nDel++;parD[e.acteId]=(parD[e.acteId]||0)+1;}});
       });

@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.2 — 07/08/2026";
+var APP_VERSION = "v10.3 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -5549,7 +5549,7 @@ function CardioPlanning() {
         }); })();
     }, [tab]);
     var restoreMedPeriod = useCallback(function (id, medId, dateFrom, dateTo) { return __awaiter(_this, void 0, void 0, function () {
-        var d, data, old_1, _a, fy, fm, fd, fromT_1, toT_1, pairs_1, n_1, i, e_9;
+        var d, data, old_1, _a, fy, fm, fd, fromT_1, toT_1, cles_1, maj_1, pairs_1, n_1, i2, e_9;
         return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
@@ -5569,52 +5569,51 @@ function CardioPlanning() {
                     }
                     _a = parseDate(dateFrom), fy = _a[0], fm = _a[1], fd = _a[2];
                     fromT_1 = new Date(fy, fm, fd).getTime(), toT_1 = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+                    cles_1 = {};
+                    Object.keys(old_1).forEach(function (k) { return cles_1[k] = 1; });
+                    Object.keys(plan).forEach(function (k) { return cles_1[k] = 1; });
+                    maj_1 = {};
                     pairs_1 = [];
                     n_1 = 0;
-                    setPlan(function (p) {
-                        var next = __assign({}, p);
-                        Object.keys(old_1).forEach(function (k) {
-                            var _a;
-                            var parts = k.split("|");
-                            if (parts.length < 2)
-                                return;
-                            var _b = parts[0].split("-").map(Number), yy = _b[0], mm = _b[1], dd = _b[2];
-                            var t = new Date(yy, mm, dd).getTime();
-                            if (t < fromT_1 || t > toT_1)
-                                return;
-                            var av = (old_1[k] || {})[medId];
-                            var dm = __assign({}, (next[k] || {}));
-                            if (av === undefined || av === null) {
-                                if (dm[medId] !== undefined) {
-                                    delete dm[medId];
-                                    n_1++;
-                                }
-                            }
-                            else if (JSON.stringify(dm[medId]) !== JSON.stringify(av)) {
-                                dm[medId] = av;
-                                n_1++;
-                            }
-                            else
-                                return;
-                            next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
-                            pairs_1.push([["planV2", k], dm]);
-                        });
-                        return next;
+                    Object.keys(cles_1).forEach(function (k) {
+                        var parts = k.split("|");
+                        if (parts.length < 2)
+                            return;
+                        var _a = parts[0].split("-").map(Number), yy = _a[0], mm = _a[1], dd = _a[2];
+                        var t = new Date(yy, mm, dd).getTime();
+                        if (t < fromT_1 || t > toT_1)
+                            return;
+                        var av = (old_1[k] || {})[medId], mt = (plan[k] || {})[medId];
+                        if (cellKey(av) === cellKey(mt))
+                            return;
+                        var dm = __assign({}, (plan[k] || {}));
+                        if (av === undefined || av === null || cellEs(av).length === 0)
+                            delete dm[medId];
+                        else
+                            dm[medId] = av;
+                        maj_1[k] = dm;
+                        pairs_1.push([["planV2", k], dm]);
+                        n_1++;
                     });
-                    if (!(pairs_1.length && updatePaths)) return [3 /*break*/, 5];
-                    i = 0;
+                    if (n_1 === 0) {
+                        toast("Rien à restaurer — déjà identique", "info");
+                        return [2 /*return*/, 0];
+                    }
+                    setPlan(function (p) { var next = __assign({}, p); Object.keys(maj_1).forEach(function (k) { next[k] = maj_1[k]; }); return next; });
+                    if (!updatePaths) return [3 /*break*/, 5];
+                    i2 = 0;
                     _b.label = 2;
                 case 2:
-                    if (!(i < pairs_1.length)) return [3 /*break*/, 5];
-                    return [4 /*yield*/, updatePaths(PLANNING_DOC, pairs_1.slice(i, i + 400))];
+                    if (!(i2 < pairs_1.length)) return [3 /*break*/, 5];
+                    return [4 /*yield*/, updatePaths(PLANNING_DOC, pairs_1.slice(i2, i2 + 400))];
                 case 3:
                     _b.sent();
                     _b.label = 4;
                 case 4:
-                    i += 400;
+                    i2 += 400;
                     return [3 /*break*/, 2];
                 case 5:
-                    toast(n_1 ? (n_1 + " case" + (n_1 > 1 ? "s" : "") + " restaurée" + (n_1 > 1 ? "s" : "")) : "Rien à restaurer — déjà identique", "info");
+                    toast(n_1 + " case" + (n_1 > 1 ? "s" : "") + " restaurée" + (n_1 > 1 ? "s" : ""), "info");
                     return [2 /*return*/, n_1];
                 case 6:
                     e_9 = _b.sent();
@@ -5624,7 +5623,7 @@ function CardioPlanning() {
                 case 7: return [2 /*return*/];
             }
         });
-    }); }, []);
+    }); }, [plan]);
     var restoreBackup = useCallback(function (id) { return __awaiter(_this, void 0, void 0, function () {
         var d, data, _ts, rest, e_6;
         return __generator(this, function (_a) {
@@ -7136,8 +7135,12 @@ function CardioPlanning() {
             .sort(function (x, y) { return y.n - x.n || String(x.lab).localeCompare(String(y.lab)); });
         return { n: n, det: det };
     }, [plan, acteById]);
+    var cellKey = function (c) { return JSON.stringify(cellEs(c)
+        .filter(function (e) { return e && e.acteId; })
+        .map(function (e) { return ({ a: e.acteId, s: e.salle || null, c: e.cond ? 1 : 0 }); })
+        .sort(function (x, y) { return String(x.a + x.s).localeCompare(String(y.a + y.s)); })); };
     var diffMedPeriod = useCallback(function (id, medId, dateFrom, dateTo) { return __awaiter(_this, void 0, void 0, function () {
-        var d, data, old_2, _a, fy, fm, fd, fromT_2, toT_2, cles_1, nAdd_1, nDel_1, nSame_1, parA_1, parD_1, det, e_15;
+        var d, data, old_2, _a, fy, fm, fd, fromT_2, toT_2, cles_2, nAdd_1, nDel_1, nSame_1, parA_1, parD_1, det, e_15;
         return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
@@ -7153,12 +7156,12 @@ function CardioPlanning() {
                         return [2 /*return*/, null];
                     _a = parseDate(dateFrom), fy = _a[0], fm = _a[1], fd = _a[2];
                     fromT_2 = new Date(fy, fm, fd).getTime(), toT_2 = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
-                    cles_1 = {};
-                    Object.keys(old_2).forEach(function (k) { return cles_1[k] = 1; });
-                    Object.keys(plan).forEach(function (k) { return cles_1[k] = 1; });
+                    cles_2 = {};
+                    Object.keys(old_2).forEach(function (k) { return cles_2[k] = 1; });
+                    Object.keys(plan).forEach(function (k) { return cles_2[k] = 1; });
                     nAdd_1 = 0, nDel_1 = 0, nSame_1 = 0;
                     parA_1 = {}, parD_1 = {};
-                    Object.keys(cles_1).forEach(function (k) {
+                    Object.keys(cles_2).forEach(function (k) {
                         var parts = k.split("|");
                         if (parts.length < 2)
                             return;
@@ -7167,7 +7170,7 @@ function CardioPlanning() {
                         if (t < fromT_2 || t > toT_2)
                             return;
                         var av = (old_2[k] || {})[medId], mt = (plan[k] || {})[medId];
-                        if (JSON.stringify(av) === JSON.stringify(mt)) {
+                        if (cellKey(av) === cellKey(mt)) {
                             if (mt !== undefined)
                                 nSame_1++;
                             return;
