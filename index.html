@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.93 — 07/08/2026";
+var APP_VERSION = "v9.94 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2684,7 +2684,7 @@ function EditPTModal(_a) {
 }
 /* ════ ABS MODAL ════ */
 function PeriodModal(_a) {
-    var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, _b = _a.allowActs, allowActs = _b === void 0 ? true : _b, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
+    var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, _b = _a.allowActs, allowActs = _b === void 0 ? true : _b, compter = _a.compter, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
     var fmt = function (d) { return "".concat(d.getFullYear(), "-").concat(String(d.getMonth() + 1).padStart(2, "0"), "-").concat(String(d.getDate()).padStart(2, "0")); };
     var _c = useState("poser"), action = _c[0], setAction = _c[1]; // poser | retirer
     var _d = useState("abs"), cible = _d[0], setCible = _d[1]; // abs | activites   (si retirer)
@@ -2736,6 +2736,10 @@ function PeriodModal(_a) {
         background: on ? (rouge ? "#fee2e2" : "#eff6ff") : "var(--bg2)", color: on ? (rouge ? "#991b1b" : "#1e40af") : "var(--txt2)" }); };
     var miniBtn = function (on) { return ({ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontWeight: 800, fontSize: 11,
         border: "1.5px solid " + (on ? "#1d4ed8" : "var(--border)"), background: on ? "#eff6ff" : "var(--bg2)", color: on ? "#1e40af" : "var(--txt3)" }); };
+    /* v9.94 : la confirmation annonce le nombre RÉEL d'activités qui vont disparaître.
+       « tout le reste sur la période » ne permettait pas de juger : effacer 3 activités et
+       en effacer 120 ne se décident pas de la même façon. */
+    var nEff = (confirm === "activites" && compter) ? compter({ medId: medId, dateFrom: rDf, dateTo: rDt, keepAbs: keepAbs, slotDebut: rDeb, slotFin: rFin }) : 0;
     if (confirm)
         return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
             React.createElement("div", { style: S.mHd },
@@ -2753,7 +2757,9 @@ function PeriodModal(_a) {
                     React.createElement("div", { style: { marginTop: 9, color: "#16a34a", fontWeight: 700 } },
                         "\u2713 Conserv\u00E9s : ",
                         keepAbs ? "absences, FMC, gardes, repos, tour" : "gardes, repos, tour"),
-                    React.createElement("div", { style: { color: "#991b1b", fontWeight: 700 } }, "\u2717 Effac\u00E9 : tout le reste sur la p\u00E9riode"))),
+                    React.createElement("div", { style: { color: "#991b1b", fontWeight: 700 } },
+                        "\u2717 Effac\u00E9 : ",
+                        nEff === 0 ? "aucune activité — rien à retirer" : nEff + " activité" + (nEff > 1 ? "s" : "") + " posée" + (nEff > 1 ? "s" : "")))),
             React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 13 } },
                 React.createElement("button", { style: segBtn(false), onClick: function () { return setConfirm(null); } }, "Annuler"),
                 React.createElement("button", { style: segBtn(true, true), onClick: function () { setConfirm(null); lancer(); } },
@@ -6804,6 +6810,35 @@ function CardioPlanning() {
     /* v9.92 : l'effacement d'activités sur une période, extrait de l'ancien écran pour être
        partagé. Conserve la même liste qu'avant, et remplace aussi « Effacer mois » : le mois
        entier n'est qu'une période comme une autre. */
+    var countPeriodActs = useCallback(function (_a) {
+        var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _b = _a.keepAbs, keepAbs = _b === void 0 ? true : _b, _c = _a.slotDebut, slotDebut = _c === void 0 ? "M" : _c, _d = _a.slotFin, slotFin = _d === void 0 ? "AM" : _d;
+        var KEEP = keepAbs ? ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE", "FORM", "FORMATION"] : ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"];
+        var sp = perSlots({ medId: medId, dateFrom: dateFrom, dateTo: dateTo, slotDebut: slotDebut, slotFin: slotFin }).slotsParJour;
+        var _e = parseDate(dateFrom), fy = _e[0], fm = _e[1], fd = _e[2];
+        var fromT = new Date(fy, fm, fd).getTime(), toT = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+        var n = 0, cy = fy, cm = fm;
+        while (new Date(cy, cm, 1).getTime() <= toT) {
+            var _loop_12 = function (d) {
+                var t = new Date(cy, cm, d).getTime();
+                if (t < fromT || t > toT)
+                    return "continue";
+                (isWE(cy, cm, d) ? ["JOUR"] : sp(cy, cm, d).concat(["JOUR"])).forEach(function (sl) {
+                    var c = (plan[sk(cy, cm, d, sl)] || {})[medId];
+                    n += cellEs(c).filter(function (e) { return e && e.acteId && KEEP.indexOf(e.acteId) < 0; }).length;
+                });
+            };
+            for (var d = 1; d <= dIM(cy, cm); d++) {
+                _loop_12(d);
+            }
+            if (cm === 11) {
+                cy++;
+                cm = 0;
+            }
+            else
+                cm++;
+        }
+        return n;
+    }, [plan]);
     var clearPeriodActs = useCallback(function (_a) {
         var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _b = _a.keepAbs, keepAbs = _b === void 0 ? true : _b, _c = _a.slotsParJour, slotsParJour = _c === void 0 ? null : _c;
         var KEEP = keepAbs ? ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE", "FORM", "FORMATION"] : ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"];
@@ -8661,7 +8696,7 @@ function CardioPlanning() {
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
-            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, allowActs: !isAdminEdit, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
+            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "colOrder" && colModal && React.createElement("div", { style: S.ov, onClick: function () { setModal(null); setColModal(null); } },

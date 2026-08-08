@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.93 — 07/08/2026";
+const APP_VERSION="v9.94 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2604,7 +2604,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
    (matin → après-midi), le cas courant restant « deux dates et je valide ».
    Un week-end n'ayant qu'une case JOUR, les demi-journées y sont ignorées : c'est déjà
    le comportement de toutes les fonctions appelées ici. */
-function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,onPose,onRetraitAbs,onEffacer,onClose}){
+function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,compter,onPose,onRetraitAbs,onEffacer,onClose}){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const [action,setAction]=useState("poser");        // poser | retirer
   const [cible,setCible]=useState("abs");            // abs | activites   (si retirer)
@@ -2649,6 +2649,10 @@ function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,onPo
   const miniBtn=on=>({padding:"4px 10px",borderRadius:6,cursor:"pointer",fontWeight:800,fontSize:11,
     border:"1.5px solid "+(on?"#1d4ed8":"var(--border)"),background:on?"#eff6ff":"var(--bg2)",color:on?"#1e40af":"var(--txt3)"});
 
+  /* v9.94 : la confirmation annonce le nombre RÉEL d'activités qui vont disparaître.
+     « tout le reste sur la période » ne permettait pas de juger : effacer 3 activités et
+     en effacer 120 ne se décident pas de la même façon. */
+  const nEff=(confirm==="activites"&&compter)?compter({medId,dateFrom:rDf,dateTo:rDt,keepAbs,slotDebut:rDeb,slotFin:rFin}):0;
   if(confirm) return(
     <div style={{minWidth:320,maxWidth:400}}>
       <div style={S.mHd}><div style={{...S.mTit2,color:"#991b1b"}}>⚠ Confirmer</div></div>
@@ -2657,7 +2661,7 @@ function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,onPo
         sur <b>{libPeriode}</b>.
         {confirm==="activites"&&<>
           <div style={{marginTop:9,color:"#16a34a",fontWeight:700}}>✓ Conservés : {keepAbs?"absences, FMC, gardes, repos, tour":"gardes, repos, tour"}</div>
-          <div style={{color:"#991b1b",fontWeight:700}}>✗ Effacé : tout le reste sur la période</div>
+          <div style={{color:"#991b1b",fontWeight:700}}>✗ Effacé : {nEff===0?"aucune activité — rien à retirer":nEff+" activité"+(nEff>1?"s":"")+" posée"+(nEff>1?"s":"")}</div>
         </>}
       </div>
       <div style={{display:"flex",gap:6,marginTop:13}}>
@@ -5948,6 +5952,28 @@ function CardioPlanning(){
   /* v9.92 : l'effacement d'activités sur une période, extrait de l'ancien écran pour être
      partagé. Conserve la même liste qu'avant, et remplace aussi « Effacer mois » : le mois
      entier n'est qu'une période comme une autre. */
+  /* v9.94 : compte, sans rien modifier, ce que l'effacement retirerait. Même parcours et
+     mêmes règles que clearPeriodActs — une seule logique, deux usages. */
+  const countPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,slotDebut="M",slotFin="AM"})=>{
+    const KEEP=keepAbs?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"]:["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"];
+    const sp=perSlots({medId,dateFrom,dateTo,slotDebut,slotFin}).slotsParJour;
+    const [fy,fm,fd]=parseDate(dateFrom);
+    const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
+    let n=0,cy=fy,cm=fm;
+    while(new Date(cy,cm,1).getTime()<=toT){
+      for(let d=1;d<=dIM(cy,cm);d++){
+        const t=new Date(cy,cm,d).getTime();
+        if(t<fromT||t>toT)continue;
+        (isWE(cy,cm,d)?["JOUR"]:sp(cy,cm,d).concat(["JOUR"])).forEach(sl=>{
+          const c=(plan[sk(cy,cm,d,sl)]||{})[medId];
+          n+=cellEs(c).filter(e=>e&&e.acteId&&KEEP.indexOf(e.acteId)<0).length;
+        });
+      }
+      if(cm===11){cy++;cm=0;}else cm++;
+    }
+    return n;
+  },[plan]);
+
   const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,slotsParJour=null})=>{
     const KEEP=keepAbs?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"]:["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"];
     const [fy,fm,fd]=parseDate(dateFrom);
@@ -7768,7 +7794,7 @@ header::-webkit-scrollbar { display: none; }
           medecins={medecins}
           initMedId={mData.medId}
           initDate={`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`}
-          year={year} month={month} allowActs={!isAdminEdit}
+          year={year} month={month} allowActs={!isAdminEdit} compter={countPeriodActs}
           onPose={p=>{applyAbsence(perSlots(p));setModal(null);}}
           onRetraitAbs={p=>{removeAbsence(perSlots(p));setModal(null);}}
           onEffacer={p=>{clearPeriodActs(perSlots(p));setModal(null);}}
