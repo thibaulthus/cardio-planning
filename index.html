@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.3 — 07/08/2026";
+var APP_VERSION = "v10.4 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -5580,7 +5580,7 @@ function CardioPlanning() {
                         if (parts.length < 2)
                             return;
                         var _a = parts[0].split("-").map(Number), yy = _a[0], mm = _a[1], dd = _a[2];
-                        var t = new Date(yy, mm, dd).getTime();
+                        var t = new Date(yy, mm - 1, dd).getTime();
                         if (t < fromT_1 || t > toT_1)
                             return;
                         var av = (old_1[k] || {})[medId], mt = (plan[k] || {})[medId];
@@ -7166,7 +7166,7 @@ function CardioPlanning() {
                         if (parts.length < 2)
                             return;
                         var _a = parts[0].split("-").map(Number), yy = _a[0], mm = _a[1], dd = _a[2];
-                        var t = new Date(yy, mm, dd).getTime();
+                        var t = new Date(yy, mm - 1, dd).getTime();
                         if (t < fromT_2 || t > toT_2)
                             return;
                         var av = (old_2[k] || {})[medId], mt = (plan[k] || {})[medId];

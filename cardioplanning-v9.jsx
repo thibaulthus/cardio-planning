@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.3 — 07/08/2026";
+const APP_VERSION="v10.4 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5091,8 +5091,11 @@ function CardioPlanning(){
       const maj={};const pairs=[];let n=0;
       Object.keys(cles).forEach(k=>{
         const parts=k.split("|");if(parts.length<2)return;
+        /* v10.4 : la clé s'écrit « 2026-08-10 » — mois EN CLAIR, donc 1-based. Je le
+           relisais comme un mois technique (0-based), ce qui décalait tout d'un mois :
+           aucune clé ne tombait dans la fenêtre demandée, d'où « rien à restaurer ». */
         const [yy,mm,dd]=parts[0].split("-").map(Number);
-        const t=new Date(yy,mm,dd).getTime();
+        const t=new Date(yy,mm-1,dd).getTime();
         if(t<fromT||t>toT)return;
         const av=(old[k]||{})[medId], mt=(plan[k]||{})[medId];
         if(cellKey(av)===cellKey(mt))return;
@@ -6221,8 +6224,11 @@ function CardioPlanning(){
       let nAdd=0,nDel=0,nSame=0;const parA={},parD={};
       Object.keys(cles).forEach(k=>{
         const parts=k.split("|");if(parts.length<2)return;
+        /* v10.4 : la clé s'écrit « 2026-08-10 » — mois EN CLAIR, donc 1-based. Je le
+           relisais comme un mois technique (0-based), ce qui décalait tout d'un mois :
+           aucune clé ne tombait dans la fenêtre demandée, d'où « rien à restaurer ». */
         const [yy,mm,dd]=parts[0].split("-").map(Number);
-        const t=new Date(yy,mm,dd).getTime();
+        const t=new Date(yy,mm-1,dd).getTime();
         if(t<fromT||t>toT)return;
         const av=(old[k]||{})[medId], mt=(plan[k]||{})[medId];
         if(cellKey(av)===cellKey(mt)){if(mt!==undefined)nSame++;return;}
