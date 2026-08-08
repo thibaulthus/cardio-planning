@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.91 — 07/08/2026";
+const APP_VERSION="v9.92 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2594,6 +2594,164 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
 }
 
 /* ════ ABS MODAL ════ */
+/* v9.92 : ÉCRAN UNIFIÉ « Modifier sur une période ». Il remplace trois boutons de la
+   modale de case — poser/retirer une absence, effacer les activités, effacer le mois —
+   qui posaient au fond la même question : quoi, sur quelle période, pour qui.
+   Vérifié avant fusion : « effacer le mois » appelait la MÊME fonction que le retrait du
+   planning type, avec la même liste de conservation que la case à cocher. Rien n'est
+   donc perdu, et il n'y a plus qu'un seul écran à faire évoluer.
+   Les demi-journées de début et de fin sont réglables mais déjà sur le bon défaut
+   (matin → après-midi), le cas courant restant « deux dates et je valide ».
+   Un week-end n'ayant qu'une case JOUR, les demi-journées y sont ignorées : c'est déjà
+   le comportement de toutes les fonctions appelées ici. */
+function PeriodModal({medecins,initMedId,initDate,year,month,onPose,onRetraitAbs,onEffacer,onClose}){
+  const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const [action,setAction]=useState("poser");        // poser | retirer
+  const [cible,setCible]=useState("abs");            // abs | activites   (si retirer)
+  const [absType,setAbsType]=useState("ABSENCE");    // ABSENCE | FORMATION
+  const [medId,setMedId]=useState(initMedId||null);
+  const [df,setDf]=useState(initDate||"");
+  const [dt,setDt]=useState(initDate||"");
+  const [slDeb,setSlDeb]=useState("M");
+  const [slFin,setSlFin]=useState("AM");
+  const [moisEntier,setMoisEntier]=useState(false);
+  const [keepAbs,setKeepAbs]=useState(true);
+  const [confirm,setConfirm]=useState(null);
+  const med=medecins.find(m=>m.id===medId);
+
+  const moisDeb=fmt(new Date(year,month,1)), moisFin=fmt(new Date(year,month+1,0));
+  const rDf=moisEntier?moisDeb:df, rDt=moisEntier?moisFin:dt;
+  const rDeb=moisEntier?"M":slDeb, rFin=moisEntier?"AM":slFin;
+  const nbJours=(()=>{ if(!rDf||!rDt)return 0;
+    const a=new Date(rDf),b=new Date(rDt); if(b<a)return 0;
+    return Math.round((b-a)/86400000)+1; })();
+  const ok=medId&&rDf&&rDt&&nbJours>0;
+
+  const libAction=action==="poser"
+    ? (absType==="FORMATION"?"Poser une formation":"Poser une absence")
+    : (cible==="abs"?"Retirer les absences et FMC":"Effacer les activités");
+  const libPeriode=!ok?"—":(moisEntier
+    ? `${MOIS[month]} ${year} entier · ${nbJours} jours`
+    : `du ${rDf} ${rDeb==="M"?"matin":"après-midi"} au ${rDt} ${rFin==="M"?"matin":"après-midi"} · ${nbJours} jour${nbJours>1?"s":""}`);
+
+  /* les demi-journées d'extrémité : un jour au milieu de la période est toujours entier */
+  const lancer=()=>{
+    if(!ok)return;
+    const p={medId,dateFrom:rDf,dateTo:rDt,slotDebut:rDeb,slotFin:rFin,slots:["M","AM"]};
+    if(action==="poser"){onPose({...p,absType});return;}
+    if(cible==="abs"){onRetraitAbs({...p,absType});return;}
+    onEffacer({...p,keepAbs});
+  };
+
+  const segBtn=(on,rouge)=>({flex:1,padding:"7px 5px",borderRadius:7,cursor:"pointer",fontWeight:800,fontSize:12,
+    border:"1.5px solid "+(on?(rouge?"#dc2626":"#1d4ed8"):"var(--border)"),
+    background:on?(rouge?"#fee2e2":"#eff6ff"):"var(--bg2)",color:on?(rouge?"#991b1b":"#1e40af"):"var(--txt2)"});
+  const miniBtn=on=>({padding:"4px 10px",borderRadius:6,cursor:"pointer",fontWeight:800,fontSize:11,
+    border:"1.5px solid "+(on?"#1d4ed8":"var(--border)"),background:on?"#eff6ff":"var(--bg2)",color:on?"#1e40af":"var(--txt3)"});
+
+  if(confirm) return(
+    <div style={{minWidth:320,maxWidth:400}}>
+      <div style={S.mHd}><div style={{...S.mTit2,color:"#991b1b"}}>⚠ Confirmer</div></div>
+      <div style={{fontSize:12.5,lineHeight:1.6,color:"var(--txt)"}}>
+        Vous allez <b>{libAction.toLowerCase()}</b> pour <b>{med?med.prenom+" "+med.nom:"—"}</b><br/>
+        sur <b>{libPeriode}</b>.
+        {confirm==="activites"&&<>
+          <div style={{marginTop:9,color:"#16a34a",fontWeight:700}}>✓ Conservés : {keepAbs?"absences, FMC, gardes, repos, tour":"gardes, repos, tour"}</div>
+          <div style={{color:"#991b1b",fontWeight:700}}>✗ Effacé : tout le reste sur la période</div>
+        </>}
+      </div>
+      <div style={{display:"flex",gap:6,marginTop:13}}>
+        <button style={segBtn(false)} onClick={()=>setConfirm(null)}>Annuler</button>
+        <button style={segBtn(true,true)} onClick={()=>{setConfirm(null);lancer();}}>Oui, {action==="poser"?"poser":"retirer"}</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minWidth:320,maxWidth:400}}>
+      <div style={S.mHd}>
+        <div style={S.mTit2}>📅 Sur une période{med?" — "+med.prenom+" "+med.nom:""}</div>
+        <button onClick={onClose} style={S.xBtn}>×</button>
+      </div>
+
+      {!initMedId&&<div style={{marginBottom:10}}>
+        <label style={S.fl}>Médecin</label>
+        <select value={medId||""} onChange={e=>setMedId(parseInt(e.target.value))} style={{...S.fi,width:"100%"}}>
+          <option value="">— Choisir —</option>
+          {medecins.filter(m=>m.role==="medecin"||m.role==="attache").map(m=>(
+            <option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>))}
+        </select>
+      </div>}
+
+      <label style={S.fl}>Action</label>
+      <div style={{display:"flex",gap:5}}>
+        <button style={segBtn(action==="poser")} onClick={()=>setAction("poser")}>＋ Poser</button>
+        <button style={segBtn(action==="retirer",true)} onClick={()=>setAction("retirer")}>－ Retirer</button>
+      </div>
+
+      {action==="poser"&&<>
+        <label style={{...S.fl,marginTop:10,display:"block"}}>Quoi</label>
+        <div style={{display:"flex",gap:5}}>
+          <button style={segBtn(absType==="ABSENCE")} onClick={()=>setAbsType("ABSENCE")}>🚫 Absence</button>
+          <button style={segBtn(absType==="FORMATION")} onClick={()=>setAbsType("FORMATION")}>🎓 Formation</button>
+        </div>
+      </>}
+
+      {action==="retirer"&&<div style={{marginTop:10,padding:9,borderRadius:8,border:"1.5px dashed #f59e0b",background:"rgba(245,158,11,.07)"}}>
+        <div style={{fontSize:9.5,fontWeight:800,color:"#b45309",textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Retirer quoi ?</div>
+        <div style={{display:"flex",gap:5}}>
+          <button style={segBtn(cible==="abs",true)} onClick={()=>setCible("abs")}>Absence / FMC</button>
+          <button style={segBtn(cible==="activites",true)} onClick={()=>setCible("activites")}>Les activités</button>
+        </div>
+      </div>}
+
+      {!moisEntier?<>
+        <label style={{...S.fl,marginTop:10,display:"block"}}>Début</label>
+        <input type="date" value={df} onChange={e=>{setDf(e.target.value);if(!dt||e.target.value>dt)setDt(e.target.value);}} style={{...S.fi,width:"100%"}}/>
+        <div style={{display:"flex",gap:4,marginTop:5}}>
+          <button style={miniBtn(slDeb==="M")} onClick={()=>setSlDeb("M")}>Matin</button>
+          <button style={miniBtn(slDeb==="AM")} onClick={()=>setSlDeb("AM")}>Après-midi</button>
+        </div>
+        <label style={{...S.fl,marginTop:10,display:"block"}}>Fin</label>
+        <input type="date" value={dt} onChange={e=>setDt(e.target.value)} style={{...S.fi,width:"100%"}}/>
+        <div style={{display:"flex",gap:4,marginTop:5}}>
+          <button style={miniBtn(slFin==="M")} onClick={()=>setSlFin("M")}>Matin</button>
+          <button style={miniBtn(slFin==="AM")} onClick={()=>setSlFin("AM")}>Après-midi</button>
+        </div>
+      </>:<>
+        <label style={{...S.fl,marginTop:10,display:"block"}}>Période</label>
+        <div style={{padding:"8px 10px",borderRadius:7,border:"1.5px solid #1d4ed8",background:"#eff6ff",fontSize:12.5,fontWeight:700,color:"#1e40af"}}>
+          📆 {MOIS[month]} {year} — mois entier
+        </div>
+      </>}
+      <button onClick={()=>setMoisEntier(v=>!v)}
+        style={{marginTop:6,background:"none",border:"none",padding:0,color:"#1d4ed8",fontSize:11,textDecoration:"underline",cursor:"pointer",fontFamily:"inherit"}}>
+        {moisEntier?"↩ ou choisir deux dates":"📆 ou choisir le mois entier"}
+      </button>
+
+      {action==="retirer"&&cible==="activites"&&
+        <label style={{display:"flex",gap:7,alignItems:"center",fontSize:11.5,color:"var(--txt)",marginTop:9,
+          background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:7,padding:"7px 9px",cursor:"pointer"}}>
+          <input type="checkbox" checked={keepAbs} onChange={e=>setKeepAbs(e.target.checked)} style={{width:14,height:14}}/>
+          Conserver absences, FMC, gardes, repos et tour
+        </label>}
+
+      <div style={{marginTop:10,padding:"8px 10px",borderRadius:8,fontSize:11.5,fontWeight:700,
+        background:action==="poser"?"rgba(63,185,80,.12)":"rgba(220,38,38,.10)",
+        border:"1px solid "+(action==="poser"?"#86efac":"#fca5a5"),
+        color:action==="poser"?"#166534":"#991b1b"}}>
+        {libAction} — {libPeriode}
+      </div>
+
+      <button disabled={!ok} onClick={()=>{ if(!ok)return; if(action==="retirer")setConfirm(cible); else lancer(); }}
+        style={{...S.btnP,width:"100%",marginTop:11,opacity:ok?1:.5,
+          background:action==="poser"?"#1d4ed8":"#dc2626"}}>
+        {action==="poser"?"Poser":"Retirer…"}
+      </button>
+    </div>
+  );
+}
+
 function ClearPeriodModal({medecins,initMedId,initDate,onApply,onClose}){
   const [medId,setMedId]=useState(initMedId||null);
   const [keepAbs,setKeepAbs]=useState(true);
@@ -5531,7 +5689,7 @@ function CardioPlanning(){
   },[]);
 
   /* ── applyAbsence ── */
-  const applyAbsence=useCallback(({medId,dateFrom,dateTo,slots,absType="ABSENCE"})=>{
+  const applyAbsence=useCallback(({medId,dateFrom,dateTo,slots,absType="ABSENCE",slotsParJour=null})=>{
     const [fy,fm,fd]=parseDate(dateFrom);
     const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
     setPlan(p=>{
@@ -5541,7 +5699,7 @@ function CardioPlanning(){
         for(let d=1;d<=dIM(cy,cm);d++){
           const t=new Date(cy,cm,d).getTime();
           if(t<fromT||t>toT)continue;
-          (isWE(cy,cm,d)?["JOUR"]:slots).forEach(sl=>{const k=sk(cy,cm,d,sl);const dm={...(next[k]||{})};dm[medId]={acteId:absType||"ABSENCE",salle:null};next={...next,[k]:dm};});
+          (isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):slots)).forEach(sl=>{const k=sk(cy,cm,d,sl);const dm={...(next[k]||{})};dm[medId]={acteId:absType||"ABSENCE",salle:null};next={...next,[k]:dm};});
         }
         if(cm===11){cy++;cm=0;}else cm++;
       }
@@ -5550,7 +5708,7 @@ function CardioPlanning(){
     toast(absType==="FORMATION"?"Formation appliquée":"Absence appliquée");
   },[]);
 
-  const removeAbsence=useCallback(({medId,dateFrom,dateTo})=>{
+  const removeAbsence=useCallback(({medId,dateFrom,dateTo,slotsParJour=null})=>{
     const [fy,fm,fd]=parseDate(dateFrom);
     const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
     setPlan(p=>{
@@ -5560,7 +5718,7 @@ function CardioPlanning(){
         for(let d=1;d<=dIM(cy,cm);d++){
           const t=new Date(cy,cm,d).getTime();
           if(t<fromT||t>toT)continue;
-          ["M","AM","JOUR","N"].forEach(sl=>{
+          (isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):["M","AM"]).concat(["JOUR"])).forEach(sl=>{
             const k=sk(cy,cm,d,sl);
             if(!next[k]||!next[k][medId])return;
             if(cellHasAny(next[k][medId],["ABSENCE","FORMATION"])){
@@ -5767,6 +5925,57 @@ function CardioPlanning(){
   },[allDays,year,month,medecins,planningType,tourMed]);
 
   /* ── clearPlanningType (global or individual) ── */
+  /* v9.92 : traduit « du 10 matin au 14 après-midi » en la liste des demi-journées à
+     traiter jour par jour. Les jours du milieu sont toujours entiers ; seules les deux
+     extrémités peuvent être partielles. Les week-ends n'ont qu'une case JOUR : les
+     fonctions appelées s'en chargent déjà, on leur passe les deux demi-journées. */
+  const perSlots=(p)=>{
+    const out={...p};
+    out.slotsParJour=(y3,m3,d3)=>{
+      const j=`${y3}-${m3}-${d3}`;
+      const a=p.dateFrom.split("-").map(Number), b=p.dateTo.split("-").map(Number);
+      const estDeb=(y3===a[0]&&m3===a[1]-1&&d3===a[2]);
+      const estFin=(y3===b[0]&&m3===b[1]-1&&d3===b[2]);
+      if(estDeb&&estFin)return p.slotDebut===p.slotFin?[p.slotDebut]:["M","AM"];
+      if(estDeb)return p.slotDebut==="AM"?["AM"]:["M","AM"];
+      if(estFin)return p.slotFin==="M"?["M"]:["M","AM"];
+      return ["M","AM"];
+    };
+    return out;
+  };
+
+  /* v9.92 : l'effacement d'activités sur une période, extrait de l'ancien écran pour être
+     partagé. Conserve la même liste qu'avant, et remplace aussi « Effacer mois » : le mois
+     entier n'est qu'une période comme une autre. */
+  const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,slotsParJour=null})=>{
+    const KEEP=keepAbs?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"]:["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"];
+    const [fy,fm,fd]=parseDate(dateFrom);
+    const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
+    setPlan(p=>{
+      let next={...p};
+      let cy=fy,cm=fm;
+      while(new Date(cy,cm,1).getTime()<=toT){
+        for(let d=1;d<=dIM(cy,cm);d++){
+          const t=new Date(cy,cm,d).getTime();
+          if(t<fromT||t>toT)continue;
+          const sls=isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):["M","AM"]).concat(["JOUR"]);
+          sls.forEach(sl=>{
+            const k=sk(cy,cm,d,sl);
+            if(!next[k]||!next[k][medId])return;
+            const dm={...next[k]};
+            const gardes=cellEs(dm[medId]).filter(e=>e&&KEEP.includes(e.acteId));
+            if(gardes.length===0)delete dm[medId];
+            else dm[medId]=gardes.length===1?gardes[0]:gardes;
+            next={...next,[k]:dm};
+          });
+        }
+        if(cm===11){cy++;cm=0;}else cm++;
+      }
+      return next;
+    });
+    toast("Activités effacées sur la période","info");
+  },[]);
+
   const clearPlanningType=useCallback((medId=null)=>{
     setPlan(p=>{
       let next={...p};
@@ -7341,8 +7550,8 @@ header::-webkit-scrollbar { display: none; }
 
             {canEditThisMed&&(
               <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
-                {!isNight&&canEditThisMed&&<button style={S.qBtn} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_absMode:true});setModal("absence");}}>Pose et retrait Abs sur période</button>}
-                {canEditThisMed&&!isAdminEdit&&<button style={{...S.qBtn,borderColor:"#dc2626",background:"#fee2e2",color:"#991b1b"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_clearMode:true});setModal("clearPeriod");}}>🗑 Effacer activités sur période</button>}
+                {/* v9.92 : un seul bouton remplace « Pose et retrait Abs », « Effacer activités » et « Effacer mois » */}
+                {isEdit&&canEditThisMed&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_perMode:true});setModal("periode");}}>📅 Modifier sur une période…</button>}
                 {isEdit&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setModal(null);openPtModal(medId);}}>▶ PT {med&&med.init}</button>}
                 {canEditThisMed&&!isAdminEdit&&med&&(med.tourMed||med.garde)&&<button style={{...S.qBtn,borderColor:"#7c3aed",background:"#f3e8ff",color:"#6d28d9"}}
                   onClick={()=>{setModal("prefs");}}>
@@ -7381,7 +7590,6 @@ header::-webkit-scrollbar { display: none; }
                     ⇄ Échanger ce jour de tour…
                   </button>);
                 })()}
-                {isEdit&&<button style={{...S.qBtn,borderColor:"#dc2626",background:"#fee2e2",color:"#991b1b"}} onClick={()=>clearPlanningType(medId)}>🗑 Effacer mois {med&&med.nom}</button>}
                 {(isNight||we)&&canGarde&&canEditThisMed&&(()=>{
                   /* v9.66 : même avertissement préalable que le sélecteur de l'onglet Gardes */
                   const _gn=new Date(y2,m2,d2+1);
@@ -7554,6 +7762,17 @@ header::-webkit-scrollbar { display: none; }
         />
       </Ov>}
 
+      {modal==="periode"&&mData&&<Ov onClose={()=>setModal(null)}>
+        <PeriodModal
+          medecins={medecins}
+          initMedId={mData.medId}
+          initDate={`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`}
+          year={year} month={month}
+          onPose={p=>{applyAbsence(perSlots(p));setModal(null);}}
+          onRetraitAbs={p=>{removeAbsence(perSlots(p));setModal(null);}}
+          onEffacer={p=>{clearPeriodActs(perSlots(p));setModal(null);}}
+          onClose={()=>setModal(null)}/>
+      </Ov>}
       {modal==="absence"&&<Ov onClose={()=>setModal(null)}><AbsModal medecins={medecins}
   initMedId={mData&&mData._absMode?mData.medId:null}
   initDate={mData&&mData._absMode?`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`:null}

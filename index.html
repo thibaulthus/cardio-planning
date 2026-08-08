@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.91 — 07/08/2026";
+var APP_VERSION = "v9.92 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2683,6 +2683,148 @@ function EditPTModal(_a) {
         })()));
 }
 /* ════ ABS MODAL ════ */
+function PeriodModal(_a) {
+    var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
+    var fmt = function (d) { return "".concat(d.getFullYear(), "-").concat(String(d.getMonth() + 1).padStart(2, "0"), "-").concat(String(d.getDate()).padStart(2, "0")); };
+    var _b = useState("poser"), action = _b[0], setAction = _b[1]; // poser | retirer
+    var _c = useState("abs"), cible = _c[0], setCible = _c[1]; // abs | activites   (si retirer)
+    var _d = useState("ABSENCE"), absType = _d[0], setAbsType = _d[1]; // ABSENCE | FORMATION
+    var _e = useState(initMedId || null), medId = _e[0], setMedId = _e[1];
+    var _f = useState(initDate || ""), df = _f[0], setDf = _f[1];
+    var _g = useState(initDate || ""), dt = _g[0], setDt = _g[1];
+    var _h = useState("M"), slDeb = _h[0], setSlDeb = _h[1];
+    var _j = useState("AM"), slFin = _j[0], setSlFin = _j[1];
+    var _k = useState(false), moisEntier = _k[0], setMoisEntier = _k[1];
+    var _l = useState(true), keepAbs = _l[0], setKeepAbs = _l[1];
+    var _m = useState(null), confirm = _m[0], setConfirm = _m[1];
+    var med = medecins.find(function (m) { return m.id === medId; });
+    var moisDeb = fmt(new Date(year, month, 1)), moisFin = fmt(new Date(year, month + 1, 0));
+    var rDf = moisEntier ? moisDeb : df, rDt = moisEntier ? moisFin : dt;
+    var rDeb = moisEntier ? "M" : slDeb, rFin = moisEntier ? "AM" : slFin;
+    var nbJours = (function () {
+        if (!rDf || !rDt)
+            return 0;
+        var a = new Date(rDf), b = new Date(rDt);
+        if (b < a)
+            return 0;
+        return Math.round((b - a) / 86400000) + 1;
+    })();
+    var ok = medId && rDf && rDt && nbJours > 0;
+    var libAction = action === "poser"
+        ? (absType === "FORMATION" ? "Poser une formation" : "Poser une absence")
+        : (cible === "abs" ? "Retirer les absences et FMC" : "Effacer les activités");
+    var libPeriode = !ok ? "—" : (moisEntier
+        ? "".concat(MOIS[month], " ").concat(year, " entier \u00B7 ").concat(nbJours, " jours")
+        : "du ".concat(rDf, " ").concat(rDeb === "M" ? "matin" : "après-midi", " au ").concat(rDt, " ").concat(rFin === "M" ? "matin" : "après-midi", " \u00B7 ").concat(nbJours, " jour").concat(nbJours > 1 ? "s" : ""));
+    /* les demi-journées d'extrémité : un jour au milieu de la période est toujours entier */
+    var lancer = function () {
+        if (!ok)
+            return;
+        var p = { medId: medId, dateFrom: rDf, dateTo: rDt, slotDebut: rDeb, slotFin: rFin, slots: ["M", "AM"] };
+        if (action === "poser") {
+            onPose(__assign(__assign({}, p), { absType: absType }));
+            return;
+        }
+        if (cible === "abs") {
+            onRetraitAbs(__assign(__assign({}, p), { absType: absType }));
+            return;
+        }
+        onEffacer(__assign(__assign({}, p), { keepAbs: keepAbs }));
+    };
+    var segBtn = function (on, rouge) { return ({ flex: 1, padding: "7px 5px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 12,
+        border: "1.5px solid " + (on ? (rouge ? "#dc2626" : "#1d4ed8") : "var(--border)"),
+        background: on ? (rouge ? "#fee2e2" : "#eff6ff") : "var(--bg2)", color: on ? (rouge ? "#991b1b" : "#1e40af") : "var(--txt2)" }); };
+    var miniBtn = function (on) { return ({ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontWeight: 800, fontSize: 11,
+        border: "1.5px solid " + (on ? "#1d4ed8" : "var(--border)"), background: on ? "#eff6ff" : "var(--bg2)", color: on ? "#1e40af" : "var(--txt3)" }); };
+    if (confirm)
+        return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
+            React.createElement("div", { style: S.mHd },
+                React.createElement("div", { style: __assign(__assign({}, S.mTit2), { color: "#991b1b" }) }, "\u26A0 Confirmer")),
+            React.createElement("div", { style: { fontSize: 12.5, lineHeight: 1.6, color: "var(--txt)" } },
+                "Vous allez ",
+                React.createElement("b", null, libAction.toLowerCase()),
+                " pour ",
+                React.createElement("b", null, med ? med.prenom + " " + med.nom : "—"),
+                React.createElement("br", null),
+                "sur ",
+                React.createElement("b", null, libPeriode),
+                ".",
+                confirm === "activites" && React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { marginTop: 9, color: "#16a34a", fontWeight: 700 } },
+                        "\u2713 Conserv\u00E9s : ",
+                        keepAbs ? "absences, FMC, gardes, repos, tour" : "gardes, repos, tour"),
+                    React.createElement("div", { style: { color: "#991b1b", fontWeight: 700 } }, "\u2717 Effac\u00E9 : tout le reste sur la p\u00E9riode"))),
+            React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 13 } },
+                React.createElement("button", { style: segBtn(false), onClick: function () { return setConfirm(null); } }, "Annuler"),
+                React.createElement("button", { style: segBtn(true, true), onClick: function () { setConfirm(null); lancer(); } },
+                    "Oui, ",
+                    action === "poser" ? "poser" : "retirer"))));
+    return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
+        React.createElement("div", { style: S.mHd },
+            React.createElement("div", { style: S.mTit2 },
+                "\uD83D\uDCC5 Sur une p\u00E9riode",
+                med ? " — " + med.prenom + " " + med.nom : ""),
+            React.createElement("button", { onClick: onClose, style: S.xBtn }, "\u00D7")),
+        !initMedId && React.createElement("div", { style: { marginBottom: 10 } },
+            React.createElement("label", { style: S.fl }, "M\u00E9decin"),
+            React.createElement("select", { value: medId || "", onChange: function (e) { return setMedId(parseInt(e.target.value)); }, style: __assign(__assign({}, S.fi), { width: "100%" }) },
+                React.createElement("option", { value: "" }, "\u2014 Choisir \u2014"),
+                medecins.filter(function (m) { return m.role === "medecin" || m.role === "attache"; }).map(function (m) { return (React.createElement("option", { key: m.id, value: m.id },
+                    m.prenom,
+                    " ",
+                    m.nom)); }))),
+        React.createElement("label", { style: S.fl }, "Action"),
+        React.createElement("div", { style: { display: "flex", gap: 5 } },
+            React.createElement("button", { style: segBtn(action === "poser"), onClick: function () { return setAction("poser"); } }, "\uFF0B Poser"),
+            React.createElement("button", { style: segBtn(action === "retirer", true), onClick: function () { return setAction("retirer"); } }, "\uFF0D Retirer")),
+        action === "poser" && React.createElement(React.Fragment, null,
+            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Quoi"),
+            React.createElement("div", { style: { display: "flex", gap: 5 } },
+                React.createElement("button", { style: segBtn(absType === "ABSENCE"), onClick: function () { return setAbsType("ABSENCE"); } }, "\uD83D\uDEAB Absence"),
+                React.createElement("button", { style: segBtn(absType === "FORMATION"), onClick: function () { return setAbsType("FORMATION"); } }, "\uD83C\uDF93 Formation"))),
+        action === "retirer" && React.createElement("div", { style: { marginTop: 10, padding: 9, borderRadius: 8, border: "1.5px dashed #f59e0b", background: "rgba(245,158,11,.07)" } },
+            React.createElement("div", { style: { fontSize: 9.5, fontWeight: 800, color: "#b45309", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 } }, "Retirer quoi ?"),
+            React.createElement("div", { style: { display: "flex", gap: 5 } },
+                React.createElement("button", { style: segBtn(cible === "abs", true), onClick: function () { return setCible("abs"); } }, "Absence / FMC"),
+                React.createElement("button", { style: segBtn(cible === "activites", true), onClick: function () { return setCible("activites"); } }, "Les activit\u00E9s"))),
+        !moisEntier ? React.createElement(React.Fragment, null,
+            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "D\u00E9but"),
+            React.createElement("input", { type: "date", value: df, onChange: function (e) { setDf(e.target.value); if (!dt || e.target.value > dt)
+                    setDt(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }),
+            React.createElement("div", { style: { display: "flex", gap: 4, marginTop: 5 } },
+                React.createElement("button", { style: miniBtn(slDeb === "M"), onClick: function () { return setSlDeb("M"); } }, "Matin"),
+                React.createElement("button", { style: miniBtn(slDeb === "AM"), onClick: function () { return setSlDeb("AM"); } }, "Apr\u00E8s-midi")),
+            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Fin"),
+            React.createElement("input", { type: "date", value: dt, onChange: function (e) { return setDt(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }),
+            React.createElement("div", { style: { display: "flex", gap: 4, marginTop: 5 } },
+                React.createElement("button", { style: miniBtn(slFin === "M"), onClick: function () { return setSlFin("M"); } }, "Matin"),
+                React.createElement("button", { style: miniBtn(slFin === "AM"), onClick: function () { return setSlFin("AM"); } }, "Apr\u00E8s-midi"))) : React.createElement(React.Fragment, null,
+            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "P\u00E9riode"),
+            React.createElement("div", { style: { padding: "8px 10px", borderRadius: 7, border: "1.5px solid #1d4ed8", background: "#eff6ff", fontSize: 12.5, fontWeight: 700, color: "#1e40af" } },
+                "\uD83D\uDCC6 ",
+                MOIS[month],
+                " ",
+                year,
+                " \u2014 mois entier")),
+        React.createElement("button", { onClick: function () { return setMoisEntier(function (v) { return !v; }); }, style: { marginTop: 6, background: "none", border: "none", padding: 0, color: "#1d4ed8", fontSize: 11, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" } }, moisEntier ? "↩ ou choisir deux dates" : "📆 ou choisir le mois entier"),
+        action === "retirer" && cible === "activites" &&
+            React.createElement("label", { style: { display: "flex", gap: 7, alignItems: "center", fontSize: 11.5, color: "var(--txt)", marginTop: 9,
+                    background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 7, padding: "7px 9px", cursor: "pointer" } },
+                React.createElement("input", { type: "checkbox", checked: keepAbs, onChange: function (e) { return setKeepAbs(e.target.checked); }, style: { width: 14, height: 14 } }),
+                "Conserver absences, FMC, gardes, repos et tour"),
+        React.createElement("div", { style: { marginTop: 10, padding: "8px 10px", borderRadius: 8, fontSize: 11.5, fontWeight: 700,
+                background: action === "poser" ? "rgba(63,185,80,.12)" : "rgba(220,38,38,.10)",
+                border: "1px solid " + (action === "poser" ? "#86efac" : "#fca5a5"),
+                color: action === "poser" ? "#166534" : "#991b1b" } },
+            libAction,
+            " \u2014 ",
+            libPeriode),
+        React.createElement("button", { disabled: !ok, onClick: function () { if (!ok)
+                return; if (action === "retirer")
+                setConfirm(cible);
+            else
+                lancer(); }, style: __assign(__assign({}, S.btnP), { width: "100%", marginTop: 11, opacity: ok ? 1 : .5, background: action === "poser" ? "#1d4ed8" : "#dc2626" }) }, action === "poser" ? "Poser" : "Retirer…")));
+}
 function ClearPeriodModal(_a) {
     var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, onApply = _a.onApply, onClose = _a.onClose;
     var _b = useState(initMedId || null), medId = _b[0], setMedId = _b[1];
@@ -6297,7 +6439,7 @@ function CardioPlanning() {
     }, []);
     /* ── applyAbsence ── */
     var applyAbsence = useCallback(function (_a) {
-        var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, slots = _a.slots, _b = _a.absType, absType = _b === void 0 ? "ABSENCE" : _b;
+        var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, slots = _a.slots, _b = _a.absType, absType = _b === void 0 ? "ABSENCE" : _b, _sp = _a.slotsParJour, slotsParJour = _sp === void 0 ? null : _sp;
         var _c = parseDate(dateFrom), fy = _c[0], fm = _c[1], fd = _c[2];
         var fromT = new Date(fy, fm, fd).getTime(), toT = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
         setPlan(function (p) {
@@ -6308,7 +6450,7 @@ function CardioPlanning() {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
-                    (isWE(cy, cm, d) ? ["JOUR"] : slots).forEach(function (sl) {
+                    (isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : slots)).forEach(function (sl) {
                         var _a;
                         var k = sk(cy, cm, d, sl);
                         var dm = __assign({}, (next[k] || {}));
@@ -6331,7 +6473,7 @@ function CardioPlanning() {
         toast(absType === "FORMATION" ? "Formation appliquée" : "Absence appliquée");
     }, []);
     var removeAbsence = useCallback(function (_a) {
-        var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo;
+        var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _sp2 = _a.slotsParJour, slotsParJour = _sp2 === void 0 ? null : _sp2;
         var _b = parseDate(dateFrom), fy = _b[0], fm = _b[1], fd = _b[2];
         var fromT = new Date(fy, fm, fd).getTime(), toT = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
         setPlan(function (p) {
@@ -6342,7 +6484,7 @@ function CardioPlanning() {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
-                    ["M", "AM", "JOUR", "N"].forEach(function (sl) {
+                    (isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : ["M", "AM"]).concat(["JOUR"])).forEach(function (sl) {
                         var _a;
                         var k = sk(cy, cm, d, sl);
                         if (!next[k] || !next[k][medId])
@@ -6642,6 +6784,68 @@ function CardioPlanning() {
         toast("PT appliqu\u00E9 pour ".concat(med.nom), "info");
     }, [allDays, year, month, medecins, planningType, tourMed]);
     /* ── clearPlanningType (global or individual) ── */
+    var perSlots = function (p) {
+        var out = __assign({}, p);
+        out.slotsParJour = function (y3, m3, d3) {
+            var j = "".concat(y3, "-").concat(m3, "-").concat(d3);
+            var a = p.dateFrom.split("-").map(Number), b = p.dateTo.split("-").map(Number);
+            var estDeb = (y3 === a[0] && m3 === a[1] - 1 && d3 === a[2]);
+            var estFin = (y3 === b[0] && m3 === b[1] - 1 && d3 === b[2]);
+            if (estDeb && estFin)
+                return p.slotDebut === p.slotFin ? [p.slotDebut] : ["M", "AM"];
+            if (estDeb)
+                return p.slotDebut === "AM" ? ["AM"] : ["M", "AM"];
+            if (estFin)
+                return p.slotFin === "M" ? ["M"] : ["M", "AM"];
+            return ["M", "AM"];
+        };
+        return out;
+    };
+    /* v9.92 : l'effacement d'activités sur une période, extrait de l'ancien écran pour être
+       partagé. Conserve la même liste qu'avant, et remplace aussi « Effacer mois » : le mois
+       entier n'est qu'une période comme une autre. */
+    var clearPeriodActs = useCallback(function (_a) {
+        var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _b = _a.keepAbs, keepAbs = _b === void 0 ? true : _b, _c = _a.slotsParJour, slotsParJour = _c === void 0 ? null : _c;
+        var KEEP = keepAbs ? ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE", "FORM", "FORMATION"] : ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"];
+        var _d = parseDate(dateFrom), fy = _d[0], fm = _d[1], fd = _d[2];
+        var fromT = new Date(fy, fm, fd).getTime(), toT = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+        setPlan(function (p) {
+            var next = __assign({}, p);
+            var cy = fy, cm = fm;
+            while (new Date(cy, cm, 1).getTime() <= toT) {
+                var _loop_12 = function (d) {
+                    var t = new Date(cy, cm, d).getTime();
+                    if (t < fromT || t > toT)
+                        return "continue";
+                    var sls = isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : ["M", "AM"]).concat(["JOUR"]);
+                    sls.forEach(function (sl) {
+                        var _a;
+                        var k = sk(cy, cm, d, sl);
+                        if (!next[k] || !next[k][medId])
+                            return;
+                        var dm = __assign({}, next[k]);
+                        var gardes = cellEs(dm[medId]).filter(function (e) { return e && KEEP.includes(e.acteId); });
+                        if (gardes.length === 0)
+                            delete dm[medId];
+                        else
+                            dm[medId] = gardes.length === 1 ? gardes[0] : gardes;
+                        next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
+                    });
+                };
+                for (var d = 1; d <= dIM(cy, cm); d++) {
+                    _loop_12(d);
+                }
+                if (cm === 11) {
+                    cy++;
+                    cm = 0;
+                }
+                else
+                    cm++;
+            }
+            return next;
+        });
+        toast("Activités effacées sur la période", "info");
+    }, []);
     var clearPlanningType = useCallback(function (medId) {
         if (medId === void 0) { medId = null; }
         setPlan(function (p) {
@@ -8245,8 +8449,7 @@ function CardioPlanning() {
                     React.createElement("span", null, "\u26A0\uFE0F"),
                     React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } }, "Ce m\u00E9decin a d\u00E9j\u00E0 une activit\u00E9 sur ce cr\u00E9neau."))),
                 canEditThisMed && (React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } },
-                    !isNight && canEditThisMed && React.createElement("button", { style: S.qBtn, onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _absMode: true }); setModal("absence"); } }, "Pose et retrait Abs sur p\u00E9riode"),
-                    canEditThisMed && !isAdminEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _clearMode: true }); setModal("clearPeriod"); } }, "\uD83D\uDDD1 Effacer activit\u00E9s sur p\u00E9riode"),
+                    isEdit && canEditThisMed && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _perMode: true }); setModal("periode"); } }, "\uD83D\uDCC5 Modifier sur une p\u00E9riode\u2026"),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setModal(null); openPtModal(medId); } },
                         "\u25B6 PT ",
                         med && med.init),
@@ -8294,10 +8497,7 @@ function CardioPlanning() {
                                 } }, "\u21A9 Remettre au tour ce jour"));
                         return (React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#f59e0b", background: "rgba(245,158,11,.10)", color: "#b45309" }), onClick: function () { setModal("daySwap"); } }, "\u21C4 \u00C9changer ce jour de tour\u2026"));
                     })(),
-                    isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fee2e2", color: "#991b1b" }), onClick: function () { return clearPlanningType(medId); } },
-                        "\uD83D\uDDD1 Effacer mois ",
-                        med && med.nom),
-                    (isNight || we) && canGarde && canEditThisMed && (function () {
+                                        (isNight || we) && canGarde && canEditThisMed && (function () {
                         /* v9.66 : même avertissement préalable que le sélecteur de l'onglet Gardes */
                         var _gn = new Date(y2, m2, d2 + 1);
                         var gNx = ["M", "AM", "JOUR"].some(function (sl2) { return cellHasAny((plan[sk(_gn.getFullYear(), _gn.getMonth(), _gn.getDate(), sl2)] || {})[medId], ABS_IDS); });
@@ -8460,6 +8660,8 @@ function CardioPlanning() {
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
+        modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
+            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "colOrder" && colModal && React.createElement("div", { style: S.ov, onClick: function () { setModal(null); setColModal(null); } },
