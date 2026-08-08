@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.0 — 07/08/2026";
+const APP_VERSION="v10.2 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2633,36 +2633,96 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
    (matin → après-midi), le cas courant restant « deux dates et je valide ».
    Un week-end n'ayant qu'une case JOUR, les demi-journées y sont ignorées : c'est déjà
    le comportement de toutes les fonctions appelées ici. */
-/* v10.0 : le formulaire de restauration ciblée. Volontairement minimal — un médecin,
-   deux dates — parce qu'il sert dans un moment de stress : on vient de perdre du travail. */
-function BkCibleForm({medecins,ts,defFrom,defTo,onGo,onClose}){
-  const [medId,setMedId]=useState(null);
-  const [df,setDf]=useState(defFrom||"");
-  const [dt,setDt]=useState(defTo||"");
-  const ok=medId&&df&&dt&&dt>=df;
-  const med=medecins.find(m=>m.id===medId);
+/* v10.2 : la restauration ciblée, depuis la modale de case — là où l'on est quand on
+   s'aperçoit de la perte. Réservée à l'éditeur : restaurer écrase le travail d'autrui sur
+   la période, ce n'est pas le même risque que modifier ses propres cases. */
+function RestoreModal({med,backups,y,m,d,onDiff,onGo,onClose}){
+  const f=dt=>`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+  const jour=new Date(y,m,d);
+  const lun=new Date(y,m,d);lun.setDate(lun.getDate()-((lun.getDay()+6)%7));
+  const dim=new Date(lun);dim.setDate(dim.getDate()+6);
+  const m1=new Date(y,m,1), m2=new Date(y,m+1,0);
+  const court=dt=>dt.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+  const CHOIX=[
+    {id:"jour",lab:"Ce jour",det:court(jour),df:f(jour),dt:f(jour)},
+    {id:"sem",lab:"Cette semaine",det:court(lun)+" au "+court(dim),df:f(lun),dt:f(dim)},
+    {id:"mois",lab:"Ce mois",det:court(m1)+" au "+court(m2),df:f(m1),dt:f(m2)},
+    {id:"libre",lab:"Deux dates",det:"au choix",df:null,dt:null}];
+  const [bkId,setBkId]=useState(backups.length?backups[0].id:"");
+  const [ch,setCh]=useState("jour");
+  const [df,setDf]=useState(f(jour)); const [dt2,setDt2]=useState(f(jour));
+  const [bilan,setBilan]=useState(null);
+  const sel=CHOIX.find(c=>c.id===ch)||CHOIX[0];
+  const rDf=sel.df||df, rDt=sel.dt||dt2;
+  const bk=backups.find(b=>b.id===bkId);
+  const ok=bkId&&rDf&&rDt&&rDt>=rDf;
+  const libBk=(b)=>{
+    if(!b)return "—";
+    const j=Math.floor((Date.now()-b.ts)/86400000);
+    const h=new Date(b.ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+    if(j<=0)return "Aujourd'hui — "+h;
+    if(j===1)return "Hier soir — "+h;
+    if(j===2)return "Avant-hier — "+h;
+    return new Date(b.ts).toLocaleDateString("fr-FR",{weekday:"short",day:"2-digit",month:"short"})+" — "+h;
+  };
+  const seg=on=>({flex:"1 1 auto",minWidth:96,padding:"7px 6px",borderRadius:7,cursor:"pointer",fontWeight:800,fontSize:11.5,
+    border:"1.5px solid "+(on?"#16a34a":"var(--border)"),background:on?"#f0fdf4":"var(--bg2)",color:on?"#166534":"var(--txt2)"});
+
+  if(bilan) return(
+    <div style={{minWidth:320,maxWidth:400}}>
+      <div style={S.mHd}><div style={{...S.mTit2,color:"#166534"}}>↩ Confirmer la restauration</div></div>
+      <div style={{fontSize:12.5,lineHeight:1.6}}>
+        État du <b>{libBk(bk)}</b><br/>pour <b>{med?med.prenom+" "+med.nom:"—"}</b><br/>
+        sur <b>{sel.id==="libre"?("du "+rDf+" au "+rDt):(sel.lab.toLowerCase()+" — "+sel.det)}</b>.
+      </div>
+      <div style={{marginTop:10,borderRadius:9,border:"1px solid var(--border)",overflow:"hidden"}}>
+        <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,borderBottom:"1px solid var(--border)",background:"#f0fdf4",color:"#166534",fontWeight:700}}>＋ {bilan.nAdd} activité{bilan.nAdd>1?"s":""} remise{bilan.nAdd>1?"s":""}</div>
+        <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,borderBottom:"1px solid var(--border)",background:"#fee2e2",color:"#991b1b",fontWeight:700}}>－ {bilan.nDel} case{bilan.nDel>1?"s":""} supprimée{bilan.nDel>1?"s":""}</div>
+        <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,background:"var(--bg2)",color:"var(--txt3)"}}>＝ {bilan.nSame} déjà identique{bilan.nSame>1?"s":""}</div>
+      </div>
+      {(bilan.nAdd>0||bilan.nDel>0)&&<div style={{marginTop:8}}>
+        {bilan.detA.length>0&&<><div style={{fontSize:9.5,fontWeight:800,color:"#166534",textTransform:"uppercase"}}>Remises</div>
+          <div>{bilan.detA.map(x=><span key={x.lab} style={{display:"inline-block",fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:11,margin:"2px 3px 0 0",background:"rgba(22,163,74,.12)",border:"1px solid #86efac",color:"#166534"}}>{x.n} × {x.lab}</span>)}</div></>}
+        {bilan.detD.length>0&&<><div style={{fontSize:9.5,fontWeight:800,color:"#991b1b",textTransform:"uppercase",marginTop:6}}>Supprimées</div>
+          <div>{bilan.detD.map(x=><span key={x.lab} style={{display:"inline-block",fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:11,margin:"2px 3px 0 0",background:"rgba(220,38,38,.10)",border:"1px solid #fca5a5",color:"#991b1b"}}>{x.n} × {x.lab}</span>)}</div></>}
+      </div>}
+      {bilan.nAdd===0&&bilan.nDel===0&&<div style={{marginTop:8,fontSize:11.5,color:"#b45309",fontWeight:700}}>Rien à restaurer — cette sauvegarde est identique à l'état actuel. Essayez une sauvegarde plus ancienne.</div>}
+      <div style={{display:"flex",gap:6,marginTop:12}}>
+        <button style={seg(false)} onClick={()=>setBilan(null)}>← Retour</button>
+        <button disabled={bilan.nAdd===0&&bilan.nDel===0} style={{...S.btnP,flex:1,background:"#16a34a",opacity:(bilan.nAdd===0&&bilan.nDel===0)?.5:1}}
+          onClick={()=>onGo(bkId,rDf,rDt)}>Restaurer</button>
+      </div>
+    </div>
+  );
+
   return(
-    <div style={{minWidth:320,maxWidth:380}}>
+    <div style={{minWidth:320,maxWidth:400}}>
       <div style={S.mHd}>
-        <div style={S.mTit2}>🎯 Restaurer un médecin</div>
+        <div style={S.mTit2}>↩ Restaurer — {med?med.prenom+" "+med.nom:""}</div>
         <button onClick={onClose} style={S.xBtn}>×</button>
       </div>
       <div style={{fontSize:11.5,color:"var(--txt2)",marginBottom:10,lineHeight:1.5}}>
-        Depuis la sauvegarde du <b>{new Date(ts).toLocaleString("fr-FR",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}</b>.<br/>
         Seules les cases de ce médecin, sur ces dates, seront remises dans l'état de la sauvegarde. Le reste du planning n'est pas touché.
       </div>
-      <label style={S.fl}>Médecin</label>
-      <select value={medId||""} onChange={e=>setMedId(parseInt(e.target.value))} style={{...S.fi,width:"100%"}}>
-        <option value="">— Choisir —</option>
-        {medecins.map(m=><option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>)}
+      <label style={S.fl}>Sauvegarde</label>
+      <select value={bkId} onChange={e=>setBkId(e.target.value)} style={{...S.fi,width:"100%"}}>
+        {backups.length===0&&<option value="">Aucune sauvegarde</option>}
+        {backups.map(b=><option key={b.id} value={b.id}>{libBk(b)}</option>)}
       </select>
-      <label style={{...S.fl,marginTop:10,display:"block"}}>Du</label>
-      <input type="date" value={df} onChange={e=>setDf(e.target.value)} style={{...S.fi,width:"100%"}}/>
-      <label style={{...S.fl,marginTop:10,display:"block"}}>Au</label>
-      <input type="date" value={dt} onChange={e=>setDt(e.target.value)} style={{...S.fi,width:"100%"}}/>
-      <button disabled={!ok} onClick={()=>ok&&onGo(medId,df,dt)}
+      <label style={{...S.fl,marginTop:10,display:"block"}}>Période</label>
+      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+        {CHOIX.map(c=>(
+          <button key={c.id} onClick={()=>setCh(c.id)} style={seg(ch===c.id)}>
+            {c.lab}<div style={{fontSize:9.5,fontWeight:600,opacity:.8,marginTop:1}}>{c.det}</div>
+          </button>))}
+      </div>
+      {ch==="libre"&&<div style={{display:"flex",gap:6,marginTop:8}}>
+        <input type="date" value={df} onChange={e=>setDf(e.target.value)} style={{...S.fi,flex:1}}/>
+        <input type="date" value={dt2} onChange={e=>setDt2(e.target.value)} style={{...S.fi,flex:1}}/>
+      </div>}
+      <button disabled={!ok} onClick={async()=>{const r=await onDiff(bkId,rDf,rDt);if(r)setBilan(r);}}
         style={{...S.btnP,width:"100%",marginTop:13,background:"#16a34a",opacity:ok?1:.5}}>
-        ↩ Restaurer {med?med.prenom+" "+med.nom:"ce médecin"}
+        Comparer…
       </button>
     </div>
   );
@@ -4916,7 +4976,6 @@ function CardioPlanning(){
      et facile à expliquer : « les 45 derniers jours ». */
   const [backupList,setBackupList]=useState([]); // [{id,ts}]
   const [bkOpen,setBkOpen]=useState("");        // sauvegarde ancienne dépliée
-  const [bkCible,setBkCible]=useState(null);    // restauration ciblée en cours
   const refreshBackupList=useCallback(async()=>{
     try{
       const snap=await window.firebaseDB.collection("backups").get();
@@ -6131,6 +6190,39 @@ function CardioPlanning(){
     return {n,det};
   },[plan,acteById]);
 
+  /* v10.2 : le BILAN avant restauration. Restaurer n'est pas qu'ajouter — cela supprime
+     aussi ce qui a été posé depuis la sauvegarde. On compte donc trois choses : ce qui
+     sera remis, ce qui sera supprimé, ce qui ne bouge pas. Trois zéros = mauvaise
+     sauvegarde, autant le savoir avant de cliquer. */
+  const diffMedPeriod=useCallback(async(id,medId,dateFrom,dateTo)=>{
+    try{
+      const d=await window.firebaseDB.collection("backups").doc(id).get();
+      const data=d.data();
+      if(!data)return null;
+      const old=data.planV2?data.planV2:(data.plan?JSON.parse(data.plan):null);
+      if(!old)return null;
+      const [fy,fm,fd]=parseDate(dateFrom);
+      const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
+      const cles={};
+      Object.keys(old).forEach(k=>cles[k]=1);
+      Object.keys(plan).forEach(k=>cles[k]=1);
+      let nAdd=0,nDel=0,nSame=0;const parA={},parD={};
+      Object.keys(cles).forEach(k=>{
+        const parts=k.split("|");if(parts.length<2)return;
+        const [yy,mm,dd]=parts[0].split("-").map(Number);
+        const t=new Date(yy,mm,dd).getTime();
+        if(t<fromT||t>toT)return;
+        const av=(old[k]||{})[medId], mt=(plan[k]||{})[medId];
+        if(JSON.stringify(av)===JSON.stringify(mt)){if(mt!==undefined)nSame++;return;}
+        cellEs(av).forEach(e=>{if(e&&e.acteId){nAdd++;parA[e.acteId]=(parA[e.acteId]||0)+1;}});
+        cellEs(mt).forEach(e=>{if(e&&e.acteId){nDel++;parD[e.acteId]=(parD[e.acteId]||0)+1;}});
+      });
+      const det=o=>Object.keys(o).map(x=>{const a=acteById(x);return{lab:(a&&(a.short||a.label))||x,n:o[x]};})
+        .sort((x,y)=>y.n-x.n||String(x.lab).localeCompare(String(y.lab)));
+      return {nAdd,nDel,nSame,detA:det(parA),detD:det(parD)};
+    }catch(e){console.log("diff:",e);return null;}
+  },[plan,acteById]);
+
   const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,slotsParJour=null})=>{
     const KEEP=keepAbs?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"]:["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"];
     const [fy,fm,fd]=parseDate(dateFrom);
@@ -7289,10 +7381,6 @@ header::-webkit-scrollbar { display: none; }
                       onClick={()=>{if(window.confirm("Restaurer la sauvegarde du "+new Date(b.ts).toLocaleString("fr-FR")+" ?\nLes données actuelles seront remplacées.")&&window.confirm("Confirmer définitivement la restauration ?"))restoreBackup(b.id);}}>
                       ↩ Restaurer
                     </button>
-                    <button style={{padding:"3px 10px",borderRadius:6,border:"1px solid #16a34a",background:"var(--bg2)",color:"#16a34a",fontSize:10,fontWeight:700,cursor:"pointer"}}
-                      onClick={()=>{setBkCible({id:b.id,ts:b.ts});setModal("bkCible");}}>
-                      🎯 Un médecin
-                    </button>
                   </div>
                 ))}
               </div>
@@ -7748,6 +7836,8 @@ header::-webkit-scrollbar { display: none; }
               <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
                 {/* v9.92 : un seul bouton remplace « Pose et retrait Abs », « Effacer activités » et « Effacer mois » */}
                 {canEditThisMed&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_perMode:true});setModal("periode");}}>📅 Modifier sur une période…</button>}
+                {/* v10.2 : réservé à l'éditeur — restaurer écrase le travail d'autrui sur la période */}
+                {isEdit&&<button style={{...S.qBtn,borderColor:"#16a34a",background:"#f0fdf4",color:"#166534"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_resMode:true});refreshBackupList();setModal("restaure");}}>↩ Restaurer depuis une sauvegarde…</button>}
                 {isEdit&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setModal(null);openPtModal(medId);}}>▶ PT {med&&med.init}</button>}
                 {canEditThisMed&&!isAdminEdit&&med&&(med.tourMed||med.garde)&&<button style={{...S.qBtn,borderColor:"#7c3aed",background:"#f3e8ff",color:"#6d28d9"}}
                   onClick={()=>{setModal("prefs");}}>
@@ -7786,13 +7876,9 @@ header::-webkit-scrollbar { display: none; }
                     ⇄ Échanger ce jour de tour…
                   </button>);
                 })()}
-                {(isNight||we)&&canGarde&&canEditThisMed&&(()=>{
-                  /* v9.66 : même avertissement préalable que le sélecteur de l'onglet Gardes */
-                  const _gn=new Date(y2,m2,d2+1);
-                  const gNx=["M","AM","JOUR"].some(sl2=>cellHasAny((plan[sk(_gn.getFullYear(),_gn.getMonth(),_gn.getDate(),sl2)]||{})[medId],ABS_IDS));
-                  return <button style={{...S.qBtn,borderColor:gNx?"#f59e0b":"#388bfd",background:gNx?"rgba(245,158,11,.12)":"#0c1a2e",color:gNx?"#b45309":"#388bfd"}} onClick={doGarde}>{gNx?"🌙 Garde — ⚠ absence/FMC demain, sans repos":"🌙 Garde + repos auto"}</button>;
-                })()}
-                {isNight&&!canGarde&&<span style={{color:"var(--txt3)",fontSize:12}}>Ce médecin ne participe pas aux gardes.</span>}
+                {/* v10.1 : plus de pose de garde ici. Le bouton prenait trois apparences
+                    différentes selon le contexte et disparaissait parfois — les gardes se
+                    posent depuis la colonne Garde du Planning et depuis l'onglet Gardes. */}
               </div>
             )}
 
@@ -7958,16 +8044,12 @@ header::-webkit-scrollbar { display: none; }
         />
       </Ov>}
 
-      {modal==="bkCible"&&bkCible&&<Ov onClose={()=>setModal(null)}>
-        {(()=>{
-          const fmt2=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-          const p0=perStart(year,month);const e0=perEnd(p0.sy,p0.sm);
-          return(
-            <BkCibleForm medecins={medecins} ts={bkCible.ts}
-              defFrom={fmt2(new Date(p0.sy,p0.sm,1))} defTo={fmt2(e0)}
-              onClose={()=>setModal(null)}
-              onGo={(mid,df,dt)=>{restoreMedPeriod(bkCible.id,mid,df,dt);setModal(null);}}/>);
-        })()}
+      {modal==="restaure"&&mData&&<Ov onClose={()=>setModal(null)}>
+        <RestoreModal med={medecins.find(m=>m.id===mData.medId)} backups={backupList}
+          y={mData.y} m={mData.m} d={mData.d}
+          onDiff={(id,df,dt)=>diffMedPeriod(id,mData.medId,df,dt)}
+          onGo={(id,df,dt)=>{restoreMedPeriod(id,mData.medId,df,dt);setModal(null);}}
+          onClose={()=>setModal(null)}/>
       </Ov>}
       {modal==="periode"&&mData&&<Ov onClose={()=>setModal(null)}>
         <PeriodModal

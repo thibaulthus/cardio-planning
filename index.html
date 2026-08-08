@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.0 — 07/08/2026";
+var APP_VERSION = "v10.2 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2738,37 +2738,126 @@ function EditPTModal(_a) {
         })()));
 }
 /* ════ ABS MODAL ════ */
-function BkCibleForm(_a) {
-    var medecins = _a.medecins, ts = _a.ts, defFrom = _a.defFrom, defTo = _a.defTo, onGo = _a.onGo, onClose = _a.onClose;
-    var _b = useState(null), medId = _b[0], setMedId = _b[1];
-    var _c = useState(defFrom || ""), df = _c[0], setDf = _c[1];
-    var _d = useState(defTo || ""), dt = _d[0], setDt = _d[1];
-    var ok = medId && df && dt && dt >= df;
-    var med = medecins.find(function (m) { return m.id === medId; });
-    return (React.createElement("div", { style: { minWidth: 320, maxWidth: 380 } },
+function RestoreModal(_a) {
+    var _this = this;
+    var med = _a.med, backups = _a.backups, y = _a.y, m = _a.m, d = _a.d, onDiff = _a.onDiff, onGo = _a.onGo, onClose = _a.onClose;
+    var f = function (dt) { return "".concat(dt.getFullYear(), "-").concat(String(dt.getMonth() + 1).padStart(2, "0"), "-").concat(String(dt.getDate()).padStart(2, "0")); };
+    var jour = new Date(y, m, d);
+    var lun = new Date(y, m, d);
+    lun.setDate(lun.getDate() - ((lun.getDay() + 6) % 7));
+    var dim = new Date(lun);
+    dim.setDate(dim.getDate() + 6);
+    var m1 = new Date(y, m, 1), m2 = new Date(y, m + 1, 0);
+    var court = function (dt) { return dt.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }); };
+    var CHOIX = [
+        { id: "jour", lab: "Ce jour", det: court(jour), df: f(jour), dt: f(jour) },
+        { id: "sem", lab: "Cette semaine", det: court(lun) + " au " + court(dim), df: f(lun), dt: f(dim) },
+        { id: "mois", lab: "Ce mois", det: court(m1) + " au " + court(m2), df: f(m1), dt: f(m2) },
+        { id: "libre", lab: "Deux dates", det: "au choix", df: null, dt: null }
+    ];
+    var _b = useState(backups.length ? backups[0].id : ""), bkId = _b[0], setBkId = _b[1];
+    var _c = useState("jour"), ch = _c[0], setCh = _c[1];
+    var _d = useState(f(jour)), df = _d[0], setDf = _d[1];
+    var _e = useState(f(jour)), dt2 = _e[0], setDt2 = _e[1];
+    var _f = useState(null), bilan = _f[0], setBilan = _f[1];
+    var sel = CHOIX.find(function (c) { return c.id === ch; }) || CHOIX[0];
+    var rDf = sel.df || df, rDt = sel.dt || dt2;
+    var bk = backups.find(function (b) { return b.id === bkId; });
+    var ok = bkId && rDf && rDt && rDt >= rDf;
+    var libBk = function (b) {
+        if (!b)
+            return "—";
+        var j = Math.floor((Date.now() - b.ts) / 86400000);
+        var h = new Date(b.ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+        if (j <= 0)
+            return "Aujourd'hui — " + h;
+        if (j === 1)
+            return "Hier soir — " + h;
+        if (j === 2)
+            return "Avant-hier — " + h;
+        return new Date(b.ts).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" }) + " — " + h;
+    };
+    var seg = function (on) { return ({ flex: "1 1 auto", minWidth: 96, padding: "7px 6px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 11.5,
+        border: "1.5px solid " + (on ? "#16a34a" : "var(--border)"), background: on ? "#f0fdf4" : "var(--bg2)", color: on ? "#166534" : "var(--txt2)" }); };
+    if (bilan)
+        return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
+            React.createElement("div", { style: S.mHd },
+                React.createElement("div", { style: __assign(__assign({}, S.mTit2), { color: "#166534" }) }, "\u21A9 Confirmer la restauration")),
+            React.createElement("div", { style: { fontSize: 12.5, lineHeight: 1.6 } },
+                "\u00C9tat du ",
+                React.createElement("b", null, libBk(bk)),
+                React.createElement("br", null),
+                "pour ",
+                React.createElement("b", null, med ? med.prenom + " " + med.nom : "—"),
+                React.createElement("br", null),
+                "sur ",
+                React.createElement("b", null, sel.id === "libre" ? ("du " + rDf + " au " + rDt) : (sel.lab.toLowerCase() + " — " + sel.det)),
+                "."),
+            React.createElement("div", { style: { marginTop: 10, borderRadius: 9, border: "1px solid var(--border)", overflow: "hidden" } },
+                React.createElement("div", { style: { display: "flex", gap: 8, padding: "8px 10px", fontSize: 12, borderBottom: "1px solid var(--border)", background: "#f0fdf4", color: "#166534", fontWeight: 700 } },
+                    "\uFF0B ",
+                    bilan.nAdd,
+                    " activit\u00E9",
+                    bilan.nAdd > 1 ? "s" : "",
+                    " remise",
+                    bilan.nAdd > 1 ? "s" : ""),
+                React.createElement("div", { style: { display: "flex", gap: 8, padding: "8px 10px", fontSize: 12, borderBottom: "1px solid var(--border)", background: "#fee2e2", color: "#991b1b", fontWeight: 700 } },
+                    "\uFF0D ",
+                    bilan.nDel,
+                    " case",
+                    bilan.nDel > 1 ? "s" : "",
+                    " supprim\u00E9e",
+                    bilan.nDel > 1 ? "s" : ""),
+                React.createElement("div", { style: { display: "flex", gap: 8, padding: "8px 10px", fontSize: 12, background: "var(--bg2)", color: "var(--txt3)" } },
+                    "\uFF1D ",
+                    bilan.nSame,
+                    " d\u00E9j\u00E0 identique",
+                    bilan.nSame > 1 ? "s" : "")),
+            (bilan.nAdd > 0 || bilan.nDel > 0) && React.createElement("div", { style: { marginTop: 8 } },
+                bilan.detA.length > 0 && React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { fontSize: 9.5, fontWeight: 800, color: "#166534", textTransform: "uppercase" } }, "Remises"),
+                    React.createElement("div", null, bilan.detA.map(function (x) { return React.createElement("span", { key: x.lab, style: { display: "inline-block", fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 11, margin: "2px 3px 0 0", background: "rgba(22,163,74,.12)", border: "1px solid #86efac", color: "#166534" } },
+                        x.n,
+                        " \u00D7 ",
+                        x.lab); }))),
+                bilan.detD.length > 0 && React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { fontSize: 9.5, fontWeight: 800, color: "#991b1b", textTransform: "uppercase", marginTop: 6 } }, "Supprim\u00E9es"),
+                    React.createElement("div", null, bilan.detD.map(function (x) { return React.createElement("span", { key: x.lab, style: { display: "inline-block", fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 11, margin: "2px 3px 0 0", background: "rgba(220,38,38,.10)", border: "1px solid #fca5a5", color: "#991b1b" } },
+                        x.n,
+                        " \u00D7 ",
+                        x.lab); })))),
+            bilan.nAdd === 0 && bilan.nDel === 0 && React.createElement("div", { style: { marginTop: 8, fontSize: 11.5, color: "#b45309", fontWeight: 700 } }, "Rien \u00E0 restaurer \u2014 cette sauvegarde est identique \u00E0 l'\u00E9tat actuel. Essayez une sauvegarde plus ancienne."),
+            React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 12 } },
+                React.createElement("button", { style: seg(false), onClick: function () { return setBilan(null); } }, "\u2190 Retour"),
+                React.createElement("button", { disabled: bilan.nAdd === 0 && bilan.nDel === 0, style: __assign(__assign({}, S.btnP), { flex: 1, background: "#16a34a", opacity: (bilan.nAdd === 0 && bilan.nDel === 0) ? .5 : 1 }), onClick: function () { return onGo(bkId, rDf, rDt); } }, "Restaurer"))));
+    return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
         React.createElement("div", { style: S.mHd },
-            React.createElement("div", { style: S.mTit2 }, "\uD83C\uDFAF Restaurer un m\u00E9decin"),
+            React.createElement("div", { style: S.mTit2 },
+                "\u21A9 Restaurer \u2014 ",
+                med ? med.prenom + " " + med.nom : ""),
             React.createElement("button", { onClick: onClose, style: S.xBtn }, "\u00D7")),
-        React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt2)", marginBottom: 10, lineHeight: 1.5 } },
-            "Depuis la sauvegarde du ",
-            React.createElement("b", null, new Date(ts).toLocaleString("fr-FR", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })),
-            ".",
-            React.createElement("br", null),
-            "Seules les cases de ce m\u00E9decin, sur ces dates, seront remises dans l'\u00E9tat de la sauvegarde. Le reste du planning n'est pas touch\u00E9."),
-        React.createElement("label", { style: S.fl }, "M\u00E9decin"),
-        React.createElement("select", { value: medId || "", onChange: function (e) { return setMedId(parseInt(e.target.value)); }, style: __assign(__assign({}, S.fi), { width: "100%" }) },
-            React.createElement("option", { value: "" }, "\u2014 Choisir \u2014"),
-            medecins.map(function (m) { return React.createElement("option", { key: m.id, value: m.id },
-                m.prenom,
-                " ",
-                m.nom); })),
-        React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Du"),
-        React.createElement("input", { type: "date", value: df, onChange: function (e) { return setDf(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }),
-        React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Au"),
-        React.createElement("input", { type: "date", value: dt, onChange: function (e) { return setDt(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }),
-        React.createElement("button", { disabled: !ok, onClick: function () { return ok && onGo(medId, df, dt); }, style: __assign(__assign({}, S.btnP), { width: "100%", marginTop: 13, background: "#16a34a", opacity: ok ? 1 : .5 }) },
-            "\u21A9 Restaurer ",
-            med ? med.prenom + " " + med.nom : "ce médecin")));
+        React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt2)", marginBottom: 10, lineHeight: 1.5 } }, "Seules les cases de ce m\u00E9decin, sur ces dates, seront remises dans l'\u00E9tat de la sauvegarde. Le reste du planning n'est pas touch\u00E9."),
+        React.createElement("label", { style: S.fl }, "Sauvegarde"),
+        React.createElement("select", { value: bkId, onChange: function (e) { return setBkId(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) },
+            backups.length === 0 && React.createElement("option", { value: "" }, "Aucune sauvegarde"),
+            backups.map(function (b) { return React.createElement("option", { key: b.id, value: b.id }, libBk(b)); })),
+        React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "P\u00E9riode"),
+        React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap" } }, CHOIX.map(function (c) { return (React.createElement("button", { key: c.id, onClick: function () { return setCh(c.id); }, style: seg(ch === c.id) },
+            c.lab,
+            React.createElement("div", { style: { fontSize: 9.5, fontWeight: 600, opacity: .8, marginTop: 1 } }, c.det))); })),
+        ch === "libre" && React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 8 } },
+            React.createElement("input", { type: "date", value: df, onChange: function (e) { return setDf(e.target.value); }, style: __assign(__assign({}, S.fi), { flex: 1 }) }),
+            React.createElement("input", { type: "date", value: dt2, onChange: function (e) { return setDt2(e.target.value); }, style: __assign(__assign({}, S.fi), { flex: 1 }) })),
+        React.createElement("button", { disabled: !ok, onClick: function () { return __awaiter(_this, void 0, void 0, function () { var r; return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, onDiff(bkId, rDf, rDt)];
+                    case 1:
+                        r = _a.sent();
+                        if (r)
+                            setBilan(r);
+                        return [2 /*return*/];
+                }
+            }); }); }, style: __assign(__assign({}, S.btnP), { width: "100%", marginTop: 13, background: "#16a34a", opacity: ok ? 1 : .5 }) }, "Comparer\u2026")));
 }
 function PeriodModal(_a) {
     var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, _b = _a.mois, mois = _b === void 0 ? [] : _b, _c = _a.finPer, finPer = _c === void 0 ? null : _c, _d = _a.allowActs, allowActs = _d === void 0 ? true : _d, compter = _a.compter, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
@@ -5270,8 +5359,7 @@ function CardioPlanning() {
     }, []);
     /* ── Sauvegardes automatiques (72h, 10 conservées) ── */
     var _28 = useState([]), backupList = _28[0], setBackupList = _28[1];
-    var _bko = useState(""), bkOpen = _bko[0], setBkOpen = _bko[1];
-    var _bkc = useState(null), bkCible = _bkc[0], setBkCible = _bkc[1]; // [{id,ts}]
+    var _bko = useState(""), bkOpen = _bko[0], setBkOpen = _bko[1]; // [{id,ts}]
     var refreshBackupList = useCallback(function () { return __awaiter(_this, void 0, void 0, function () {
         var snap, items_1, e_1;
         return __generator(this, function (_a) {
@@ -7048,6 +7136,62 @@ function CardioPlanning() {
             .sort(function (x, y) { return y.n - x.n || String(x.lab).localeCompare(String(y.lab)); });
         return { n: n, det: det };
     }, [plan, acteById]);
+    var diffMedPeriod = useCallback(function (id, medId, dateFrom, dateTo) { return __awaiter(_this, void 0, void 0, function () {
+        var d, data, old_2, _a, fy, fm, fd, fromT_2, toT_2, cles_1, nAdd_1, nDel_1, nSame_1, parA_1, parD_1, det, e_15;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    _b.trys.push([0, 2, , 3]);
+                    return [4 /*yield*/, window.firebaseDB.collection("backups").doc(id).get()];
+                case 1:
+                    d = _b.sent();
+                    data = d.data();
+                    if (!data)
+                        return [2 /*return*/, null];
+                    old_2 = data.planV2 ? data.planV2 : (data.plan ? JSON.parse(data.plan) : null);
+                    if (!old_2)
+                        return [2 /*return*/, null];
+                    _a = parseDate(dateFrom), fy = _a[0], fm = _a[1], fd = _a[2];
+                    fromT_2 = new Date(fy, fm, fd).getTime(), toT_2 = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+                    cles_1 = {};
+                    Object.keys(old_2).forEach(function (k) { return cles_1[k] = 1; });
+                    Object.keys(plan).forEach(function (k) { return cles_1[k] = 1; });
+                    nAdd_1 = 0, nDel_1 = 0, nSame_1 = 0;
+                    parA_1 = {}, parD_1 = {};
+                    Object.keys(cles_1).forEach(function (k) {
+                        var parts = k.split("|");
+                        if (parts.length < 2)
+                            return;
+                        var _a = parts[0].split("-").map(Number), yy = _a[0], mm = _a[1], dd = _a[2];
+                        var t = new Date(yy, mm, dd).getTime();
+                        if (t < fromT_2 || t > toT_2)
+                            return;
+                        var av = (old_2[k] || {})[medId], mt = (plan[k] || {})[medId];
+                        if (JSON.stringify(av) === JSON.stringify(mt)) {
+                            if (mt !== undefined)
+                                nSame_1++;
+                            return;
+                        }
+                        cellEs(av).forEach(function (e) { if (e && e.acteId) {
+                            nAdd_1++;
+                            parA_1[e.acteId] = (parA_1[e.acteId] || 0) + 1;
+                        } });
+                        cellEs(mt).forEach(function (e) { if (e && e.acteId) {
+                            nDel_1++;
+                            parD_1[e.acteId] = (parD_1[e.acteId] || 0) + 1;
+                        } });
+                    });
+                    det = function (o) { return Object.keys(o).map(function (x) { var a = acteById(x); return { lab: (a && (a.short || a.label)) || x, n: o[x] }; })
+                        .sort(function (x, y) { return y.n - x.n || String(x.lab).localeCompare(String(y.lab)); }); };
+                    return [2 /*return*/, { nAdd: nAdd_1, nDel: nDel_1, nSame: nSame_1, detA: det(parA_1), detD: det(parD_1) }];
+                case 2:
+                    e_15 = _b.sent();
+                    console.log("diff:", e_15);
+                    return [2 /*return*/, null];
+                case 3: return [2 /*return*/];
+            }
+        });
+    }); }, [plan, acteById]);
     var clearPeriodActs = useCallback(function (_a) {
         var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _b = _a.keepAbs, keepAbs = _b === void 0 ? true : _b, _c = _a.slotsParJour, slotsParJour = _c === void 0 ? null : _c;
         var KEEP = keepAbs ? ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE", "FORM", "FORMATION"] : ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"];
@@ -8090,8 +8234,7 @@ function CardioPlanning() {
                                 React.createElement("span", { style: { flex: 1 } }, new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })),
                                 React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #388bfd", background: "var(--bg2)", color: "#388bfd", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { return previewBackup(b.id, b.ts); } }, "\uD83D\uDC41 Aper\u00E7u"),
                                 React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(b.ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?"))
-                                        restoreBackup(b.id); } }, "\u21A9 Restaurer"),
-                                    React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #16a34a", background: "var(--bg2)", color: "#16a34a", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { setBkCible({ id: b.id, ts: b.ts }); setModal("bkCible"); } }, "\uD83C\uDFAF Un m\u00E9decin"))); })),
+                                        restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
                         React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
                         React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#e3b341", color: "#111" }), onClick: function () {
@@ -8702,6 +8845,7 @@ function CardioPlanning() {
                     React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } }, "Ce m\u00E9decin a d\u00E9j\u00E0 une activit\u00E9 sur ce cr\u00E9neau."))),
                 canEditThisMed && (React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } },
                     canEditThisMed && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _perMode: true }); setModal("periode"); } }, "\uD83D\uDCC5 Modifier sur une p\u00E9riode\u2026"),
+                    isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#16a34a", background: "#f0fdf4", color: "#166534" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _resMode: true }); refreshBackupList(); setModal("restaure"); } }, "\u21A9 Restaurer depuis une sauvegarde\u2026"),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setModal(null); openPtModal(medId); } },
                         "\u25B6 PT ",
                         med && med.init),
@@ -8749,13 +8893,7 @@ function CardioPlanning() {
                                 } }, "\u21A9 Remettre au tour ce jour"));
                         return (React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#f59e0b", background: "rgba(245,158,11,.10)", color: "#b45309" }), onClick: function () { setModal("daySwap"); } }, "\u21C4 \u00C9changer ce jour de tour\u2026"));
                     })(),
-                                        (isNight || we) && canGarde && canEditThisMed && (function () {
-                        /* v9.66 : même avertissement préalable que le sélecteur de l'onglet Gardes */
-                        var _gn = new Date(y2, m2, d2 + 1);
-                        var gNx = ["M", "AM", "JOUR"].some(function (sl2) { return cellHasAny((plan[sk(_gn.getFullYear(), _gn.getMonth(), _gn.getDate(), sl2)] || {})[medId], ABS_IDS); });
-                        return React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: gNx ? "#f59e0b" : "#388bfd", background: gNx ? "rgba(245,158,11,.12)" : "#0c1a2e", color: gNx ? "#b45309" : "#388bfd" }), onClick: doGarde }, gNx ? "🌙 Garde — ⚠ absence/FMC demain, sans repos" : "🌙 Garde + repos auto");
-                    })(),
-                    isNight && !canGarde && React.createElement("span", { style: { color: "var(--txt3)", fontSize: 12 } }, "Ce m\u00E9decin ne participe pas aux gardes."))),
+                                        null)),
                 canEditThisMed && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Ajouter"),
                 canEditThisMed && (React.createElement("div", { style: S.actGrd }, eligible.filter(function (a) { return a.id !== "GARDE"; }).map(function (a) {
                     var on = curIds.includes(a.id);
@@ -8912,12 +9050,8 @@ function CardioPlanning() {
                     }
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
-        modal === "bkCible" && bkCible && React.createElement(Ov, { onClose: function () { return setModal(null); } }, (function () {
-            var fmt2 = function (d) { return "".concat(d.getFullYear(), "-").concat(String(d.getMonth() + 1).padStart(2, "0"), "-").concat(String(d.getDate()).padStart(2, "0")); };
-            var p0 = perStart(year, month);
-            var e0 = perEnd(p0.sy, p0.sm);
-            return (React.createElement(BkCibleForm, { medecins: medecins, ts: bkCible.ts, defFrom: fmt2(new Date(p0.sy, p0.sm, 1)), defTo: fmt2(e0), onClose: function () { return setModal(null); }, onGo: function (mid, df, dt) { restoreMedPeriod(bkCible.id, mid, df, dt); setModal(null); } }));
-        })()),
+        modal === "restaure" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
+            React.createElement(RestoreModal, { med: medecins.find(function (m) { return m.id === mData.medId; }), backups: backupList, y: mData.y, m: mData.m, d: mData.d, onDiff: function (id, df, dt) { return diffMedPeriod(id, mData.medId, df, dt); }, onGo: function (id, df, dt) { restoreMedPeriod(id, mData.medId, df, dt); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, finPer: (function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm); return "".concat(e.getFullYear(), "-").concat(String(e.getMonth() + 1).padStart(2, "0"), "-").concat(String(e.getDate()).padStart(2, "0")); })(), allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
