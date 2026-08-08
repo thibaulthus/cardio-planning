@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.97 — 07/08/2026";
+const APP_VERSION="v9.99 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -649,7 +649,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
         </>);})()}
       </div>
     </Ov>}
-    <TableScroll>
+    <TableScroll jours>
       <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
         <thead>
           <tr>
@@ -670,7 +670,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
             const isMonGV=!we&&dow(ey,em,d)===1;
             const gardeMed=getGardeMed2(ey,em,d);
             return slots.map((sl,si)=>(
-              <tr key={ey+"-"+em+"-"+d+sl} style={{height:28,borderBottom:si===slots.length-1?"1px solid var(--border)":"1px solid var(--border2)",...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{}),...(si===0&&isMonGV?{boxShadow:"0 -2px 0 0 var(--border)"}:{})}}>
+              <tr key={ey+"-"+em+"-"+d+sl} data-day={ey+"-"+em+"-"+d} style={{height:28,borderBottom:si===slots.length-1?"1px solid var(--border)":"1px solid var(--border2)",...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{}),...(si===0&&isMonGV?{boxShadow:"0 -2px 0 0 var(--border)"}:{})}}>
                 {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:C0,background:isVac&&isVac(ey,em,d)?"var(--vac-bg)":"var(--td-fix)"}} rowSpan={slots.length}>
                   <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700,fontFamily:"sans-serif",lineHeight:1.2}}>{MOIS[em]}</div>}</div>
                   <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dow(ey,em,d)]}</div>
@@ -739,7 +739,35 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
    navigation, emportant la ligne des initiales avec lui. En le raccourcissant, son sommet
    se pose juste en dessous et les en-têtes restent lisibles jusqu'à la dernière ligne.
    Valeur unique et facile à retoucher : c'est tout l'intérêt du composant partagé. */
-function TableScroll({children,style,mh=150}){
+/* v9.98 : mémoire de défilement. Deux comportements, selon sa demande :
+   — les onglets qui affichent les JOURS partagent une même date : si on regarde le
+     12 août dans Planning, on arrive au 12 août dans CHL, CHB, PT Cardio, PT Angio et
+     Attachés. C'est la date qui suit, pas une position en pixels — les lignes n'ont pas
+     la même hauteur d'un onglet à l'autre ;
+   — les autres onglets retrouvent simplement l'endroit où ils étaient.
+   Rien ne survit au rechargement : on revient alors au jour courant, ce qui convient. */
+const SCROLL_MEM={jour:null,pos:{}};
+function TableScroll({children,style,mh=150,jours=false,memId=null}){
+  const ref=React.useRef(null);
+  React.useLayoutEffect(()=>{
+    const el=ref.current; if(!el)return;
+    if(jours&&SCROLL_MEM.jour){
+      const t=el.querySelector('[data-day="'+SCROLL_MEM.jour+'"]');
+      if(t){el.scrollTop=Math.max(0,t.offsetTop-el.offsetTop);return;}
+    }
+    if(!jours&&memId&&SCROLL_MEM.pos[memId])el.scrollTop=SCROLL_MEM.pos[memId];
+  },[jours,memId]);
+  const onScroll=()=>{
+    const el=ref.current; if(!el)return;
+    if(jours){
+      const rows=el.querySelectorAll("[data-day]");
+      for(let i=0;i<rows.length;i++){
+        if(rows[i].offsetTop-el.offsetTop>=el.scrollTop-2){SCROLL_MEM.jour=rows[i].getAttribute("data-day");break;}
+      }
+      return;
+    }
+    if(memId)SCROLL_MEM.pos[memId]=el.scrollTop;
+  };
   /* v9.87.2 : RETOUR au comportement d'avant la v9.87, à sa demande.
      Mes deux tentatives ont empiré les choses : la première laissait les en-têtes partir,
      la seconde a créé DEUX barres de défilement à droite dans un ordre inversé, réduisant
@@ -747,7 +775,7 @@ function TableScroll({children,style,mh=150}){
      Le composant unique est conservé : il n'y a plus qu'un seul endroit à modifier si on
      reprend ce sujet, au lieu des dix cadres identiques d'avant. */
   return(
-    <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - "+mh+"px)",
+    <div ref={ref} onScroll={onScroll} style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - "+mh+"px)",
       borderRadius:8,border:"1px solid var(--border)",...(style||{})}}>
       {children}
     </div>
@@ -885,7 +913,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
 
     return(
     <div>{hdr}
-      <TableScroll>
+      <TableScroll jours>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
@@ -899,7 +927,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
               const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();
               const dSV=dow(wY,wM,d), weSV=isWE(wY,wM,d), isMonSV=dSV===1&&!weSV;
               if(weSV) return(
-                <tr key={wY+"-"+wM+"-"+d+"we"} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
+                <tr key={wY+"-"+wM+"-"+d+"we"} data-day={wY+"-"+wM+"-"+d} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
                   <td colSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,background:"var(--bg-we)"}}>
                     <div style={{fontWeight:800,color:"#92400e",fontSize:11,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<span style={{fontSize:7,color:"#92400e",fontWeight:600,marginLeft:2}}>{MOIS[wM].slice(0,4)}</span>} {JOURSC[dSV]}</div>
                   </td>
@@ -907,7 +935,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
                 </tr>
               );
               return["M","AM"].map((sl,si)=>(
-                <tr key={wY+"-"+wM+"-"+d+sl} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",...(isT?{background:"var(--bg-td)"}:{}),...(isMonSV&&si===0?{borderTop:"3px solid var(--border)"}:{})}}>
+                <tr key={wY+"-"+wM+"-"+d+sl} data-day={wY+"-"+wM+"-"+d} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",...(isT?{background:"var(--bg-td)"}:{}),...(isMonSV&&si===0?{borderTop:"3px solid var(--border)"}:{})}}>
                   {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:42}} rowSpan={2}>
                     <div style={{fontWeight:800,color:isT?"var(--today-c)":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:8,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}</div>
                     <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dSV]}</div>
@@ -1101,7 +1129,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
 
     return(
     <div>{hdr}
-      <TableScroll>
+      <TableScroll jours>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
@@ -1115,7 +1143,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
               const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();
               const dAT=dow(wY,wM,d), weAT=isWE(wY,wM,d), isMonAT=dAT===1&&!weAT;
                 if(weAT) return(
-                  <tr key={wY+"-"+wM+"-"+d+"we"} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
+                  <tr key={wY+"-"+wM+"-"+d+"we"} data-day={wY+"-"+wM+"-"+d} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
                     <td colSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,background:"var(--bg-we)"}}>
                       <div style={{fontWeight:800,color:"#92400e",fontSize:11,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<span style={{fontSize:7,color:"#92400e",fontWeight:600,marginLeft:2}}>{MOIS[wM].slice(0,4)}</span>} {JOURSC[dAT]}</div>
                     </td>
@@ -1123,7 +1151,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
                   </tr>
                 );
                 return["M","AM"].map((sl,si)=>(
-                <tr key={wY+"-"+wM+"-"+d+sl} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",...(isT?{background:"var(--bg-td)"}:{}),...(isMonAT&&si===0?{borderTop:"3px solid var(--border)"}:{})}}>
+                <tr key={wY+"-"+wM+"-"+d+sl} data-day={wY+"-"+wM+"-"+d} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",...(isT?{background:"var(--bg-td)"}:{}),...(isMonAT&&si===0?{borderTop:"3px solid var(--border)"}:{})}}>
                   {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:42}} rowSpan={2}>
                     <div style={{fontWeight:800,color:isT?"var(--today-c)":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600,lineHeight:1}}>{MOIS[wM]}</div>}</div>
                     <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dAT]}</div>
@@ -1444,7 +1472,7 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
   const wdays=printWk?gvEffDays.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):gvEffDays; // keep full objects
 
   const viewV=(
-    <TableScroll>
+    <TableScroll memId="gardes">
       <table key={showFull?"gvfull":"gvpart"} style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
         <thead>
           <tr>
@@ -1822,7 +1850,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
   return(
     <div>
       {hdr}
-      <TableScroll>
+      <TableScroll memId="bip">
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
@@ -1839,7 +1867,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
               const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();
               const dBip=dow(wY,wM,d), weBip=isWE(wY,wM,d), isMonBip=dBip===1&&!weBip;
               if(weBip) return(
-                <tr key={wY+"-"+wM+"-"+d+"we"} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
+                <tr key={wY+"-"+wM+"-"+d+"we"} data-day={wY+"-"+wM+"-"+d} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
                   <td colSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:5,background:"var(--bg-we)"}}>
                     <div style={{fontWeight:800,color:"#92400e",fontSize:11,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d} {JOURSC[dBip]}</div>
                   </td>
@@ -1847,7 +1875,7 @@ function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries
                 </tr>
               );
               return["M","AM"].map((sl,si)=>(
-                <tr key={wY+"-"+wM+"-"+d+sl} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",
+                <tr key={wY+"-"+wM+"-"+d+sl} data-day={wY+"-"+wM+"-"+d} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",
                   ...(isT?{background:"var(--bg-td)"}:{}),...(isMonBip&&si===0?{borderTop:"3px solid var(--border)"}:{})}}>
                   {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:5,verticalAlign:"middle",minWidth:42}} rowSpan={2}>
                     <div style={{fontWeight:800,color:isT?"var(--today-c)":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600,lineHeight:1}}>{MOIS[wM]}</div>}</div>
@@ -2021,7 +2049,7 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
   const jours=["","Lun","Mar","Mer","Jeu","Ven"];
 
     return(
-    <TableScroll mh={150}>
+    <TableScroll memId="type" mh={150}>
       <table style={{borderCollapse:"collapse"}}>
         <thead>
           <tr>
@@ -3806,7 +3834,7 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
               background:on?m.color:"var(--bg2)",color:on?"#111":"var(--txt2)"}}>{m.init}</button>;
         })}
       </div>
-      <TableScroll mh={190}>
+      <TableScroll memId="stats" mh={190}>
         <table style={{borderCollapse:"collapse",fontSize:11}}>
           <thead>
             <tr>
@@ -4429,7 +4457,22 @@ function CardioPlanning(){
     }catch(e){}
   },[]);
   const [editMedId,setEditMedId]=useState(null); // medecin logged in with personal PIN
+  /* v9.99 : l'onglet Paramètres défile avec la PAGE, pas dans un cadre — la mémoire de
+     TableScroll ne le couvre donc pas. C'est le seul onglet où la perte de position le
+     gêne réellement (il est long : droits, tour, salles, sauvegardes, archives). On
+     mémorise le défilement de la fenêtre à la sortie et on le restaure au retour.
+     Volontairement limité à cet onglet. */
   const [tab,setTab]=useState("planning");
+  const pageMem=useRef({});
+  const goTab=useCallback((next)=>{
+    setTab(cur=>{
+      if(cur===next)return cur;
+      if(cur==="partage")pageMem.current.partage=window.scrollY||0;
+      const y=(next==="partage")?(pageMem.current.partage||0):0;
+      setTimeout(()=>window.scrollTo(0,y),0);
+      return next;
+    });
+  },[]);
   const [ym,setYM]=useState(()=>({year:new Date().getFullYear(),month:new Date().getMonth()}));
   const year=ym.year, month=ym.month;
   const setYear=y=>setYM(p=>({...p,year:typeof y==="function"?y(p.year):y}));
@@ -6294,7 +6337,7 @@ header::-webkit-scrollbar { display: none; }
               onDragStart={()=>setDragTab(v)}
               onDragOver={e=>{e.preventDefault();}}
               onDrop={e=>{ e.preventDefault(); if(dragTab&&dragTab!==v){ setTabOrder(p=>{ const a=[...p],fi=a.indexOf(dragTab),ti=a.indexOf(v); a.splice(fi,1); a.splice(ti,0,dragTab); return a; }); } setDragTab(null); }}
-              onClick={()=>setTab(v)}
+              onClick={()=>goTab(v)}
               style={{...S.nb,...(tab===v?S.nba:{}),cursor:"grab",userSelect:"none"}}>{l}</button>
           ))}
         </nav>
@@ -6702,7 +6745,7 @@ header::-webkit-scrollbar { display: none; }
               <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,border:"2px solid #7c3aed",marginRight:4,verticalAlign:"middle"}}/>exception jour · période affichée</div>
             </div>
             {/* Tableau des jours — style onglet Gardes */}
-            <TableScroll>
+            <TableScroll memId="astreinte">
               <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
                 <thead>
                   <tr>

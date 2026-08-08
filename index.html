@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.97 — 07/08/2026";
+var APP_VERSION = "v9.99 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -673,11 +673,11 @@ function GridV(_a) {
         if (!viewPeriod) {
             var base = allDays.map(function (d) { return ({ y: year, m: month, d: d, label: null }); });
             if (!showFull) {
-                var tod_3 = new Date();
-                tod_3.setHours(0, 0, 0, 0);
+                var tod_1 = new Date();
+                tod_1.setHours(0, 0, 0, 0);
                 return base.filter(function (_a) {
                     var ey = _a.y, em = _a.m, d = _a.d;
-                    return new Date(ey, em, d) >= tod_3;
+                    return new Date(ey, em, d) >= tod_1;
                 });
             }
             return base;
@@ -686,11 +686,11 @@ function GridV(_a) {
         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
         var days = perDaysList(sy, sm).map(function (o) { return ({ y: o.y, m: o.m, d: o.d, label: null }); });
         if (!showFull) {
-            var tod_4 = new Date();
-            tod_4.setHours(0, 0, 0, 0);
+            var tod_2 = new Date();
+            tod_2.setHours(0, 0, 0, 0);
             return days.filter(function (_a) {
                 var ey = _a.y, em = _a.m, d = _a.d;
-                return new Date(ey, em, d) >= tod_4;
+                return new Date(ey, em, d) >= tod_2;
             });
         }
         return days;
@@ -811,7 +811,7 @@ function GridV(_a) {
                         filteredGM.length === 1 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 4, textAlign: "center" } }, "\u21B5 Entr\u00E9e pour confirmer"),
                         React.createElement(GardeCandidateList, { meds: filteredGM, isAbsDay: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; return isAbsOn(mid, p2.y, p2.m, p2.d); }, isAbsNext: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var nx = new Date(p2.y, p2.m, p2.d + 1); return isAbsOn(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, currentId: (function () { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var gm = getGardeMed2(p2.y, p2.m, p2.d); return gm ? gm.id : null; })(), onPick: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(mid, p2.y, p2.m, p2.d); setPickGardeDayFull(null); }, maxHeight: 320 })));
                 })())),
-        React.createElement(TableScroll, null,
+        React.createElement(TableScroll, { jours: true },
             React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
                 React.createElement("thead", null,
                     React.createElement("tr", null,
@@ -828,7 +828,7 @@ function GridV(_a) {
                     var slots = we ? ["JOUR"] : ["M", "AM"];
                     var isMonGV = !we && dow(ey, em, d) === 1;
                     var gardeMed = getGardeMed2(ey, em, d);
-                    return slots.map(function (sl, si) { return (React.createElement("tr", { key: ey + "-" + em + "-" + d + sl, style: __assign(__assign(__assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMonGV ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
+                    return slots.map(function (sl, si) { return (React.createElement("tr", { key: ey + "-" + em + "-" + d + sl, "data-day": ey + "-" + em + "-" + d, style: __assign(__assign(__assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMonGV ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: C0, background: isVac && isVac(ey, em, d) ? "var(--vac-bg)" : "var(--td-fix)" }), rowSpan: slots.length },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
@@ -868,15 +868,69 @@ function GridV(_a) {
                 }))))));
 }
 /* ════ SITE VIEW (CHL/CHB) ════ */
+/* v9.87 : LE CADRE DE DÉFILEMENT DES TABLEAUX, écrit 10 fois dans 7 composants.
+   Défaut corrigé au passage : DEUX défilements imbriqués — celui de la page et celui de
+   ce cadre. Les en-têtes (initiales, salles, dates) étaient figés par rapport au CADRE ;
+   or, en faisant défiler le tableau d'abord, la page se mettait ensuite à monter en
+   emportant le cadre, en-têtes compris. D'où des en-têtes qui s'échappaient — et
+   invisibles sur un écran où le bandeau du haut est plus grand, les 110px n'étant qu'une
+   estimation. Correction : le cadre ne défile plus verticalement (rendu à la page) et ses
+   en-têtes se figent par rapport à L'ÉCRAN, sous la barre de navigation. Les bandeaux et
+   les filtres remontent donc toujours, mais les en-têtes ne peuvent plus partir. */
+/* v9.87.3 : le seul réglage qui restait à ajuster. Le cadre était trop haut de quelques
+   dizaines de pixels : arrivé en bas de page, son sommet passait DERRIÈRE la barre de
+   navigation, emportant la ligne des initiales avec lui. En le raccourcissant, son sommet
+   se pose juste en dessous et les en-têtes restent lisibles jusqu'à la dernière ligne.
+   Valeur unique et facile à retoucher : c'est tout l'intérêt du composant partagé. */
+/* v9.98 : mémoire de défilement. Deux comportements, selon sa demande :
+   — les onglets qui affichent les JOURS partagent une même date : si on regarde le
+     12 août dans Planning, on arrive au 12 août dans CHL, CHB, PT Cardio, PT Angio et
+     Attachés. C'est la date qui suit, pas une position en pixels — les lignes n'ont pas
+     la même hauteur d'un onglet à l'autre ;
+   — les autres onglets retrouvent simplement l'endroit où ils étaient.
+   Rien ne survit au rechargement : on revient alors au jour courant, ce qui convient. */
+var SCROLL_MEM = { jour: null, pos: {} };
 function TableScroll(_a) {
-    var children = _a.children, style = _a.style, _b = _a.mh, mh = _b === void 0 ? 150 : _b;
+    var children = _a.children, style = _a.style, _b = _a.mh, mh = _b === void 0 ? 150 : _b, _c = _a.jours, jours = _c === void 0 ? false : _c, _d = _a.memId, memId = _d === void 0 ? null : _d;
+    var ref = React.useRef(null);
+    React.useLayoutEffect(function () {
+        var el = ref.current;
+        if (!el)
+            return;
+        if (jours && SCROLL_MEM.jour) {
+            var t = el.querySelector('[data-day="' + SCROLL_MEM.jour + '"]');
+            if (t) {
+                el.scrollTop = Math.max(0, t.offsetTop - el.offsetTop);
+                return;
+            }
+        }
+        if (!jours && memId && SCROLL_MEM.pos[memId])
+            el.scrollTop = SCROLL_MEM.pos[memId];
+    }, [jours, memId]);
+    var onScroll = function () {
+        var el = ref.current;
+        if (!el)
+            return;
+        if (jours) {
+            var rows = el.querySelectorAll("[data-day]");
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].offsetTop - el.offsetTop >= el.scrollTop - 2) {
+                    SCROLL_MEM.jour = rows[i].getAttribute("data-day");
+                    break;
+                }
+            }
+            return;
+        }
+        if (memId)
+            SCROLL_MEM.pos[memId] = el.scrollTop;
+    };
     /* v9.87.2 : RETOUR au comportement d'avant la v9.87, à sa demande.
        Mes deux tentatives ont empiré les choses : la première laissait les en-têtes partir,
        la seconde a créé DEUX barres de défilement à droite dans un ordre inversé, réduisant
        la zone visible. Le cadre retrouve donc exactement ses réglages d'origine.
        Le composant unique est conservé : il n'y a plus qu'un seul endroit à modifier si on
        reprend ce sujet, au lieu des dix cadres identiques d'avant. */
-    return (React.createElement("div", { style: __assign({ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - " + mh + "px)", borderRadius: 8, border: "1px solid var(--border)" }, (style || {})) }, children));
+    return (React.createElement("div", { ref: ref, onScroll: onScroll, style: __assign({ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - " + mh + "px)", borderRadius: 8, border: "1px solid var(--border)" }, (style || {})) }, children));
 }
 function SiteView(_a) {
     var _b = _a.printWk, printWk = _b === void 0 ? null : _b, _c = _a.onPrint, onPrint = _c === void 0 ? null : _c, site = _a.site, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, actes = _a.actes, medecins = _a.medecins, getEntries = _a.getEntries, salleOcc = _a.salleOcc, allDays = _a.allDays, isEdit = _a.isEdit, onPickSite = _a.onPickSite, _d = _a.notes, notes = _d === void 0 ? {} : _d, _e = _a.salleReg, salleReg = _e === void 0 ? [] : _e, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, _f = _a.colOrder, colOrder = _f === void 0 ? null : _f, _g = _a.onOrder, onOrder = _g === void 0 ? null : _g;
@@ -1007,7 +1061,7 @@ function SiteView(_a) {
             React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))));
     return (React.createElement("div", null,
         hdr,
-        React.createElement(TableScroll, null,
+        React.createElement(TableScroll, { jours: true },
             React.createElement("table", { style: { borderCollapse: "collapse" } },
                 React.createElement("thead", null,
                     React.createElement("tr", null,
@@ -1020,7 +1074,7 @@ function SiteView(_a) {
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
                     var dSV = dow(wY, wM, d), weSV = isWE(wY, wM, d), isMonSV = dSV === 1 && !weSV;
                     if (weSV)
-                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
+                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", "data-day": wY + "-" + wM + "-" + d, style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
                             React.createElement("td", { colSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, background: "var(--bg-we)" }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: "#92400e", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     d,
@@ -1028,7 +1082,7 @@ function SiteView(_a) {
                                     " ",
                                     JOURSC[dSV])),
                             allSalles.map(function (s) { return React.createElement("td", { key: s, style: __assign(__assign({}, S.td), S.tdWE) }); })));
-                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonSV && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
+                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, "data-day": wY + "-" + wM + "-" + d, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonSV && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: 42 }), rowSpan: 2 },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
@@ -1230,7 +1284,7 @@ function ActTabView(_a) {
         ideExtra);
     return (React.createElement("div", null,
         hdr,
-        React.createElement(TableScroll, null,
+        React.createElement(TableScroll, { jours: true },
             React.createElement("table", { style: { borderCollapse: "collapse" } },
                 React.createElement("thead", null,
                     React.createElement("tr", null,
@@ -1243,7 +1297,7 @@ function ActTabView(_a) {
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
                     var dAT = dow(wY, wM, d), weAT = isWE(wY, wM, d), isMonAT = dAT === 1 && !weAT;
                     if (weAT)
-                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
+                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", "data-day": wY + "-" + wM + "-" + d, style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
                             React.createElement("td", { colSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, background: "var(--bg-we)" }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: "#92400e", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     d,
@@ -1251,7 +1305,7 @@ function ActTabView(_a) {
                                     " ",
                                     JOURSC[dAT])),
                             rows.map(function (r) { return React.createElement("td", { key: r.label, style: __assign(__assign({}, S.td), S.tdWE) }); })));
-                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonAT && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
+                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, "data-day": wY + "-" + wM + "-" + d, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonAT && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: 42 }), rowSpan: 2 },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
@@ -1657,7 +1711,7 @@ function GardeView(_a) {
                 gMed.nom))) : null));
     }
     var wdays = printWk ? gvEffDays.filter(function (o) { return inPrintRange(printWk, o.y, o.m, o.d); }) : gvEffDays; // keep full objects
-    var viewV = (React.createElement(TableScroll, null,
+    var viewV = (React.createElement(TableScroll, { memId: "gardes" },
         React.createElement("table", { key: showFull ? "gvfull" : "gvpart", style: { borderCollapse: "collapse", tableLayout: "fixed" } },
             React.createElement("thead", null,
                 React.createElement("tr", null,
@@ -2027,7 +2081,7 @@ function BipTab(_a) {
             React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A"))));
     return (React.createElement("div", null,
         hdr,
-        React.createElement(TableScroll, null,
+        React.createElement(TableScroll, { memId: "bip" },
             React.createElement("table", { style: { borderCollapse: "collapse" } },
                 React.createElement("thead", null,
                     React.createElement("tr", null,
@@ -2041,14 +2095,14 @@ function BipTab(_a) {
                     var isT = d === today.getDate() && wM === today.getMonth() && wY === today.getFullYear();
                     var dBip = dow(wY, wM, d), weBip = isWE(wY, wM, d), isMonBip = dBip === 1 && !weBip;
                     if (weBip)
-                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
+                        return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + "we", "data-day": wY + "-" + wM + "-" + d, style: { background: "var(--bg-we)", borderBottom: "1px solid var(--border)", height: 28 } },
                             React.createElement("td", { colSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, background: "var(--bg-we)" }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: "#92400e", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     d,
                                     " ",
                                     JOURSC[dBip])),
                             React.createElement("td", { style: __assign(__assign({}, S.td), S.tdWE) })));
-                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonBip && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
+                    return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: wY + "-" + wM + "-" + d + sl, "data-day": wY + "-" + wM + "-" + d, style: __assign(__assign({ borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (isT ? { background: "var(--bg-td)" } : {})), (isMonBip && si === 0 ? { borderTop: "3px solid var(--border)" } : {})) },
                         si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, verticalAlign: "middle", minWidth: 42 }), rowSpan: 2 },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
@@ -2178,7 +2232,7 @@ function PTOccRooms(_a) {
 function PlanTypeGrid(_a) {
     var medecins = _a.medecins, actes = _a.actes, planningType = _a.planningType, setPlanningType = _a.setPlanningType, isEdit = _a.isEdit, acteById = _a.acteById, setMData = _a.setMData, setModal = _a.setModal;
     var jours = ["", "Lun", "Mar", "Mer", "Jeu", "Ven"];
-    return (React.createElement(TableScroll, { mh: 150 },
+    return (React.createElement(TableScroll, { memId: "type", mh: 150 },
         React.createElement("table", { style: { borderCollapse: "collapse" } },
             React.createElement("thead", null,
                 React.createElement("tr", null,
@@ -3973,7 +4027,7 @@ function StatsTab(_a) {
                 return React.createElement("button", { key: m.id, onClick: function () { return setMedFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "4px 10px", borderRadius: 20, border: "1px solid " + (on ? m.color : "var(--border)"), cursor: "pointer", fontSize: 11, fontWeight: 700,
                         background: on ? m.color : "var(--bg2)", color: on ? "#111" : "var(--txt2)" } }, m.init);
             })),
-        React.createElement(TableScroll, { mh: 190 },
+        React.createElement(TableScroll, { memId: "stats", mh: 190 },
             React.createElement("table", { style: { borderCollapse: "collapse", fontSize: 11 } },
                 React.createElement("thead", null,
                     React.createElement("tr", null,
@@ -4006,7 +4060,7 @@ function StatsTab(_a) {
                 }))))));
 }
 /* ════ AIDE (V9) — composant partagé jsx/html, React.createElement pur ════ */
-const HE=React.createElement;
+var HE = React.createElement;
 /* Reproductions visuelles des éléments de l'interface */
 function HBtn(p){
   const st={green:{border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"},
@@ -4588,6 +4642,18 @@ function CardioPlanning() {
     }, []);
     var _e = useState(null), editMedId = _e[0], setEditMedId = _e[1]; // medecin logged in with personal PIN
     var _f = useState("planning"), tab = _f[0], setTab = _f[1];
+    var pageMem = useRef({});
+    var goTab = useCallback(function (next) {
+        setTab(function (cur) {
+            if (cur === next)
+                return cur;
+            if (cur === "partage")
+                pageMem.current.partage = window.scrollY || 0;
+            var y = (next === "partage") ? (pageMem.current.partage || 0) : 0;
+            setTimeout(function () { return window.scrollTo(0, y); }, 0);
+            return next;
+        });
+    }, []);
     var _g = useState(function () { return ({ year: new Date().getFullYear(), month: new Date().getMonth() }); }), ym = _g[0], setYM = _g[1];
     var year = ym.year, month = ym.month;
     var setYear = function (y) { return setYM(function (p) { return (__assign(__assign({}, p), { year: typeof y === "function" ? y(p.year) : y })); }); };
@@ -7131,7 +7197,7 @@ function CardioPlanning() {
                 var v = _a[0], l = _a[1];
                 return (React.createElement("button", { key: v, draggable: true, onDragStart: function () { return setDragTab(v); }, onDragOver: function (e) { e.preventDefault(); }, onDrop: function (e) { e.preventDefault(); if (dragTab && dragTab !== v) {
                         setTabOrder(function (p) { var a = __spreadArray([], p, true), fi = a.indexOf(dragTab), ti = a.indexOf(v); a.splice(fi, 1); a.splice(ti, 0, dragTab); return a; });
-                    } setDragTab(null); }, onClick: function () { return setTab(v); }, style: __assign(__assign(__assign({}, S.nb), (tab === v ? S.nba : {})), { cursor: "grab", userSelect: "none" }) }, l));
+                    } setDragTab(null); }, onClick: function () { return goTab(v); }, style: __assign(__assign(__assign({}, S.nb), (tab === v ? S.nba : {})), { cursor: "grab", userSelect: "none" }) }, l));
             })),
             Object.keys(archPlan).length > 0 && (function () {
                 var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
@@ -7542,7 +7608,7 @@ function CardioPlanning() {
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } },
                             React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 2, border: "2px solid #7c3aed", marginRight: 4, verticalAlign: "middle" } }),
                             "exception jour \u00B7 p\u00E9riode affich\u00E9e")),
-                    React.createElement(TableScroll, null,
+                    React.createElement(TableScroll, { memId: "astreinte" },
                         React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
                             React.createElement("thead", null,
                                 React.createElement("tr", null,
