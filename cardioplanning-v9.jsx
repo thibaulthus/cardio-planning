@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v9.92 — 07/08/2026";
+const APP_VERSION="v9.93 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2604,7 +2604,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
    (matin → après-midi), le cas courant restant « deux dates et je valide ».
    Un week-end n'ayant qu'une case JOUR, les demi-journées y sont ignorées : c'est déjà
    le comportement de toutes les fonctions appelées ici. */
-function PeriodModal({medecins,initMedId,initDate,year,month,onPose,onRetraitAbs,onEffacer,onClose}){
+function PeriodModal({medecins,initMedId,initDate,year,month,allowActs=true,onPose,onRetraitAbs,onEffacer,onClose}){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const [action,setAction]=useState("poser");        // poser | retirer
   const [cible,setCible]=useState("abs");            // abs | activites   (si retirer)
@@ -2701,7 +2701,8 @@ function PeriodModal({medecins,initMedId,initDate,year,month,onPose,onRetraitAbs
         <div style={{fontSize:9.5,fontWeight:800,color:"#b45309",textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Retirer quoi ?</div>
         <div style={{display:"flex",gap:5}}>
           <button style={segBtn(cible==="abs",true)} onClick={()=>setCible("abs")}>Absence / FMC</button>
-          <button style={segBtn(cible==="activites",true)} onClick={()=>setCible("activites")}>Les activités</button>
+          {/* v9.93 : le rôle administratif ne retire pas d'activités — même périmètre qu'avant */}
+          {allowActs&&<button style={segBtn(cible==="activites",true)} onClick={()=>setCible("activites")}>Les activités</button>}
         </div>
       </div>}
 
@@ -7551,7 +7552,7 @@ header::-webkit-scrollbar { display: none; }
             {canEditThisMed&&(
               <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
                 {/* v9.92 : un seul bouton remplace « Pose et retrait Abs », « Effacer activités » et « Effacer mois » */}
-                {isEdit&&canEditThisMed&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_perMode:true});setModal("periode");}}>📅 Modifier sur une période…</button>}
+                {canEditThisMed&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_perMode:true});setModal("periode");}}>📅 Modifier sur une période…</button>}
                 {isEdit&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setModal(null);openPtModal(medId);}}>▶ PT {med&&med.init}</button>}
                 {canEditThisMed&&!isAdminEdit&&med&&(med.tourMed||med.garde)&&<button style={{...S.qBtn,borderColor:"#7c3aed",background:"#f3e8ff",color:"#6d28d9"}}
                   onClick={()=>{setModal("prefs");}}>
@@ -7767,7 +7768,7 @@ header::-webkit-scrollbar { display: none; }
           medecins={medecins}
           initMedId={mData.medId}
           initDate={`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`}
-          year={year} month={month}
+          year={year} month={month} allowActs={!isAdminEdit}
           onPose={p=>{applyAbsence(perSlots(p));setModal(null);}}
           onRetraitAbs={p=>{removeAbsence(perSlots(p));setModal(null);}}
           onEffacer={p=>{clearPeriodActs(perSlots(p));setModal(null);}}

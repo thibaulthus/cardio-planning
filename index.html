@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v9.92 — 07/08/2026";
+var APP_VERSION = "v9.93 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2684,19 +2684,19 @@ function EditPTModal(_a) {
 }
 /* ════ ABS MODAL ════ */
 function PeriodModal(_a) {
-    var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
+    var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, _b = _a.allowActs, allowActs = _b === void 0 ? true : _b, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
     var fmt = function (d) { return "".concat(d.getFullYear(), "-").concat(String(d.getMonth() + 1).padStart(2, "0"), "-").concat(String(d.getDate()).padStart(2, "0")); };
-    var _b = useState("poser"), action = _b[0], setAction = _b[1]; // poser | retirer
-    var _c = useState("abs"), cible = _c[0], setCible = _c[1]; // abs | activites   (si retirer)
-    var _d = useState("ABSENCE"), absType = _d[0], setAbsType = _d[1]; // ABSENCE | FORMATION
-    var _e = useState(initMedId || null), medId = _e[0], setMedId = _e[1];
-    var _f = useState(initDate || ""), df = _f[0], setDf = _f[1];
-    var _g = useState(initDate || ""), dt = _g[0], setDt = _g[1];
-    var _h = useState("M"), slDeb = _h[0], setSlDeb = _h[1];
-    var _j = useState("AM"), slFin = _j[0], setSlFin = _j[1];
-    var _k = useState(false), moisEntier = _k[0], setMoisEntier = _k[1];
-    var _l = useState(true), keepAbs = _l[0], setKeepAbs = _l[1];
-    var _m = useState(null), confirm = _m[0], setConfirm = _m[1];
+    var _c = useState("poser"), action = _c[0], setAction = _c[1]; // poser | retirer
+    var _d = useState("abs"), cible = _d[0], setCible = _d[1]; // abs | activites   (si retirer)
+    var _e = useState("ABSENCE"), absType = _e[0], setAbsType = _e[1]; // ABSENCE | FORMATION
+    var _f = useState(initMedId || null), medId = _f[0], setMedId = _f[1];
+    var _g = useState(initDate || ""), df = _g[0], setDf = _g[1];
+    var _h = useState(initDate || ""), dt = _h[0], setDt = _h[1];
+    var _j = useState("M"), slDeb = _j[0], setSlDeb = _j[1];
+    var _k = useState("AM"), slFin = _k[0], setSlFin = _k[1];
+    var _l = useState(false), moisEntier = _l[0], setMoisEntier = _l[1];
+    var _m = useState(true), keepAbs = _m[0], setKeepAbs = _m[1];
+    var _o = useState(null), confirm = _o[0], setConfirm = _o[1];
     var med = medecins.find(function (m) { return m.id === medId; });
     var moisDeb = fmt(new Date(year, month, 1)), moisFin = fmt(new Date(year, month + 1, 0));
     var rDf = moisEntier ? moisDeb : df, rDt = moisEntier ? moisFin : dt;
@@ -2786,7 +2786,7 @@ function PeriodModal(_a) {
             React.createElement("div", { style: { fontSize: 9.5, fontWeight: 800, color: "#b45309", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 } }, "Retirer quoi ?"),
             React.createElement("div", { style: { display: "flex", gap: 5 } },
                 React.createElement("button", { style: segBtn(cible === "abs", true), onClick: function () { return setCible("abs"); } }, "Absence / FMC"),
-                React.createElement("button", { style: segBtn(cible === "activites", true), onClick: function () { return setCible("activites"); } }, "Les activit\u00E9s"))),
+                allowActs && React.createElement("button", { style: segBtn(cible === "activites", true), onClick: function () { return setCible("activites"); } }, "Les activit\u00E9s"))),
         !moisEntier ? React.createElement(React.Fragment, null,
             React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "D\u00E9but"),
             React.createElement("input", { type: "date", value: df, onChange: function (e) { setDf(e.target.value); if (!dt || e.target.value > dt)
@@ -8449,7 +8449,7 @@ function CardioPlanning() {
                     React.createElement("span", null, "\u26A0\uFE0F"),
                     React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } }, "Ce m\u00E9decin a d\u00E9j\u00E0 une activit\u00E9 sur ce cr\u00E9neau."))),
                 canEditThisMed && (React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } },
-                    isEdit && canEditThisMed && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _perMode: true }); setModal("periode"); } }, "\uD83D\uDCC5 Modifier sur une p\u00E9riode\u2026"),
+                    canEditThisMed && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _perMode: true }); setModal("periode"); } }, "\uD83D\uDCC5 Modifier sur une p\u00E9riode\u2026"),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setModal(null); openPtModal(medId); } },
                         "\u25B6 PT ",
                         med && med.init),
@@ -8661,7 +8661,7 @@ function CardioPlanning() {
                     setModal(null);
                 }, onClose: function () { return setModal(null); } })),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
-            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
+            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, allowActs: !isAdminEdit, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "colOrder" && colModal && React.createElement("div", { style: S.ov, onClick: function () { setModal(null); setColModal(null); } },
