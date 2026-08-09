@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.4 — 07/08/2026";
+const APP_VERSION="v10.5 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5462,13 +5462,18 @@ function CardioPlanning(){
   const acteById=useCallback(id=>actes.find(a=>a.id===id),[actes]);
   const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"))&&!netOff; // hors ligne : lecture seule
   // ─── Undo/Redo history (edit mode) ───
-  const histRef=useRef({stack:[],idx:-1,restoring:false});
+  const histRef=useRef({stack:[],idx:-1,restoring:0});
   const [histVer,setHistVer]=useState(0);
   const histSnapshot=()=>({plan,tourMed,astreinte,notes,planningType});
   useEffect(()=>{
     if(isFirstLoad.current)return;
     const h=histRef.current;
-    if(h.restoring){h.restoring=false;return;}
+    /* v10.5 : une annulation change CINQ états d'un coup (plan, tour, astreinte, notes,
+       planning type). L'ancien drapeau était consommé par le premier signal reçu ; les
+       quatre suivants étaient donc enregistrés comme de NOUVELLES actions, ce qui effaçait
+       aussitôt la branche de rétablissement — d'où le bouton « avant » qui s'allumait puis
+       se grisait. On compte désormais les cinq signaux avant de rendre la main. */
+    if(h.restoring>0){h.restoring--;return;}
     // Truncate redo branch, push snapshot
     h.stack=h.stack.slice(0,h.idx+1);
     h.stack.push(JSON.stringify(histSnapshot()));
@@ -5476,27 +5481,48 @@ function CardioPlanning(){
     h.idx=h.stack.length-1;
     setHistVer(v=>v+1);
   },[plan,tourMed,astreinte,notes,planningType]);
+  /* compte les cases du planning qui vont réellement changer — sert au garde-fou */
+  const histDiff=(snap)=>{
+    try{
+      const s=JSON.parse(snap);const av=s.plan||{};let n=0;
+      const cles={};Object.keys(av).forEach(k=>cles[k]=1);Object.keys(plan).forEach(k=>cles[k]=1);
+      Object.keys(cles).forEach(k=>{
+        const A=av[k]||{},B=plan[k]||{};const ids={};
+        Object.keys(A).forEach(x=>ids[x]=1);Object.keys(B).forEach(x=>ids[x]=1);
+        Object.keys(ids).forEach(x=>{if(cellKey(A[x])!==cellKey(B[x]))n++;});
+      });
+      return n;
+    }catch(e){return 0;}
+  };
   const applySnapshot=(snap)=>{
     const s=JSON.parse(snap);
-    histRef.current.restoring=true;
+    histRef.current.restoring=5;   // les 5 états restaurés ci-dessous
     setPlan(s.plan);setTourMed(s.tourMed);setAstreinte(s.astreinte);
     setNotes(s.notes);setPlanningType(s.planningType);
   };
   const canUndo=histRef.current.idx>0;
   const canRedo=histRef.current.idx<histRef.current.stack.length-1;
+  const HIST_SEUIL=5;   /* au-delà, on demande confirmation : une action de masse ne se défait pas par mégarde */
   const doUndo=()=>{
     const h=histRef.current;
     if(h.idx<=0)return;
-    h.idx--;
-    applySnapshot(h.stack[h.idx]);
-    setHistVer(v=>v+1);
+    const n=histDiff(h.stack[h.idx-1]);
+    if(n>HIST_SEUIL){setHistConf({sens:"undo",n});return;}
+    h.idx--;applySnapshot(h.stack[h.idx]);setHistVer(v=>v+1);
+  };
+  const [histConf,setHistConf]=useState(null);
+  const histGo=()=>{
+    const h=histRef.current;
+    if(histConf&&histConf.sens==="undo"){if(h.idx>0){h.idx--;applySnapshot(h.stack[h.idx]);setHistVer(v=>v+1);}}
+    else{if(h.idx<h.stack.length-1){h.idx++;applySnapshot(h.stack[h.idx]);setHistVer(v=>v+1);}}
+    setHistConf(null);
   };
   const doRedo=()=>{
     const h=histRef.current;
     if(h.idx>=h.stack.length-1)return;
-    h.idx++;
-    applySnapshot(h.stack[h.idx]);
-    setHistVer(v=>v+1);
+    const n=histDiff(h.stack[h.idx+1]);
+    if(n>HIST_SEUIL){setHistConf({sens:"redo",n});return;}
+    h.idx++;applySnapshot(h.stack[h.idx]);setHistVer(v=>v+1);
   };
   /* ── v9.11 : niveaux de droits (basic | inter | editeur) portés par la fiche médecin ── */
   const medLvl=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic"):null;
@@ -8062,6 +8088,22 @@ header::-webkit-scrollbar { display: none; }
         />
       </Ov>}
 
+      {histConf&&<Ov onClose={()=>setHistConf(null)}>
+        <div style={{minWidth:300,maxWidth:380}}>
+          <div style={S.mHd}><div style={{...S.mTit2,color:"#b45309"}}>⚠ {histConf.sens==="undo"?"Annuler l'action précédente":"Rétablir l'action"}</div></div>
+          <div style={{fontSize:12.5,lineHeight:1.6}}>
+            Cette action modifie <b>{histConf.n} cases</b> du planning.<br/>
+            {histConf.sens==="undo"
+              ? "Elles reviendront à leur état précédent."
+              : "Elles reprendront l'état d'après l'action."}
+          </div>
+          <div style={{fontSize:11,color:"var(--txt2)",marginTop:8}}>Vous pourrez faire le geste inverse juste après.</div>
+          <div style={{display:"flex",gap:6,marginTop:13}}>
+            <button style={{...S.icnBtn,flex:1}} onClick={()=>setHistConf(null)}>Annuler</button>
+            <button style={{...S.btnP,flex:1,background:"#b45309"}} onClick={histGo}>{histConf.sens==="undo"?"Revenir en arrière":"Rétablir"}</button>
+          </div>
+        </div>
+      </Ov>}
       {modal==="restaure"&&mData&&<Ov onClose={()=>setModal(null)}>
         <RestoreModal med={medecins.find(m=>m.id===mData.medId)} backups={backupList}
           y={mData.y} m={mData.m} d={mData.d}
