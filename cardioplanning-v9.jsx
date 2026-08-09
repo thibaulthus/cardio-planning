@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.12 — 07/08/2026";
+const APP_VERSION="v10.13 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -6075,7 +6075,7 @@ function CardioPlanning(){
       for(let d=1;d<=dIM(cy,cm);d++){
         const t=new Date(cy,cm,d).getTime();
         if(t<fromT||t>toT)continue;
-        (isWE(cy,cm,d)?["JOUR"]:sp(cy,cm,d).concat(["JOUR"])).forEach(sl=>{
+        (isWE(cy,cm,d)?["JOUR"]:sp(cy,cm,d).concat(["JOUR"])).concat(keepGardes?[]:["N"]).forEach(sl=>{
           const c=(plan[sk(cy,cm,d,sl)]||{})[medId];
           cellEs(c).forEach(e=>{if(e&&e.acteId&&KEEP.indexOf(e.acteId)<0){n++;par[e.acteId]=(par[e.acteId]||0)+1;}});
         });
@@ -6139,6 +6139,28 @@ function CardioPlanning(){
     }catch(e){console.log("diff:",e);return null;}
   },[plan,acteById]);
 
+  /* v10.13 : retire les semaines de tour d'un médecin sur une période. */
+  const removeTourPeriod=useCallback((medId,dateFrom,dateTo)=>{
+    const [fy,fm,fd]=parseDate(dateFrom);
+    const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
+    setTourMed(tm=>{
+      const next={...tm};let n=0;
+      Object.keys(next).forEach(wk=>{
+        const p=wk.split("-").map(Number);
+        const t=new Date(p[0],p[1],p[2]).getTime();
+        if(isNaN(t))return;
+        const fin=t+6*86400000;
+        if(fin<fromT||t>toT)return;
+        const w={...(next[wk]||{})};
+        ["HC","USIC"].forEach(r=>{
+          if((w[r]||[]).includes(medId)){w[r]=(w[r]||[]).filter(x=>x!==medId);n++;}
+        });
+        next[wk]=w;
+      });
+      return n?next:tm;
+    });
+  },[]);
+
   const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,keepGardes=true,slotsParJour=null})=>{
     /* v10.10 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
        repos partent TOUJOURS ensemble — jamais l'un sans l'autre, sinon on laisserait
@@ -6153,7 +6175,11 @@ function CardioPlanning(){
         for(let d=1;d<=dIM(cy,cm);d++){
           const t=new Date(cy,cm,d).getTime();
           if(t<fromT||t>toT)continue;
-          const sls=isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):["M","AM"]).concat(["JOUR"]);
+          /* v10.13 : la GARDE est enregistrée dans le créneau « N », qui n'était jamais
+             parcouru — d'où le repos retiré mais la garde conservée. On l'ajoute quand on
+             ne conserve pas les gardes. Le TOUR, lui, ne vit pas dans le planning mais
+             dans une liste de semaines ; il est traité séparément par l'appelant. */
+          const sls=(isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):["M","AM"]).concat(["JOUR"])).concat(keepGardes?[]:["N"]);
           sls.forEach(sl=>{
             const k=sk(cy,cm,d,sl);
             if(!next[k]||!next[k][medId])return;
@@ -6943,7 +6969,10 @@ header::-webkit-scrollbar { display: none; }
                       }}
                       style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,
                         border:"1px solid "+(on?"#7c3aed":hasAbs?"#fca5a5":"var(--border)"),
-                        background:on?"#f5f3ff":hasAbs?"#fff8f8":"var(--bg2)",
+                        /* v10.13 : ces deux fonds clairs étaient figés — illisibles en mode
+                           sombre, où le texte reste clair. On teinte la couleur du thème,
+                           comme le fait déjà la modale des gardes. */
+                        background:on?"rgba(124,58,237,.16)":hasAbs?"rgba(239,68,68,.10)":"var(--bg2)",
                         cursor:(!isWeek&&absent)?"not-allowed":"pointer"}}>
                       <div style={{width:28,height:28,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
                       <div style={{flex:1}}>
@@ -7993,7 +8022,12 @@ header::-webkit-scrollbar { display: none; }
           year={year} month={month} mois={ptPeriodMonths} finPer={(()=>{const p=perStart(year,month);const e=perEnd(p.sy,p.sm);return `${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,"0")}-${String(e.getDate()).padStart(2,"0")}`;})()} allowActs={!isAdminEdit} compter={countPeriodActs}
           onPose={p=>{applyAbsence(perSlots(p));setModal(null);}}
           onRetraitAbs={p=>{removeAbsence(perSlots(p));setModal(null);}}
-          onEffacer={p=>{clearPeriodActs(perSlots(p));setModal(null);}}
+          onEffacer={p=>{
+            clearPeriodActs(perSlots(p));
+            /* v10.13 : le TOUR ne vit pas dans le planning mais dans une liste de semaines —
+               il fallait donc le retirer à part, sinon il restait en place. */
+            if(p.keepGardes===false)removeTourPeriod(p.medId,p.dateFrom,p.dateTo);
+            setModal(null);}}
           onClose={()=>setModal(null)}/>
       </Ov>}
       {modal==="absence"&&<Ov onClose={()=>setModal(null)}><AbsModal medecins={medecins}

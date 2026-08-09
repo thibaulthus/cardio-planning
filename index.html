@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.12 — 07/08/2026";
+var APP_VERSION = "v10.13 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -7079,7 +7079,7 @@ function CardioPlanning() {
                 var t = new Date(cy, cm, d).getTime();
                 if (t < fromT || t > toT)
                     return "continue";
-                (isWE(cy, cm, d) ? ["JOUR"] : sp(cy, cm, d).concat(["JOUR"])).forEach(function (sl) {
+                (isWE(cy, cm, d) ? ["JOUR"] : sp(cy, cm, d).concat(["JOUR"])).concat(keepGardes ? [] : ["N"]).forEach(function (sl) {
                     var c = (plan[sk(cy, cm, d, sl)] || {})[medId];
                     cellEs(c).forEach(function (e) { if (e && e.acteId && KEEP.indexOf(e.acteId) < 0) {
                         n++;
@@ -7163,6 +7163,32 @@ function CardioPlanning() {
             }
         });
     }); }, [plan, acteById]);
+    var removeTourPeriod = useCallback(function (medId, dateFrom, dateTo) {
+        var _a = parseDate(dateFrom), fy = _a[0], fm = _a[1], fd = _a[2];
+        var fromT = new Date(fy, fm, fd).getTime(), toT = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+        setTourMed(function (tm) {
+            var next = __assign({}, tm);
+            var n = 0;
+            Object.keys(next).forEach(function (wk) {
+                var p = wk.split("-").map(Number);
+                var t = new Date(p[0], p[1], p[2]).getTime();
+                if (isNaN(t))
+                    return;
+                var fin = t + 6 * 86400000;
+                if (fin < fromT || t > toT)
+                    return;
+                var w = __assign({}, (next[wk] || {}));
+                ["HC", "USIC"].forEach(function (r) {
+                    if ((w[r] || []).includes(medId)) {
+                        w[r] = (w[r] || []).filter(function (x) { return x !== medId; });
+                        n++;
+                    }
+                });
+                next[wk] = w;
+            });
+            return n ? next : tm;
+        });
+    }, []);
     var clearPeriodActs = useCallback(function (_a) {
         var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _b = _a.keepAbs, keepAbs = _b === void 0 ? true : _b, _c = _a.keepGardes, keepGardes = _c === void 0 ? true : _c, _d = _a.slotsParJour, slotsParJour = _d === void 0 ? null : _d;
         /* v10.10 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
@@ -7179,7 +7205,7 @@ function CardioPlanning() {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
-                    var sls = isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : ["M", "AM"]).concat(["JOUR"]);
+                    var sls = (isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : ["M", "AM"]).concat(["JOUR"])).concat(keepGardes ? [] : ["N"]);
                     sls.forEach(function (sl) {
                         var _a;
                         var k = sk(cy, cm, d, sl);
@@ -7954,7 +7980,7 @@ function CardioPlanning() {
                                     setAstPickModal(null);
                                 }, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8,
                                     border: "1px solid " + (on ? "#7c3aed" : hasAbs ? "#fca5a5" : "var(--border)"),
-                                    background: on ? "#f5f3ff" : hasAbs ? "#fff8f8" : "var(--bg2)",
+                                    background: on ? "rgba(124,58,237,.16)" : hasAbs ? "rgba(239,68,68,.10)" : "var(--bg2)",
                                     cursor: (!isWeek && absent) ? "not-allowed" : "pointer" } },
                                 React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, m.init),
                                 React.createElement("div", { style: { flex: 1 } },
@@ -9046,7 +9072,7 @@ function CardioPlanning() {
         modal === "restaure" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(RestoreModal, { med: medecins.find(function (m) { return m.id === mData.medId; }), backups: backupList, y: mData.y, m: mData.m, d: mData.d, onDiff: function (id, df, dt) { return diffMedPeriod(id, mData.medId, df, dt); }, onGo: function (id, df, dt) { restoreMedPeriod(id, mData.medId, df, dt); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
-            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, finPer: (function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm); return "".concat(e.getFullYear(), "-").concat(String(e.getMonth() + 1).padStart(2, "0"), "-").concat(String(e.getDate()).padStart(2, "0")); })(), allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); setModal(null); }, onClose: function () { return setModal(null); } })),
+            React.createElement(PeriodModal, { medecins: medecins, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, finPer: (function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm); return "".concat(e.getFullYear(), "-").concat(String(e.getMonth() + 1).padStart(2, "0"), "-").concat(String(e.getDate()).padStart(2, "0")); })(), allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) { clearPeriodActs(perSlots(p)); if (p.keepGardes === false) removeTourPeriod(p.medId, p.dateFrom, p.dateTo); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "absence" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(AbsModal, { medecins: medecins, initMedId: mData && mData._absMode ? mData.medId : null, initDate: mData && mData._absMode ? "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")) : null, onApply: function (p) { applyAbsence(p); setModal(null); }, onRemove: function (p) { removeAbsence(p); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "colOrder" && colModal && React.createElement("div", { style: S.ov, onClick: function () { setModal(null); setColModal(null); } },
