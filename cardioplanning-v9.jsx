@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.8 — 07/08/2026";
+const APP_VERSION="v10.9 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -1792,190 +1792,6 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
 
 
 /* ════ BIP TAB ════ */
-function BipTab({year,month,prevM,nextM,medecins,allDays,isEdit,actes,getEntries,salleOcc,addEntry,removeEntry,isMedAvailable,darkMode,setDarkMode,showFull,setShowFull}){
-  const bipActe=actes.find(a=>a.id==="BIP");
-  const bipSalles=(bipActe&&bipActe.salles)||["CHB-1","CHB-2","CHB-3"];
-  const wdays=allDays.map(d=>({y:year,m:month,d}));
-  // Filter medecins allowed for BIP
-  const bipMeds=bipActe&&(bipActe.medecinsAutorise&&bipActe.medecinsAutorise.length)
-    ? medecins.filter(m=>bipActe.medecinsAutorise.includes(m.init))
-    : medecins;
-
-  if(!bipActe)return <div style={{color:"var(--txt2)",padding:20}}>Activité BIP non configurée.</div>;
-
-  const today=new Date();
-
-  function getOccBip(d,sl){
-    const occ=[];
-    bipSalles.forEach(salle=>{
-      const o=salleOcc("BIP",year,month,d,sl);
-      (o[salle]||[]).forEach(med=>{
-        if(!occ.find(x=>x.med.id===med.id)) occ.push({med,acte:bipActe,salle});
-      });
-    });
-    return occ;
-  }
-
-  function renderBipCell(d,sl){
-    if(isWE(year,month,d)) return <td key={"bip-"+d+sl} style={{...S.td,...S.tdWE,padding:2}}/>;
-    const occ=getOccBip(d,sl);
-    return(
-      <td key={"bip-"+d+sl} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default"}}
-        onClick={isEdit?()=>openBipPicker({d,sl}):undefined}>
-        {occ.map(({med,salle},i)=>(
-          <div key={i} style={{display:"flex",alignItems:"center",gap:2,margin:"1px 0"}}>
-            <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
-            <span style={{fontSize:10,color:"#111",fontWeight:700}}>{salle}</span>
-          </div>
-        ))}
-        {occ.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
-      </td>
-    );
-  }
-
-  const [pickerData,setPickerData]=useState(null);
-  const [selMedId,setSelMedId]=useState(null);
-
-  function openBipPicker(data){ setPickerData(data); setSelMedId(null); }
-
-  const hdr=(
-    <div style={S.bar}>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <button onClick={prevM} style={S.arr}>‹</button>
-        <h2 style={S.mTit}><span style={{color:"#fb923c"}}>🔔 BIP</span> — {MOIS[month]} {year}</h2>
-        <button onClick={nextM} style={S.arr}>›</button>
-      </div>
-    </div>
-  );
-
-  return(
-    <div>
-      {hdr}
-      <TableScroll memId="bip">
-        <table style={{borderCollapse:"collapse"}}>
-          <thead>
-            <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:42}}>Jour</th>
-              <th style={{...S.thFix,position:"sticky",top:0,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
-              <th style={{...S.th,minWidth:120,position:"sticky",top:0,zIndex:20}}>
-                <div style={{fontWeight:800,fontSize:10,color:"#111",fontFamily:"'JetBrains Mono',monospace"}}>BIP CHB</div>
-                <div style={{fontSize:8,color:"var(--txt3)"}}>{bipSalles.join(", ")}</div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {wdays.map(({y:wY,m:wM,d})=>{
-              const isT=d===today.getDate()&&wM===today.getMonth()&&wY===today.getFullYear();
-              const dBip=dow(wY,wM,d), weBip=isWE(wY,wM,d), isMonBip=dBip===1&&!weBip;
-              if(weBip) return(
-                <tr key={wY+"-"+wM+"-"+d+"we"} data-day={wY+"-"+wM+"-"+d} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
-                  <td colSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:5,background:"var(--bg-we)"}}>
-                    <div style={{fontWeight:800,color:"#92400e",fontSize:11,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d} {JOURSC[dBip]}</div>
-                  </td>
-                  <td style={{...S.td,...S.tdWE}}/>
-                </tr>
-              );
-              return["M","AM"].map((sl,si)=>(
-                <tr key={wY+"-"+wM+"-"+d+sl} data-day={wY+"-"+wM+"-"+d} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",
-                  ...(isT?{background:"var(--bg-td)"}:{}),...(isMonBip&&si===0?{borderTop:"3px solid var(--border)"}:{})}}>
-                  {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:5,verticalAlign:"middle",minWidth:42}} rowSpan={2}>
-                    <div style={{fontWeight:800,color:isT?"var(--today-c)":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600,lineHeight:1}}>{MOIS[wM]}</div>}</div>
-                    <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dBip]}</div>
-                  </td>}
-                  <td style={{...S.tdFix,position:"sticky",left:42,zIndex:4,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--td-fix)",borderRight:"2px solid var(--border)",minWidth:24,padding:"2px"}}>{SLOTS[sl]}</td>
-                  {renderBipCell(d,sl)}
-                </tr>
-              ));
-            })}
-          </tbody>
-        </table>
-      </TableScroll>
-
-      {/* Picker modal */}
-      {pickerData&&isEdit&&(()=>{
-        const {d,sl}=pickerData;
-        const selMed=bipMeds.find(m=>m.id===selMedId);
-        const existing=getOccBip(d,sl);
-        return(
-          <Ov onClose={()=>setPickerData(null)}>
-            <div style={S.mHd}>
-              <div>
-                <div style={S.mTit2}>BIP — {JOURSC[dow(year,month,d)]} {d} {MOIS[month]}</div>
-                <div style={{color:"var(--txt2)",fontSize:12,marginTop:2}}>{SLOTL[sl]}</div>
-              </div>
-              <button onClick={()=>setPickerData(null)} style={S.xBtn}>×</button>
-            </div>
-            {existing.length>0&&(
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Assignés</div>
-                {existing.map(({med,salle})=>(
-                  <div key={med.id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"rgba(251,146,60,.15)",border:"1px solid #fb923c44",marginBottom:4}}>
-                    <div style={{width:28,height:28,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
-                    <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
-                    <span style={{color:"#fb923c",fontSize:10,fontFamily:"'JetBrains Mono',monospace",fontWeight:800}}>{salle}</span>
-                    <button onClick={()=>removeEntry(med.id,year,month,d,sl,"BIP")} style={{background:"none",border:"none",color:"#fb923c",cursor:"pointer",fontSize:13,lineHeight:1}}>×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {!selMedId&&(
-              <>
-                <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
-                <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:360,overflowY:"auto"}}>
-                  {bipMeds.map(m=>{
-                    const avail=isMedAvailable(m,year,month,d,sl);
-                    const already=existing.find(e=>e.med.id===m.id);
-                    return(
-                      <button key={m.id} disabled={avail==="blocked"||!!already}
-                        style={{display:"flex",alignItems:"center",gap:7,padding:"6px 9px",borderRadius:7,
-                          border:"1px solid var(--border)",cursor:avail!=="blocked"&&!already?"pointer":"default",
-                          background:avail==="warning"&&!already?"rgba(245,158,11,.15)":"var(--bg2)",opacity:avail==="blocked"||already?.35:1}}
-                        onClick={()=>{ if(avail==="blocked"||already)return; setSelMedId(m.id); }}>
-                        <div style={{width:26,height:26,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
-                        <div style={{textAlign:"left",flex:1}}>
-                          <div style={{fontSize:11,fontWeight:700,color:"var(--txt)"}}>{m.prenom} {m.nom}</div>
-                          <div style={{fontSize:9,color:already?"#fb923c":avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>
-                            {already?"Déjà assigné":avail==="blocked"?"Absent/repos":avail==="warning"?"⚠ Déjà occupé":"Disponible"}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-            {selMedId&&selMed&&(
-              <>
-                <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10,padding:"6px 9px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)"}}>
-                  <div style={{width:26,height:26,borderRadius:"50%",background:selMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{selMed.init}</div>
-                  <span style={{fontSize:12,fontWeight:700,color:"var(--txt)",flex:1}}>{selMed.prenom} {selMed.nom}</span>
-                  <button onClick={()=>setSelMedId(null)} style={{background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:13}}>←</button>
-                </div>
-                <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Salle</div>
-                {bipSalles.map(salle=>{
-                  const o=salleOcc("BIP",year,month,d,sl);
-                  const isFull=(o[salle]||[]).length>=1;
-                  return(
-                    <button key={salle} disabled={isFull}
-                      style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                        padding:"8px 11px",borderRadius:7,border:"1px solid var(--border)",marginBottom:5,
-                        cursor:isFull?"not-allowed":"pointer",background:isFull?"var(--bg)":"var(--bg2)",opacity:isFull?.5:1}}
-                      onClick={()=>{ if(isFull)return; addEntry(selMed.id,year,month,d,sl,{acteId:"BIP",salle}); setSelMedId(null); setPickerData(null); }}>
-                      <span style={{fontWeight:800,color:"#fb923c",fontFamily:"'JetBrains Mono',monospace"}}>{salle}</span>
-                      {isFull?<span style={{fontSize:10,color:"var(--txt3)"}}>Occupée</span>:<span style={{fontSize:10,color:"#fb923c"}}>Libre →</span>}
-                    </button>
-                  );
-                })}
-              </>
-            )}
-          </Ov>
-        );
-      })()}
-    </div>
-  );
-}
-
-
 function PTOccRooms({medecins,planningType,actes,acteById,salleReg,darkMode}){
   const jours=["","Lun","Mar","Mer","Jeu","Ven"];
   const reg=site=>(salleReg||[]).filter(x=>Array.isArray(x.s)?x.s.indexOf(site)>=0:x.s===site).map(x=>x.n);
@@ -5552,7 +5368,7 @@ function CardioPlanning(){
   /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
   const hideTabs=accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte"]
     :isMedEdit?["activites","equipe","partage"]
-    :accessMode==="view"?["tourmedical","bip","activites","equipe","reports","stats","partage"]:[];
+    :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
     .filter(([tid])=>hideTabs.indexOf(tid)<0);
@@ -6678,7 +6494,6 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="garde"&&<GardeView onRemoveGarde={removeGardeDay} printWk={printWk} onPrint={()=>setModal("print")} year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} getEntry={getEntry} allDays={allDays} isEdit={isEdit} applyGarde={applyGarde} isMedAvailable={isMedAvailable} plan={plan} setPlan={setPlan} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod} tourMed={tourMed} gardeAvoid={gardeAvoid} gardeWish={gardeWish} toast={toast}/>}
 
-      {tab==="bip"&&<BipTab year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} allDays={allDays} isEdit={isEdit} actes={actes} getEntries={getEntries} salleOcc={salleOcc} addEntry={addEntry} removeEntry={removeEntry} isMedAvailable={isMedAvailable} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull}/>}
 
       {tab==="plantype"&&(
         <div>
