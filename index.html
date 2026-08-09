@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.5 — 07/08/2026";
+var APP_VERSION = "v10.6 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -6157,9 +6157,15 @@ function CardioPlanning() {
     var _60 = useState(0), histVer = _60[0], setHistVer = _60[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
     useEffect(function () {
-        if (isFirstLoad.current)
-            return;
         var h = histRef.current;
+        /* v10.6 : pendant le chargement on ne remplit pas la pile, mais on RETIENT l'état
+           courant. Sans lui, la pile ne contenait après la première pose qu'un seul cran —
+           celui d'APRÈS — et le premier clic sur « retour » reculait vers ce même état :
+           rien ne bougeait à l'écran et il fallait cliquer deux fois. */
+        if (isFirstLoad.current) {
+            h.depart = JSON.stringify(histSnapshot());
+            return;
+        }
         /* v10.5 : une annulation change CINQ états d'un coup (plan, tour, astreinte, notes,
            planning type). L'ancien drapeau était consommé par le premier signal reçu ; les
            quatre suivants étaient donc enregistrés comme de NOUVELLES actions, ce qui effaçait
@@ -6168,6 +6174,10 @@ function CardioPlanning() {
         if (h.restoring > 0) {
             h.restoring--;
             return;
+        }
+        if (h.stack.length === 0 && h.depart) {
+            h.stack.push(h.depart);
+            h.idx = 0;
         }
         // Truncate redo branch, push snapshot
         h.stack = h.stack.slice(0, h.idx + 1);

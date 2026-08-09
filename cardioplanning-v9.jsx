@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.5 — 07/08/2026";
+const APP_VERSION="v10.6 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5466,14 +5466,19 @@ function CardioPlanning(){
   const [histVer,setHistVer]=useState(0);
   const histSnapshot=()=>({plan,tourMed,astreinte,notes,planningType});
   useEffect(()=>{
-    if(isFirstLoad.current)return;
     const h=histRef.current;
+    /* v10.6 : pendant le chargement on ne remplit pas la pile, mais on RETIENT l'état
+       courant. Sans lui, la pile ne contenait après la première pose qu'un seul cran —
+       celui d'APRÈS — et le premier clic sur « retour » reculait vers ce même état :
+       rien ne bougeait à l'écran et il fallait cliquer deux fois. */
+    if(isFirstLoad.current){h.depart=JSON.stringify(histSnapshot());return;}
     /* v10.5 : une annulation change CINQ états d'un coup (plan, tour, astreinte, notes,
        planning type). L'ancien drapeau était consommé par le premier signal reçu ; les
        quatre suivants étaient donc enregistrés comme de NOUVELLES actions, ce qui effaçait
        aussitôt la branche de rétablissement — d'où le bouton « avant » qui s'allumait puis
        se grisait. On compte désormais les cinq signaux avant de rendre la main. */
     if(h.restoring>0){h.restoring--;return;}
+    if(h.stack.length===0&&h.depart){h.stack.push(h.depart);h.idx=0;}
     // Truncate redo branch, push snapshot
     h.stack=h.stack.slice(0,h.idx+1);
     h.stack.push(JSON.stringify(histSnapshot()));
