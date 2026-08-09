@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v11.0 — 07/08/2026";
+const APP_VERSION="v10.12 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -523,6 +523,14 @@ function MedBtn({med,avail,onClick,extra}){
 }
 
 /* ════ GRID H ════ */
+/* v10.12 : ces deux variables servent à distinguer un APPUI LONG (téléphone) d'un clic.
+   Elles étaient utilisées sans avoir jamais été déclarées. Sur téléphone, `onTouchStart`
+   s'exécute en premier et les crée implicitement, donc tout fonctionnait ; sur ORDINATEUR
+   aucun événement tactile ne se produit, et `onClick` lisait une variable inexistante —
+   ce qui interrompait le clic (ReferenceError) sans rien afficher. D'où : téléphone
+   parfait, ordinateur muet, et clic droit intact puisqu'il ne les consulte pas. */
+let _gvLpF=false,_gvLpT=null;
+
 function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
   const today=new Date();
   const C0=42,C1=24,CG=44;
@@ -2612,7 +2620,15 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
   /* v9.94 : la confirmation annonce le nombre RÉEL d'activités qui vont disparaître.
      « tout le reste sur la période » ne permettait pas de juger : effacer 3 activités et
      en effacer 120 ne se décident pas de la même façon. */
-  const rEff=(confirm==="activites"&&compter)?compter({medId,dateFrom:rDf,dateTo:rDt,keepAbs,slotDebut:rDeb,slotFin:rFin}):{n:0,det:[]};
+  /* v10.11 : le décompte ne se faisait que pour « Les activités » — avec « Tout » il
+     restait à zéro alors que le retrait, lui, fonctionnait. On compte désormais aussi
+     pour « Tout », en lui passant les mêmes règles que celles qui seront appliquées. */
+  const rEff=(compter&&(confirm==="activites"||confirm==="tout"))
+    ? compter({medId,dateFrom:rDf,dateTo:rDt,
+        keepAbs:confirm==="tout"?false:keepAbs,
+        keepGardes:confirm==="tout"?(degre!=="absolu"):true,
+        slotDebut:rDeb,slotFin:rFin})
+    : {n:0,det:[]};
   const nEff=rEff.n;
   if(confirm) return(
     <div style={{minWidth:320,maxWidth:400}}>
@@ -2674,7 +2690,7 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
           <button style={segBtn(cible==="abs",true)} onClick={()=>setCible("abs")}>Absence / FMC</button>
           {/* v9.93 : le rôle administratif ne retire pas d'activités — même périmètre qu'avant */}
           {allowActs&&<button style={segBtn(cible==="activites",true)} onClick={()=>setCible("activites")}>Les activités</button>}
-          {/* v11.0 : « Tout » évite deux passages sur la même période pour vider une ligne */}
+          {/* v10.10 : « Tout » évite deux passages sur la même période pour vider une ligne */}
           {allowActs&&<button style={segBtn(cible==="tout",true)} onClick={()=>setCible("tout")}>Tout</button>}
         </div>
         {cible==="tout"&&<div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
@@ -6047,7 +6063,7 @@ function CardioPlanning(){
   /* v9.94 : compte, sans rien modifier, ce que l'effacement retirerait. Même parcours et
      mêmes règles que clearPeriodActs — une seule logique, deux usages. */
   const countPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,keepGardes=true,slotDebut="M",slotFin="AM"})=>{
-    /* v11.0 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
+    /* v10.10 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
        repos partent TOUJOURS ensemble — jamais l'un sans l'autre, sinon on laisserait
        quelqu'un de garde sans repos le lendemain, incohérence que l'application signale. */
     const KEEP=(keepGardes?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"]:[]).concat(keepAbs?["ABSENCE","FORM","FORMATION"]:[]);
@@ -6124,7 +6140,7 @@ function CardioPlanning(){
   },[plan,acteById]);
 
   const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,keepGardes=true,slotsParJour=null})=>{
-    /* v11.0 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
+    /* v10.10 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
        repos partent TOUJOURS ensemble — jamais l'un sans l'autre, sinon on laisserait
        quelqu'un de garde sans repos le lendemain, incohérence que l'application signale. */
     const KEEP=(keepGardes?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"]:[]).concat(keepAbs?["ABSENCE","FORM","FORMATION"]:[]);

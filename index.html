@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v11.0 — 07/08/2026";
+var APP_VERSION = "v10.12 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -658,6 +658,11 @@ function MedBtn(_a) {
         extra && extra));
 }
 /* ════ GRID H ════ */
+/* v10.12 : appui long (téléphone) contre clic (ordinateur). Ces deux variables étaient
+   utilisées sans jamais avoir été déclarées : sur téléphone onTouchStart les créait
+   implicitement, sur ordinateur onClick lisait une variable inexistante et le clic était
+   interrompu sans rien afficher. */
+var _gvLpF = false, _gvLpT = null;
 function GridV(_a) {
     var _b = _a.onRemoveGarde, onRemoveGarde = _b === void 0 ? null : _b, _c = _a.planIssues, planIssues = _c === void 0 ? {} : _c, allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _d = _a.notes, notes = _d === void 0 ? {} : _d, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _e = _a.showGarde, showGarde = _e === void 0 ? true : _e, _f = _a.gardeLocked, gardeLocked = _f === void 0 ? false : _f, _g = _a.onCellHistory, onCellHistory = _g === void 0 ? null : _g, getAstreinteForDay = _a.getAstreinteForDay, _h = _a.printWk, printWk = _h === void 0 ? null : _h;
     var today = new Date();
@@ -2790,7 +2795,15 @@ function PeriodModal(_a) {
     /* v9.94 : la confirmation annonce le nombre RÉEL d'activités qui vont disparaître.
        « tout le reste sur la période » ne permettait pas de juger : effacer 3 activités et
        en effacer 120 ne se décident pas de la même façon. */
-    var rEff = (confirm === "activites" && compter) ? compter({ medId: medId, dateFrom: rDf, dateTo: rDt, keepAbs: keepAbs, slotDebut: rDeb, slotFin: rFin }) : { n: 0, det: [] };
+    /* v10.11 : le décompte ne se faisait que pour « Les activités » — avec « Tout » il
+       restait à zéro alors que le retrait, lui, fonctionnait. On compte désormais aussi
+       pour « Tout », en lui passant les mêmes règles que celles qui seront appliquées. */
+    var rEff = (compter && (confirm === "activites" || confirm === "tout"))
+        ? compter({ medId: medId, dateFrom: rDf, dateTo: rDt,
+            keepAbs: confirm === "tout" ? false : keepAbs,
+            keepGardes: confirm === "tout" ? (degre !== "absolu") : true,
+            slotDebut: rDeb, slotFin: rFin })
+        : { n: 0, det: [] };
     var nEff = rEff.n;
     if (confirm)
         return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
@@ -7052,7 +7065,7 @@ function CardioPlanning() {
        entier n'est qu'une période comme une autre. */
     var countPeriodActs = useCallback(function (_a) {
         var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _b = _a.keepAbs, keepAbs = _b === void 0 ? true : _b, _c = _a.keepGardes, keepGardes = _c === void 0 ? true : _c, _d = _a.slotDebut, slotDebut = _d === void 0 ? "M" : _d, _e = _a.slotFin, slotFin = _e === void 0 ? "AM" : _e;
-        /* v11.0 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
+        /* v10.10 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
            repos partent TOUJOURS ensemble — jamais l'un sans l'autre, sinon on laisserait
            quelqu'un de garde sans repos le lendemain, incohérence que l'application signale. */
         var KEEP = (keepGardes ? ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"] : []).concat(keepAbs ? ["ABSENCE", "FORM", "FORMATION"] : []);
@@ -7152,7 +7165,7 @@ function CardioPlanning() {
     }); }, [plan, acteById]);
     var clearPeriodActs = useCallback(function (_a) {
         var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _b = _a.keepAbs, keepAbs = _b === void 0 ? true : _b, _c = _a.keepGardes, keepGardes = _c === void 0 ? true : _c, _d = _a.slotsParJour, slotsParJour = _d === void 0 ? null : _d;
-        /* v11.0 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
+        /* v10.10 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
            repos partent TOUJOURS ensemble — jamais l'un sans l'autre, sinon on laisserait
            quelqu'un de garde sans repos le lendemain, incohérence que l'application signale. */
         var KEEP = (keepGardes ? ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"] : []).concat(keepAbs ? ["ABSENCE", "FORM", "FORMATION"] : []);
