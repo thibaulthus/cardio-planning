@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.9 — 07/08/2026";
+const APP_VERSION="v11.0 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -2547,7 +2547,8 @@ function RestoreModal({med,backups,y,m,d,onDiff,onGo,onClose}){
 function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null,allowActs=true,compter,onPose,onRetraitAbs,onEffacer,onClose}){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const [action,setAction]=useState("poser");        // poser | retirer
-  const [cible,setCible]=useState("abs");            // abs | activites   (si retirer)
+  const [cible,setCible]=useState("abs");            // abs | activites | tout   (si retirer)
+  const [degre,setDegre]=useState("garde");          // garde = gardes/repos/tour conservés · absolu = tout part
   const [absType,setAbsType]=useState("ABSENCE");    // ABSENCE | FORMATION
   const [medId,setMedId]=useState(initMedId||null);
   const [df,setDf]=useState(initDate||"");
@@ -2583,7 +2584,9 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
 
   const libAction=action==="poser"
     ? (absType==="FORMATION"?"Poser une formation":"Poser une absence")
-    : (cible==="abs"?"Retirer les absences et FMC":"Effacer les activités");
+    : (cible==="abs"?"Retirer les absences et FMC"
+       :cible==="tout"?(degre==="absolu"?"Tout retirer, gardes et tour compris":"Tout retirer sauf gardes et tour")
+       :"Effacer les activités");
   const libPeriode=!ok?"—":(moisEntier
     ? (moisSel.length===1
         ? `${MOIS[mDeb.m]} ${mDeb.y}${iFin===moisList.length-1&&finPer?" (jusqu'à la fin de la période)":" entier"} · ${nbJours} jours`
@@ -2596,7 +2599,8 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
     const p={medId,dateFrom:rDf,dateTo:rDt,slotDebut:rDeb,slotFin:rFin,slots:["M","AM"]};
     if(action==="poser"){onPose({...p,absType});return;}
     if(cible==="abs"){onRetraitAbs({...p,absType});return;}
-    onEffacer({...p,keepAbs});
+    if(cible==="tout"){onEffacer({...p,keepAbs:false,keepGardes:degre!=="absolu"});return;}
+    onEffacer({...p,keepAbs,keepGardes:true});
   };
 
   const segBtn=(on,rouge)=>({flex:1,padding:"7px 5px",borderRadius:7,cursor:"pointer",fontWeight:800,fontSize:12,
@@ -2616,8 +2620,8 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
       <div style={{fontSize:12.5,lineHeight:1.6,color:"var(--txt)"}}>
         Vous allez <b>{libAction.toLowerCase()}</b> pour <b>{med?med.prenom+" "+med.nom:"—"}</b><br/>
         sur <b>{libPeriode}</b>.
-        {confirm==="activites"&&<>
-          <div style={{marginTop:9,color:"#16a34a",fontWeight:700}}>✓ Conservés : {keepAbs?"absences, FMC, gardes, repos, tour":"gardes, repos, tour"}</div>
+        {(confirm==="activites"||confirm==="tout")&&<>
+          <div style={{marginTop:9,color:"#16a34a",fontWeight:700}}>✓ Conservés : {confirm==="tout"?(degre==="absolu"?"rien":"gardes, repos et tour"):(keepAbs?"absences, FMC, gardes, repos, tour":"gardes, repos, tour")}</div>
           <div style={{color:"#991b1b",fontWeight:700}}>✗ Effacé : {nEff===0?"aucune activité — rien à retirer":nEff+" activité"+(nEff>1?"s":"")+" posée"+(nEff>1?"s":"")}</div>
           {nEff>0&&<div style={{marginTop:5,display:"flex",flexWrap:"wrap",gap:4}}>
             {rEff.det.map(x=>(
@@ -2670,7 +2674,19 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
           <button style={segBtn(cible==="abs",true)} onClick={()=>setCible("abs")}>Absence / FMC</button>
           {/* v9.93 : le rôle administratif ne retire pas d'activités — même périmètre qu'avant */}
           {allowActs&&<button style={segBtn(cible==="activites",true)} onClick={()=>setCible("activites")}>Les activités</button>}
+          {/* v11.0 : « Tout » évite deux passages sur la même période pour vider une ligne */}
+          {allowActs&&<button style={segBtn(cible==="tout",true)} onClick={()=>setCible("tout")}>Tout</button>}
         </div>
+        {cible==="tout"&&<div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
+          {[["garde","Tout sauf gardes et tour","absences, FMC et activités"],
+            ["absolu","Absolument tout","+ gardes, repos et semaines de tour"]].map(([v,t,d])=>(
+            <button key={v} onClick={()=>setDegre(v)}
+              style={{textAlign:"left",padding:"7px 10px",borderRadius:7,cursor:"pointer",fontWeight:800,fontSize:12,
+                border:"1.5px solid "+(degre===v?"#dc2626":"var(--border)"),
+                background:degre===v?"#fee2e2":"var(--bg2)",color:degre===v?"#991b1b":"var(--txt2)"}}>
+              {t}<span style={{display:"block",fontSize:10,fontWeight:600,opacity:.85,marginTop:2}}>{d}</span>
+            </button>))}
+        </div>}
       </div>}
 
       {!moisEntier?<>
@@ -6030,8 +6046,11 @@ function CardioPlanning(){
      entier n'est qu'une période comme une autre. */
   /* v9.94 : compte, sans rien modifier, ce que l'effacement retirerait. Même parcours et
      mêmes règles que clearPeriodActs — une seule logique, deux usages. */
-  const countPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,slotDebut="M",slotFin="AM"})=>{
-    const KEEP=keepAbs?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"]:["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"];
+  const countPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,keepGardes=true,slotDebut="M",slotFin="AM"})=>{
+    /* v11.0 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
+       repos partent TOUJOURS ensemble — jamais l'un sans l'autre, sinon on laisserait
+       quelqu'un de garde sans repos le lendemain, incohérence que l'application signale. */
+    const KEEP=(keepGardes?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"]:[]).concat(keepAbs?["ABSENCE","FORM","FORMATION"]:[]);
     const sp=perSlots({medId,dateFrom,dateTo,slotDebut,slotFin}).slotsParJour;
     const [fy,fm,fd]=parseDate(dateFrom);
     const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
@@ -6104,8 +6123,11 @@ function CardioPlanning(){
     }catch(e){console.log("diff:",e);return null;}
   },[plan,acteById]);
 
-  const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,slotsParJour=null})=>{
-    const KEEP=keepAbs?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"]:["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"];
+  const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,keepGardes=true,slotsParJour=null})=>{
+    /* v11.0 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
+       repos partent TOUJOURS ensemble — jamais l'un sans l'autre, sinon on laisserait
+       quelqu'un de garde sans repos le lendemain, incohérence que l'application signale. */
+    const KEEP=(keepGardes?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"]:[]).concat(keepAbs?["ABSENCE","FORM","FORMATION"]:[]);
     const [fy,fm,fd]=parseDate(dateFrom);
     const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
     setPlan(p=>{
