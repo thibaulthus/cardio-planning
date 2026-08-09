@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.7 — 07/08/2026";
+const APP_VERSION="v10.8 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5465,13 +5465,21 @@ function CardioPlanning(){
   const histRef=useRef({stack:[],idx:-1,restoring:0});
   const [histVer,setHistVer]=useState(0);
   const histSnapshot=()=>({plan,tourMed,astreinte,notes,planningType});
+  /* v10.8 : sérialisation à CLÉS TRIÉES. Mon dédoublonnage de la v10.7 comparait deux
+     textes bruts ; or l'écho du serveur renvoie les mêmes données dans un ORDRE DE CLÉS
+     différent, donc le doublon passait quand même et le premier « retour » revenait sur
+     un état identique. Avec un ordre stable, deux états de même contenu sont reconnus
+     égaux — et le drapeau de restauration devient d'ailleurs superflu, l'état restauré
+     étant par construction égal au cran visé. */
+  const histStr=(o)=>JSON.stringify(o,(k,v)=>(v&&typeof v==="object"&&!Array.isArray(v))
+    ?Object.keys(v).sort().reduce((a,x)=>{a[x]=v[x];return a;},{}):v);
   useEffect(()=>{
     const h=histRef.current;
     /* v10.6 : pendant le chargement on ne remplit pas la pile, mais on RETIENT l'état
        courant. Sans lui, la pile ne contenait après la première pose qu'un seul cran —
        celui d'APRÈS — et le premier clic sur « retour » reculait vers ce même état :
        rien ne bougeait à l'écran et il fallait cliquer deux fois. */
-    if(isFirstLoad.current){h.depart=JSON.stringify(histSnapshot());return;}
+    if(isFirstLoad.current){h.depart=histStr(histSnapshot());return;}
     /* v10.5 : une annulation change CINQ états d'un coup (plan, tour, astreinte, notes,
        planning type). L'ancien drapeau était consommé par le premier signal reçu ; les
        quatre suivants étaient donc enregistrés comme de NOUVELLES actions, ce qui effaçait
@@ -5485,7 +5493,7 @@ function CardioPlanning(){
        rien ne bougeait, d'où les deux clics nécessaires. Le « avant » n'était pas touché,
        puisqu'il avançait vers un cran réellement différent. On n'empile plus un état
        identique au sommet de la pile. */
-    const snap=JSON.stringify(histSnapshot());
+    const snap=histStr(histSnapshot());
     if(h.stack[h.idx]===snap)return;
     // Truncate redo branch, push snapshot
     h.stack=h.stack.slice(0,h.idx+1);
@@ -5509,7 +5517,7 @@ function CardioPlanning(){
   };
   const applySnapshot=(snap)=>{
     const s=JSON.parse(snap);
-    histRef.current.restoring=5;   // les 5 états restaurés ci-dessous
+    histRef.current.restoring=1;   /* React regroupe les 5 changements en un seul rendu */
     setPlan(s.plan);setTourMed(s.tourMed);setAstreinte(s.astreinte);
     setNotes(s.notes);setPlanningType(s.planningType);
   };

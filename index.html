@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.7 — 07/08/2026";
+var APP_VERSION = "v10.8 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -6156,6 +6156,14 @@ function CardioPlanning() {
     var histRef = useRef({ stack: [], idx: -1, restoring: 0 });
     var _60 = useState(0), histVer = _60[0], setHistVer = _60[1];
     var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType }); };
+    /* v10.8 : sérialisation à CLÉS TRIÉES. Mon dédoublonnage de la v10.7 comparait deux
+       textes bruts ; or l'écho du serveur renvoie les mêmes données dans un ORDRE DE CLÉS
+       différent, donc le doublon passait quand même et le premier « retour » revenait sur
+       un état identique. Avec un ordre stable, deux états de même contenu sont reconnus
+       égaux — et le drapeau de restauration devient d'ailleurs superflu, l'état restauré
+       étant par construction égal au cran visé. */
+    var histStr = function (o) { return JSON.stringify(o, function (k, v) { return (v && typeof v === "object" && !Array.isArray(v))
+        ? Object.keys(v).sort().reduce(function (a, x) { a[x] = v[x]; return a; }, {}) : v; }); };
     useEffect(function () {
         var h = histRef.current;
         /* v10.6 : pendant le chargement on ne remplit pas la pile, mais on RETIENT l'état
@@ -6163,7 +6171,7 @@ function CardioPlanning() {
            celui d'APRÈS — et le premier clic sur « retour » reculait vers ce même état :
            rien ne bougeait à l'écran et il fallait cliquer deux fois. */
         if (isFirstLoad.current) {
-            h.depart = JSON.stringify(histSnapshot());
+            h.depart = histStr(histSnapshot());
             return;
         }
         /* v10.5 : une annulation change CINQ états d'un coup (plan, tour, astreinte, notes,
@@ -6185,7 +6193,7 @@ function CardioPlanning() {
            rien ne bougeait, d'où les deux clics nécessaires. Le « avant » n'était pas touché,
            puisqu'il avançait vers un cran réellement différent. On n'empile plus un état
            identique au sommet de la pile. */
-        var snap = JSON.stringify(histSnapshot());
+        var snap = histStr(histSnapshot());
         if (h.stack[h.idx] === snap)
             return;
         // Truncate redo branch, push snapshot
@@ -6221,7 +6229,7 @@ function CardioPlanning() {
     };
     var applySnapshot = function (snap) {
         var s = JSON.parse(snap);
-        histRef.current.restoring = 5; // les 5 états restaurés ci-dessous
+        histRef.current.restoring = 1; // les 5 états restaurés ci-dessous
         setPlan(s.plan);
         setTourMed(s.tourMed);
         setAstreinte(s.astreinte);
