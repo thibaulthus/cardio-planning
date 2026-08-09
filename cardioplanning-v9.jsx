@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.6 — 07/08/2026";
+const APP_VERSION="v10.7 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -5479,9 +5479,17 @@ function CardioPlanning(){
        se grisait. On compte désormais les cinq signaux avant de rendre la main. */
     if(h.restoring>0){h.restoring--;return;}
     if(h.stack.length===0&&h.depart){h.stack.push(h.depart);h.idx=0;}
+    /* v10.7 : une seule pose déclenche DEUX fois cet effet — la modification, puis l'écho
+       du serveur qui repose le même contenu dans un nouvel objet. Deux crans identiques
+       étaient donc empilés, et le premier « retour » revenait sur un état identique :
+       rien ne bougeait, d'où les deux clics nécessaires. Le « avant » n'était pas touché,
+       puisqu'il avançait vers un cran réellement différent. On n'empile plus un état
+       identique au sommet de la pile. */
+    const snap=JSON.stringify(histSnapshot());
+    if(h.stack[h.idx]===snap)return;
     // Truncate redo branch, push snapshot
     h.stack=h.stack.slice(0,h.idx+1);
-    h.stack.push(JSON.stringify(histSnapshot()));
+    h.stack.push(snap);
     if(h.stack.length>50)h.stack.shift();
     h.idx=h.stack.length-1;
     setHistVer(v=>v+1);
