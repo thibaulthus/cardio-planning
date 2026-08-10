@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.13 — 07/08/2026";
+const APP_VERSION="v10.14 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -366,7 +366,19 @@ function hexToLum(hex){
    L'onglet Planning et l'onglet Attachés gardent volontairement leurs pastilles PLEINES. */
 const _hx=c=>{c=String(c||"#888888").replace("#","");return [parseInt(c.slice(0,2),16)||0,parseInt(c.slice(2,4),16)||0,parseInt(c.slice(4,6),16)||0];};
 const mixC=(c,t,k)=>{const a=_hx(c),b=_hx(t);return "#"+[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*k).toString(16).padStart(2,"0")).join("");};
-const pillCols=(c,night)=>({border:"2px solid "+mixC(c,"#000000",.12),background:night?mixC(c,"#0d1117",.86):"#ffffff",color:night?mixC(c,"#ffffff",.55):mixC(c,"#000000",.62)});
+const pillCols=(c,night)=>{
+  /* v10.14 : pastille PLEINE, comme dans l'onglet Planning — la couleur se lit d'un coup
+     d'œil au lieu de demander à l'œil de s'arrêter sur un contour. La couleur du texte
+     suit la LUMINOSITÉ du fond (fonction hexToLum déjà utilisée pour le choix des
+     activités), donc elle reste lisible quelles que soient les couleurs choisies. */
+  const bg=night?mixC(c,"#0d1117",.30):c;
+  /* on ne fixe pas un seuil arbitraire : on retient des deux textes possibles celui qui
+     CONTRASTE le mieux avec le fond, ce qui reste juste quelles que soient les couleurs */
+  const L=hexToLum(bg), sombre=mixC(bg,"#000000",.80);
+  const ct=(a,b)=>(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+  const txt=ct(L,hexToLum("#ffffff"))>=ct(L,hexToLum(sombre))?"#ffffff":sombre;
+  return {border:"1px solid "+mixC(bg,"#000000",.18),background:bg,color:txt};
+};
 /* fond rouge des cases à deux activités : le pointillé y prend sa couleur propre,
    celle de bordure générale étant invisible sur ce fond (surtout en mode nuit) */
 const conflBg=night=>({background:night?"rgba(239,68,68,.16)":"#fee2e2",outline:"1px solid #ef4444"});
@@ -1086,7 +1098,12 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           /* v9.45 : le segment gauche porte la SALLE si la ligne en propose, sinon
              le libellé de l'activité — jamais les deux, jamais de couleur de fond. */
           const salleTrack=row.hasSalleChoice||(g.acte&&g.acte.hasSalle&&!g.acte.fixedSalle);
-          const lieu=(salleTrack&&g.salle)?g.salle:(monoActe?null:(g.acte.short||g.acte.label||""));
+          /* v10.14 : le libellé n'est masqué que sur une colonne d'ACTIVITÉ, où il ferait
+             doublon avec l'en-tête. Sur une colonne de SALLE, l'en-tête dit OÙ et non QUOI :
+             l'activité doit toujours s'afficher, même s'il n'y en a qu'une possible —
+             c'est ce qui rendait la salle d'EEP muette. */
+          const colSalle=!!(row.salle||row.hasSalleChoice);
+          const lieu=(salleTrack&&g.salle)?g.salle:((monoActe&&!colSalle)?null:(g.acte.short||g.acte.label||""));
           /* v9.67 : option A — l'occupant sans salle est signalé sur sa ligne */
           const noSalle=salleTrack&&!g.salle&&g.acte&&g.acte.hasSalle&&g.meds.some(m=>m&&m.id!==IDE_MED.id);
           const dc=g.dif?((g.dif.c||"")+(g.dif.h?(g.dif.c?" — ":"")+g.dif.h:"")):"";

@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.13 — 07/08/2026";
+var APP_VERSION = "v10.14 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -509,7 +509,21 @@ function hexToLum(hex) {
    Planning et Attaches gardent volontairement leurs pastilles PLEINES. */
 var _hx = function (c) { c = String(c || "#888888").replace("#", ""); return [parseInt(c.slice(0, 2), 16) || 0, parseInt(c.slice(2, 4), 16) || 0, parseInt(c.slice(4, 6), 16) || 0]; };
 var mixC = function (c, t, k) { var a = _hx(c), b = _hx(t); return "#" + [0, 1, 2].map(function (i) { return Math.round(a[i] + (b[i] - a[i]) * k).toString(16).padStart(2, "0"); }).join(""); };
-var pillCols = function (c, night) { return ({ border: "2px solid " + mixC(c, "#000000", .12), background: night ? mixC(c, "#0d1117", .86) : "#ffffff", color: night ? mixC(c, "#ffffff", .55) : mixC(c, "#000000", .62) }); };
+var pillCols = function (c, night) {
+    /* v10.14 : pastille PLEINE, comme dans l'onglet Planning — la couleur se lit d'un coup
+       d'œil au lieu de demander à l'œil de s'arrêter sur un contour. La couleur du texte
+       suit la LUMINOSITÉ du fond (fonction hexToLum déjà utilisée pour le choix des
+       activités), donc elle reste lisible quelles que soient les couleurs choisies. */
+    var bg = night ? mixC(c, "#0d1117", .30) : c;
+    /* on ne fixe pas un seuil arbitraire : on retient des deux textes possibles celui qui
+       CONTRASTE le mieux avec le fond, ce qui reste juste quelles que soient les couleurs */
+    var L = hexToLum(bg), sombre = mixC(bg, "#000000", .80);
+    var ct = function (a, b) { return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+    var txt = ct(L, hexToLum("#ffffff")) >= ct(L, hexToLum(sombre)) ? "#ffffff" : sombre;
+    return { border: "1px solid " + mixC(bg, "#000000", .18), background: bg, color: txt };
+};
+/* fond rouge des cases à deux activités : le pointillé y prend sa couleur propre,
+   celle de bordure générale étant invisible sur ce fond (surtout en mode nuit) */
 var conflBg = function (night) { return ({ background: night ? "rgba(239,68,68,.16)" : "#fee2e2", outline: "1px solid #ef4444" }); };
 var conflSep = function (night) { return night ? "#f87171" : "#b91c1c"; };
 /* v9.56 — CHOIX OUVERT (etape 1/4). Une case de planning type porte 1 activite ferme
@@ -1249,7 +1263,12 @@ function ActTabView(_a) {
                 /* v9.45 : le segment gauche porte la SALLE si la ligne en propose, sinon
                    le libellé de l'activité — jamais les deux, jamais de couleur de fond. */
                 var salleTrack = row.hasSalleChoice || (g.acte && g.acte.hasSalle && !g.acte.fixedSalle);
-                var lieu = (salleTrack && g.salle) ? g.salle : (monoActe ? null : (g.acte.short || g.acte.label || ""));
+                /* v10.14 : le libellé n'est masqué que sur une colonne d'ACTIVITÉ, où il ferait
+                   doublon avec l'en-tête. Sur une colonne de SALLE, l'en-tête dit OÙ et non QUOI :
+                   l'activité doit toujours s'afficher, même s'il n'y en a qu'une possible —
+                   c'est ce qui rendait la salle d'EEP muette. */
+                var colSalle = !!(row.salle || row.hasSalleChoice);
+                var lieu = (salleTrack && g.salle) ? g.salle : ((monoActe && !colSalle) ? null : (g.acte.short || g.acte.label || ""));
                 /* v9.67 : option A — l'occupant sans salle est signalé sur sa ligne */
                 var noSalle = salleTrack && !g.salle && g.acte && g.acte.hasSalle && g.meds.some(function (m) { return m && m.id !== IDE_MED.id; });
                 var dc = g.dif ? ((g.dif.c || "") + (g.dif.h ? (g.dif.c ? " — " : "") + g.dif.h : "")) : "";
