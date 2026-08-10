@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.14 — 07/08/2026";
+const APP_VERSION="v10.15 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -427,6 +427,21 @@ function CondBadges({es,acteById,noteT}){
         </span>;})}
     </span>}
   </>);
+}
+
+/* v10.15 : l'étiquette de SALLE. Elle était rendue à trois endroits avec des styles
+   différents — fond blanc dans PT Angio et dans la colonne BIP, couleur de l'activité
+   dans PT Cardio, et une taille plus petite pour le BIP. Un seul composant désormais :
+   la salle prend TOUJOURS la couleur de l'activité qui l'occupe, à la même taille que
+   la pastille d'activité. */
+function SallePill({nom,acte,night}){
+  if(!nom)return null;
+  return(
+    <span style={{...pillCols((acte&&acte.color)||"#888888",night),
+      fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:4,
+      padding:"2px 3px",lineHeight:1.3,textAlign:"center",display:"inline-block",
+      width:48,minWidth:48,maxWidth:48,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{nom}</span>
+  );
 }
 
 function ActPill({a,night,hasNote}){
@@ -869,7 +884,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
           {bipOcc2.map(({med,acte,rs},i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
               <div title={((med.prenom||"")+" "+(med.nom||"")).trim()} style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
-              {rs?<span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg2)",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>{rs}</span>
+              {rs?<SallePill nom={rs} acte={acte} night={darkMode}/>
                 :(bipActe.hasSalle?<span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>⚠ sans salle</span>:null)}
             </div>
           ))}
@@ -2239,7 +2254,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               <span style={{flex:1,color:"var(--txt)",fontSize:12}}>{med.prenom} {med.nom}</span>
               <span style={{fontSize:10,color:acte.color,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>
               {(()=>{const _r=curOcc[i]&&curOcc[i].rs;
-                if(_r)return <span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>{_r}</span>;
+                if(_r)return <SallePill nom={_r} acte={curOcc[i]&&curOcc[i].acte} night={darkMode}/>;
                 if(acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
                 return null;})()}
               {isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!adminOnly||acte.adminOk===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
