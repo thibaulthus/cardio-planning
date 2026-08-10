@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.15 — 07/08/2026";
+const APP_VERSION="v10.16 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 function perStart(y,m){
@@ -440,7 +440,12 @@ function SallePill({nom,acte,night}){
     <span style={{...pillCols((acte&&acte.color)||"#888888",night),
       fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:4,
       padding:"2px 3px",lineHeight:1.3,textAlign:"center",display:"inline-block",
-      width:48,minWidth:48,maxWidth:48,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{nom}</span>
+      /* v10.16 : largeur ADAPTATIVE. Les 48 px figés dataient d'une police plus petite et ne
+   tenaient plus que 6 caractères — « Angio-1 » et « CHB-BIP » se retrouvaient tronqués.
+   On garde un minimum pour que les pastilles restent alignées entre elles, mais le nom
+   long fait grandir la pastille au lieu d'être coupé. Vaut pour les 4 onglets et pour
+   toute salle ou activité future au nom plus long. */
+minWidth:48,maxWidth:"100%",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{nom}</span>
   );
 }
 
@@ -449,8 +454,13 @@ function ActPill({a,night,hasNote}){
   return(
     <div style={{position:"relative",display:"inline-block",margin:"1px"}}>
       <div style={{...pillCols(a.color||"#888888",night),fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",
-        borderRadius:4,padding:"2px 3px",lineHeight:1.3,textAlign:"center",
-        width:48,minWidth:48,maxWidth:48,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{a.short}</div>
+        borderRadius:4,padding:"2px 6px",lineHeight:1.3,textAlign:"center",
+        /* v10.16 : largeur ADAPTATIVE. Les 48 px figés dataient d'une police plus petite et ne
+   tenaient plus que 6 caractères — « Angio-1 » et « CHB-BIP » se retrouvaient tronqués.
+   On garde un minimum pour que les pastilles restent alignées entre elles, mais le nom
+   long fait grandir la pastille au lieu d'être coupé. Vaut pour les 4 onglets et pour
+   toute salle ou activité future au nom plus long. */
+minWidth:48,maxWidth:"100%",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{a.short}</div>
       {hasNote&&<div style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
     </div>
   );
