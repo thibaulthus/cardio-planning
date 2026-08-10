@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.16 — 07/08/2026";
+var APP_VERSION = "v10.17 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 function perStart(y, m) {
@@ -2352,10 +2352,10 @@ function PickMedActModal(_a) {
 }
 /* ════ PICK MED SITE MODAL (CHL/CHB) ════ */
 function PickMedSiteModal(_a) {
-    var mData = _a.mData, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, isMedAvailable = _a.isMedAvailable, addEntry = _a.addEntry, removeEntry = _a.removeEntry, onClose = _a.onClose, _b = _a.adminOnly, adminOnly = _b === void 0 ? false : _b, _c = _a.selfOnly, selfOnly = _c === void 0 ? null : _c;
+    var mData = _a.mData, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, isMedAvailable = _a.isMedAvailable, addEntry = _a.addEntry, removeEntry = _a.removeEntry, onClose = _a.onClose, _b = _a.adminOnly, adminOnly = _b === void 0 ? false : _b, _c = _a.selfOnly, selfOnly = _c === void 0 ? null : _c, _d = _a.darkMode, darkMode = _d === void 0 ? false : _d;
     var salle = mData.salle, siteActes = mData.siteActes, d = mData.d, sl = mData.sl, y2 = mData.y, m2 = mData.m;
-    var _d = useState("med"), step = _d[0], setStep = _d[1]; // med | acte | salle
-    var _e = useState(null), selMedId = _e[0], setSelMedId = _e[1];
+    var _e = useState("med"), step = _e[0], setStep = _e[1]; // med | acte | salle
+    var _f = useState(null), selMedId = _f[0], setSelMedId = _f[1];
     var selMed = medecins.find(function (x) { return x.id === selMedId; });
     /* v9.58.1 : les colonnes « ↩ reprise activité » étaient câblées pour le seul BIP —
        occupants introuvables et activité proposée toujours BIP dès qu'on en créait une
@@ -2376,7 +2376,7 @@ function PickMedSiteModal(_a) {
             });
         });
     });
-    var _f = useState(null), selBipSalle = _f[0], setSelBipSalle = _f[1];
+    var _g = useState(null), selBipSalle = _g[0], setSelBipSalle = _g[1];
     var eligActes0 = (selMed ? (isRecapCol ? [recapActe].filter(Boolean) : siteActes.filter(function (a) { return !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init); })) : []).filter(function (a) { return !adminOnly || a.adminOk === true; });
     /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches.
        Si aucune n'est offerte par cette salle, on ne le bloque pas — on le prévient. */
@@ -9159,7 +9159,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "La bo\u00eete d'impression du navigateur s'ouvrira : choisissez l'imprimante, ou \u00ab Enregistrer en PDF \u00bb pour envoyer la feuille."))));
         })(),
         modal === "pickMedAct" && mData && React.createElement(PickMedActModal, { patchAct: patchActivity, canDif: isEdit || isCadre, mData: mData, setMData: setMData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, selfOnly: isMedEdit && !isInterEdit ? editMedId : null, onClose: function () { return setModal(null); } }),
-        modal === "pickMedSite" && mData && React.createElement(PickMedSiteModal, { mData: mData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, selfOnly: isMedEdit && !isInterEdit ? editMedId : null, onClose: function () { return setModal(null); } }),
+        modal === "pickMedSite" && mData && React.createElement(PickMedSiteModal, { mData: mData, medecins: medecins, actes: actes, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntry, removeEntry: removeEntry, adminOnly: isAdminEdit, selfOnly: isMedEdit && !isInterEdit ? editMedId : null, onClose: function () { return setModal(null); } , darkMode: darkMode}),
         modal === "editPT" && mData && React.createElement(EditPTModal, { mData: mData, setMData: setMData, medecins: medecins, actes: actes, planningType: planningType, setPlanningType: setPlanningType, onClose: function () { return setModal(null); } }),
         modal === "editActe" && mData && (React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement("div", { style: S.mHd },
