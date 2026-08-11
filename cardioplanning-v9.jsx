@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.20 — 07/08/2026";
+const APP_VERSION="v10.21 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -479,7 +479,6 @@ minWidth:48,maxWidth:"100%",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"
 const fmtLong=(iso)=>{ if(!iso)return "—";
   const d=new Date(iso+"T00:00:00");
   return d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}); };
-const jourCourt=(iso)=>iso?new Date(iso+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}):"\u2014";
 const fmtLongD=(d)=>d?d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):"—";
 const vacAnSuivante=(list)=>{
   const ans=list.map(v=>v.an).filter(Boolean).sort();
@@ -7350,12 +7349,6 @@ header::-webkit-scrollbar { display: none; }
                           <input type="date" value={v.d2||""} disabled={!isEdit}
                             onChange={e=>setVacs(l=>l.map((x,i)=>i===idx?{...x,d2:e.target.value}:x))}
                             style={{...S.fi,fontSize:11.5,padding:"3px 6px",width:"100%",maxWidth:150}}/>
-                        </td>
-                        {/* v10.19 : la date complète faisait déborder le tableau et répétait les
-                            deux champs. On ne garde que le jour de la semaine, qui est la seule
-                            information que les champs de date n'affichent pas. */}
-                        <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",fontSize:10.5,color:"var(--txt3)",whiteSpace:"nowrap"}}>
-                          {(v.d1&&v.d2)?(jourCourt(v.d1)+" \u2192 "+jourCourt(v.d2)):"\u2014"}
                         </td>
                         {isEdit&&<td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",width:22}}>
                           <span title={"Supprimer la ligne "+v.nom+" — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées"} onClick={()=>{if(window.confirm("Supprimer « "+v.nom+" "+v.an+" » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))setVacs(l=>l.filter((x,i)=>i!==idx));}} style={{color:"#dc2626",cursor:"pointer",fontWeight:800}}>✕</span>

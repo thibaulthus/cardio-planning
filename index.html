@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.20 — 07/08/2026";
+var APP_VERSION = "v10.21 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -608,7 +608,6 @@ var fmtLong = function (iso) {
     var d = new Date(iso + "T00:00:00");
     return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 };
-var jourCourt = function (iso) { return iso ? new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "\u2014"; };
 var fmtLongD = function (d) { return d ? d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—"; };
 var vacAnSuivante = function (list) {
     var ans = list.map(function (v) { return v.an; }).filter(Boolean).sort();
@@ -8192,7 +8191,6 @@ function CardioPlanning() {
                                                     React.createElement("input", { type: "date", value: v.d1 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d1: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
                                                 React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)" } },
                                                     React.createElement("input", { type: "date", value: v.d2 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d2: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
-                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)", fontSize: 10.5, color: "var(--txt3)", whiteSpace: "nowrap" } }, (v.d1 && v.d2) ? (jourCourt(v.d1) + " \u2192 " + jourCourt(v.d2)) : "\u2014"),
                                                 isEdit && React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)", width: 22 } },
                                                     React.createElement("span", { title: "Supprimer la ligne " + v.nom + " — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées", onClick: function () { if (window.confirm("Supprimer « " + v.nom + " " + v.an + " » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))
                                                             setVacs(function (l) { return l.filter(function (x, i) { return i !== idx; }); }); }, style: { color: "#dc2626", cursor: "pointer", fontWeight: 800 } }, "\u2715"))));
