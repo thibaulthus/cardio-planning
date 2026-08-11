@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.22 — 07/08/2026";
+const APP_VERSION="v10.23 — 11/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -7017,7 +7017,9 @@ header::-webkit-scrollbar { display: none; }
                   cur.jours.push({y,m,d});
                 });
                 const fmtJ=(o)=>o.d+" "+MOIS[o.m].slice(0,4).toLowerCase()+".";
-                return <div style={{padding:"4px 2px"}}>
+                /* v10.23 : les tuiles s'alignent sur le cadre recapitulatif du dessus
+                   (meme maxWidth 560) — pleine largeur, elles etaient peu pratiques. */
+                return <div style={{padding:"4px 0",maxWidth:560}}>
                   {sems.map(sem=>{
                     const j0=sem.jours[0],j9=sem.jours[sem.jours.length-1];
                     const exc=sem.jours.filter(o=>{const dk=o.y+"-"+o.m+"-"+o.d;return dk!==sem.wk&&typeof astreinte[dk]==="string";});
@@ -7396,28 +7398,32 @@ header::-webkit-scrollbar { display: none; }
                     {vacTerminee(an)&&<span style={{fontWeight:600,color:"var(--txt3)"}}> — terminée</span>}
                   </div>
                   {vacOuvert(vacOuv,an)&&
+                  /* v10.23 : cadre complet a coins arrondis, comme l'encart Apercu.
+                     Les td ont un fond blanc (regle globale) : sans ce cadre, les lignes
+                     paraissaient ouvertes a droite et a gauche. */
+                  <div style={{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                     <tbody>
-                    {lignes.map(({v,idx})=>(
+                    {lignes.map(({v,idx},i9)=>(
                       <tr key={idx}>
-                        <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",width:88,fontWeight:700}}>{v.nom}</td>
-                        <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)"}}>
+                        <td style={{padding:"3px 6px",borderBottom:i9===lignes.length-1?"none":"1px solid var(--border)",width:88,fontWeight:700}}>{v.nom}</td>
+                        <td style={{padding:"3px 6px",borderBottom:i9===lignes.length-1?"none":"1px solid var(--border)"}}>
                           <input type="date" value={v.d1||""} disabled={!isEdit}
                             onChange={e=>setVacs(l=>l.map((x,i)=>i===idx?{...x,d1:e.target.value}:x))}
                             style={{...S.fi,fontSize:11.5,padding:"3px 6px",width:"100%",maxWidth:150}}/>
                         </td>
-                        <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)"}}>
+                        <td style={{padding:"3px 6px",borderBottom:i9===lignes.length-1?"none":"1px solid var(--border)"}}>
                           <input type="date" value={v.d2||""} disabled={!isEdit}
                             onChange={e=>setVacs(l=>l.map((x,i)=>i===idx?{...x,d2:e.target.value}:x))}
                             style={{...S.fi,fontSize:11.5,padding:"3px 6px",width:"100%",maxWidth:150}}/>
                         </td>
-                        {isEdit&&<td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",width:22}}>
+                        {isEdit&&<td style={{padding:"3px 6px",borderBottom:i9===lignes.length-1?"none":"1px solid var(--border)",width:22}}>
                           <span title={"Supprimer la ligne "+v.nom+" — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées"} onClick={()=>{if(window.confirm("Supprimer « "+v.nom+" "+v.an+" » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))setVacs(l=>l.filter((x,i)=>i!==idx));}} style={{color:"#dc2626",cursor:"pointer",fontWeight:800}}>✕</span>
                         </td>}
                       </tr>
                     ))}
                     </tbody>
-                  </table>}
+                  </table></div>}
                 </div>
               ))}
               {vacs.length===0&&<div style={{fontSize:11.5,color:"var(--txt3)"}}>Aucune vacance saisie.</div>}
