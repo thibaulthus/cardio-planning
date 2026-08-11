@@ -26,9 +26,22 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.17 — 07/08/2026";
+const APP_VERSION="v10.18 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
+/* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
+   téléchargement était instable (4 sources, souvent toutes en échec) et surtout ASYNCHRONE :
+   faire dépendre les bornes de période d'une donnée qui arrive après coup les aurait rendues
+   changeantes en cours d'usage — inacceptable pour un calcul qui décide aussi jusqu'où va
+   un retrait sur période. Ici la liste est locale et immédiate, donc identique à chaque
+   chargement. VAC_LIST est tenue à jour depuis l'état React, comme PCFG. */
+let VAC_LIST=[];        // [{an,nom,d1,d2}] — d1/d2 au format AAAA-MM-JJ
+let VAC_RULE=false;     // étendre la période jusqu'à la fin des vacances
+const VAC_NOMS=["Toussaint","Noël","Hiver","Printemps","Été"];
+function vacContient(dt){
+  const k=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+  return VAC_LIST.find(v=>v.d1&&v.d2&&k>=v.d1&&k<=v.d2)||null;
+}
 function perStart(y,m){
   const d=((m-PCFG.startM)%12+12)%12;
   const off=d%PCFG.len;
@@ -45,7 +58,20 @@ function perEnd(sy,sm){
   const dt=new Date(ey,em+1,0); // dernier jour du dernier mois
   while(dt.getDay()!==0)dt.setDate(dt.getDate()+1); // → dimanche
   const mon=new Date(dt);mon.setDate(mon.getDate()+1);
-  if(isFerie(mon.getFullYear(),mon.getMonth(),mon.getDate()))return mon;
+  if(isFerie(mon.getFullYear(),mon.getMonth(),mon.getDate()))dt=mon;
+  /* v10.18 : si cette fin tombe AU MILIEU de vacances, on va jusqu'à leur dernier jour.
+     La période suivante démarre le lendemain (perDaysList part de la fin précédente + 1),
+     donc ni chevauchement ni trou. On n'étend jamais quand les vacances commencent APRÈS. */
+  if(VAC_RULE){
+    const v=vacContient(dt);
+    if(v){
+      const f=new Date(v.d2+"T00:00:00");
+      /* Limite de 21 jours : les congés d'hiver ou de printemps durent 15 jours et sont
+         donc absorbés, mais PAS l'été. Sans elle, une période finissant le 4 juillet —
+         premier week-end des grandes vacances — s'étendrait jusqu'à fin août. */
+      if(f>dt&&(f-dt)<=21*86400000)return f;
+    }
+  }
   return dt;
 }
 function perDaysList(sy,sm){
@@ -448,6 +474,23 @@ function SallePill({nom,acte,night}){
 minWidth:48,maxWidth:"100%",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{nom}</span>
   );
 }
+
+/* v10.18 : petits utilitaires du panneau « Vacances scolaires ». */
+const fmtLong=(iso)=>{ if(!iso)return "—";
+  const d=new Date(iso+"T00:00:00");
+  return d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}); };
+const fmtLongD=(d)=>d?d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):"—";
+const vacAnSuivante=(list)=>{
+  const ans=list.map(v=>v.an).filter(Boolean).sort();
+  if(!ans.length){const y=new Date().getFullYear();return y+"-"+(y+1);}
+  const d=parseInt(String(ans[ans.length-1]).slice(0,4),10)+1;
+  return d+"-"+(d+1);
+};
+const vacGroupes=(list)=>{
+  const g={};
+  list.forEach((v,idx)=>{(g[v.an||"?"]=g[v.an||"?"]||[]).push({v,idx});});
+  return Object.keys(g).sort().map(an=>[an,g[an]]);
+};
 
 function ActPill({a,night,hasNote}){
   if(!a)return null;
@@ -2594,6 +2637,62 @@ function RestoreModal({med,backups,y,m,d,onDiff,onGo,onClose}){
   );
 }
 
+/* v10.18 : « Coller un calendrier ». On colle le texte du site officiel ; les dates sont
+   repérées puis PROPOSÉES — rien n'est enregistré sans validation. C'est ce qui permet de
+   garder la commodité d'une source extérieure sans lui laisser toucher les données. */
+function VacCollerModal({onClose,onValider}){
+  const [txt,setTxt]=useState("");
+  const [prop,setProp]=useState(null);
+  const MOISN={janvier:0,"février":1,fevrier:1,mars:2,avril:3,mai:4,juin:5,juillet:6,"août":7,aout:7,septembre:8,octobre:9,novembre:10,"décembre":11,decembre:11};
+  const analyser=()=>{
+    const t=txt.toLowerCase().replace(/\s+/g," ");
+    const dre="(\\d{1,2})(?:er)? ([a-zéûà]+) (\\d{4})";
+    const re=new RegExp("du "+dre+" au "+dre,"g");
+    const out=[];let m2,n=0;
+    while((m2=re.exec(t))!==null){
+      const mm1=MOISN[m2[2]],mm2=MOISN[m2[5]];
+      if(mm1===undefined||mm2===undefined)continue;
+      const f=(y,mo,d)=>y+"-"+String(mo+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+      const d1=f(+m2[3],mm1,+m2[1]),d2=f(+m2[6],mm2,+m2[4]);
+      const y1=+m2[3],an=(mm1>=7)?(y1+"-"+(y1+1)):((y1-1)+"-"+y1);
+      out.push({an,nom:VAC_NOMS[n%5],d1,d2});n++;
+    }
+    setProp(out);
+  };
+  return(
+    <div style={{minWidth:320,maxWidth:460}}>
+      <div style={S.mHd}><div style={S.mTit2}>📋 Coller un calendrier</div><button onClick={onClose} style={S.xBtn}>×</button></div>
+      {!prop?<>
+        <div style={{fontSize:11.5,color:"var(--txt2)",marginBottom:8,lineHeight:1.5}}>
+          Copiez le texte depuis le site officiel — ou n'importe quelle source — et collez-le ici.
+          Les mentions « du … au … » seront repérées et proposées avant enregistrement.
+        </div>
+        <textarea value={txt} onChange={e=>setTxt(e.target.value)} rows={7}
+          placeholder="ex. Vacances d'hiver : du samedi 13 février 2027 au lundi 1er mars 2027"
+          style={{...S.fi,width:"100%",fontSize:12,fontFamily:"inherit"}}/>
+        <button onClick={analyser} disabled={!txt.trim()} style={{...S.btnP,width:"100%",marginTop:10,opacity:txt.trim()?1:.5}}>Analyser</button>
+      </>:<>
+        {prop.length===0
+          ? <div style={{fontSize:12,color:"#b45309",fontWeight:700}}>Aucune date reconnue. Vérifiez que le texte contient des mentions « du … au … », ou saisissez les dates à la main.</div>
+          : <>
+            <div style={{fontSize:11.5,color:"var(--txt2)",marginBottom:8}}>Vérifiez avant d'enregistrer. Les noms sont attribués dans l'ordre habituel — corrigez-les ensuite si besoin.</div>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><tbody>
+              {prop.map((v,i)=>(<tr key={i}>
+                <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",fontWeight:700,width:76}}>{v.nom}</td>
+                <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",fontSize:11}}>{fmtLong(v.d1)}</td>
+                <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",fontSize:11}}>{fmtLong(v.d2)}</td>
+              </tr>))}
+            </tbody></table>
+          </>}
+        <div style={{display:"flex",gap:6,marginTop:12}}>
+          <button style={{...S.icnBtn,flex:1,width:"auto"}} onClick={()=>setProp(null)}>← Retour</button>
+          <button disabled={!prop.length} style={{...S.btnP,flex:1,opacity:prop.length?1:.5}} onClick={()=>onValider(prop)}>Enregistrer</button>
+        </div>
+      </>}
+    </div>
+  );
+}
+
 function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null,allowActs=true,compter,onPose,onRetraitAbs,onEffacer,onClose}){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const [action,setAction]=useState("poser");        // poser | retirer
@@ -4543,76 +4642,24 @@ function CardioPlanning(){
   const [tourYear,setTourYear]=useState(()=>new Date().getFullYear());
   const [tourMonth,setTourMonth]=useState(()=>new Date().getMonth());
   const [fbStatus,setFbStatus]=useState("connecting");
-  const [vacZone,setVacZone]=useState(()=>{try{return localStorage.getItem("cp6_vaczone")||"B";}catch{return"B";}});
-  const [vacDates,setVacDates]=useState(new Set()); // Set of "YYYY-MM-DD" strings
-  const [vacSource,setVacSource]=useState(null); // provenance des données vacances
-
-  // Vacances scolaires : fichier iCal officiel du ministère (l'ancienne API records a été retirée)
-  // + calendrier officiel 2025-2027 embarqué en secours (arrêté du 22/10/2025, JO 23/10/2025)
-  const VAC_FALLBACK={
-    A:[["2025-10-18","2025-11-03"],["2025-12-20","2026-01-05"],["2026-02-07","2026-02-23"],["2026-04-04","2026-04-20"],["2026-05-14","2026-05-18"],["2026-07-04","2026-09-01"],["2026-10-17","2026-11-02"],["2026-12-19","2027-01-04"],["2027-02-13","2027-03-01"],["2027-04-10","2027-04-26"],["2027-05-06","2027-05-10"],["2027-07-03","2027-09-01"]],
-    B:[["2025-10-18","2025-11-03"],["2025-12-20","2026-01-05"],["2026-02-14","2026-03-02"],["2026-04-11","2026-04-27"],["2026-05-14","2026-05-18"],["2026-07-04","2026-09-01"],["2026-10-17","2026-11-02"],["2026-12-19","2027-01-04"],["2027-02-20","2027-03-08"],["2027-04-17","2027-05-03"],["2027-05-06","2027-05-10"],["2027-07-03","2027-09-01"]],
-    C:[["2025-10-18","2025-11-03"],["2025-12-20","2026-01-05"],["2026-02-21","2026-03-09"],["2026-04-18","2026-05-04"],["2026-05-14","2026-05-18"],["2026-07-04","2026-09-01"],["2026-10-17","2026-11-02"],["2026-12-19","2027-01-04"],["2027-02-06","2027-02-22"],["2027-04-03","2027-04-19"],["2027-05-06","2027-05-10"],["2027-07-03","2027-09-01"]]
-  };
-  const vacFromFallback=(zone)=>{
-    const dates=new Set();
-    const fmt=(y,m,d)=>y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
-    (VAC_FALLBACK[zone]||VAC_FALLBACK.B).forEach(([s,e])=>{
-      const[sy2,sm2,sd2]=s.split("-").map(Number);
-      const[ey2,em2,ed2]=e.split("-").map(Number);
-      const cur=new Date(sy2,sm2-1,sd2),end=new Date(ey2,em2-1,ed2);
-      while(cur<end){dates.add(fmt(cur.getFullYear(),cur.getMonth()+1,cur.getDate()));cur.setDate(cur.getDate()+1);}
-    });
-    return dates;
-  };
-  useEffect(()=>{
-    const yr=new Date().getFullYear();
-    const icsUrl="https://fr.ftp.opendatasoft.com/openscol/fr-en-calendrier-scolaire/Zone-"+vacZone+".ics";
-    const proxies=[
-      icsUrl,
-      "https://api.allorigins.win/raw?url="+encodeURIComponent(icsUrl),
-      "https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(icsUrl),
-      "https://corsproxy.io/?url="+encodeURIComponent(icsUrl)
-    ];
-    const parseIcs=(txt)=>{
-      const dates=new Set();
-      const fmt=(y,m,d)=>y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
-      const events=txt.split("BEGIN:VEVENT").slice(1);
-      events.forEach(ev=>{
-        const ms=ev.match(/DTSTART[^:]*:(\d{4})(\d{2})(\d{2})/);
-        const me=ev.match(/DTEND[^:]*:(\d{4})(\d{2})(\d{2})/);
-        if(!ms||!me)return;
-        const sy2=+ms[1];
-        if(sy2<yr-1||sy2>yr+1)return;
-        const cur=new Date(+ms[1],+ms[2]-1,+ms[3]);
-        const end=new Date(+me[1],+me[2]-1,+me[3]); // DTEND exclusif (norme iCal)
-        while(cur<end){
-          dates.add(fmt(cur.getFullYear(),cur.getMonth()+1,cur.getDate()));
-          cur.setDate(cur.getDate()+1);
-        }
-      });
-      return dates;
-    };
-    const srcLabels=["iCal officiel (direct)","iCal officiel (via proxy AllOrigins)","iCal officiel (via proxy CodeTabs)","iCal officiel (via proxy CorsProxy)"];
-    const tryFetch=(i)=>{
-      if(i>=proxies.length){
-        // Toutes les sources réseau ont échoué : calendrier officiel embarqué
-        setVacDates(vacFromFallback(vacZone));
-        setVacSource("calendrier intégré à l'application (hors ligne)");
-        return;
+  /* v10.18 : les vacances sont désormais SAISIES (onglet Paramètres) et enregistrées avec
+     le reste. Plus de téléchargement : il échouait le plus souvent, et surtout il arrivait
+     APRÈS l'affichage — les bornes de période auraient changé en cours d'usage. */
+  const [vacs,setVacs]=useState([]);          // [{an,nom,d1,d2}]
+  const [vacRule,setVacRule]=useState(false); // étendre la période jusqu'à la fin des vacances
+  useEffect(()=>{VAC_LIST=vacs;},[vacs]);
+  useEffect(()=>{VAC_RULE=vacRule;},[vacRule]);
+  const vacDates=React.useMemo(()=>{
+    const set=new Set();
+    vacs.forEach(v=>{
+      if(!v.d1||!v.d2)return;
+      const a=new Date(v.d1+"T00:00:00"),b=new Date(v.d2+"T00:00:00");
+      for(let dt=new Date(a);dt<=b;dt.setDate(dt.getDate()+1)){
+        set.add(dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0"));
       }
-      fetch(proxies[i])
-        .then(r=>{if(!r.ok)throw new Error("http "+r.status);return r.text();})
-        .then(txt=>{
-          const dates=parseIcs(txt||"");
-          if(dates.size>0){setVacDates(dates);setVacSource(srcLabels[i]);}
-          else tryFetch(i+1);
-        })
-        .catch(()=>tryFetch(i+1));
-    };
-    tryFetch(0);
-  },[vacZone]);
-
+    });
+    return set;
+  },[vacs]);
   const isVac=(y,m,d)=>vacDates.has(`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`);
   const isFirstLoad=useRef(true);
   /* v9.71 : la persistance hors ligne fait que le TOUT PREMIER message vient du CACHE
@@ -4813,6 +4860,8 @@ function CardioPlanning(){
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
           if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
           if(data.specColors){try{setSpecColors(JSON.parse(data.specColors)||{});}catch(e){}}
+          if(data.vacs!==undefined){try{setVacs(JSON.parse(data.vacs)||[]);}catch(e){}}
+          if(data.vacRule!==undefined)setVacRule(!!data.vacRule);
           if(data.colOrder){try{setColOrder(JSON.parse(data.colOrder)||{});}catch(e){}}
             if(data.adminEnabled!==undefined)setAdminEnabled(data.adminEnabled);
             if(data.adminCanReports!==undefined)setAdminCanReports(data.adminCanReports);
@@ -5295,6 +5344,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({specColors:JSON.stringify(specColors)});},[specColors]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({vacs:JSON.stringify(vacs),vacRule:vacRule?1:0});},[vacs,vacRule]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({colOrder:JSON.stringify(colOrder)});},[colOrder]);
   const moveCol=(siteKey,key,dir)=>{
     const cur=(colOrder[siteKey]&&colOrder[siteKey].length)?colOrder[siteKey].slice():((colModal&&colModal.cols)?colModal.cols.slice():[]);
@@ -6533,6 +6583,21 @@ header::-webkit-scrollbar { display: none; }
       {/* PLANNING */}
       {tab==="planning"&&(
         <div>
+          {/* v10.18 : alerte si la période affichée n'est pas couverte par les vacances saisies.
+              Placée dans le Planning — l'onglet toujours ouvert — et réservée à l'éditeur.
+              Pas de blocage de l'écriture : changer une borne ne déplace ni n'efface aucune
+              activité, cela ne change que ce qui est AFFICHÉ. Bloquer gênerait sans protéger. */}
+          {isEdit&&(()=>{
+            const p0=perStart(year,month);const a=new Date(p0.sy,p0.sm,1),b=perEnd(p0.sy,p0.sm);
+            const couvert=vacs.some(v=>v.d1&&v.d2&&new Date(v.d2+"T00:00:00")>=a&&new Date(v.d1+"T00:00:00")<=b);
+            if(couvert)return null;
+            return <div style={{background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:9,padding:"9px 12px",
+              fontSize:12.5,color:"#78350f",marginBottom:8,display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}>
+              <span>⚠</span>
+              <span><b>Vacances scolaires non renseignées</b> pour cette période — les bornes affichées sont provisoires.</span>
+              <button onClick={()=>goTab("partage")} style={{...S.icnBtn,width:"auto",padding:"3px 10px",fontSize:11,fontWeight:800,marginLeft:"auto"}}>Les saisir</button>
+            </div>;
+          })()}
           {isEdit&&<IssuePanel iss={planIssues} open={plIssOpen} setOpen={setPlIssOpen} onGo={goIssue}/>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -7196,24 +7261,84 @@ header::-webkit-scrollbar { display: none; }
             {/* Vacances scolaires */}
             <div style={{marginBottom:20,padding:"14px 16px",background:"var(--bg)",borderRadius:10,border:"1px solid var(--border)"}}>
               <div style={{fontWeight:700,fontSize:13,color:"var(--txt)",marginBottom:8}}>🏖 Vacances scolaires</div>
-              <div style={{fontSize:12,color:"var(--txt2)",marginBottom:10}}>Les jours de vacances apparaissent avec un fond grisé dans tous les calendriers.</div>
-              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                <span style={{fontSize:12,fontWeight:600,color:"var(--txt2)"}}>Zone :</span>
-                <div style={{display:"flex",gap:6}}>
-                  {["A","B","C"].map(z=>(
-                    <button key={z} onClick={()=>{setVacZone(z);try{localStorage.setItem("cp6_vaczone",z);}catch{}}}
-                      style={{padding:"6px 16px",borderRadius:7,border:`1px solid ${vacZone===z?"#1d4ed8":"var(--border)"}`,
-                        background:vacZone===z?"#1d4ed8":"var(--bg2)",color:vacZone===z?"#fff":"var(--txt2)",
-                        fontWeight:700,fontSize:13,cursor:"pointer"}}>
-                      Zone {z}
-                    </button>
-                  ))}
-                </div>
-                <span style={{fontSize:11,color:vacDates.size>0?"#16a34a":"#f59e0b",fontWeight:600}}>
-                  {vacDates.size>0?`✓ ${vacDates.size} jours chargés`:"⏳ Chargement..."}
-                </span>
-                {vacSource&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:3}}>Source : {vacSource}</div>}
+              <div style={{fontSize:12,color:"var(--txt2)",marginBottom:10}}>
+                Saisies ici, elles grisent les jours concernés dans tous les onglets. Elles ne sont plus téléchargées :
+                une donnée qui arrive après l'affichage rendrait les bornes de période changeantes.
               </div>
+              {(()=>{
+                const der=vacs.filter(v=>v.d2).map(v=>v.d2).sort().slice(-1)[0]||null;
+                const proche=der?((new Date(der+"T00:00:00")-new Date())/86400000)<183:true;
+                if(!proche)return null;
+                return <div style={{background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:8,padding:"9px 11px",fontSize:12,color:"#78350f",marginBottom:10}}>
+                  {der?<>Vos dates couvrent jusqu'au <b>{fmtLong(der)}</b>. Au-delà, l'application ne connaît plus les vacances — pensez à saisir l'année suivante.</>
+                     :<>Aucune date saisie. La règle d'extension et le grisé des vacances sont sans effet tant que la liste est vide.</>}
+                </div>;
+              })()}
+              <label style={{display:"flex",alignItems:"center",gap:9,fontSize:12.5,fontWeight:700,marginBottom:10,cursor:"pointer"}}>
+                <input type="checkbox" checked={vacRule} onChange={e=>setVacRule(e.target.checked)} style={{width:15,height:15}}/>
+                Étendre la période jusqu'à la fin des vacances
+              </label>
+              <div style={{fontSize:11.5,color:"var(--txt2)",marginBottom:10,lineHeight:1.5}}>
+                Quand la fin d'une période tombe au milieu de vacances, elle est repoussée à leur dernier jour et la
+                période suivante démarre le lendemain. Limité à 3 semaines, pour que les grandes vacances n'absorbent pas août.
+              </div>
+              {(()=>{
+                const p0=perStart(year,month);const out=[];let cy=p0.sy,cm=p0.sm;
+                for(let i=0;i<3;i++){
+                  const pv=perPrev(cy,cm);const a=new Date(perEnd(pv.sy,pv.sm));a.setDate(a.getDate()+1);
+                  const b=perEnd(cy,cm);
+                  out.push(<div key={i} style={{marginBottom:5}}>
+                    <b>{MOIS[cm]} {cy}</b> — du {fmtLongD(a)} au {fmtLongD(b)}
+                  </div>);
+                  const nx=perNext(cy,cm);cy=nx.sy;cm=nx.sm;
+                }
+                return <div style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 11px",fontSize:11.5,marginBottom:12}}>
+                  <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",marginBottom:5}}>Aperçu</div>
+                  {out}
+                </div>;
+              })()}
+              {isEdit&&<>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                  <button onClick={()=>setModal("vacColler")} style={{...S.icnBtn,width:"auto",padding:"6px 11px",fontSize:11.5,fontWeight:800}}>📋 Coller un calendrier</button>
+                  <a href="https://www.education.gouv.fr/calendrier-scolaire" target="_blank" rel="noopener"
+                    style={{...S.icnBtn,width:"auto",padding:"6px 11px",fontSize:11.5,fontWeight:800,textDecoration:"none",display:"inline-flex",alignItems:"center"}}>🔗 Calendrier officiel</a>
+                  <button onClick={()=>{
+                    const an=vacAnSuivante(vacs);
+                    setVacs(v=>v.concat(VAC_NOMS.map(n2=>({an,nom:n2,d1:"",d2:""}))));
+                  }} style={{...S.icnBtn,width:"auto",padding:"6px 11px",fontSize:11.5,fontWeight:800}}>+ Année {vacAnSuivante(vacs)}</button>
+                </div>
+              </>}
+              {vacGroupes(vacs).map(([an,lignes])=>(
+                <div key={an} style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:800,color:"var(--txt2)",marginBottom:4}}>Année scolaire {an}</div>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                    <tbody>
+                    {lignes.map(({v,idx})=>(
+                      <tr key={idx}>
+                        <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",width:88,fontWeight:700}}>{v.nom}</td>
+                        <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)"}}>
+                          <input type="date" value={v.d1||""} disabled={!isEdit}
+                            onChange={e=>setVacs(l=>l.map((x,i)=>i===idx?{...x,d1:e.target.value}:x))}
+                            style={{...S.fi,fontSize:11.5,padding:"3px 6px"}}/>
+                        </td>
+                        <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)"}}>
+                          <input type="date" value={v.d2||""} disabled={!isEdit}
+                            onChange={e=>setVacs(l=>l.map((x,i)=>i===idx?{...x,d2:e.target.value}:x))}
+                            style={{...S.fi,fontSize:11.5,padding:"3px 6px"}}/>
+                        </td>
+                        <td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",fontSize:10.5,color:"var(--txt3)",whiteSpace:"nowrap"}}>
+                          {(v.d1&&v.d2)?(fmtLong(v.d1)+" \u2192 "+fmtLong(v.d2)):"\u2014"}
+                        </td>
+                        {isEdit&&<td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",width:22}}>
+                          <span onClick={()=>setVacs(l=>l.filter((x,i)=>i!==idx))} style={{color:"#dc2626",cursor:"pointer",fontWeight:800}}>\u2715</span>
+                        </td>}
+                      </tr>
+                    ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+              {vacs.length===0&&<div style={{fontSize:11.5,color:"var(--txt3)"}}>Aucune vacance saisie.</div>}
             </div>
 
             {isEdit&&(()=>{
@@ -8048,6 +8173,10 @@ header::-webkit-scrollbar { display: none; }
             <button style={{...S.btnP,flex:1,background:"#b45309"}} onClick={histGo}>{histConf.sens==="undo"?"Revenir en arrière":"Rétablir"}</button>
           </div>
         </div>
+      </Ov>}
+      {modal==="vacColler"&&<Ov onClose={()=>setModal(null)}>
+        <VacCollerModal onClose={()=>setModal(null)}
+          onValider={lignes=>{setVacs(v=>v.filter(x=>!lignes.some(n2=>n2.an===x.an)).concat(lignes));setModal(null);toast(lignes.length+" période(s) enregistrée(s)","info");}}/>
       </Ov>}
       {modal==="restaure"&&mData&&<Ov onClose={()=>setModal(null)}>
         <RestoreModal med={medecins.find(m=>m.id===mData.medId)} backups={backupList}
