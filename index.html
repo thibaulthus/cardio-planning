@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.21 — 07/08/2026";
+var APP_VERSION = "v10.22 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -894,60 +894,87 @@ function GridV(_a) {
                         React.createElement(GardeCandidateList, { meds: filteredGM, isAbsDay: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; return isAbsOn(mid, p2.y, p2.m, p2.d); }, isAbsNext: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var nx = new Date(p2.y, p2.m, p2.d + 1); return isAbsOn(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, currentId: (function () { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var gm = getGardeMed2(p2.y, p2.m, p2.d); return gm ? gm.id : null; })(), onPick: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(mid, p2.y, p2.m, p2.d); setPickGardeDayFull(null); }, maxHeight: 320 })));
                 })())),
         React.createElement(TableScroll, { jours: true },
-            React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
-                React.createElement("thead", null,
-                    React.createElement("tr", null,
-                        React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: C0 }) }, "Jour"),
-                        React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: C0, zIndex: 40, minWidth: C1 }) }, "Sl"),
-                        showGarde && React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: CG, borderRight: "2px solid var(--border)", fontSize: 9, color: "#93c47d" }) }, "Garde"),
-                        meds.map(function (m) { return React.createElement("th", { key: m.id, style: __assign(__assign({}, S.th), { minWidth: 46, position: "sticky", top: 0, zIndex: 20 }), title: "Dr. ".concat(m.prenom, " ").concat(m.nom) },
-                            React.createElement("div", { style: __assign(__assign({}, S.avT), { background: m.color, margin: "0 auto" }) }, m.init)); }))),
-                React.createElement("tbody", null, printDays.map(function (_a, di) {
-                    var ey = _a.y, em = _a.m, d = _a.d;
-                    var prevDay = di > 0 ? printDays[di - 1] : null;
-                    var isNewMonth = viewPeriod && (!prevDay || prevDay.m !== em || prevDay.y !== ey);
-                    var we = isWE(ey, em, d), isT = d === today.getDate() && em === today.getMonth() && ey === today.getFullYear();
-                    var slots = we ? ["JOUR"] : ["M", "AM"];
-                    var isMonGV = !we && dow(ey, em, d) === 1;
-                    var gardeMed = getGardeMed2(ey, em, d);
-                    return slots.map(function (sl, si) { return (React.createElement("tr", { key: ey + "-" + em + "-" + d + sl, "data-day": ey + "-" + em + "-" + d, style: __assign(__assign(__assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMonGV ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
-                        si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: C0, background: isVac && isVac(ey, em, d) ? "var(--vac-bg)" : "var(--td-fix)" }), rowSpan: slots.length },
-                            React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
-                                d,
-                                viewPeriod && React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700, fontFamily: "sans-serif", lineHeight: 1.2 } }, MOIS[em])),
-                            React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)", textTransform: "uppercase", textAlign: "center" } }, JOURSC[dow(ey, em, d)])),
-                        React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, SLOTS[sl]),
-                        si === 0 && showGarde && React.createElement("td", { rowSpan: slots.length, style: __assign(__assign({}, S.tdFix), { borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "var(--garde-bg)" : "var(--td-fix)" }), onClick: function () { if (!isEdit || gardeLocked)
-                                return; setGardeSearch(""); setPickGardeDayFull({ d: d, y: ey, m: em }); } }, gardeMed && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2 } },
-                            React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: gardeMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, gardeMed.init))),
-                        meds.map(function (med) {
-                            var es = getEntries(med.id, ey, em, d, sl);
-                            var bl = es[0] && es[0]._blocked;
-                            var noteT = notes[nk(med.id, ey, em, d, sl)];
-                            var issueT = planIssues[med.id + "|" + ey + "|" + em + "|" + d + "|" + sl];
-                            var astId = getAstreinteForDay ? getAstreinteForDay(ey, em, d) : null;
-                            var isAst = astId !== null && String(astId) === String(med.id);
-                            var astSh = null;
-                            if (isAst) {
-                                var pdV = new Date(ey, em, d - 1), ndV = new Date(ey, em, d + 1);
-                                var paV = getAstreinteForDay(pdV.getFullYear(), pdV.getMonth(), pdV.getDate()), naV = getAstreinteForDay(ndV.getFullYear(), ndV.getMonth(), ndV.getDate());
-                                var contPrev = paV !== null && String(paV) === String(med.id), contNext = naV !== null && String(naV) === String(med.id);
-                                var parts = ["inset 1px 0 0 var(--ast-bord)", "inset -1px 0 0 var(--ast-bord)"];
-                                if (si === 0 && !contPrev)
-                                    parts.push("inset 0 1px 0 var(--ast-bord)");
-                                if (si === slots.length - 1 && !contNext)
-                                    parts.push("inset 0 -1px 0 var(--ast-bord)");
-                                astSh = parts.join(", ");
+            (function () {
+                        var sems = [];
+                        var cur = null;
+                        astPrintDays.forEach(function (_a) {
+                            var y = _a.y, m = _a.m, d = _a.d;
+                            var wk = monKey2(y, m, d);
+                            if (!cur || cur.wk !== wk) {
+                                cur = { wk: wk, jours: [] };
+                                sems.push(cur);
                             }
-                            return React.createElement("td", { key: med.id, title: (issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle", position: "relative" }), onContextMenu: onCellHistory ? function (e) { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onTouchMove: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onClick: bl || !isEdit ? undefined : function () { if (_gvLpF) {
-                                    _gvLpF = false;
-                                    return;
-                                } onCell(med.id, ey, em, d, sl); } },
-                                issueT && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }),
-                                !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } },
-                                    React.createElement(CondBadges, { es: es, acteById: acteById, noteT: noteT })));
-                        }))); });
-                }))))));
+                            cur.jours.push({ y: y, m: m, d: d });
+                        });
+                        var fmtJ = function (o) { return o.d + " " + MOIS[o.m].slice(0, 4).toLowerCase() + "."; };
+                        return React.createElement("div", { style: { padding: "4px 2px" } }, sems.map(function (sem) {
+                            var j0 = sem.jours[0], j9 = sem.jours[sem.jours.length - 1];
+                            var exc = sem.jours.filter(function (o) { var dk = o.y + "-" + o.m + "-" + o.d; return dk !== sem.wk && typeof astreinte[dk] === "string"; });
+                            var ouvert = astSemOuv[sem.wk] !== undefined ? astSemOuv[sem.wk] : exc.length > 0;
+                            var midS = astreinte[sem.wk];
+                            var medS = midS ? medecins.find(function (x) { return String(x.id) === String(midS); }) : null;
+                            var auj = sem.jours.some(function (o) { return o.d === astToday.getDate() && o.m === astToday.getMonth() && o.y === astToday.getFullYear(); });
+                            return React.createElement("div", { key: sem.wk, style: { border: "1px solid " + (exc.length ? "#7c3aed" : "var(--border)"),
+                                    borderLeftWidth: exc.length ? 4 : 1, borderRadius: 9, marginBottom: 6, overflow: "hidden",
+                                    background: auj ? "var(--bg-td)" : "var(--card)", borderStyle: medS ? "solid" : "dashed" } },
+                                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", flexWrap: "wrap",
+                                        cursor: "pointer" }, onClick: function () { return setAstSemOuv(function (o) {
+                                        var _a;
+                                        return (__assign(__assign({}, o), (_a = {}, _a[sem.wk] = !ouvert, _a)));
+                                    }); } },
+                                    React.createElement("span", { style: { color: "var(--txt3)", fontSize: 11, width: 10 } }, ouvert ? "▾" : "▸"),
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, minWidth: 130 } },
+                                        fmtJ(j0),
+                                        " \u2192 ",
+                                        fmtJ(j9)),
+                                    React.createElement("span", { onClick: function (e) {
+                                            if (!canAst)
+                                                return;
+                                            e.stopPropagation();
+                                            setAstPickModal({ dayKey: sem.wk, wKey: sem.wk, isWeek: true, label: "semaine du " + fmtJ(j0) });
+                                        }, style: { cursor: canAst ? "pointer" : "default", display: "flex", alignItems: "center", gap: 6 } }, medS ? React.createElement(React.Fragment, null,
+                                        React.createElement("span", { style: { width: 22, height: 22, borderRadius: "50%", background: medS.color, display: "flex",
+                                                alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, medS.init),
+                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700 } },
+                                            medS.prenom,
+                                            " ",
+                                            medS.nom)) : React.createElement("span", { style: { color: "var(--txt3)", fontSize: 12.5 } }, "\u2014 non renseign\u00E9e")),
+                                    React.createElement("span", { style: { marginLeft: "auto", fontSize: 10, fontWeight: 800, borderRadius: 11, padding: "2px 9px",
+                                            background: exc.length ? "rgba(124,58,237,.12)" : (medS ? "transparent" : "rgba(220,38,38,.10)"),
+                                            border: exc.length ? "1px solid #c4b5fd" : (medS ? "none" : "1px solid #fca5a5"),
+                                            color: exc.length ? "#5b21b6" : (medS ? "transparent" : "#991b1b") } }, exc.length ? (exc.length + " exception" + (exc.length > 1 ? "s" : "")) : (medS ? "" : "à remplir"))),
+                                ouvert && React.createElement("div", { style: { borderTop: "1px solid var(--border)", background: "var(--bg)" } }, sem.jours.map(function (_a) {
+                                    var y = _a.y, m = _a.m, d = _a.d;
+                                    var dk = y + "-" + m + "-" + d;
+                                    var hasExc = dk !== sem.wk && typeof astreinte[dk] === "string";
+                                    var mid = astForDay2(y, m, d);
+                                    var med = mid ? medecins.find(function (x) { return String(x.id) === String(mid); }) : null;
+                                    var isAbsMed = med ? (getEntries(med.id, y, m, d, "M").some(function (e) { return ABS_IDS.includes(e.acteId); }) || getEntries(med.id, y, m, d, "JOUR").some(function (e) { return ABS_IDS.includes(e.acteId); })) : false;
+                                    var dw2 = new Date(y, m, d).getDay();
+                                    return React.createElement("div", { key: dk, onClick: canAst ? function () { return setAstPickModal({ dayKey: dk, wKey: sem.wk, isWeek: false,
+                                            label: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2] + " " + d + " " + MOIS[m] }); } : undefined, style: { display: "flex", alignItems: "center", gap: 10, padding: "5px 11px 5px 32px", fontSize: 12,
+                                            borderBottom: "1px solid var(--border)", cursor: canAst ? "pointer" : "default",
+                                            background: hasExc ? "rgba(124,58,237,.06)" : "transparent", fontWeight: hasExc ? 700 : 400 } },
+                                        React.createElement("span", { style: { width: 112, color: "var(--txt2)" } },
+                                            ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2],
+                                            " ",
+                                            d,
+                                            " ",
+                                            MOIS[m].slice(0, 4).toLowerCase(),
+                                            "."),
+                                        med ? React.createElement(React.Fragment, null,
+                                            React.createElement("span", { style: { width: 20, height: 20, borderRadius: "50%", background: med.color, display: "flex",
+                                                    alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8.5, fontWeight: 800 } }, med.init),
+                                            React.createElement("span", { style: { color: isAbsMed ? "#ef4444" : "var(--txt)" } },
+                                                med.prenom,
+                                                " ",
+                                                med.nom),
+                                            isAbsMed && React.createElement("span", { style: { fontSize: 9, color: "#ef4444", fontWeight: 700 } }, "\u26A0 abs")) : React.createElement("span", { style: { color: "var(--txt3)" } }, "\u2014"),
+                                        hasExc && React.createElement("span", { style: { marginLeft: "auto", fontSize: 9.5, fontWeight: 800, borderRadius: 9,
+                                                padding: "1px 7px", background: "rgba(124,58,237,.14)", color: "#5b21b6" } }, "exception"));
+                                })));
+                        }));
+                    })())));
 }
 /* ════ SITE VIEW (CHL/CHB) ════ */
 /* v9.87 : LE CADRE DE DÉFILEMENT DES TABLEAUX, écrit 10 fois dans 7 composants.
@@ -4907,6 +4934,7 @@ function CardioPlanning() {
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
     var _20 = useState(function () { return new Date().getFullYear(); }), astYear = _20[0], setAstYear = _20[1];
     var _21 = useState(function () { return new Date().getMonth(); }), astMonth = _21[0], setAstMonth = _21[1];
+    var _aso = useState({}), astSemOuv = _aso[0], setAstSemOuv = _aso[1];
     var _22 = useState(function () { return new Date().getFullYear(); }), tourYear = _22[0], setTourYear = _22[1];
     var _23 = useState(function () { return new Date().getMonth(); }), tourMonth = _23[0], setTourMonth = _23[1];
     var _24 = useState("connecting"), fbStatus = _24[0], setFbStatus = _24[1];
@@ -7552,6 +7580,47 @@ function CardioPlanning() {
                     React.createElement("button", { onClick: function () { return setShowFull(true); }, style: { fontSize: 11, fontWeight: 800, padding: "5px 12px", borderRadius: 6, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.15)", color: "#b45309", cursor: "pointer" } }, "\ud83d\udcc5 Afficher la p\u00e9riode compl\u00e8te")));
             })(),
             tab === "planning" && (React.createElement("div", null,
+                isEdit && (function () {
+                    var auj = new Date();
+                    auj.setHours(0, 0, 0, 0);
+                    var lim = new Date(auj);
+                    lim.setDate(lim.getDate() + 42);
+                    var fin = null;
+                    Object.keys(astreinte || {}).forEach(function (k) {
+                        var v = astreinte[k];
+                        if (v === undefined || v === null || v === "")
+                            return;
+                        var p = String(k).split("-").map(Number);
+                        if (p.length < 3 || isNaN(p[0]))
+                            return;
+                        var d0 = new Date(p[0], p[1], p[2]);
+                        if (isNaN(d0))
+                            return;
+                        var d1 = new Date(d0);
+                        d1.setDate(d1.getDate() + 6); // une clé de semaine couvre 7 jours
+                        if (!fin || d1 > fin)
+                            fin = d1;
+                    });
+                    if (fin && fin >= lim)
+                        return null;
+                    var reste = fin ? Math.max(0, Math.round((fin - auj) / 86400000)) : 0;
+                    return React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 9, padding: "9px 12px",
+                            fontSize: 12.5, color: "#78350f", marginBottom: 8, display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" } },
+                        React.createElement("span", null, "\u26A0"),
+                        React.createElement("span", null, fin ? React.createElement(React.Fragment, null,
+                            React.createElement("b", null,
+                                "Astreinte remplie jusqu'au ",
+                                fmtLongD(fin)),
+                            " \u2014 soit ",
+                            reste,
+                            " jour",
+                            reste > 1 ? "s" : "",
+                            ". Pensez \u00E0 compl\u00E9ter la suite.")
+                            : React.createElement(React.Fragment, null,
+                                React.createElement("b", null, "Astreinte non renseign\u00E9e."),
+                                " Aucune semaine n'est remplie.")),
+                        React.createElement("button", { onClick: function () { return goTab("astreinte"); }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "3px 10px", fontSize: 11, fontWeight: 800, marginLeft: "auto" }) }, "Compl\u00E9ter"));
+                })(),
                 isEdit && (function () {
                     var p0 = perStart(year, month);
                     var a = new Date(p0.sy, p0.sm, 1), b = perEnd(p0.sy, p0.sm);

@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.21 — 07/08/2026";
+const APP_VERSION="v10.22 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4647,6 +4647,7 @@ function CardioPlanning(){
   // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
   const [astYear,setAstYear]=useState(()=>new Date().getFullYear());
   const [astMonth,setAstMonth]=useState(()=>new Date().getMonth());
+  const [astSemOuv,setAstSemOuv]=useState({}); // v10.22 : semaines dépliées dans l'onglet Astreinte
   const [tourYear,setTourYear]=useState(()=>new Date().getFullYear());
   const [tourMonth,setTourMonth]=useState(()=>new Date().getMonth());
   const [fbStatus,setFbStatus]=useState("connecting");
@@ -6596,6 +6597,30 @@ header::-webkit-scrollbar { display: none; }
               Placée dans le Planning — l'onglet toujours ouvert — et réservée à l'éditeur.
               Pas de blocage de l'écriture : changer une borne ne déplace ni n'efface aucune
               activité, cela ne change que ce qui est AFFICHÉ. Bloquer gênerait sans protéger. */}
+          {/* v10.22 : alerte de fin de liste d'astreinte, sur le modèle de celle des
+              vacances — Planning seulement, éditeur seulement, seuil à 6 semaines. */}
+          {isEdit&&(()=>{
+            const auj=new Date();auj.setHours(0,0,0,0);
+            const lim=new Date(auj);lim.setDate(lim.getDate()+42);
+            let fin=null;
+            Object.keys(astreinte||{}).forEach(k=>{
+              const v=astreinte[k];if(v===undefined||v===null||v==="")return;
+              const p=String(k).split("-").map(Number);
+              if(p.length<3||isNaN(p[0]))return;
+              const d0=new Date(p[0],p[1],p[2]);if(isNaN(d0))return;
+              const d1=new Date(d0);d1.setDate(d1.getDate()+6);   // une clé de semaine couvre 7 jours
+              if(!fin||d1>fin)fin=d1;
+            });
+            if(fin&&fin>=lim)return null;
+            const reste=fin?Math.max(0,Math.round((fin-auj)/86400000)):0;
+            return <div style={{background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:9,padding:"9px 12px",
+              fontSize:12.5,color:"#78350f",marginBottom:8,display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}>
+              <span>⚠</span>
+              <span>{fin?<><b>Astreinte remplie jusqu'au {fmtLongD(fin)}</b> — soit {reste} jour{reste>1?"s":""}. Pensez à compléter la suite.</>
+                        :<><b>Astreinte non renseignée.</b> Aucune semaine n'est remplie.</>}</span>
+              <button onClick={()=>goTab("astreinte")} style={{...S.icnBtn,width:"auto",padding:"3px 10px",fontSize:11,fontWeight:800,marginLeft:"auto"}}>Compléter</button>
+            </div>;
+          })()}
           {isEdit&&(()=>{
             const p0=perStart(year,month);const a=new Date(p0.sy,p0.sm,1),b=perEnd(p0.sy,p0.sm);
             const couvert=vacs.some(v=>v.d1&&v.d2&&new Date(v.d2+"T00:00:00")>=a&&new Date(v.d1+"T00:00:00")<=b);
@@ -6979,43 +7004,79 @@ header::-webkit-scrollbar { display: none; }
             </div>
             {/* Tableau des jours — style onglet Gardes */}
             <TableScroll memId="astreinte">
-              <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
-                <thead>
-                  <tr>
-                    <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:80}}>Date</th>
-                    <th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:150}}>Astreinte</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {astPrintDays.map(({y,m,d})=>{
-                    const dt=new Date(y,m,d);const dw2=dt.getDay();
-                    const we=dw2===6||dw2===0;
-                    const isT=d===astToday.getDate()&&m===astToday.getMonth()&&y===astToday.getFullYear();
-                    const dk=y+"-"+m+"-"+d;const wk=monKey2(y,m,d);
-                    const hasExc=dk!==wk&&typeof astreinte[dk]==="string";
-                    const mid=astForDay2(y,m,d);
-                    const med=mid?medecins.find(x=>String(x.id)===String(mid)):null;
-                    const isAbsMed=med?(getEntries(med.id,y,m,d,"M").some(e=>["ABSENCE","FORMATION","FORM"].includes(e.acteId))||getEntries(med.id,y,m,d,"JOUR").some(e=>["ABSENCE","FORMATION","FORM"].includes(e.acteId))):false;
-                    return(
-                      <tr key={dk} style={{height:36,borderBottom:"1px solid var(--border2)",...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{})}}>
-                        <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5,textAlign:"center",background:isT?"var(--bg-td)":we?"var(--bg-we)":"var(--td-fix)"}}>
-                          <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{d} <span style={{fontSize:9,fontWeight:600}}>{MOIS[m].slice(0,4)}</span></div>
-                          <div style={{fontSize:9,color:we?"#92400e":isT?"var(--today-c)":"var(--txt3)",fontWeight:600}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]}</div>
-                        </td>
-                        <td style={{...S.td,padding:4,cursor:canAst?"pointer":"default",...(hasExc?{outline:"2px solid #7c3aed",outlineOffset:-2}:{})}}
-                          onClick={canAst?()=>{setAstPickModal({dayKey:dk,wKey:wk,isWeek:false,label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]+" "+y});setAstSearch("");}:undefined}>
-                          {med?(<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:med.color+"22"}}>
-                            <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
-                            <span style={{fontSize:12,fontWeight:600,color:isAbsMed?"#ef4444":"var(--txt)"}}>{med.prenom} {med.nom}</span>
-                            {isAbsMed&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>⚠ abs</span>}
-                            {hasExc&&!isAbsMed&&<span style={{fontSize:9,color:"#7c3aed",marginLeft:"auto",fontWeight:700}}>exc.</span>}
-                          </div>):(<span style={{color:"var(--txt3)",fontSize:11}}>—</span>)}
-                        </td>
-                      </tr>
-                    );
+              {/* v10.22 : UNE TUILE PAR SEMAINE. L'astreinte est déjà enregistrée par
+                  SEMAINE, un jour ne l'écrasant qu'en cas d'exception — l'ancien tableau
+                  développait donc artificiellement sept lignes identiques. Les semaines à
+                  exception sont bordées de violet et s'ouvrent d'elles-mêmes. Rien ne change
+                  à l'enregistrement, à l'export ni à l'impression : affichage seul. */}
+              {(()=>{
+                const sems=[];let cur=null;
+                astPrintDays.forEach(({y,m,d})=>{
+                  const wk=monKey2(y,m,d);
+                  if(!cur||cur.wk!==wk){cur={wk,jours:[]};sems.push(cur);}
+                  cur.jours.push({y,m,d});
+                });
+                const fmtJ=(o)=>o.d+" "+MOIS[o.m].slice(0,4).toLowerCase()+".";
+                return <div style={{padding:"4px 2px"}}>
+                  {sems.map(sem=>{
+                    const j0=sem.jours[0],j9=sem.jours[sem.jours.length-1];
+                    const exc=sem.jours.filter(o=>{const dk=o.y+"-"+o.m+"-"+o.d;return dk!==sem.wk&&typeof astreinte[dk]==="string";});
+                    const ouvert=astSemOuv[sem.wk]!==undefined?astSemOuv[sem.wk]:exc.length>0;
+                    const midS=astreinte[sem.wk];
+                    const medS=midS?medecins.find(x=>String(x.id)===String(midS)):null;
+                    const auj=sem.jours.some(o=>o.d===astToday.getDate()&&o.m===astToday.getMonth()&&o.y===astToday.getFullYear());
+                    return <div key={sem.wk} style={{border:"1px solid "+(exc.length?"#7c3aed":"var(--border)"),
+                      borderLeftWidth:exc.length?4:1,borderRadius:9,marginBottom:6,overflow:"hidden",
+                      background:auj?"var(--bg-td)":"var(--card)",borderStyle:medS?"solid":"dashed"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",flexWrap:"wrap",
+                        cursor:"pointer"}} onClick={()=>setAstSemOuv(o=>({...o,[sem.wk]:!ouvert}))}>
+                        <span style={{color:"var(--txt3)",fontSize:11,width:10}}>{ouvert?"▾":"▸"}</span>
+                        <span style={{fontSize:12,fontWeight:700,minWidth:130}}>{fmtJ(j0)} → {fmtJ(j9)}</span>
+                        <span onClick={e=>{if(!canAst)return;e.stopPropagation();
+                          setAstPickModal({dayKey:sem.wk,wKey:sem.wk,isWeek:true,label:"semaine du "+fmtJ(j0)});}}
+                          style={{cursor:canAst?"pointer":"default",display:"flex",alignItems:"center",gap:6}}>
+                          {medS?<>
+                            <span style={{width:22,height:22,borderRadius:"50%",background:medS.color,display:"flex",
+                              alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{medS.init}</span>
+                            <span style={{fontSize:12.5,fontWeight:700}}>{medS.prenom} {medS.nom}</span>
+                          </>:<span style={{color:"var(--txt3)",fontSize:12.5}}>— non renseignée</span>}
+                        </span>
+                        <span style={{marginLeft:"auto",fontSize:10,fontWeight:800,borderRadius:11,padding:"2px 9px",
+                          background:exc.length?"rgba(124,58,237,.12)":(medS?"transparent":"rgba(220,38,38,.10)"),
+                          border:exc.length?"1px solid #c4b5fd":(medS?"none":"1px solid #fca5a5"),
+                          color:exc.length?"#5b21b6":(medS?"transparent":"#991b1b")}}>
+                          {exc.length?(exc.length+" exception"+(exc.length>1?"s":"")):(medS?"":"à remplir")}
+                        </span>
+                      </div>
+                      {ouvert&&<div style={{borderTop:"1px solid var(--border)",background:"var(--bg)"}}>
+                        {sem.jours.map(({y,m,d})=>{
+                          const dk=y+"-"+m+"-"+d;
+                          const hasExc=dk!==sem.wk&&typeof astreinte[dk]==="string";
+                          const mid=astForDay2(y,m,d);
+                          const med=mid?medecins.find(x=>String(x.id)===String(mid)):null;
+                          const isAbsMed=med?(getEntries(med.id,y,m,d,"M").some(e=>ABS_IDS.includes(e.acteId))||getEntries(med.id,y,m,d,"JOUR").some(e=>ABS_IDS.includes(e.acteId))):false;
+                          const dw2=new Date(y,m,d).getDay();
+                          return <div key={dk} onClick={canAst?()=>setAstPickModal({dayKey:dk,wKey:sem.wk,isWeek:false,
+                            label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]}):undefined}
+                            style={{display:"flex",alignItems:"center",gap:10,padding:"5px 11px 5px 32px",fontSize:12,
+                              borderBottom:"1px solid var(--border)",cursor:canAst?"pointer":"default",
+                              background:hasExc?"rgba(124,58,237,.06)":"transparent",fontWeight:hasExc?700:400}}>
+                            <span style={{width:112,color:"var(--txt2)"}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]} {d} {MOIS[m].slice(0,4).toLowerCase()}.</span>
+                            {med?<>
+                              <span style={{width:20,height:20,borderRadius:"50%",background:med.color,display:"flex",
+                                alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8.5,fontWeight:800}}>{med.init}</span>
+                              <span style={{color:isAbsMed?"#ef4444":"var(--txt)"}}>{med.prenom} {med.nom}</span>
+                              {isAbsMed&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>⚠ abs</span>}
+                            </>:<span style={{color:"var(--txt3)"}}>—</span>}
+                            {hasExc&&<span style={{marginLeft:"auto",fontSize:9.5,fontWeight:800,borderRadius:9,
+                              padding:"1px 7px",background:"rgba(124,58,237,.14)",color:"#5b21b6"}}>exception</span>}
+                          </div>;
+                        })}
+                      </div>}
+                    </div>;
                   })}
-                </tbody>
-              </table>
+                </div>;
+              })()}
             </TableScroll>
           </div>
         );
