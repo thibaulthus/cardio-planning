@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.19 — 07/08/2026";
+const APP_VERSION="v10.20 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -487,6 +487,14 @@ const vacAnSuivante=(list)=>{
   const d=parseInt(String(ans[ans.length-1]).slice(0,4),10)+1;
   return d+"-"+(d+1);
 };
+const vacTerminee=(an)=>{
+  /* une année scolaire est terminée quand son 31 août est passé */
+  const d=parseInt(String(an||"").slice(0,4),10);
+  if(!d)return false;
+  return new Date()>new Date(d+1,7,31);
+};
+const vacOuvert=(o,an)=>o[an]!==undefined?o[an]:!vacTerminee(an);
+
 const vacGroupes=(list)=>{
   const g={};
   list.forEach((v,idx)=>{(g[v.an||"?"]=g[v.an||"?"]||[]).push({v,idx});});
@@ -4648,6 +4656,7 @@ function CardioPlanning(){
      APRÈS l'affichage — les bornes de période auraient changé en cours d'usage. */
   const [vacs,setVacs]=useState([]);          // [{an,nom,d1,d2}]
   const [vacRule,setVacRule]=useState(false); // étendre la période jusqu'à la fin des vacances
+  const [vacOuv,setVacOuv]=useState({});      // années dépliées dans le panneau
   useEffect(()=>{VAC_LIST=vacs;},[vacs]);
   useEffect(()=>{VAC_RULE=vacRule;},[vacRule]);
   const vacDates=React.useMemo(()=>{
@@ -7309,9 +7318,24 @@ header::-webkit-scrollbar { display: none; }
                   }} style={{...S.icnBtn,width:"auto",padding:"6px 11px",fontSize:11.5,fontWeight:800}}>+ Année {vacAnSuivante(vacs)}</button>
                 </div>
               </>}
+              {isEdit&&vacGroupes(vacs).some(([an])=>vacTerminee(an))&&
+                <button onClick={()=>{
+                  const fin=vacGroupes(vacs).filter(([an])=>vacTerminee(an)).map(([an])=>an);
+                  if(window.confirm("Supprimer "+fin.length+" année(s) scolaire(s) terminée(s) ?\n\n"+fin.join(", ")+"\n\nLes activités du planning ne sont pas touchées ; seules les bornes des périodes déjà écoulées peuvent se décaler de quelques jours."))
+                    setVacs(l=>l.filter(v=>!vacTerminee(v.an)));
+                }} style={{...S.icnBtn,width:"auto",padding:"5px 10px",fontSize:11,fontWeight:800,marginBottom:10}}>
+                  🗑 Supprimer les années terminées
+                </button>}
               {vacGroupes(vacs).map(([an,lignes])=>(
                 <div key={an} style={{marginBottom:12}}>
-                  <div style={{fontSize:11,fontWeight:800,color:"var(--txt2)",marginBottom:4}}>Année scolaire {an}</div>
+                  {/* v10.20 : une année terminée est repliée — la liste reste courte au fil des
+                      ans sans que rien ne soit supprimé à votre insu. */}
+                  <div onClick={()=>setVacOuv(o=>({...o,[an]:!vacOuvert(o,an)}))}
+                    style={{fontSize:11,fontWeight:800,color:"var(--txt2)",marginBottom:4,cursor:"pointer",userSelect:"none"}}>
+                    {vacOuvert(vacOuv,an)?"▾":"▸"} Année scolaire {an}
+                    {vacTerminee(an)&&<span style={{fontWeight:600,color:"var(--txt3)"}}> — terminée</span>}
+                  </div>
+                  {vacOuvert(vacOuv,an)&&
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                     <tbody>
                     {lignes.map(({v,idx})=>(
@@ -7334,12 +7358,12 @@ header::-webkit-scrollbar { display: none; }
                           {(v.d1&&v.d2)?(jourCourt(v.d1)+" \u2192 "+jourCourt(v.d2)):"\u2014"}
                         </td>
                         {isEdit&&<td style={{padding:"3px 6px",borderBottom:"1px solid var(--border)",width:22}}>
-                          <span title={"Supprimer la ligne "+v.nom+" — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées"} onClick={()=>{if(window.confirm("Supprimer « "+v.nom+" "+v.an+" » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))setVacs(l=>l.filter((x,i)=>i!==idx));}} style={{color:"#dc2626",cursor:"pointer",fontWeight:800}}>\u2715</span>
+                          <span title={"Supprimer la ligne "+v.nom+" — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées"} onClick={()=>{if(window.confirm("Supprimer « "+v.nom+" "+v.an+" » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))setVacs(l=>l.filter((x,i)=>i!==idx));}} style={{color:"#dc2626",cursor:"pointer",fontWeight:800}}>✕</span>
                         </td>}
                       </tr>
                     ))}
                     </tbody>
-                  </table>
+                  </table>}
                 </div>
               ))}
               {vacs.length===0&&<div style={{fontSize:11.5,color:"var(--txt3)"}}>Aucune vacance saisie.</div>}

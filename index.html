@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.19 — 07/08/2026";
+var APP_VERSION = "v10.20 — 07/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -619,6 +619,14 @@ var vacAnSuivante = function (list) {
     var d = parseInt(String(ans[ans.length - 1]).slice(0, 4), 10) + 1;
     return d + "-" + (d + 1);
 };
+var vacTerminee = function (an) {
+    /* une année scolaire est terminée quand son 31 août est passé */
+    var d = parseInt(String(an || "").slice(0, 4), 10);
+    if (!d)
+        return false;
+    return new Date() > new Date(d + 1, 7, 31);
+};
+var vacOuvert = function (o, an) { return o[an] !== undefined ? o[an] : !vacTerminee(an); };
 var vacGroupes = function (list) {
     var g = {};
     list.forEach(function (v, idx) { (g[v.an || "?"] = g[v.an || "?"] || []).push({ v: v, idx: idx }); });
@@ -4907,7 +4915,8 @@ function CardioPlanning() {
        le reste. Plus de téléchargement : il échouait le plus souvent, et surtout il arrivait
        APRÈS l'affichage — les bornes de période auraient changé en cours d'usage. */
     var _52 = useState([]), vacs = _52[0], setVacs = _52[1]; // [{an,nom,d1,d2}]
-    var _53 = useState(false), vacRule = _53[0], setVacRule = _53[1]; // étendre la période jusqu'à la fin des vacances
+    var _53 = useState(false), vacRule = _53[0], setVacRule = _53[1];
+    var _vo = useState({}), vacOuv = _vo[0], setVacOuv = _vo[1]; // étendre la période jusqu'à la fin des vacances
     useEffect(function () { VAC_LIST = vacs; }, [vacs]);
     useEffect(function () { VAC_RULE = vacRule; }, [vacRule]);
     var vacDates = React.useMemo(function () {
@@ -8147,26 +8156,47 @@ function CardioPlanning() {
                                     }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "6px 11px", fontSize: 11.5, fontWeight: 800 }) },
                                     "+ Ann\u00E9e ",
                                     vacAnSuivante(vacs)))),
+                        isEdit && vacGroupes(vacs).some(function (_a) {
+                            var an = _a[0];
+                            return vacTerminee(an);
+                        }) &&
+                            React.createElement("button", { onClick: function () {
+                                    var fin = vacGroupes(vacs).filter(function (_a) {
+                                        var an = _a[0];
+                                        return vacTerminee(an);
+                                    }).map(function (_a) {
+                                        var an = _a[0];
+                                        return an;
+                                    });
+                                    if (window.confirm("Supprimer " + fin.length + " année(s) scolaire(s) terminée(s) ?\n\n" + fin.join(", ") + "\n\nLes activités du planning ne sont pas touchées ; seules les bornes des périodes déjà écoulées peuvent se décaler de quelques jours."))
+                                        setVacs(function (l) { return l.filter(function (v) { return !vacTerminee(v.an); }); });
+                                }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "5px 10px", fontSize: 11, fontWeight: 800, marginBottom: 10 }) }, "\uD83D\uDDD1 Supprimer les ann\u00E9es termin\u00E9es"),
                         vacGroupes(vacs).map(function (_a) {
                             var an = _a[0], lignes = _a[1];
                             return (React.createElement("div", { key: an, style: { marginBottom: 12 } },
-                                React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "var(--txt2)", marginBottom: 4 } },
-                                    "Ann\u00E9e scolaire ",
-                                    an),
-                                React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
-                                    React.createElement("tbody", null, lignes.map(function (_a) {
-                                        var v = _a.v, idx = _a.idx;
-                                        return (React.createElement("tr", { key: idx },
-                                            React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)", width: 88, fontWeight: 700 } }, v.nom),
-                                            React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)" } },
-                                                React.createElement("input", { type: "date", value: v.d1 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d1: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
-                                            React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)" } },
-                                                React.createElement("input", { type: "date", value: v.d2 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d2: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
-                                            React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)", fontSize: 10.5, color: "var(--txt3)", whiteSpace: "nowrap" } }, (v.d1 && v.d2) ? (jourCourt(v.d1) + " \u2192 " + jourCourt(v.d2)) : "\u2014"),
-                                            isEdit && React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)", width: 22 } },
-                                                React.createElement("span", { title: "Supprimer la ligne " + v.nom + " — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées", onClick: function () { if (window.confirm("Supprimer « " + v.nom + " " + v.an + " » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))
-                                                        setVacs(function (l) { return l.filter(function (x, i) { return i !== idx; }); }); }, style: { color: "#dc2626", cursor: "pointer", fontWeight: 800 } }, "\\u2715"))));
-                                    })))));
+                                React.createElement("div", { onClick: function () { return setVacOuv(function (o) {
+                                        var _a;
+                                        return (__assign(__assign({}, o), (_a = {}, _a[an] = !vacOuvert(o, an), _a)));
+                                    }); }, style: { fontSize: 11, fontWeight: 800, color: "var(--txt2)", marginBottom: 4, cursor: "pointer", userSelect: "none" } },
+                                    vacOuvert(vacOuv, an) ? "▾" : "▸",
+                                    " Ann\u00E9e scolaire ",
+                                    an,
+                                    vacTerminee(an) && React.createElement("span", { style: { fontWeight: 600, color: "var(--txt3)" } }, " \u2014 termin\u00E9e")),
+                                vacOuvert(vacOuv, an) &&
+                                    React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
+                                        React.createElement("tbody", null, lignes.map(function (_a) {
+                                            var v = _a.v, idx = _a.idx;
+                                            return (React.createElement("tr", { key: idx },
+                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)", width: 88, fontWeight: 700 } }, v.nom),
+                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)" } },
+                                                    React.createElement("input", { type: "date", value: v.d1 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d1: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
+                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)" } },
+                                                    React.createElement("input", { type: "date", value: v.d2 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d2: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
+                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)", fontSize: 10.5, color: "var(--txt3)", whiteSpace: "nowrap" } }, (v.d1 && v.d2) ? (jourCourt(v.d1) + " \u2192 " + jourCourt(v.d2)) : "\u2014"),
+                                                isEdit && React.createElement("td", { style: { padding: "3px 6px", borderBottom: "1px solid var(--border)", width: 22 } },
+                                                    React.createElement("span", { title: "Supprimer la ligne " + v.nom + " — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées", onClick: function () { if (window.confirm("Supprimer « " + v.nom + " " + v.an + " » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))
+                                                            setVacs(function (l) { return l.filter(function (x, i) { return i !== idx; }); }); }, style: { color: "#dc2626", cursor: "pointer", fontWeight: 800 } }, "\u2715"))));
+                                        })))));
                         }),
                         vacs.length === 0 && React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt3)" } }, "Aucune vacance saisie.")),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
