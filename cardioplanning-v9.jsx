@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.31 — 12/08/2026";
+const APP_VERSION="v10.32 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -3546,9 +3546,13 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
           const quotaN=isExcl?0:(savedCfg&&savedCfg.weeks&&savedCfg.weeks[m.id]!==undefined?savedCfg.weeks[m.id]:Math.ceil((weeksT.length*4)/nActifs));
           const quotaOK=total>=quotaN;
           return(
-            <div key={m.id} style={{...S.card,textAlign:"center",minWidth:64,flexShrink:0,padding:"7px 9px",opacity:quotaOK?1:.55,filter:quotaOK?"none":"grayscale(.35)"}} title={total+"/"+quotaN+" semaines"}>
-              <Av med={m}/>
-              <div style={{fontWeight:800,fontSize:14,color:m.color,fontFamily:"'JetBrains Mono',monospace",marginTop:3}}>{total}</div>
+            <div key={m.id} style={{...S.card,textAlign:"center",minWidth:64,flexShrink:0,padding:"5px 7px",opacity:quotaOK?1:.55,filter:quotaOK?"none":"grayscale(.35)"}} title={total+"/"+quotaN+" semaines"}>
+              {/* v10.32 : le total passe A COTE des initiales, le decompte HC/USIC
+                  remonte d'autant — une ligne de moins, largeur et corps inchanges. */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+                <Av med={m}/>
+                <div style={{fontWeight:800,fontSize:14,color:m.color,fontFamily:"'JetBrains Mono',monospace"}}>{total}</div>
+              </div>
               <div style={{display:"flex",gap:4,justifyContent:"center",marginTop:2}}>
                 <span style={{fontSize:9,color:"#388bfd",fontWeight:700}}>{hcCount}<span style={{fontWeight:400}}>HC</span></span>
                 <span style={{fontSize:9,color:"#a371f7",fontWeight:700}}>{usicCount}<span style={{fontWeight:400}}>US</span></span>
@@ -4920,6 +4924,18 @@ function ReportsView(p){
    v10.30 : pointage à UNE COCHE, étape terminée d'elle-même quand elle est
    mesurable, repli à la validation, jauge, rail numéroté, et le planning type
    s'applique SANS QUITTER l'onglet (la fenêtre reçoit la période de Construire). */
+/* v10.32 — LOT 2 : les trois demandes a l'equipe.
+   [identifiant, icone, ce que voit le medecin, champ de reponse]
+   Le champ « pers » est CELUI DU POINTAGE A LA MAIN de l'etape 1 : quand un
+   medecin repond, sa ligne se coche dans Construire — un seul etat, jamais deux. */
+const BUILD_DEM=[["conges","🏖️","Poser vos congés de la période","pers","Congés"],
+                 ["tour","🔄","Dire vos préférences de tour","prefT","Préférences de tour"],
+                 ["garde","🌙","Dire vos préférences de gardes","prefG","Préférences de gardes"]];
+/* l'annee de fin est dite quand la periode change d'annee (comme _titlePeriod) :
+   un bandeau se lit hors contexte, il ne doit pas laisser d'ambiguite. */
+const perLibelle=(sy,sm)=>{const a=String(sy).split("_");const y=+a[0],m=(sm===undefined?+String(sy).split("_")[1]:sm);
+  const ey=m+PCFG.len-1>11?y+1:y;
+  return MOIS[m]+" — "+MOIS[(m+PCFG.len-1)%12]+" "+(y!==ey?y+"/"+ey:ey);};
 const BUILD_SPECS=["Coro","EEP","FOP","Stim"];
 const BIP_MIN_SEM=3;   /* un jour sans bip est normal ; on alerte sous 3 bips/semaine */
 const BUILD_BAR_H=46;
@@ -4996,6 +5012,53 @@ function BuildEmbed({titre,children}){
   );
 }
 
+/* v10.32 : LE RAPPEL DU MEDECIN. Il s'affiche dans l'onglet Planning QUELLE QUE
+   SOIT LA PERIODE AFFICHEE — sa regle : « les gens n'iront jamais dans la periode
+   d'apres spontanement ». On balaie donc TOUTES les periodes de `build`, et le
+   bandeau dit de quelle periode il s'agit, avec un bouton pour y aller. */
+function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
+  if(!editMedId)return null;
+  const moi=medecins.find(m=>m.id===editMedId);
+  if(!moi||(moi.role||"medecin")!=="medecin")return null;
+  const att=[];
+  Object.keys(build||{}).forEach(k=>{
+    const B=(build||{})[k]||{};
+    BUILD_DEM.forEach(([id,ic,txt,champ])=>{
+      if((B.dem||{})[id]&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ});
+    });
+  });
+  if(!att.length)return null;
+  return(
+    <div style={{marginBottom:10}}>
+      {att.map(a=>(
+        <div key={a.k+"|"+a.id} style={{display:"flex",alignItems:"center",gap:9,flexWrap:"wrap",padding:"7px 11px",marginBottom:5,borderRadius:8,
+          border:"1px solid #f59e0b",background:"rgba(245,158,11,.13)"}}>
+          <span style={{fontSize:14}}>{a.ic}</span>
+          <div style={{flex:1,minWidth:150}}>
+            <div style={{fontSize:12.5,fontWeight:800,color:"#b45309"}}>{a.txt}</div>
+            <div style={{fontSize:11,color:"var(--txt2)"}}>{"Pour la période "+perLibelle(a.k)}</div>
+          </div>
+          <button onClick={()=>onGoPer(a.k)} style={{fontSize:11,padding:"4px 11px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>→ Voir cette période</button>
+          <button onClick={()=>onRepondre(a.k,a.champ)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #3fb950",background:"rgba(63,185,80,.13)",color:"#3fb950",fontWeight:800,cursor:"pointer"}}>✓ C'est fait</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* Liste compacte d'initiales, pour les deux demandes de preferences. */
+function BuildInitList({gens,etat,onSet,peut}){
+  if(!gens.length)return null;
+  return(
+    <div style={{display:"grid",gap:4,justifyContent:"start",gridTemplateColumns:"repeat(auto-fill,minmax(46px,58px))"}}>
+      {gens.map(m=>{const on=!!(etat||{})[m.id];return(
+        <button key={m.id} disabled={!peut} onClick={()=>onSet(m.id,!on)}
+          style={{padding:"3px 4px",borderRadius:6,fontSize:11,fontWeight:800,cursor:peut?"pointer":"default",overflow:"hidden",
+            border:"1px solid "+(on?"#3fb950":"var(--border)"),background:on?"rgba(63,185,80,.13)":"var(--bg3)",color:on?"#3fb950":"var(--txt3)"}}>{(on?"✓":"")+m.init}</button>);})}
+    </div>
+  );
+}
+
 function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps}){
   /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
   const [bPer,setBPer]=React.useState(()=>{if(BUILD_MEM.per)return BUILD_MEM.per;const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
@@ -5005,9 +5068,11 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
   const patchB=(patch)=>setBuild(p=>{const cur=(p||{})[pKey]||{};return {...(p||{}),[pKey]:{...cur,...patch}};});
   const sign=()=>({by:author||"?",at:new Date().toLocaleDateString("fr-FR")});
   const setPers=(medId,v)=>{const c={...(B.pers||{})};if(v)c[medId]=1;else delete c[medId];patchB({pers:c});};
+  const setRep=(champ,medId,v)=>{const c={...(B[champ]||{})};if(v)c[medId]=1;else delete c[medId];patchB({[champ]:c});};
+  const setDem=(id)=>{const d={...(B.dem||{})};if(d[id])delete d[id];else d[id]=sign();patchB({dem:d});};
   const setSpec=(nom)=>{const s={...(B.specs||{})};if(s[nom])delete s[nom];else s[nom]=sign();patchB({specs:s});};
 
-  const perLbl=MOIS[bPer.sm]+" — "+MOIS[(bPer.sm+PCFG.len-1)%12]+" "+bPer.sy;
+  const perLbl=perLibelle(bPer.sy,bPer.sm);
   const bDays=useMemo(()=>perDaysList(bPer.sy,bPer.sm),[bPer.sy,bPer.sm,PCFG.len]);
   const meds=useMemo(()=>medecins.filter(m=>(m.role||"medecin")==="medecin"),[medecins]);
   /* v10.31 : la coche « absences a recueillir » de la fiche Equipe decide qui parait ici */
@@ -5081,10 +5146,25 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
 
   const tuiles=[
     {n:1,icon:"🏖️",titre:"Congés de l'équipe",
-     sous:nMeds+" médecin"+(nMeds>1?"s":"")+" sur "+meds.length+" ont posé leurs congés",
+     sous:nMeds+" médecin"+(nMeds>1?"s":"")+" sur "+meds.length+" ont posé leurs congés"+((B.dem&&Object.keys(B.dem).length)?(" · "+Object.keys(B.dem).length+" demande"+(Object.keys(B.dem).length>1?"s":"")+" ouverte"+(Object.keys(B.dem).length>1?"s":"")):""),
      alerte:mMeds?(mMeds+" médecin"+(mMeds>1?"s n'ont":" n'a")+" pas encore posé ses congés"):null,
      body:<div>
-       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Une coche par personne dès qu'elle a posé ses vacances. Les médecins d'abord — ce sont les seuls nécessaires au tour ; les attachés et les IDE sont rappelés à l'étape 4.</div>
+       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:6,marginBottom:10}}>
+         {BUILD_DEM.map(([id,ic,txt,champ,titre])=>{
+           const ouverte=(B.dem||{})[id];
+           const n=meds.filter(m=>(B[champ]||{})[m.id]).length;
+           return(
+             <div key={id} style={{border:"1px solid "+(ouverte?"#8b5cf6":"var(--border)"),borderRadius:8,padding:"7px 9px",background:"var(--bg3)"}}>
+               <div style={{fontSize:12,fontWeight:800,color:"var(--txt)"}}>{ic+" "+titre}</div>
+               <div style={{fontSize:11,color:"var(--txt3)",margin:"2px 0 6px"}}>{n+" réponse"+(n>1?"s":"")+" sur "+meds.length}</div>
+               {isEdit&&<button onClick={()=>setDem(id)} style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",
+                 border:"1.5px solid #8b5cf6",background:ouverte?"#8b5cf6":"rgba(139,92,246,.10)",color:ouverte?"#fff":"#8b5cf6"}}>{ouverte?"✓ Demande ouverte":"Ouvrir la demande"}</button>}
+               {ouverte&&ouverte.at&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"ouverte le "+ouverte.at}</div>}
+               {id!=="conges"&&ouverte&&<div style={{marginTop:6}}><BuildInitList gens={meds} etat={B[champ]} onSet={(mid,v)=>setRep(champ,mid,v)} peut={isEdit}/></div>}
+             </div>);
+         })}
+       </div>
+       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Une coche par personne dès qu'elle a posé ses vacances — elle se coche aussi toute seule quand le médecin répond au rappel affiché dans son Planning. Les attachés et les IDE sont rappelés à l'étape 4.</div>
        <BuildPersonList gens={meds} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>
      </div>},
     {n:2,icon:"🔄",titre:"Distribution du tour",
@@ -7337,6 +7417,12 @@ header::-webkit-scrollbar { display: none; }
       {/* PLANNING */}
       {tab==="planning"&&(
         <div>
+          {/* v10.32 : rappel des demandes ouvertes. Il apparait quelle que soit la
+              periode affichee — la demande porte sur la periode suivante, mais
+              personne n'y va spontanement (sa remarque du 12/08). */}
+          <BuildAsk build={build} medecins={medecins} editMedId={accessMode==="medecinEdit"?editMedId:null}
+            onRepondre={(k,champ)=>setBuild(p=>{const B0=(p||{})[k]||{};const c={...(B0[champ]||{})};c[editMedId]=1;return {...(p||{}),[k]:{...B0,[champ]:c}};})}
+            onGoPer={(k)=>{const a=String(k).split("_");setYM({year:+a[0],month:+a[1]});}}/>
           {/* v10.18 : alerte si la période affichée n'est pas couverte par les vacances saisies.
               Placée dans le Planning — l'onglet toujours ouvert — et réservée à l'éditeur.
               Pas de blocage de l'écriture : changer une borne ne déplace ni n'efface aucune
