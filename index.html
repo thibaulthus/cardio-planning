@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.28 — 12/08/2026";
+var APP_VERSION = "v10.29 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1442,7 +1442,7 @@ function GardeCandidateList(_a) {
         meds.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", textAlign: "center", padding: "8px 0" } }, "Aucun m\u00E9decin de garde configur\u00E9.")));
 }
 function GardeView(_a) {
-    var _b = _a.onRemoveGarde, onRemoveGarde = _b === void 0 ? null : _b, _c = _a.printWk, printWk = _c === void 0 ? null : _c, _d = _a.onPrint, onPrint = _d === void 0 ? null : _d, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
+    var _nn = _a.noNav, noNav = _nn === void 0 ? false : _nn, _b = _a.onRemoveGarde, onRemoveGarde = _b === void 0 ? null : _b, _c = _a.printWk, printWk = _c === void 0 ? null : _c, _d = _a.onPrint, onPrint = _d === void 0 ? null : _d, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
     /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
        l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
     var removeGarde = function (d3, y3, m3) { if (onRemoveGarde)
@@ -1824,7 +1824,7 @@ function GardeView(_a) {
                             gMed.nom))) : (React.createElement("span", { style: { color: "var(--txt3)", fontSize: 11 } }, "\u2014")))));
             })))));
     return (React.createElement("div", null,
-        React.createElement("div", { style: S.bar },
+        React.createElement("div", { style: noNav ? { display: "none" } : S.bar },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
                 React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
                 React.createElement("h2", { style: S.mTit },
@@ -3141,7 +3141,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var _b = _a.specColors, specColors = _b === void 0 ? null : _b, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var _nn = _a.noNav, noNav = _nn === void 0 ? false : _nn, _b = _a.specColors, specColors = _b === void 0 ? null : _b, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -3755,7 +3755,7 @@ function TourTab(_a) {
         setAutoModal(false);
     };
     return (React.createElement("div", null,
-        React.createElement("div", { style: S.bar },
+        React.createElement("div", { style: noNav ? { display: "none" } : S.bar },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
                 React.createElement("button", { onClick: prevPeriodT, style: S.arr }, "\u2039"),
                 React.createElement("h2", { style: S.mTit }, "🔄 Tour médical — " + perLabelT + " " + perT.startY),
@@ -5121,6 +5121,194 @@ function ReportsView(p){
         })())));
 }
 
+/* ═══════════════ v10.29 : onglet CONSTRUIRE (lot 1) ═══════════════
+   Chef d'orchestre de la construction d'un planning. N'INVENTE AUCUNE
+   FONCTION : les tuiles Tour et Gardes montent les écrans EXISTANTS (mêmes
+   composants, mêmes props, via tourProps/gardeProps partagés avec les onglets
+   d'origine), les autres pointent à la main et renvoient vers l'onglet concerné.
+   UNE SEULE PÉRIODE, choisie dans la barre figée du haut : aucune flèche de mois
+   dans les tuiles (prop noNav), pour ne jamais remplir deux périodes à la fois.
+   Les alertes sont NON BLOQUANTES : elles signalent, elles n'empêchent pas. */
+var BUILD_SPECS = ["Coro", "EEP", "FOP", "Stim"];
+var BIP_MIN_SEM = 3; /* un jour sans bip est normal ; on alerte sous 3 bips/semaine */
+function BuildTile(_a) {
+    var n = _a.n, icon = _a.icon, titre = _a.titre, ouvert = _a.ouvert, onToggle = _a.onToggle, alerte = _a.alerte, fait = _a.fait, onFait = _a.onFait, peutFaire = _a.peutFaire, sous = _a.sous, children = _a.children;
+    var col = fait ? "#3fb950" : (alerte ? "#f59e0b" : "var(--border)");
+    return (React.createElement("div", { style: { border: "1px solid var(--border)", borderLeft: "4px solid " + col, borderRadius: 8, marginBottom: 8, background: "var(--bg2)", overflow: "hidden" } },
+        React.createElement("div", { onClick: onToggle, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", cursor: "pointer" } },
+            React.createElement("span", { style: { width: 22, height: 22, borderRadius: 11, background: fait ? "#3fb950" : "var(--bg3)", color: fait ? "#fff" : "var(--txt2)", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" } }, n),
+            React.createElement("span", { style: { fontSize: 13 } }, icon),
+            React.createElement("span", { style: { fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, titre),
+            fait && React.createElement("span", { style: { fontSize: 10, color: "#3fb950", fontWeight: 700 } }, "\u2713 fait"),
+            React.createElement("span", { style: { marginLeft: "auto", fontSize: 12, color: "var(--txt3)" } }, ouvert ? "▾" : "▸")),
+        alerte && React.createElement("div", { style: { margin: "0 10px 8px", padding: "5px 9px", borderRadius: 6, background: "rgba(245,158,11,.13)", border: "1px solid #f59e0b", color: "#b45309", fontSize: 11, fontWeight: 600 } },
+            "\u26A0 ",
+            alerte),
+        ouvert && React.createElement("div", { style: { padding: "0 10px 10px" } },
+            sous && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, sous),
+            children,
+            peutFaire && React.createElement("div", { style: { marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+                React.createElement("button", { onClick: onFait, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, fontWeight: 800, cursor: "pointer", border: fait ? "1.5px solid #3fb950" : "1.5px solid var(--border)", background: fait ? "rgba(63,185,80,.13)" : "var(--bg3)", color: fait ? "#3fb950" : "var(--txt2)" } }, fait ? "✓ Étape validée" : "Marquer cette étape comme faite"),
+                fait && fait.by && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "par " + fait.by + " le " + fait.at)))));
+}
+function BuildStatus(_a) {
+    var v = _a.v, onSet = _a.onSet, peut = _a.peut;
+    var OPT = [["oui", "oui", "#3fb950"], ["non", "non", "var(--txt3)"], ["na", "pas besoin", "#8b5cf6"]];
+    return (React.createElement("div", { style: { display: "flex", gap: 3 } }, OPT.map(function (_a) {
+        var k = _a[0], lbl = _a[1], c = _a[2];
+        return (React.createElement("button", { key: k, disabled: !peut, onClick: function () { return onSet(v === k ? null : k); }, style: { fontSize: 10, padding: "2px 7px", borderRadius: 5, fontWeight: 700, cursor: peut ? "pointer" : "default",
+                border: "1px solid " + (v === k ? c : "var(--border)"), background: v === k ? c : "var(--bg3)", color: v === k ? "#fff" : "var(--txt3)", opacity: peut ? 1 : .6 } }, lbl));
+    })));
+}
+function BuildPersonList(_a) {
+    var gens = _a.gens, etat = _a.etat, onSet = _a.onSet, peut = _a.peut, vide = _a.vide;
+    if (!gens.length)
+        return React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, vide);
+    return (React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 4 } }, gens.map(function (m) { return (React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 6, padding: "3px 6px", borderRadius: 6, background: "var(--bg3)" } },
+        React.createElement("span", { style: { width: 26, height: 20, borderRadius: 5, background: m.color || "#888", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" } }, m.init),
+        React.createElement("span", { style: { fontSize: 11, color: "var(--txt2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, m.prenom + " " + m.nom),
+        React.createElement("span", { style: { marginLeft: "auto" } },
+            React.createElement(BuildStatus, { v: (etat || {})[m.id] || null, onSet: function (x) { return onSet(m.id, x); }, peut: peut })))); })));
+}
+function BuildLien(_a) {
+    var txt = _a.txt, onClick = _a.onClick;
+    return React.createElement("button", { onClick: onClick, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, txt);
+}
+function BuildTab(_a) {
+    var build = _a.build, setBuild = _a.setBuild, medecins = _a.medecins, getEntries = _a.getEntries, tourMed = _a.tourMed, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, author = _a.author, goTab = _a.goTab, onOpenBip = _a.onOpenBip, tourProps = _a.tourProps, gardeProps = _a.gardeProps;
+    /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
+    var _b = React.useState(function () { var t = new Date(); var p0 = perStart(t.getFullYear(), t.getMonth()); return perNext(p0.sy, p0.sm); }), bPer = _b[0], setBPer = _b[1];
+    var pKey = bPer.sy + "_" + bPer.sm;
+    var B = (build || {})[pKey] || {};
+    var patchB = function (patch) { return setBuild(function (p) {
+        var _a;
+        var cur = (p || {})[pKey] || {};
+        return __assign(__assign({}, (p || {})), (_a = {}, _a[pKey] = __assign(__assign({}, cur), patch), _a));
+    }); };
+    var sign = function () { return ({ by: author || "?", at: new Date().toLocaleDateString("fr-FR") }); };
+    var setEtape = function (n) { var st = __assign({}, (B.etapes || {})); if (st[n])
+        delete st[n];
+    else
+        st[n] = sign(); patchB({ etapes: st }); };
+    var setPers = function (medId, v) { var c = __assign({}, (B.pers || {})); if (v)
+        c[medId] = v;
+    else
+        delete c[medId]; patchB({ pers: c }); };
+    var setSpec = function (nom) { var s = __assign({}, (B.specs || {})); if (s[nom])
+        delete s[nom];
+    else
+        s[nom] = sign(); patchB({ specs: s }); };
+    /* changement de période : on RECALCULE mais on NE REPLIE PAS (décision 12/08) */
+    var _c = React.useState({ 1: true }), ouv = _c[0], setOuv = _c[1];
+    var toggle = function (n) { return setOuv(function (o) {
+        var _a;
+        return (__assign(__assign({}, o), (_a = {}, _a[n] = !o[n], _a)));
+    }); };
+    var perLbl = MOIS[bPer.sm] + " — " + MOIS[(bPer.sm + PCFG.len - 1) % 12] + " " + bPer.sy;
+    var bDays = useMemo(function () { return perDaysList(bPer.sy, bPer.sm); }, [bPer.sy, bPer.sm, PCFG.len]);
+    var meds = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") === "medecin"; }); }, [medecins]);
+    var autres = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") !== "medecin"; }); }, [medecins]);
+    /* ── alertes, toutes non bloquantes ── */
+    var manqMeds = meds.filter(function (m) { var v = (B.pers || {})[m.id]; return v !== "oui" && v !== "na"; }).length;
+    var manqAutres = autres.filter(function (m) { var v = (B.pers || {})[m.id]; return v !== "oui" && v !== "na"; }).length;
+    var semVides = useMemo(function () {
+        var vus = {}, manq = [];
+        bDays.forEach(function (_a) {
+            var y = _a.y, m = _a.m, d = _a.d;
+            var wk = wKey(y, m, d);
+            if (vus[wk])
+                return;
+            vus[wk] = 1;
+            var wm = tourMed[wk] || {};
+            if (!((wm.HC || []).length) && !((wm.USIC || []).length))
+                manq.push(wk);
+        });
+        return manq.length;
+    }, [bDays, tourMed]);
+    var jSansGarde = useMemo(function () {
+        var n = 0;
+        bDays.forEach(function (_a) {
+            var y = _a.y, m = _a.m, d = _a.d;
+            var pris = medecins.some(function (md) { return ["N", "JOUR"].some(function (sl) { return getEntries(md.id, y, m, d, sl).some(function (e) { return e && e.acteId === "GARDE"; }); }); });
+            if (!pris)
+                n++;
+        });
+        return n;
+    }, [bDays, medecins, getEntries]);
+    var semBip = useMemo(function () {
+        var par = {};
+        bDays.forEach(function (_a) {
+            var y = _a.y, m = _a.m, d = _a.d;
+            var wk = wKey(y, m, d);
+            if (par[wk] === undefined)
+                par[wk] = 0;
+            if (dow(y, m, d) === 0 || dow(y, m, d) === 6)
+                return;
+            medecins.forEach(function (md) {
+                if (["M", "AM"].some(function (sl) { return getEntries(md.id, y, m, d, sl).some(function (e) { return e && e.acteId === "BIP"; }); }))
+                    par[wk]++;
+            });
+        });
+        return Object.keys(par).filter(function (k) { return par[k] < BIP_MIN_SEM; }).length;
+    }, [bDays, medecins, getEntries]);
+    var specManq = BUILD_SPECS.filter(function (s) { return !(B.specs || {})[s]; }).length;
+    var fait = function (n) { return (B.etapes || {})[n] || null; };
+    var tuiles = [
+        { n: 1, icon: "🏖️", titre: "Congés de l'équipe",
+            alerte: manqMeds ? (manqMeds + " médecin" + (manqMeds > 1 ? "s n'ont" : " n'a") + " pas encore donné ses congés") : null,
+            sous: "Les médecins d'abord — ce sont les seuls nécessaires pour distribuer le tour. Les attachés et les IDE peuvent être pointés ici aussi, l'étape 4 les rappelle.",
+            body: React.createElement(BuildPersonList, { gens: meds, etat: B.pers, onSet: setPers, peut: isEdit, vide: "Aucun m\u00E9decin dans l'\u00E9quipe." }) },
+        { n: 2, icon: "🔄", titre: "Distribution du tour",
+            alerte: semVides ? (semVides + " semaine" + (semVides > 1 ? "s" : "") + " sans tour attribué") : null,
+            body: React.createElement(TourTab, __assign({}, tourProps, { noNav: true, year: bPer.sy, month: bPer.sm })) },
+        { n: 3, icon: "🌙", titre: "Gardes",
+            alerte: jSansGarde ? (jSansGarde + " jour" + (jSansGarde > 1 ? "s" : "") + " sans garde sur la période") : null,
+            body: React.createElement(GardeView, __assign({}, gardeProps, { noNav: true, year: bPer.sy, month: bPer.sm })) },
+        { n: 4, icon: "🚫", titre: "Absences de tout le monde",
+            alerte: manqAutres ? (manqAutres + " personne" + (manqAutres > 1 ? "s" : "") + " hors médecins sans réponse") : null,
+            sous: "Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES.",
+            body: React.createElement("div", null,
+                React.createElement(BuildPersonList, { gens: autres, etat: B.pers, onSet: setPers, peut: isEdit, vide: "Aucun attach\u00E9 ni IDE dans l'\u00E9quipe." }),
+                React.createElement("div", { style: { marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" } },
+                    React.createElement(BuildLien, { txt: "\u2192 Saisir dans le Planning", onClick: function () { return goTab("planning"); } }),
+                    React.createElement(BuildLien, { txt: "\u2192 Onglet Attach\u00E9s", onClick: function () { return goTab("attache"); } }))) },
+        { n: 5, icon: "📋", titre: "Appliquer le planning type",
+            alerte: null,
+            sous: "Le planning type s'applique depuis son onglet, semaine par semaine ou sur la période.",
+            body: React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+                React.createElement(BuildLien, { txt: "\u2192 Onglet Type", onClick: function () { return goTab("plantype"); } })) },
+        { n: 6, icon: "🔬", titre: "Plannings par surspécialité",
+            alerte: specManq ? (specManq + " surspécialité" + (specManq > 1 ? "s" : "") + " non terminée" + (specManq > 1 ? "s" : "")) : null,
+            body: React.createElement("div", null,
+                React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 } }, BUILD_SPECS.map(function (s) {
+                    var f = (B.specs || {})[s];
+                    return (React.createElement("button", { key: s, disabled: !isEdit, onClick: function () { return setSpec(s); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (f ? "#3fb950" : "var(--border)"), background: f ? "rgba(63,185,80,.13)" : "var(--bg3)", color: f ? "#3fb950" : "var(--txt2)" } }, (f ? "✓ " : "") + s));
+                })),
+                React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+                    React.createElement(BuildLien, { txt: "\u2192 PT Cardio", onClick: function () { return goTab("plateau"); } }),
+                    React.createElement(BuildLien, { txt: "\u2192 PT Angio", onClick: function () { return goTab("angio"); } }))) },
+        { n: 7, icon: "📟", titre: "Bip de Béthune",
+            alerte: semBip ? (semBip + " semaine" + (semBip > 1 ? "s" : "") + " sous " + BIP_MIN_SEM + " bips") : null,
+            sous: "Un jour sans bip est normal ; l'alerte se déclenche sous " + BIP_MIN_SEM + " bips dans une semaine.",
+            body: React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+                isEdit && React.createElement("button", { onClick: onOpenBip, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #46bdc6", background: "rgba(70,189,198,.10)", color: "#46bdc6", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCDF R\u00E9partition du Bip"),
+                React.createElement(BuildLien, { txt: "\u2192 Onglet CHB", onClick: function () { return goTab("chb"); } })) }
+    ];
+    var nFaits = tuiles.filter(function (t) { return fait(t.n); }).length;
+    return (React.createElement("div", null,
+        React.createElement("div", { style: __assign(__assign({}, S.bar), { position: "sticky", top: HDR_H, zIndex: 30, background: "var(--bg)", paddingTop: 6, paddingBottom: 6, marginBottom: 8 }) },
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+                React.createElement("button", { onClick: function () { var p = perPrev(bPer.sy, bPer.sm); setBPer({ sy: p.sy, sm: p.sm }); }, style: S.arr }, "\u2039"),
+                React.createElement("h2", { style: S.mTit }, "🏗️ Construire — " + perLbl),
+                React.createElement("button", { onClick: function () { var p = perNext(bPer.sy, bPer.sm); setBPer({ sy: p.sy, sm: p.sm }); }, style: S.arr }, "\u203A")),
+            React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" } },
+                React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)", fontWeight: 700 } }, nFaits + "/7"),
+                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
+        !isEdit && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Lecture seule : le pointage est r\u00E9serv\u00E9 aux personnes qui peuvent modifier le planning."),
+        tuiles.map(function (t) { return (React.createElement(BuildTile, { key: t.n, n: t.n, icon: t.icon, titre: t.titre, ouvert: !!ouv[t.n], onToggle: function () { return toggle(t.n); }, alerte: t.alerte, fait: fait(t.n), onFait: function () { return setEtape(t.n); }, peutFaire: isEdit, sous: t.sous }, t.body)); }),
+        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", textAlign: "center", marginTop: 10 } }, "Les alertes signalent, elles ne bloquent pas : une \u00E9tape non valid\u00E9e n'emp\u00EAche jamais d'avancer.")));
+}
+
 function CardioPlanning() {
     var _this = this;
     var today = new Date();
@@ -5237,9 +5425,9 @@ function CardioPlanning() {
         else if (mq.removeListener)
             mq.removeListener(onChg); };
     }, []);
-    var DEFAULT_TABS = [["planning", "📅 Planning"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["tourmedical", "🔄 Tour"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["reports", "📥 Reports"], ["attache", "👔 Attachés"], ["plantype", "📋 Type"], ["equipe", "👥 Équipe"], ["activites", "⚙️ Activités"], ["stats", "📊 Stats"], ["aide", "❓ Aide"], ["partage", "⚙️ Paramètres"]];
+    var DEFAULT_TABS = [["planning", "📅 Planning"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["construire", "🏗️ Construire"], ["tourmedical", "🔄 Tour"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["reports", "📥 Reports"], ["attache", "👔 Attachés"], ["plantype", "📋 Type"], ["equipe", "👥 Équipe"], ["activites", "⚙️ Activités"], ["stats", "📊 Stats"], ["aide", "❓ Aide"], ["partage", "⚙️ Paramètres"]];
     var _k = useState(function () { try {
-        var v = localStorage.getItem("cp6_taborder_v2");
+        var v = localStorage.getItem("cp6_taborder_v3");
         if (v) {
             var saved_1 = JSON.parse(v);
             var all_1 = DEFAULT_TABS.map(function (t) { return t[0]; });
@@ -5253,7 +5441,7 @@ function CardioPlanning() {
     } }), tabOrder = _k[0], setTabOrder = _k[1];
     var _l = useState(null), dragTab = _l[0], setDragTab = _l[1];
     useEffect(function () { try {
-        localStorage.setItem("cp6_taborder_v2", JSON.stringify(tabOrder));
+        localStorage.setItem("cp6_taborder_v3", JSON.stringify(tabOrder));
     }
     catch (_a) { } }, [tabOrder]);
     var _m = useState(null), modal = _m[0], setModal = _m[1];
@@ -5277,6 +5465,8 @@ function CardioPlanning() {
     var _1 = useState({ coro: 3, pace: 1, eep: 1, ett: 1 }), tourMins = _1[0], setTourMins = _1[1];
     var _2 = useState({ coro: 2, pace: 1, eep: 1, ett: 0 }), tourMinsHard = _2[0], setTourMinsHard = _2[1];
     var _3 = useState({}), tourCfg = _3[0], setTourCfg = _3[1];
+    /* v10.29 : etat de l'onglet Construire, un objet par periode */
+    var _bld = useState({}), build = _bld[0], setBuild = _bld[1];
     var _4 = useState({}), tourAvoid = _4[0], setTourAvoid = _4[1]; // {weekKey:{medId:true}} préférences "ne pas tourner"
     var _5 = useState({}), tourWish = _5[0], setTourWish = _5[1]; // {weekKey:{medId:true}} souhaite tourner
     var _6 = useState({}), gardeAvoid = _6[0], setGardeAvoid = _6[1]; // {dateKey:{medId:true}} préfère pas de garde ce jour
@@ -5668,6 +5858,12 @@ function CardioPlanning() {
                         setTourMinsHard(JSON.parse(data.tourMinsHard));
                     if (data.tourCfg)
                         setTourCfg(JSON.parse(data.tourCfg));
+                    if (data.build) {
+                        try {
+                            setBuild(JSON.parse(data.build) || {});
+                        }
+                        catch (e) { }
+                    }
                     if (data.tourAvoid)
                         setTourAvoid(JSON.parse(data.tourAvoid));
                     if (data.tourWish)
@@ -6329,6 +6525,8 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourCfg: JSON.stringify(tourCfg) }); }, [tourCfg]);
     useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ build: JSON.stringify(build) }); }, [build]);
+    useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourAvoid: JSON.stringify(tourAvoid) }); }, [tourAvoid]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ tourWish: JSON.stringify(tourWish) }); }, [tourWish]);
@@ -6715,9 +6913,9 @@ function CardioPlanning() {
     var isMedEdit = accessMode === "medecinEdit" && medLvl !== "editeur" && !netOff;
     var isInterEdit = accessMode === "medecinEdit" && medLvl === "inter" && !netOff;
     /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
-    var hideTabs = accessMode === "adminEdit" ? ["activites", "equipe", "partage", "plantype", "stats", "astreinte"]
-        : isMedEdit ? ["activites", "equipe", "partage"]
-            : accessMode === "view" ? ["tourmedical", "activites", "equipe", "reports", "stats", "partage"] : [];
+    var hideTabs = accessMode === "adminEdit" ? ["activites", "equipe", "partage", "plantype", "stats", "astreinte", "construire"]
+        : isMedEdit ? ["activites", "equipe", "partage"].concat(isInterEdit ? [] : ["construire"])
+            : accessMode === "view" ? ["tourmedical", "activites", "equipe", "reports", "stats", "partage", "construire"] : [];
     var canAst = isEdit || (accessMode === "medecinEdit" && !netOff && ((medecins.find(function (m) { return m.id === editMedId; }) || {}).astreinte === true));
     var orderedTabs = tabOrder.map(function (id) { return DEFAULT_TABS.find(function (t2) { return t2[0] === id; }); }).filter(Boolean)
         .filter(function (_t) { return hideTabs.indexOf(_t[0]) < 0; });
@@ -7968,6 +8166,9 @@ function CardioPlanning() {
     var _per = getPeriodRange(year, month);
     var _pem = (_per.sm + PCFG.len - 1) % 12, _pey = _per.sm + PCFG.len - 1 > 11 ? _per.sy + 1 : _per.sy;
     var _titlePeriod = MOIS[_per.sm] + " — " + MOIS[_pem] + " " + (_per.sy !== _pey ? _per.sy + "/" + _pey : _pey);
+    /* v10.29 : un SEUL jeu de props par ecran, partage par l'onglet et par la tuile */
+    var tourProps = { specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast };
+    var gardeProps = { onRemoveGarde: removeGardeDay, printWk: printWk, onPrint: function () { return setModal("print"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, getEntry: getEntry, allDays: allDays, isEdit: isEdit, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast };
     return (React.createElement("div", { style: S.app },
         React.createElement("style", null, "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav::-webkit-scrollbar { display: none; }\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
         notif && React.createElement("div", { style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", borderColor: "#4ade80" }) }, notif.msg),
@@ -8105,15 +8306,14 @@ function CardioPlanning() {
                     React.createElement("button", { onClick: function () { return setPlanFilter([]); }, style: { padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border)", background: planFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: planFilter.length === 0 ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: 600 } }, "Tous"),
                     medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); })),
                 React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
-            tab === "tourmedical" && React.createElement(TourTab, { specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast }),
+            tab === "tourmedical" && React.createElement(TourTab, tourProps),
+            tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medecins, getEntries: getEntries, tourMed: tourMed, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, tourProps: tourProps, gardeProps: gardeProps }),
             tab === "chl" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
             tab === "chb" && React.createElement("div", null,
-                isEdit && React.createElement("div", { style: { marginBottom: 6 } },
-                    React.createElement("button", { style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #46bdc6", background: "rgba(70,189,198,.10)", color: "#46bdc6", fontWeight: 800, cursor: "pointer" }, onClick: bipOpen }, "\uD83D\uDCDF R\u00E9partition du Bip")),
                 React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHB"] || null, onOrder: function (cols) { setColModal({ site: "CHB", cols: cols }); setModal("colOrder"); }, site: "CHB", darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, showFull: showFull, setShowFull: setShowFull, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
@@ -8140,7 +8340,7 @@ function CardioPlanning() {
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "garde" && React.createElement(GardeView, { onRemoveGarde: removeGardeDay, printWk: printWk, onPrint: function () { return setModal("print"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, getEntry: getEntry, allDays: allDays, isEdit: isEdit, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast }),
+            tab === "garde" && React.createElement(GardeView, gardeProps),
             tab === "plantype" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },

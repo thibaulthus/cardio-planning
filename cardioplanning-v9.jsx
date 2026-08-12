@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.28 — 12/08/2026";
+const APP_VERSION="v10.29 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1313,7 +1313,7 @@ function GardeCandidateList({meds,isAbsDay,isAbsNext,currentId,onPick,maxHeight=
     </div>);
 }
 
-function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
+function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
   /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
      l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
   const removeGarde=(d3,y3,m3)=>{ if(onRemoveGarde)onRemoveGarde(y3,m3,d3); };
@@ -1609,7 +1609,7 @@ function GardeView({onRemoveGarde=null,printWk=null,onPrint=null,year,month,prev
 
     return(
     <div>
-      <div style={S.bar}>
+      <div style={noNav?{display:"none"}:S.bar}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <button onClick={prevM} style={S.arr}>‹</button>
           <h2 style={S.mTit}><span style={{color:"#f85149"}}>🌙 Gardes</span> — {MOIS[gvSm]+" — "+MOIS[(gvSm+PCFG.len-1)%12]+" "+gvSy}</h2>
@@ -3028,7 +3028,7 @@ function AbsModal({medecins,onApply,onRemove,onClose,initMedId=null,initDate=nul
 /* ════════════════════════════════════════════════════════════
    MAIN APP
 ════════════════════════════════════════════════════════════ */
-function TourTab({specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast}){
+function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast}){
   const _psT=perStart(tourYear,tourMonth);
   const perT={pi:_psT.sm,startY:_psT.sy,startM:_psT.sm};
   const perKeyT=perT.startY+"_"+perT.startM;
@@ -3511,7 +3511,7 @@ function TourTab({specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,apply
   };
   return(
     <div>
-      <div style={S.bar}>
+      <div style={noNav?{display:"none"}:S.bar}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={prevPeriodT} style={S.arr}>‹</button>
           <h2 style={S.mTit}>{"🔄 Tour médical — "+perLabelT+" "+perT.startY}</h2>
@@ -4909,6 +4909,203 @@ function ReportsView(p){
         })())));
 }
 
+/* ═══════════════ v10.29 : onglet CONSTRUIRE (lot 1) ═══════════════
+   Chef d'orchestre de la construction d'un planning. N'INVENTE AUCUNE
+   FONCTION : les tuiles Tour et Gardes montent les écrans EXISTANTS (mêmes
+   composants, mêmes props, via tourProps/gardeProps partagés avec les onglets
+   d'origine), les autres pointent à la main et renvoient vers l'onglet concerné.
+   UNE SEULE PÉRIODE, choisie dans la barre figée du haut : aucune flèche de mois
+   dans les tuiles (prop noNav), pour ne jamais remplir deux périodes à la fois.
+   Les alertes sont NON BLOQUANTES : elles signalent, elles n'empêchent pas. */
+const BUILD_SPECS=["Coro","EEP","FOP","Stim"];
+const BIP_MIN_SEM=3;   /* un jour sans bip est normal ; on alerte sous 3 bips/semaine */
+
+function BuildTile({n,icon,titre,ouvert,onToggle,alerte,fait,onFait,peutFaire,sous,children}){
+  const col=fait?"#3fb950":(alerte?"#f59e0b":"var(--border)");
+  return(
+    <div style={{border:"1px solid var(--border)",borderLeft:"4px solid "+col,borderRadius:8,marginBottom:8,background:"var(--bg2)",overflow:"hidden"}}>
+      <div onClick={onToggle} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer"}}>
+        <span style={{width:22,height:22,borderRadius:11,background:fait?"#3fb950":"var(--bg3)",color:fait?"#fff":"var(--txt2)",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto"}}>{n}</span>
+        <span style={{fontSize:13}}>{icon}</span>
+        <span style={{fontSize:13,fontWeight:800,color:"var(--txt)"}}>{titre}</span>
+        {fait&&<span style={{fontSize:10,color:"#3fb950",fontWeight:700}}>✓ fait</span>}
+        <span style={{marginLeft:"auto",fontSize:12,color:"var(--txt3)"}}>{ouvert?"▾":"▸"}</span>
+      </div>
+      {alerte&&<div style={{margin:"0 10px 8px",padding:"5px 9px",borderRadius:6,background:"rgba(245,158,11,.13)",border:"1px solid #f59e0b",color:"#b45309",fontSize:11,fontWeight:600}}>⚠ {alerte}</div>}
+      {ouvert&&<div style={{padding:"0 10px 10px"}}>
+        {sous&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>{sous}</div>}
+        {children}
+        {peutFaire&&<div style={{marginTop:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <button onClick={onFait} style={{fontSize:11,padding:"4px 13px",borderRadius:6,fontWeight:800,cursor:"pointer",border:fait?"1.5px solid #3fb950":"1.5px solid var(--border)",background:fait?"rgba(63,185,80,.13)":"var(--bg3)",color:fait?"#3fb950":"var(--txt2)"}}>{fait?"✓ Étape validée":"Marquer cette étape comme faite"}</button>
+          {fait&&fait.by&&<span style={{fontSize:10,color:"var(--txt3)"}}>{"par "+fait.by+" le "+fait.at}</span>}
+        </div>}
+      </div>}
+    </div>
+  );
+}
+
+function BuildStatus({v,onSet,peut}){
+  const OPT=[["oui","oui","#3fb950"],["non","non","var(--txt3)"],["na","pas besoin","#8b5cf6"]];
+  return(
+    <div style={{display:"flex",gap:3}}>
+      {OPT.map(([k,lbl,c])=>(
+        <button key={k} disabled={!peut} onClick={()=>onSet(v===k?null:k)}
+          style={{fontSize:10,padding:"2px 7px",borderRadius:5,fontWeight:700,cursor:peut?"pointer":"default",
+            border:"1px solid "+(v===k?c:"var(--border)"),background:v===k?c:"var(--bg3)",color:v===k?"#fff":"var(--txt3)",opacity:peut?1:.6}}>{lbl}</button>
+      ))}
+    </div>
+  );
+}
+
+function BuildPersonList({gens,etat,onSet,peut,vide}){
+  if(!gens.length)return <div style={{fontSize:11,color:"var(--txt3)"}}>{vide}</div>;
+  return(
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:4}}>
+      {gens.map(m=>(
+        <div key={m.id} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 6px",borderRadius:6,background:"var(--bg3)"}}>
+          <span style={{width:26,height:20,borderRadius:5,background:m.color||"#888",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto"}}>{m.init}</span>
+          <span style={{fontSize:11,color:"var(--txt2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.prenom+" "+m.nom}</span>
+          <span style={{marginLeft:"auto"}}><BuildStatus v={(etat||{})[m.id]||null} onSet={(x)=>onSet(m.id,x)} peut={peut}/></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BuildLien({txt,onClick}){
+  return <button onClick={onClick} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>{txt}</button>;
+}
+
+function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,setDarkMode,author,goTab,onOpenBip,tourProps,gardeProps}){
+  /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
+  const [bPer,setBPer]=React.useState(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
+  const pKey=bPer.sy+"_"+bPer.sm;
+  const B=(build||{})[pKey]||{};
+  const patchB=(patch)=>setBuild(p=>{const cur=(p||{})[pKey]||{};return {...(p||{}),[pKey]:{...cur,...patch}};});
+  const sign=()=>({by:author||"?",at:new Date().toLocaleDateString("fr-FR")});
+  const setEtape=(n)=>{const st={...(B.etapes||{})};if(st[n])delete st[n];else st[n]=sign();patchB({etapes:st});};
+  const setPers=(medId,v)=>{const c={...(B.pers||{})};if(v)c[medId]=v;else delete c[medId];patchB({pers:c});};
+  const setSpec=(nom)=>{const s={...(B.specs||{})};if(s[nom])delete s[nom];else s[nom]=sign();patchB({specs:s});};
+
+  /* changement de période : on RECALCULE mais on NE REPLIE PAS (décision 12/08) */
+  const [ouv,setOuv]=React.useState({1:true});
+  const toggle=(n)=>setOuv(o=>({...o,[n]:!o[n]}));
+
+  const perLbl=MOIS[bPer.sm]+" — "+MOIS[(bPer.sm+PCFG.len-1)%12]+" "+bPer.sy;
+  const bDays=useMemo(()=>perDaysList(bPer.sy,bPer.sm),[bPer.sy,bPer.sm,PCFG.len]);
+  const meds=useMemo(()=>medecins.filter(m=>(m.role||"medecin")==="medecin"),[medecins]);
+  const autres=useMemo(()=>medecins.filter(m=>(m.role||"medecin")!=="medecin"),[medecins]);
+
+  /* ── alertes, toutes non bloquantes ── */
+  const manqMeds=meds.filter(m=>{const v=(B.pers||{})[m.id];return v!=="oui"&&v!=="na";}).length;
+  const manqAutres=autres.filter(m=>{const v=(B.pers||{})[m.id];return v!=="oui"&&v!=="na";}).length;
+
+  const semVides=useMemo(()=>{
+    const vus={},manq=[];
+    bDays.forEach(({y,m,d})=>{
+      const wk=wKey(y,m,d);if(vus[wk])return;vus[wk]=1;
+      const wm=tourMed[wk]||{};
+      if(!((wm.HC||[]).length)&&!((wm.USIC||[]).length))manq.push(wk);
+    });
+    return manq.length;
+  },[bDays,tourMed]);
+
+  const jSansGarde=useMemo(()=>{
+    let n=0;
+    bDays.forEach(({y,m,d})=>{
+      const pris=medecins.some(md=>["N","JOUR"].some(sl=>getEntries(md.id,y,m,d,sl).some(e=>e&&e.acteId==="GARDE")));
+      if(!pris)n++;
+    });
+    return n;
+  },[bDays,medecins,getEntries]);
+
+  const semBip=useMemo(()=>{
+    const par={};
+    bDays.forEach(({y,m,d})=>{
+      const wk=wKey(y,m,d);
+      if(par[wk]===undefined)par[wk]=0;
+      if(dow(y,m,d)===0||dow(y,m,d)===6)return;
+      medecins.forEach(md=>{
+        if(["M","AM"].some(sl=>getEntries(md.id,y,m,d,sl).some(e=>e&&e.acteId==="BIP")))par[wk]++;
+      });
+    });
+    return Object.keys(par).filter(k=>par[k]<BIP_MIN_SEM).length;
+  },[bDays,medecins,getEntries]);
+
+  const specManq=BUILD_SPECS.filter(s=>!(B.specs||{})[s]).length;
+  const fait=(n)=>(B.etapes||{})[n]||null;
+
+  const tuiles=[
+    {n:1,icon:"🏖️",titre:"Congés de l'équipe",
+     alerte:manqMeds?(manqMeds+" médecin"+(manqMeds>1?"s n'ont":" n'a")+" pas encore donné ses congés"):null,
+     sous:"Les médecins d'abord — ce sont les seuls nécessaires pour distribuer le tour. Les attachés et les IDE peuvent être pointés ici aussi, l'étape 4 les rappelle.",
+     body:<BuildPersonList gens={meds} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>},
+    {n:2,icon:"🔄",titre:"Distribution du tour",
+     alerte:semVides?(semVides+" semaine"+(semVides>1?"s":"")+" sans tour attribué"):null,
+     body:<TourTab {...tourProps} noNav={true} year={bPer.sy} month={bPer.sm}/>},
+    {n:3,icon:"🌙",titre:"Gardes",
+     alerte:jSansGarde?(jSansGarde+" jour"+(jSansGarde>1?"s":"")+" sans garde sur la période"):null,
+     body:<GardeView {...gardeProps} noNav={true} year={bPer.sy} month={bPer.sm}/>},
+    {n:4,icon:"🚫",titre:"Absences de tout le monde",
+     alerte:manqAutres?(manqAutres+" personne"+(manqAutres>1?"s":"")+" hors médecins sans réponse"):null,
+     sous:"Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES.",
+     body:<div>
+       <BuildPersonList gens={autres} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun attaché ni IDE dans l'équipe."/>
+       <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
+         <BuildLien txt="→ Saisir dans le Planning" onClick={()=>goTab("planning")}/>
+         <BuildLien txt="→ Onglet Attachés" onClick={()=>goTab("attache")}/>
+       </div></div>},
+    {n:5,icon:"📋",titre:"Appliquer le planning type",
+     alerte:null,
+     sous:"Le planning type s'applique depuis son onglet, semaine par semaine ou sur la période.",
+     body:<div style={{display:"flex",gap:6,flexWrap:"wrap"}}><BuildLien txt="→ Onglet Type" onClick={()=>goTab("plantype")}/></div>},
+    {n:6,icon:"🔬",titre:"Plannings par surspécialité",
+     alerte:specManq?(specManq+" surspécialité"+(specManq>1?"s":"")+" non terminée"+(specManq>1?"s":"")):null,
+     body:<div>
+       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
+         {BUILD_SPECS.map(s=>{const f=(B.specs||{})[s];return(
+           <button key={s} disabled={!isEdit} onClick={()=>setSpec(s)} style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:isEdit?"pointer":"default",border:"1px solid "+(f?"#3fb950":"var(--border)"),background:f?"rgba(63,185,80,.13)":"var(--bg3)",color:f?"#3fb950":"var(--txt2)"}}>{(f?"✓ ":"")+s}</button>);})}
+       </div>
+       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+         <BuildLien txt="→ PT Cardio" onClick={()=>goTab("plateau")}/>
+         <BuildLien txt="→ PT Angio" onClick={()=>goTab("angio")}/>
+       </div></div>},
+    {n:7,icon:"📟",titre:"Bip de Béthune",
+     alerte:semBip?(semBip+" semaine"+(semBip>1?"s":"")+" sous "+BIP_MIN_SEM+" bips"):null,
+     sous:"Un jour sans bip est normal ; l'alerte se déclenche sous "+BIP_MIN_SEM+" bips dans une semaine.",
+     body:<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+       {isEdit&&<button onClick={onOpenBip} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}}>📟 Répartition du Bip</button>}
+       <BuildLien txt="→ Onglet CHB" onClick={()=>goTab("chb")}/>
+     </div>}
+  ];
+
+  const nFaits=tuiles.filter(t=>fait(t.n)).length;
+
+  return(
+    <div>
+      <div style={{...S.bar,position:"sticky",top:HDR_H,zIndex:30,background:"var(--bg)",paddingTop:6,paddingBottom:6,marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <button onClick={()=>{const p=perPrev(bPer.sy,bPer.sm);setBPer({sy:p.sy,sm:p.sm});}} style={S.arr}>‹</button>
+          <h2 style={S.mTit}>{"🏗️ Construire — "+perLbl}</h2>
+          <button onClick={()=>{const p=perNext(bPer.sy,bPer.sm);setBPer({sy:p.sy,sm:p.sm});}} style={S.arr}>›</button>
+        </div>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
+          <span style={{fontSize:11,color:"var(--txt3)",fontWeight:700}}>{nFaits+"/7"}</span>
+          <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+        </div>
+      </div>
+      {!isEdit&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Lecture seule : le pointage est réservé aux personnes qui peuvent modifier le planning.</div>}
+      {tuiles.map(t=>(
+        <BuildTile key={t.n} n={t.n} icon={t.icon} titre={t.titre} ouvert={!!ouv[t.n]} onToggle={()=>toggle(t.n)}
+          alerte={t.alerte} fait={fait(t.n)} onFait={()=>setEtape(t.n)} peutFaire={isEdit} sous={t.sous}>
+          {t.body}
+        </BuildTile>
+      ))}
+      <div style={{fontSize:10,color:"var(--txt3)",textAlign:"center",marginTop:10}}>Les alertes signalent, elles ne bloquent pas : une étape non validée n'empêche jamais d'avancer.</div>
+    </div>
+  );
+}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -4997,10 +5194,10 @@ function CardioPlanning(){
     if(mq.addEventListener)mq.addEventListener("change",onChg);else if(mq.addListener)mq.addListener(onChg);
     return ()=>{if(mq.removeEventListener)mq.removeEventListener("change",onChg);else if(mq.removeListener)mq.removeListener(onChg);};
   },[]);
-  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
-  const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder_v2"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
+  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["construire","🏗️ Construire"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
+  const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder_v3"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
-  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v2",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
+  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v3",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
 
   const [modal,setModal]=useState(null);
   const [mData,setMData]=useState(null);
@@ -5022,6 +5219,8 @@ function CardioPlanning(){
   const [tourMins,setTourMins]=useState({coro:3,pace:1,eep:1,ett:1});
   const [tourMinsHard,setTourMinsHard]=useState({coro:2,pace:1,eep:1,ett:0});
   const [tourCfg,setTourCfg]=useState({});
+  /* v10.29 : etat de l'onglet Construire, un objet par periode (pointage, etapes, surspecialites) */
+  const [build,setBuild]=useState({});
   const [tourAvoid,setTourAvoid]=useState({}); // {weekKey:{medId:true}} préférences "ne pas tourner"
   const [tourWish,setTourWish]=useState({});   // {weekKey:{medId:true}} souhaite tourner
   const [gardeAvoid,setGardeAvoid]=useState({}); // {dateKey:{medId:true}} préfère pas de garde ce jour
@@ -5299,6 +5498,7 @@ function CardioPlanning(){
           if(data.tourMins)setTourMins(JSON.parse(data.tourMins));
           if(data.tourMinsHard)setTourMinsHard(JSON.parse(data.tourMinsHard));
           if(data.tourCfg)setTourCfg(JSON.parse(data.tourCfg));
+          if(data.build){try{setBuild(JSON.parse(data.build)||{});}catch(e){}}
           if(data.tourAvoid)setTourAvoid(JSON.parse(data.tourAvoid));
           if(data.tourWish)setTourWish(JSON.parse(data.tourWish));
           if(data.gardeAvoid)setGardeAvoid(JSON.parse(data.gardeAvoid));
@@ -5705,6 +5905,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourMins:JSON.stringify(tourMins)});},[tourMins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourMinsHard:JSON.stringify(tourMinsHard)});},[tourMinsHard]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourCfg:JSON.stringify(tourCfg)});},[tourCfg]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({build:JSON.stringify(build)});},[build]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourAvoid:JSON.stringify(tourAvoid)});},[tourAvoid]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourWish:JSON.stringify(tourWish)});},[tourWish]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({gardeAvoid:JSON.stringify(gardeAvoid)});},[gardeAvoid]);
@@ -5969,9 +6170,9 @@ function CardioPlanning(){
   const isMedEdit=accessMode==="medecinEdit"&&medLvl!=="editeur"&&!netOff;
   const isInterEdit=accessMode==="medecinEdit"&&medLvl==="inter"&&!netOff;
   /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
-  const hideTabs=accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte"]
-    :isMedEdit?["activites","equipe","partage"]
-    :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage"]:[];
+  const hideTabs=accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte","construire"]
+    :isMedEdit?["activites","equipe","partage"].concat(isInterEdit?[]:["construire"])
+    :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage","construire"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
     .filter(([tid])=>hideTabs.indexOf(tid)<0);
@@ -6917,6 +7118,10 @@ function CardioPlanning(){
   const _per=getPeriodRange(year,month);
   const _pem=(_per.sm+PCFG.len-1)%12,_pey=_per.sm+PCFG.len-1>11?_per.sy+1:_per.sy;
   const _titlePeriod=MOIS[_per.sm]+" — "+MOIS[_pem]+" "+(_per.sy!==_pey?_per.sy+"/"+_pey:_pey);
+  /* v10.29 : un SEUL jeu de props par ecran, utilise par l'onglet d'origine ET par la
+     tuile de Construire (qui n'y change que l'annee, le mois et noNav). */
+  const tourProps={specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit:isEdit||isInterEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast};
+  const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -7129,14 +7334,16 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {/* TOUR MÉDICAL */}
-      {tab==="tourmedical"&&<TourTab specColors={specColors} tourMins={tourMins} tourMinsHard={tourMinsHard} tourAvoid={tourAvoid} tourWish={tourWish} applyTPForWeek={applyTPForWeek} cleanTPForWeek={cleanTPForWeek} clearWeekActivities={clearWeekActivities} reapplyPTWeek={reapplyPTWeek} purgeTourExtras={purgeTourExtras} plan={plan} tourDerog={tourDerog} lastReport={tourReport} setLastReport={setTourReport} tourCfg={tourCfg} setTourCfg={setTourCfg} year={tourYear} month={tourMonth} setYear={setTourYear} setMonth={setTourMonth} tourMed={tourMed} setTourMed={setTourMed} medecins={medecins} getEntries={getEntries} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} planningType={planningType} setPlan={setPlan} allDays={allDays} toast={toast}/>}
+      {tab==="tourmedical"&&<TourTab {...tourProps}/>}
+
+      {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
+      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medecins} getEntries={getEntries} tourMed={tourMed} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} tourProps={tourProps} gardeProps={gardeProps}/>}
 
       {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        {isEdit&&<div style={{marginBottom:6}}><button style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}} onClick={bipOpen}>📟 Répartition du Bip</button></div>}
         <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
@@ -7168,7 +7375,7 @@ header::-webkit-scrollbar { display: none; }
         getEntries={getEntries} allDays={allDays} isEdit={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="garde"&&<GardeView onRemoveGarde={removeGardeDay} printWk={printWk} onPrint={()=>setModal("print")} year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} getEntry={getEntry} allDays={allDays} isEdit={isEdit} applyGarde={applyGarde} isMedAvailable={isMedAvailable} plan={plan} setPlan={setPlan} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod} tourMed={tourMed} gardeAvoid={gardeAvoid} gardeWish={gardeWish} toast={toast}/>}
+      {tab==="garde"&&<GardeView {...gardeProps}/>}
 
 
       {tab==="plantype"&&(
