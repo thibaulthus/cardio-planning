@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.30 — 12/08/2026";
+var APP_VERSION = "v10.31 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -3837,14 +3837,14 @@ function TourTab(_a) {
                         }))),
                 ["HC", "USIC"].map(function (unit) { return (React.createElement("div", { key: unit, style: { flex: 1, minWidth: 170 } },
                     React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: unit === "HC" ? "#388bfd" : "#a371f7", marginBottom: 4 } }, unit),
-                    React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, tourMeds.map(function (m) {
+                    React.createElement("div", { style: { display: "grid", gap: 4, justifyContent: "start", gridTemplateColumns: "repeat(auto-fill,minmax(62px,76px))" } }, tourMeds.map(function (m) {
                         var on = (wm[unit] || []).includes(m.id);
                         var blocked = isBlockedInWeek(m.id, w.key);
                         var inOther = (wm[unit === "HC" ? "USIC" : "HC"] || []).includes(m.id);
                         var dis = blocked || inOther;
                         var avoidW = !!((tourAvoid || {})[w.key] || {})[m.id];
                         var wishW = !!((tourWish || {})[w.key] || {})[m.id];
-                        return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "3px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 44,
+                        return (React.createElement("button", { key: m.id, disabled: dis || !isEdit, style: { padding: "4px 6px", borderRadius: 6, border: "none", cursor: dis || !isEdit ? "default" : "pointer", textAlign: "center", minWidth: 62, overflow: "hidden",
                                 background: on ? ({ coro: "rgba(118,165,175,.82)", pace: "rgba(227,179,65,.82)", eep: "rgba(139,92,246,.82)", ett: "rgba(236,72,153,.82)" }[m.surSpec] || "rgba(56,139,253,.82)") : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontWeight: on ? 800 : 600, opacity: dis ? .3 : 1,
                                 outline: on ? "2px solid " + (SPEC_COLORS[m.surSpec] || "#388bfd") : m.surSpec && !blocked ? "2px solid " + (SPEC_COLORS[m.surSpec] || "var(--border)") : "1px solid var(--border)" }, onClick: function () {
                                 if (dis || !isEdit)
@@ -3872,10 +3872,10 @@ function TourTab(_a) {
                                     setTimeout(function () { return reapplyPTWeek(m.id, w.key); }, 60);
                                 }
                             } },
-                            React.createElement("div", { style: { fontWeight: 800, fontSize: 10 }, title: avoidW ? "Préfère ne pas tourner cette semaine" : wishW ? "Souhaite tourner cette semaine" : "" },
+                            React.createElement("div", { style: { fontWeight: 800, fontSize: 11, lineHeight: 1.15 }, title: avoidW ? "Préfère ne pas tourner cette semaine" : wishW ? "Souhaite tourner cette semaine" : "" },
                                 m.init,
                                 avoidW ? " 🚫" : wishW ? " ⭐" : ""),
-                            React.createElement("div", { style: { fontSize: 8, color: blocked ? "inherit" : m.surSpec && !on ? (SPEC_COLORS[m.surSpec]) : "inherit" } }, blocked ? "indispo" : inOther ? "≠" : "")));
+                            React.createElement("div", { style: { fontSize: 8.5, color: blocked ? "inherit" : m.surSpec && !on ? (SPEC_COLORS[m.surSpec]) : "inherit" } }, blocked ? "indispo" : inOther ? "≠" : "")));
                     })),
                     React.createElement("div", { style: { marginTop: 4, display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("span", { style: { fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: (wm[unit] || []).length === 2 ? "#3fb950" : (wm[unit] || []).length > 2 ? "#f85149" : "#e3b341" } },
@@ -5134,7 +5134,11 @@ function ReportsView(p){
    s'applique SANS QUITTER l'onglet (la fenêtre reçoit la période de Construire). */
 var BUILD_SPECS = ["Coro", "EEP", "FOP", "Stim"];
 var BIP_MIN_SEM = 3; /* un jour sans bip est normal ; on alerte sous 3 bips/semaine */
-var BUILD_BAR_H = 46; /* hauteur de la barre de période — les zones figées des écrans montés se calent dessous */
+var BUILD_BAR_H = 46;
+/* v10.31 : ce qu'on retrouve en revenant dans l'onglet — periode et tuiles ouvertes.
+   Volontairement en memoire de session, comme SCROLL_MEM (v9.98) : rien ne survit
+   au rechargement, le defilement est memorise par goTab. */
+var BUILD_MEM = { per: null, ouv: null }; /* hauteur de la barre de période — les zones figées des écrans montés se calent dessous */
 function BuildTile(_a) {
     var n = _a.n, icon = _a.icon, titre = _a.titre, sous = _a.sous, ouvert = _a.ouvert, onToggle = _a.onToggle, alerte = _a.alerte, fait = _a.fait, auto = _a.auto, onFait = _a.onFait, peutFaire = _a.peutFaire, children = _a.children;
     var ok = !!(fait || auto);
@@ -5144,7 +5148,7 @@ function BuildTile(_a) {
             React.createElement("div", { style: { width: 24, height: 24, borderRadius: 12, marginTop: 10, flex: "0 0 24px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
                     border: "1px solid " + (ok ? "#3fb950" : "var(--border)"), background: ok ? "#3fb950" : "var(--bg2)", color: ok ? "#fff" : "var(--txt3)" } }, ok ? "✓" : n),
             React.createElement("div", { style: { flex: 1, width: 2, background: "var(--border2)", margin: "2px 0" } })),
-        React.createElement("div", { style: { flex: 1, minWidth: 0, border: "1px solid " + col, borderRadius: 9, background: "var(--bg2)", marginBottom: 8, overflow: "hidden" } },
+        React.createElement("div", { style: { flex: 1, minWidth: 0, border: "1px solid " + col, borderRadius: 9, background: "var(--bg2)", marginBottom: 8 } },
             React.createElement("div", { onClick: onToggle, style: { display: "flex", alignItems: "center", gap: 9, padding: "9px 11px", cursor: "pointer" } },
                 React.createElement("span", { style: { fontSize: 13 } }, icon),
                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
@@ -5193,7 +5197,9 @@ function BuildEmbed(_a) {
 function BuildTab(_a) {
     var build = _a.build, setBuild = _a.setBuild, medecins = _a.medecins, getEntries = _a.getEntries, tourMed = _a.tourMed, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, author = _a.author, goTab = _a.goTab, onOpenBip = _a.onOpenBip, onApplyPT = _a.onApplyPT, onRemovePT = _a.onRemovePT, tourProps = _a.tourProps, gardeProps = _a.gardeProps;
     /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
-    var _b = React.useState(function () { var t = new Date(); var p0 = perStart(t.getFullYear(), t.getMonth()); return perNext(p0.sy, p0.sm); }), bPer = _b[0], setBPer = _b[1];
+    var _b = React.useState(function () { if (BUILD_MEM.per)
+        return BUILD_MEM.per; var t = new Date(); var p0 = perStart(t.getFullYear(), t.getMonth()); return perNext(p0.sy, p0.sm); }), bPer = _b[0], setBPer = _b[1];
+    var allerA = function (p) { BUILD_MEM.per = { sy: p.sy, sm: p.sm }; setBPer({ sy: p.sy, sm: p.sm }); };
     var pKey = bPer.sy + "_" + bPer.sm;
     var B = (build || {})[pKey] || {};
     var patchB = function (patch) { return setBuild(function (p) {
@@ -5213,7 +5219,8 @@ function BuildTab(_a) {
     var perLbl = MOIS[bPer.sm] + " — " + MOIS[(bPer.sm + PCFG.len - 1) % 12] + " " + bPer.sy;
     var bDays = useMemo(function () { return perDaysList(bPer.sy, bPer.sm); }, [bPer.sy, bPer.sm, PCFG.len]);
     var meds = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") === "medecin"; }); }, [medecins]);
-    var autres = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") !== "medecin"; }); }, [medecins]);
+    /* v10.31 : la coche « absences a recueillir » de la fiche Equipe decide qui parait ici */
+    var autres = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") !== "medecin" && m.suiviAbs !== false; }); }, [medecins]);
     /* ── mesures : elles servent A LA FOIS d'alerte et de fin d'etape ── */
     var nMeds = meds.filter(function (m) { return (B.pers || {})[m.id]; }).length;
     var nAutres = autres.filter(function (m) { return (B.pers || {})[m.id]; }).length;
@@ -5276,13 +5283,16 @@ function BuildTab(_a) {
        validee se REFERME (sa demande) et ne se rouvre jamais toute seule */
     var _c = React.useState(function () {
         var _a;
+        if (BUILD_MEM.ouv)
+            return BUILD_MEM.ouv;
         for (var n = 1; n <= 7; n++) {
             if (!autoOk[n])
                 return _a = {}, _a[n] = true, _a;
         }
         return {};
     }), ouv = _c[0], setOuv = _c[1];
-    var toggle = function (n) { return setOuv(function (o) {
+    var majOuv = function (f) { return setOuv(function (o) { var r = f(o); BUILD_MEM.ouv = r; return r; }); };
+    var toggle = function (n) { return majOuv(function (o) {
         var _a;
         return (__assign(__assign({}, o), (_a = {}, _a[n] = !o[n], _a)));
     }); };
@@ -5292,7 +5302,7 @@ function BuildTab(_a) {
             delete st[n];
         else {
             st[n] = sign();
-            setOuv(function (o) {
+            majOuv(function (o) {
                 var _a;
                 return (__assign(__assign({}, o), (_a = {}, _a[n] = false, _a)));
             });
@@ -5324,7 +5334,7 @@ function BuildTab(_a) {
             sous: nAutres + " sur " + autres.length + " renseigné" + (nAutres > 1 ? "s" : ""),
             alerte: mAut ? (mAut + " personne" + (mAut > 1 ? "s" : "") + " hors médecins sans réponse") : null,
             body: React.createElement("div", null,
-                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Attach\u00E9s et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PR\u00C9SENCES."),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Attach\u00E9s et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PR\u00C9SENCES. Seuls ceux dont la fiche \u00C9quipe porte \u00AB absences \u00E0 recueillir \u00BB figurent ici."),
                 React.createElement(BuildPersonList, { gens: autres, etat: B.pers, onSet: setPers, peut: isEdit, vide: "Aucun attach\u00E9 ni IDE dans l'\u00E9quipe." }),
                 React.createElement("div", { style: { marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" } },
                     React.createElement(BuildLien, { txt: "\u2192 Saisir dans le Planning", onClick: function () { return goTab("planning"); } }),
@@ -5365,9 +5375,9 @@ function BuildTab(_a) {
     return (React.createElement("div", null,
         React.createElement("div", { style: __assign(__assign({}, S.bar), { position: "sticky", top: HDR_H, zIndex: 60, background: "var(--bg)", paddingTop: 6, paddingBottom: 6, marginBottom: 0, minHeight: BUILD_BAR_H }) },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                React.createElement("button", { onClick: function () { var p = perPrev(bPer.sy, bPer.sm); setBPer({ sy: p.sy, sm: p.sm }); }, style: S.arr }, "\u2039"),
+                React.createElement("button", { onClick: function () { return allerA(perPrev(bPer.sy, bPer.sm)); }, style: S.arr }, "\u2039"),
                 React.createElement("h2", { style: S.mTit }, "🏗️ Construire — " + perLbl),
-                React.createElement("button", { onClick: function () { var p = perNext(bPer.sy, bPer.sm); setBPer({ sy: p.sy, sm: p.sm }); }, style: S.arr }, "\u203A")),
+                React.createElement("button", { onClick: function () { return allerA(perNext(bPer.sy, bPer.sm)); }, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" } },
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, margin: "8px 0 14px" } },
@@ -5445,9 +5455,10 @@ function CardioPlanning() {
         setTab(function (cur) {
             if (cur === next)
                 return cur;
-            if (cur === "partage")
-                pageMem.current.partage = window.scrollY || 0;
-            var y = (next === "partage") ? (pageMem.current.partage || 0) : 0;
+            /* v10.31 : Construire rejoint Parametres — on retrouve l'endroit ou on etait */
+            if (cur === "partage" || cur === "construire")
+                pageMem.current[cur] = window.scrollY || 0;
+            var y = (next === "partage" || next === "construire") ? (pageMem.current[next] || 0) : 0;
             setTimeout(function () { return window.scrollTo(0, y); }, 0);
             return next;
         });
@@ -10361,6 +10372,11 @@ function CardioPlanning() {
                         React.createElement("input", { type: "checkbox", checked: !!mData.astreinte, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { astreinte: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
                         "Astreinte rythmo")),
                 (mData.role || "medecin") === "medecin" && React.createElement("div", { style: { gridColumn: "1/-1", borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 8, fontSize: 10, fontWeight: 800, color: "#388bfd", textTransform: "uppercase", letterSpacing: .5 } }, "\u2699\uFE0F Statut & options"),
+                (mData.role || "medecin") !== "medecin" && React.createElement("div", { style: { gridColumn: "1/-1" } },
+                    React.createElement("label", { style: { display: "flex", gap: 6, alignItems: "center", color: "var(--txt2)", fontSize: 13, cursor: "pointer" } },
+                        React.createElement("input", { type: "checkbox", checked: mData.suiviAbs !== false, onChange: function (e) { return setMData(function (p) { return (__assign(__assign({}, p), { suiviAbs: e.target.checked })); }); }, style: { width: 14, height: 14 } }),
+                        "\uD83D\uDEAB Absences \u00E0 recueillir"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 3 } }, "D\u00E9cochez si vous n'avez pas \u00E0 recueillir ses absences : la personne ne figurera plus dans l'\u00E9tape 4 de l'onglet Construire.")),
                 (mData.role || "medecin") === "medecin" && React.createElement("div", { style: { gridColumn: "1/-1" } },
                     React.createElement("label", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 } }, "Statut"),
                     React.createElement("div", { style: { display: "flex", gap: 4 } }, [["senior", "Sénior"], ["junior", "Junior"]].map(function (_a) {

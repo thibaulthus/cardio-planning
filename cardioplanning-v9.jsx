@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.30 — 12/08/2026";
+const APP_VERSION="v10.31 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -3599,7 +3599,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
             {["HC","USIC"].map(unit=>(
               <div key={unit} style={{flex:1,minWidth:170}}>
                 <div style={{fontSize:10,fontWeight:700,color:unit==="HC"?"#388bfd":"#a371f7",marginBottom:4}}>{unit}</div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                <div style={{display:"grid",gap:4,justifyContent:"start",gridTemplateColumns:"repeat(auto-fill,minmax(62px,76px))"}}>
                   {tourMeds.map(m=>{
                     const on=(wm[unit]||[]).includes(m.id);
                     const blocked=isBlockedInWeek(m.id,w.key);
@@ -3609,7 +3609,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                     const wishW=!!((tourWish||{})[w.key]||{})[m.id];
                     return(
                       <button key={m.id} disabled={dis||!isEdit}
-                        style={{padding:"3px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:44,
+                        style={{padding:"4px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:62,overflow:"hidden",
                           background:on?({coro:"rgba(118,165,175,.82)",pace:"rgba(227,179,65,.82)",eep:"rgba(139,92,246,.82)",ett:"rgba(236,72,153,.82)"}[m.surSpec]||"rgba(56,139,253,.82)"):"var(--bg2)",color:on?"#fff":"var(--txt2)",fontWeight:on?800:600,opacity:dis?.3:1,
                            outline:on?"2px solid "+(SPEC_COLORS[m.surSpec]||"#388bfd"):m.surSpec&&!blocked?"2px solid "+(SPEC_COLORS[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
                         onClick={()=>{if(dis||!isEdit)return;
@@ -3622,8 +3622,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                           if(unit==="USIC"&&m.partTime)cleanTPForWeek(m.id,w.key);
                           setTimeout(()=>reapplyPTWeek(m.id,w.key),60);
                         }}}>
-                        <div style={{fontWeight:800,fontSize:10}} title={avoidW?"Préfère ne pas tourner cette semaine":wishW?"Souhaite tourner cette semaine":""}>{m.init}{avoidW?" 🚫":wishW?" ⭐":""}</div>
-                        <div style={{fontSize:8,color:blocked?"inherit":m.surSpec&&!on?(SPEC_COLORS[m.surSpec]):"inherit"}}>
+                        <div style={{fontWeight:800,fontSize:11,lineHeight:1.15}} title={avoidW?"Préfère ne pas tourner cette semaine":wishW?"Souhaite tourner cette semaine":""}>{m.init}{avoidW?" 🚫":wishW?" ⭐":""}</div>
+                        <div style={{fontSize:8.5,color:blocked?"inherit":m.surSpec&&!on?(SPEC_COLORS[m.surSpec]):"inherit"}}>
                           {blocked?"indispo":inOther?"≠":""}
                         </div>
                       </button>
@@ -4922,7 +4922,11 @@ function ReportsView(p){
    s'applique SANS QUITTER l'onglet (la fenêtre reçoit la période de Construire). */
 const BUILD_SPECS=["Coro","EEP","FOP","Stim"];
 const BIP_MIN_SEM=3;   /* un jour sans bip est normal ; on alerte sous 3 bips/semaine */
-const BUILD_BAR_H=46;  /* hauteur de la barre de période — les zones figées des écrans montés se calent dessous */
+const BUILD_BAR_H=46;
+/* v10.31 : ce qu'on retrouve en revenant dans l'onglet — periode et tuiles ouvertes.
+   Volontairement en memoire de session, comme SCROLL_MEM (v9.98) : rien ne survit
+   au rechargement, le defilement est memorise par goTab. */
+const BUILD_MEM={per:null,ouv:null};  /* hauteur de la barre de période — les zones figées des écrans montés se calent dessous */
 
 function BuildTile({n,icon,titre,sous,ouvert,onToggle,alerte,fait,auto,onFait,peutFaire,children}){
   const ok=!!(fait||auto);
@@ -4934,7 +4938,9 @@ function BuildTile({n,icon,titre,sous,ouvert,onToggle,alerte,fait,auto,onFait,pe
           border:"1px solid "+(ok?"#3fb950":"var(--border)"),background:ok?"#3fb950":"var(--bg2)",color:ok?"#fff":"var(--txt3)"}}>{ok?"✓":n}</div>
         <div style={{flex:1,width:2,background:"var(--border2)",margin:"2px 0"}}/>
       </div>
-      <div style={{flex:1,minWidth:0,border:"1px solid "+col,borderRadius:9,background:"var(--bg2)",marginBottom:8,overflow:"hidden"}}>
+      {/* v10.31 : PAS d'overflow:hidden ici — il transformait la tuile en conteneur
+           de defilement et empechait le rappel du Tour de se figer. */}
+      <div style={{flex:1,minWidth:0,border:"1px solid "+col,borderRadius:9,background:"var(--bg2)",marginBottom:8}}>
         <div onClick={onToggle} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 11px",cursor:"pointer"}}>
           <span style={{fontSize:13}}>{icon}</span>
           <div style={{flex:1,minWidth:0}}>
@@ -4992,7 +4998,8 @@ function BuildEmbed({titre,children}){
 
 function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps}){
   /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
-  const [bPer,setBPer]=React.useState(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
+  const [bPer,setBPer]=React.useState(()=>{if(BUILD_MEM.per)return BUILD_MEM.per;const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
+  const allerA=(p)=>{BUILD_MEM.per={sy:p.sy,sm:p.sm};setBPer({sy:p.sy,sm:p.sm});};
   const pKey=bPer.sy+"_"+bPer.sm;
   const B=(build||{})[pKey]||{};
   const patchB=(patch)=>setBuild(p=>{const cur=(p||{})[pKey]||{};return {...(p||{}),[pKey]:{...cur,...patch}};});
@@ -5003,7 +5010,8 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
   const perLbl=MOIS[bPer.sm]+" — "+MOIS[(bPer.sm+PCFG.len-1)%12]+" "+bPer.sy;
   const bDays=useMemo(()=>perDaysList(bPer.sy,bPer.sm),[bPer.sy,bPer.sm,PCFG.len]);
   const meds=useMemo(()=>medecins.filter(m=>(m.role||"medecin")==="medecin"),[medecins]);
-  const autres=useMemo(()=>medecins.filter(m=>(m.role||"medecin")!=="medecin"),[medecins]);
+  /* v10.31 : la coche « absences a recueillir » de la fiche Equipe decide qui parait ici */
+  const autres=useMemo(()=>medecins.filter(m=>(m.role||"medecin")!=="medecin"&&m.suiviAbs!==false),[medecins]);
 
   /* ── mesures : elles servent A LA FOIS d'alerte et de fin d'etape ── */
   const nMeds=meds.filter(m=>(B.pers||{})[m.id]).length;
@@ -5057,11 +5065,12 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
 
   /* la premiere etape non terminee est ouverte au premier affichage ; une etape
      validee se REFERME (sa demande) et ne se rouvre jamais toute seule */
-  const [ouv,setOuv]=React.useState(()=>{for(let n=1;n<=7;n++){if(!autoOk[n])return {[n]:true};}return {};});
-  const toggle=(n)=>setOuv(o=>({...o,[n]:!o[n]}));
+  const [ouv,setOuv]=React.useState(()=>{if(BUILD_MEM.ouv)return BUILD_MEM.ouv;for(let n=1;n<=7;n++){if(!autoOk[n])return {[n]:true};}return {};});
+  const majOuv=(f)=>setOuv(o=>{const r=f(o);BUILD_MEM.ouv=r;return r;});
+  const toggle=(n)=>majOuv(o=>({...o,[n]:!o[n]}));
   const setEtape=(n)=>{
     const st={...(B.etapes||{})};
-    if(st[n])delete st[n];else{st[n]=sign();setOuv(o=>({...o,[n]:false}));}
+    if(st[n])delete st[n];else{st[n]=sign();majOuv(o=>({...o,[n]:false}));}
     patchB({etapes:st});
   };
 
@@ -5090,7 +5099,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
      sous:nAutres+" sur "+autres.length+" renseigné"+(nAutres>1?"s":""),
      alerte:mAut?(mAut+" personne"+(mAut>1?"s":"")+" hors médecins sans réponse"):null,
      body:<div>
-       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES.</div>
+       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES. Seuls ceux dont la fiche Équipe porte « absences à recueillir » figurent ici.</div>
        <BuildPersonList gens={autres} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun attaché ni IDE dans l'équipe."/>
        <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
          <BuildLien txt="→ Saisir dans le Planning" onClick={()=>goTab("planning")}/>
@@ -5135,9 +5144,9 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     <div>
       <div style={{...S.bar,position:"sticky",top:HDR_H,zIndex:60,background:"var(--bg)",paddingTop:6,paddingBottom:6,marginBottom:0,minHeight:BUILD_BAR_H}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <button onClick={()=>{const p=perPrev(bPer.sy,bPer.sm);setBPer({sy:p.sy,sm:p.sm});}} style={S.arr}>‹</button>
+          <button onClick={()=>allerA(perPrev(bPer.sy,bPer.sm))} style={S.arr}>‹</button>
           <h2 style={S.mTit}>{"🏗️ Construire — "+perLbl}</h2>
-          <button onClick={()=>{const p=perNext(bPer.sy,bPer.sm);setBPer({sy:p.sy,sm:p.sm});}} style={S.arr}>›</button>
+          <button onClick={()=>allerA(perNext(bPer.sy,bPer.sm))} style={S.arr}>›</button>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
           <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
@@ -5224,8 +5233,10 @@ function CardioPlanning(){
   const goTab=useCallback((next)=>{
     setTab(cur=>{
       if(cur===next)return cur;
-      if(cur==="partage")pageMem.current.partage=window.scrollY||0;
-      const y=(next==="partage")?(pageMem.current.partage||0):0;
+      /* v10.31 : Construire rejoint Paramètres — on retrouve l'endroit où on était.
+         La période et les tuiles ouvertes, elles, sont retenues par BUILD_MEM. */
+      if(cur==="partage"||cur==="construire")pageMem.current[cur]=window.scrollY||0;
+      const y=(next==="partage"||next==="construire")?(pageMem.current[next]||0):0;
       setTimeout(()=>window.scrollTo(0,y),0);
       return next;
     });
@@ -9323,6 +9334,13 @@ header::-webkit-scrollbar { display: none; }
               <label style={{display:"flex",gap:6,alignItems:"center",color:"var(--txt2)",fontSize:13,cursor:"pointer"}}><input type="checkbox" checked={!!mData.astreinte} onChange={e=>setMData(p=>({...p,astreinte:e.target.checked}))} style={{width:14,height:14}}/>Astreinte rythmo</label>
             </div>}
             {(mData.role||"medecin")==="medecin"&&<div style={{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,fontSize:10,fontWeight:800,color:"#388bfd",textTransform:"uppercase",letterSpacing:.5}}>⚙️ Statut & options</div>}
+            {(mData.role||"medecin")!=="medecin"&&<div style={{gridColumn:"1/-1"}}>
+              <label style={{display:"flex",gap:6,alignItems:"center",color:"var(--txt2)",fontSize:13,cursor:"pointer"}}>
+                <input type="checkbox" checked={mData.suiviAbs!==false} onChange={e=>setMData(p=>({...p,suiviAbs:e.target.checked}))} style={{width:14,height:14}}/>
+                🚫 Absences à recueillir
+              </label>
+              <div style={{fontSize:11,color:"var(--txt3)",marginTop:3}}>Décochez si vous n'avez pas à recueillir ses absences : la personne ne figurera plus dans l'étape 4 de l'onglet Construire.</div>
+            </div>}
             {(mData.role||"medecin")==="medecin"&&<div style={{gridColumn:"1/-1"}}>
               <label style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:4}}>Statut</label>
               <div style={{display:"flex",gap:4}}>
