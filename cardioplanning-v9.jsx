@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.24 — 11/08/2026";
+const APP_VERSION="v10.25 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4123,6 +4123,9 @@ function ReportsView(p){
   const clrReport=(o)=>setRep(c=>{delete c.to[lostK(o)];});
   const setRepNote=(o,txt)=>setRep(c=>{const k=lostK(o);if(c.to[k])c.to[k]={...c.to[k],n:txt};});
   const [repModal,setRepModal]=React.useState(null);
+  const [repStep,setRepStep]=React.useState(null);/* 2e temps : combien de patients, quelle salle */
+  const [showG3,setShowG3]=React.useState(false);/* 3e groupe de la modale, replie par defaut */
+  const [weekModal,setWeekModal]=React.useState(null);/* bouton violet : choix d'une autre semaine */
   const dkParse=(s)=>{const q=String(s).split("-");return {y:+q[0],m:+q[1],d:+q[2]};};
   /* ── v10.24 : petits nombres en toutes lettres dans les libelles ── */
   const NLET=["zéro","un","deux","trois","quatre","cinq","six","sept","huit","neuf","dix","onze","douze","treize","quatorze","quinze","seize","dix-sept","dix-huit","dix-neuf","vingt"];
@@ -4186,7 +4189,7 @@ function ReportsView(p){
   const habList=[];Object.keys(habCS).forEach(dw=>Object.keys(habCS[dw]).forEach(sl=>habList.push({dw:+dw,sl})));
   const habDW=Object.keys(habCS).map(Number); // jours de la semaine avec consultation habituelle
   /* ── Analyse ── */
-  const JR=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+  const JR=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];/* v10.25 : aussi utilise par la modale */
   const fmtD=(o)=>JR[new Date(o.y,o.m,o.d).getDay()]+" "+o.d+" "+MOIS[o.m].slice(0,4);
   const inTour=(y,m,d)=>{const wm=tourMed[wkOf(y,m,d)]||{};return((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid));};
   const slotState=(y,m,d,sl)=>{
@@ -4204,12 +4207,56 @@ function ReportsView(p){
   const addNote=(dest,txt)=>{if(!p.setNotes)return;
     p.setNotes(pn=>{const k=nk(mid,dest.y,dest.m,dest.d,dest.sl);const cur=(pn[k]||"").trim();
       const nn={...pn};nn[k]=cur?(cur+"\n"+txt):txt;return nn;});};
-  const validRep=(L,dest)=>{const a2=acteOf(L.acte);
-    setReport(L,dest,"");
-    addNote(dest,"Report du "+fmtD(L)+" "+L.sl+(a2?" ("+(a2.short||a2.label)+")":""));};
-  const annulRep=(L)=>{const r=repTo[lostK(L)];
-    if(r){const D=dkParse(r.d);addNote({y:D.y,m:D.m,d:D.d,sl:r.sl},"Report annulé le "+jourMois()+" — demi-journée redevenue libre");}
-    clrReport(L);};
+  /* ── v10.25 : une consultation perdue peut etre DIVISEE ────────────────────
+     csRep[mid].to[<demi-journee perdue>] = {
+       tot   : nombre total de patients, ou null tant qu'il n'est pas divise
+       att   : nombre parti en liste d'attente
+       n     : note libre
+       parts : [ {d,sl,n,salle,cree} ]   n=null -> la consultation entiere
+                                          cree=true -> la CS a ete creee dans le planning
+     }
+     La case tot VIDE veut dire « toute la consultation part d'un bloc » ; un nombre
+     veut dire « je divise ». C'est la case elle-meme qui porte l'information. */
+  const repOf=(L)=>repTo[lostK(L)]||null;
+  const partsOf=(L)=>{const r=repOf(L);return (r&&r.parts)||[];};
+  const totOf=(L)=>{const r=repOf(L);return (r&&typeof r.tot==="number")?r.tot:null;};
+  const attOf=(L)=>{const r=repOf(L);return (r&&r.att)||0;};
+  const placeOf=(L)=>partsOf(L).reduce((s,q)=>s+(q.n||0),0);
+  const resteOf=(L)=>{const t=totOf(L);if(t===null)return null;return Math.max(0,t-placeOf(L)-attOf(L));};
+  const incomplet=(L)=>{const r=resteOf(L);return r!==null&&r>0;};
+  const vide={tot:null,att:0,n:"",parts:[]};
+  const setTot=(L,v)=>setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;
+    c.to[k]={...cur,tot:(v===""||v===null)?null:Math.max(0,parseInt(v,10)||0)};});
+  const addPart=(L,q)=>setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;
+    c.to[k]={...cur,parts:(cur.parts||[]).concat([q])};});
+  const delPart=(L,i)=>setRep(c=>{const k=lostK(L),cur=c.to[k];if(!cur)return;
+    const ps=(cur.parts||[]).slice();ps.splice(i,1);
+    if(ps.length===0&&cur.tot===null&&!cur.att&&!cur.n)delete c.to[k];else c.to[k]={...cur,parts:ps};});
+  const setAtt=(L,v)=>setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;c.to[k]={...cur,att:Math.max(0,v)};});
+  const setRepNote2=(L,txt)=>setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;c.to[k]={...cur,n:txt};});
+  const txtPat=(nb)=>nb===null?"":(", "+enLet(nb)+" patient"+(nb>1?"s":""));
+  /* Poser sur une semaine blanche : la consultation existe deja, elle n'attend que
+     ses patients — aucune salle a choisir, et elle reprend tout ce qui reste. */
+  const poseBlanche=(L,dest)=>{const a2=acteOf(L.acte),t=totOf(L),nb=(t===null)?null:resteOf(L);
+    addPart(L,{d:dk3(dest.y,dest.m,dest.d),sl:dest.sl,n:nb,salle:null,cree:false});
+    addNote(dest,"Report du "+fmtD(L)+" "+L.sl+txtPat(nb)+(a2?" ("+(a2.short||a2.label)+")":""));};
+  /* Poser sur un creneau de tour ou un autre jour : la consultation est CREEE dans le
+     planning, avec sa salle, et ne reprend qu'une part des patients. */
+  const poseCree=(L,dest,nb,salle)=>{const a2=acteOf(L.acte);
+    if(p.addEntry)p.addEntry(mid,dest.y,dest.m,dest.d,dest.sl,{acteId:L.acte,salle:salle||null});
+    addPart(L,{d:dk3(dest.y,dest.m,dest.d),sl:dest.sl,n:nb,salle:salle||null,cree:true});
+    addNote(dest,"Report du "+fmtD(L)+" "+L.sl+txtPat(nb)+(a2?" ("+(a2.short||a2.label)+")":""));};
+  const annulPart=(L,i)=>{const q=partsOf(L)[i];if(!q)return;const D=dkParse(q.d);
+    if(q.cree&&p.removeEntry)p.removeEntry(mid,D.y,D.m,D.d,q.sl,L.acte);
+    addNote({y:D.y,m:D.m,d:D.d,sl:q.sl},"Report annulé le "+jourMois()
+      +(q.cree?" — consultation retirée du planning":" — demi-journée redevenue libre"));
+    delPart(L,i);};
+  /* Salles reellement libres pour l'activite reportee ; null = activite sans salle */
+  const sallesLibres=(L,o,sl)=>{const a2=acteOf(L.acte);
+    if(!a2||!a2.hasSalle)return null;
+    const occ=occSalles(o.y,o.m,o.d,sl);return (a2.salles||[]).filter(s=>!occ[s]);};
+  const seulLeTour=(y,m,d,sl)=>{const es=getEntries(mid,y,m,d,sl);
+    return es.length>0&&es.every(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));};
   const analysis=React.useMemo(()=>{
     /* Semaines à reporter : dates habituelles perdues (tour ou absence) hors blanche, groupées par semaine */
     const lostByWeek={},weekOrder=[];
@@ -4314,8 +4361,8 @@ function ReportsView(p){
      s'il repartit les deux consultations d'une semaine sur des semaines differentes. */
   const propAt={},validAt={};
   analysis.weekPairs.forEach(wp=>wp.lost.forEach((L,k)=>{
-    const r=repTo[lostK(L)];
-    if(r)validAt[r.d+"|"+r.sl]=L;
+    const ps=partsOf(L);
+    if(ps.length)ps.forEach(q=>{validAt[q.d+"|"+q.sl]=L;});
     else if(wp.dest&&wp.dest[k])propAt[dk3(wp.dest[k].y,wp.dest[k].m,wp.dest[k].d)+"|"+wp.dest[k].sl]=L;
   }));
   const [hidGrp,setHidGrp]=React.useState({});
@@ -4342,7 +4389,10 @@ function ReportsView(p){
     analysis.weekPairs.forEach(wp=>wp.lost.forEach((L,i)=>{
       const a2=acteOf(L.acte);
       rows.push([fmtD(L)+" "+L.sl,a2?a2.short:L.acte,L.why==="tour"?"Semaine de tour":"Absence",
-        wp.dest?(fmtD(wp.dest[i])+" "+wp.dest[i].sl+" (semaine blanche)"):"Pas de report possible"]);
+        (partsOf(L).length
+          ?partsOf(L).map(q=>fmtD(dkParse(q.d))+" "+q.sl+(q.n===null?" (entière)":" ("+q.n+" patients)")).join(" + ")
+            +(attOf(L)?" + "+attOf(L)+" en liste d'attente":"")
+          :(wp.dest?(fmtD(wp.dest[i])+" "+wp.dest[i].sl+" (proposé, semaine blanche)"):"Pas de report possible"))]);
     }));
     const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\n");
     const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
@@ -4445,19 +4495,69 @@ function ReportsView(p){
             inf?("rouvert par "+(inf.by||"?")+(inf.at?" — "+inf.at:"")):"à rouvrir"));
       };
       /* une consultation perdue */
+      /* case patients — VIDE par defaut : vide = tout part d'un bloc */
+      const patBox=(L,tot)=>RE("span",{style:{display:"inline-flex",alignItems:"center",gap:4,fontSize:9.5,fontWeight:800,
+        color:tot===null?"var(--txt3)":"var(--txt2)",background:tot===null?"var(--th)":"rgba(124,58,237,.09)",
+        borderRadius:9,padding:"1px 7px"}},
+        "👥",
+        RE("input",{value:tot===null?"":String(tot),placeholder:"—",readOnly:!editable,
+          title:"Laissez vide si toute la consultation part d'un bloc ; un nombre signifie que vous la divisez",
+          onChange:e=>setTot(L,e.target.value.replace(/[^0-9]/g,"")),
+          style:{width:30,textAlign:"center",fontSize:9.5,fontWeight:800,fontFamily:"inherit",color:"var(--txt)",
+            border:"1px solid var(--border)",borderRadius:4,background:"var(--bg2)",padding:"0 2px"}}),
+        "patients");
+      const jauge=(tot,pl,att,reste)=>{const pc=tot>0?Math.round(100*(pl+att)/tot):0;
+        return RE("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:9.5,fontWeight:800}},
+          RE("span",{style:{display:"inline-block",width:74,height:8,borderRadius:4,background:"var(--th)",
+            overflow:"hidden",border:"1px solid var(--border2)",verticalAlign:"middle"}},
+            RE("span",{style:{display:"block",height:"100%",width:pc+"%",background:reste>0?"#f59e0b":"#16a34a"}})),
+          RE("span",{style:{color:reste>0?"#ef4444":"#16a34a"}},
+            reste>0?(enLet(reste)+" à placer"):(enLet(pl)+" placé"+(pl>1?"s":""))));};
+      const noteInp=(L)=>RE("input",{value:(repOf(L)||{}).n||"",placeholder:"note…",readOnly:!editable,
+        onChange:e=>setRepNote2(L,e.target.value),
+        style:{fontSize:9,padding:"1px 5px",borderRadius:4,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",width:140}});
+      const cmtTag=()=>RE("span",{style:{fontSize:9,color:"#16a34a",background:"rgba(22,163,74,.09)",borderRadius:4,padding:"1px 6px"}},"💬 commentaire écrit dans la case");
       const lostLine=(L,k,prop)=>{
-        const a2=acteOf(L.acte),r=repTo[lostK(L)];
-        return RE("div",{key:k,style:{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",padding:"2px 0"}},
+        const a2=acteOf(L.acte),ps=partsOf(L),tot=totOf(L),att=attOf(L),reste=resteOf(L);
+        const divise=tot!==null,rows=[];
+        rows.push(RE("div",{key:"h",style:{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",padding:"2px 0"}},
           pill(a2),
-          RE("span",{style:{color:r?"var(--txt3)":"var(--txt2)",fontWeight:r?400:700,textDecoration:r?"line-through":"none"}},fmtD(L)+" "+L.sl),
-          r&&RE("span",{style:{color:"#16a34a",fontWeight:800}},"→ reporté au "+fmtD(dkParse(r.d))+" "+r.sl),
-          r&&RE("span",{style:{fontSize:9,color:"#16a34a",background:"rgba(22,163,74,.09)",borderRadius:4,padding:"1px 6px"}},"💬 commentaire écrit dans la case"),
-          r&&RE("input",{value:r.n||"",placeholder:"note…",readOnly:!editable,onChange:e=>setRepNote(L,e.target.value),
-            style:{fontSize:9,padding:"1px 5px",borderRadius:4,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",width:140}}),
-          !r&&prop&&RE("span",{style:{color:"var(--txt3)"}},"→ "+fmtD(prop)+" "+prop.sl+" — la consultation entière"),
-          editable&&r&&miniBtn("annuler le report","var(--txt3)",()=>annulRep(L)),
-          editable&&!r&&prop&&miniBtn("✓ valider","#16a34a",()=>validRep(L,prop)),
-          editable&&!r&&miniBtn("autre date","#7c3aed",()=>setRepModal({L})));
+          RE("span",{style:{fontWeight:(divise||ps.length)?800:700,color:"var(--txt)"}},fmtD(L)+" "+L.sl),
+          patBox(L,tot),
+          divise&&jauge(tot,placeOf(L),att,reste),
+          /* cas simple : rien de pose, la consultation part d'un bloc */
+          !divise&&ps.length===0&&prop&&RE("span",{style:{color:"var(--txt3)"}},"→ "+fmtD(prop)+" "+prop.sl+" — la consultation entière"),
+          !divise&&ps.length===0&&editable&&prop&&miniBtn("✓ valider","#16a34a",()=>poseBlanche(L,prop)),
+          !divise&&ps.length===1&&RE("span",{style:{color:"#16a34a",fontWeight:800}},"→ reporté au "+fmtD(dkParse(ps[0].d))+" "+ps[0].sl),
+          !divise&&ps.length===1&&ps[0].salle&&RE("span",{style:{color:"var(--txt3)"}},"salle "+ps[0].salle),
+          !divise&&ps.length===1&&cmtTag(),
+          !divise&&ps.length===1&&noteInp(L),
+          !divise&&ps.length===1&&editable&&miniBtn("annuler le report","var(--txt3)",()=>annulPart(L,0)),
+          ps.length===0&&editable&&miniBtn(prop?"autre date":"choisir une date","#7c3aed",()=>{setRepStep(null);setShowG3(false);setRepModal({L});})));
+        /* cas divise : une sous-ligne par part */
+        if(divise)ps.forEach((q,i)=>{const D=dkParse(q.d);
+          rows.push(RE("div",{key:"p"+i,style:{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",padding:"1px 0 1px 20px"}},
+            RE("span",{style:{color:"#16a34a",fontWeight:800}},"✓ "+(q.n===null?"la consultation entière":enLet(q.n))),
+            RE("span",{style:{color:"var(--txt2)"}},"→ "+fmtD(D)+" "+q.sl),
+            q.cree&&badge("créée","rgba(29,78,216,.12)","#1d4ed8"),
+            q.salle&&RE("span",{style:{color:"var(--txt3)"}},"salle "+q.salle),
+            cmtTag(),
+            editable&&miniBtn("annuler le report","var(--txt3)",()=>annulPart(L,i))));});
+        if(divise&&reste>0)rows.push(RE("div",{key:"al",style:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",
+          fontSize:10,fontWeight:800,color:"#ef4444",background:"rgba(239,68,68,.08)",
+          border:"1px solid rgba(239,68,68,.35)",borderRadius:6,padding:"4px 8px",marginTop:4}},
+          "⚠ ",RE("b",null,cap1(enLet(reste))+" patient"+(reste>1?"s":"")+(reste>1?" ne sont pas replacés.":" n'est pas replacé.")),
+          editable&&miniBtn("placer le reste","#7c3aed",()=>{setRepStep(null);setShowG3(false);setRepModal({L});}),
+          editable&&miniBtn("↪ en liste d'attente","#b45309",()=>setAtt(L,att+reste))));
+        if(att>0)rows.push(RE("div",{key:"at",style:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",
+          fontSize:10,fontWeight:800,color:"#b45309",background:"rgba(245,158,11,.10)",
+          border:"1px solid rgba(245,158,11,.45)",borderRadius:6,padding:"4px 8px",marginTop:4}},
+          "↪ ",RE("b",null,cap1(enLet(att))+" en liste d'attente"),
+          RE("span",{style:{color:"var(--txt3)",fontWeight:400}},"— replacés hors période ou ventilés par le secrétariat"),
+          editable&&miniBtn("reprendre","var(--txt3)",()=>setAtt(L,0))));
+        if(divise&&ps.length===0&&reste===tot)rows.push(RE("div",{key:"ai",style:{fontSize:9.5,color:"var(--txt3)",fontStyle:"italic",paddingLeft:20}},
+          "Videz la case pour reporter la consultation entière d'un seul bloc."));
+        return RE("div",{key:k,style:{padding:"1px 0"}},rows);
       };
       /* une demi-journee blanche : que recoit-elle ? */
       const recvLine=(o,k)=>{
@@ -4502,18 +4602,8 @@ function ReportsView(p){
               if(nP)recvTxt.push({t:"peut accueillir "+enLet(nP)+" report"+(nP>1?"s":""),c:"var(--txt2)"});
               if(!nV&&!nP)recvTxt.push({t:"libre — rien ne s'y reporte pour l'instant",c:"#b45309"});
               /* le bouton de rattrapage manuel, a DROITE du texte rouge */
-              const weekReport=()=>{
-                const src=new Date(it.lost[0].y,it.lost[0].m,it.lost[0].d);
-                const cand=weeks.filter(w=>w.key!==it.wk&&it.lost.every(L=>{
-                    const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===L.dw);
-                    return o&&isBl(o.y,o.m,o.d)&&!isFerie(o.y,o.m,o.d)&&slotFreeCS(o.y,o.m,o.d,L.sl);}))
-                  .sort((A,B)=>Math.abs(new Date(A.days[0].y,A.days[0].m,A.days[0].d)-src)-Math.abs(new Date(B.days[0].y,B.days[0].m,B.days[0].d)-src));
-                const w=cand[0];
-                if(!w){if(toast)toast("Aucune semaine blanche libre sur la période","warn");return;}
-                it.lost.forEach(L=>{const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===L.dw);
-                  if(o)validRep(L,{y:o.y,m:o.m,d:o.d,sl:L.sl});});
-                if(toast)toast("Reporté sur la semaine du "+w.days[0].d+" "+MOIS[w.days[0].m].slice(0,4));
-              };
+              /* v10.25 : le bouton n'applique plus rien tout seul — il OUVRE le choix. */
+              const nInc=(it.lost||[]).filter(L=>incomplet(L)).length;
               return RE("div",{key:it.wk,style:{padding:"7px 10px 8px 13px",borderTop:i>0?"1px solid var(--border2)":"none",
                 fontSize:11,position:"relative",borderLeft:"3px solid "+bar,
                 background:it.kind==="rien"?"rgba(127,127,127,.045)":"transparent"}},
@@ -4521,13 +4611,14 @@ function ReportsView(p){
                   RE("span",{style:{fontWeight:800,color:it.kind==="rien"?"var(--txt3)":"var(--txt)"}},"Semaine du "+f.d+" "+MOIS[f.m].slice(0,4)),
                   it.kind==="ok"&&badge("tour","rgba(29,78,216,.12)","#1d4ed8"),
                   (it.kind==="report"||it.kind==="norep")&&badge(it.why,it.why==="tour"?"rgba(29,78,216,.12)":"rgba(239,68,68,.12)",it.why==="tour"?"#1d4ed8":"#ef4444"),
+                  nInc>0&&badge("⚠ report incomplet","#ef4444","#fff"),
                   it.kind==="recv"&&badge(it.dates.length>=nHab?"blanche":"blanche partielle","rgba(245,158,11,.2)","#b45309"),
                   RE("span",{style:{color:"var(--txt3)"}},"→"),
                   it.kind==="report"&&RE("span",{style:{fontWeight:800,color:"var(--txt2)"}},
                     "semaine blanche libre la plus proche : "+it.to.days[0].d+" "+MOIS[it.to.days[0].m].slice(0,4)),
                   it.kind==="report"&&ecBadge(it.ec),
-                  it.kind==="norep"&&RE("span",{style:{color:"#ef4444",fontWeight:800}},"aucune semaine blanche libre à moins de "+MAXEC+" jours"),
-                  it.kind==="norep"&&editable&&RE("button",{onClick:weekReport,
+                  it.kind==="norep"&&RE("span",{style:{color:"#ef4444",fontWeight:800}},"aucune semaine blanche à moins d'un mois"),
+                  it.kind==="norep"&&editable&&RE("button",{onClick:()=>setWeekModal({it}),
                     style:{fontSize:10,padding:"3px 9px",borderRadius:6,cursor:"pointer",fontWeight:800,
                       border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed"}},"⇄ Chercher une autre semaine blanche"),
                   it.kind==="ok"&&RE("span",{style:{fontWeight:800,color:"#16a34a"}},"✓ semaine blanche — pas de report nécessaire"),
@@ -4569,44 +4660,190 @@ function ReportsView(p){
       RE("span",{style:{color:"#7c3aed",fontWeight:700}},"violet")," = vos jours habituels de consultation · ",
       RE("span",{style:{color:"#16a34a",fontWeight:700}},"vert")," = une salle est libre ce créneau",editable?" — touchez la case pour poser une activité":""),
     analysis.weekPairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"),
+    /* ── v10.25 : modale de report a TROIS groupes ────────────────────────────
+       1. semaines blanches, meme jour de semaine — reprennent tout d'un coup
+       2. creneaux de tour — APRES-MIDI seulement (« on ne consulte jamais le matin
+          en semaine de tour »), sur ses jours habituels, la ou seul le tour est pose
+       3. autres jours de la semaine — REPLIE par defaut
+       Les groupes 2 et 3 CREENT la consultation dans le planning : salle demandee. */
     repModal&&(()=>{
       const L=repModal.L,dwL=new Date(L.y,L.m,L.d).getDay(),src=new Date(L.y,L.m,L.d);
-      /* v10.24 : plus de limite a dix — toute la periode, de la plus proche a la
-         plus lointaine, avec l'ecart et l'etat reel de chaque demi-journee. */
-      const cands=days.filter(x=>new Date(x.y,x.m,x.d).getDay()===dwL&&isBl(x.y,x.m,x.d)&&!isFerie(x.y,x.m,x.d)
-          &&!(x.y===L.y&&x.m===L.m&&x.d===L.d))
-        .map(x=>{const kk=dk3(x.y,x.m,x.d)+"|"+L.sl;
-          return {o:x,ec:Math.round((new Date(x.y,x.m,x.d)-src)/86400000),
-            libre:slotFreeCS(x.y,x.m,x.d,L.sl),val:validAt[kk]||null,prop:propAt[kk]||null};})
-        .sort((A,B)=>Math.abs(A.ec)-Math.abs(B.ec));
+      const tot=totOf(L),reste=resteOf(L);
+      const g1=[],g2=[],g3=[];
+      days.forEach(x=>{
+        const dw=new Date(x.y,x.m,x.d).getDay();
+        if(dw===0||dw===6||isFerie(x.y,x.m,x.d))return;
+        if(x.y===L.y&&x.m===L.m&&x.d===L.d)return;
+        const tour=inTour(x.y,x.m,x.d),blanche=isBl(x.y,x.m,x.d);
+        const ec=Math.round((new Date(x.y,x.m,x.d)-src)/86400000);
+        ["M","AM"].forEach(sl=>{
+          const kk=dk3(x.y,x.m,x.d)+"|"+sl;
+          const hab=habCS[dw]&&habCS[dw][sl];
+          if(!tour&&blanche&&dw===dwL&&hab)
+            g1.push({o:x,sl,ec,libre:slotFreeCS(x.y,x.m,x.d,sl),val:validAt[kk]||null,prop:propAt[kk]||null});
+          else if(tour&&sl==="AM"&&habDW.indexOf(dw)>=0&&seulLeTour(x.y,x.m,x.d,sl))
+            g2.push({o:x,sl,ec,salles:sallesLibres(L,x,sl)});
+          else if(!tour&&habDW.indexOf(dw)<0&&slotState(x.y,x.m,x.d,sl)==="free")
+            g3.push({o:x,sl,ec,salles:sallesLibres(L,x,sl)});
+        });
+      });
+      const parEc=(A,B)=>Math.abs(A.ec)-Math.abs(B.ec);
+      g1.sort(parEc);g2.sort(parEc);g3.sort(parEc);
       const tagS=(bgc,cl,dash)=>({fontSize:8.5,fontWeight:800,padding:"1px 6px",borderRadius:9,background:bgc,color:cl,
         border:dash?"1px dashed var(--border)":"none"});
-      return RE("div",{onClick:()=>setRepModal(null),
+      const tag=(txt,bgc,cl,dash)=>RE("span",{style:tagS(bgc,cl,dash)},txt);
+      const grpT=(txt)=>RE("div",{style:{fontSize:9.5,fontWeight:800,textTransform:"uppercase",letterSpacing:.4,
+        color:"var(--txt3)",margin:"11px 0 5px",borderTop:"1px solid var(--border2)",paddingTop:9}},txt);
+      const ligne=(cle,contenu,style2,ko,fn)=>RE("button",{key:cle,disabled:ko,onClick:ko?undefined:fn,
+        style:Object.assign({display:"flex",alignItems:"center",gap:8,width:"100%",textAlign:"left",padding:"6px 9px",
+          borderRadius:8,marginBottom:5,fontFamily:"inherit",cursor:ko?"not-allowed":"pointer",opacity:ko?.8:1},style2)},contenu);
+      const dJour=(C,violet)=>RE("span",{style:{fontSize:11.5,fontWeight:800,color:"var(--txt)",minWidth:104}},
+        violet?RE("span",{style:{display:"inline-block",width:30,color:"#7c3aed",fontWeight:800}},JR[new Date(C.o.y,C.o.m,C.o.d).getDay()]):null,
+        (violet?"":"")+ (violet?(C.o.d+" "+MOIS[C.o.m].slice(0,4)):fmtD(C.o))+" "+C.sl);
+      const metas=(kids)=>RE("span",{style:{fontSize:9,display:"flex",gap:4,flexWrap:"wrap",alignItems:"center",
+        marginLeft:"auto",justifyContent:"flex-end"}},kids);
+      const ouvrir=(C)=>{setRepStep({L,o:C.o,sl:C.sl,salles:C.salles,tot:"",nb:"",salle:(C.salles&&C.salles.length===1)?C.salles[0]:null});};
+      return RE("div",{onClick:()=>{setRepModal(null);setRepStep(null);},
+        style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.55)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:12}},
+        RE("div",{onClick:e=>e.stopPropagation(),style:{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:12,padding:14,width:"100%",maxWidth:460,maxHeight:"85vh",overflowY:"auto"}},
+          RE("div",{style:{fontWeight:800,fontSize:13,color:"var(--txt)",marginBottom:3}},"⇄ Reporter "+fmtD(L)+" "+L.sl),
+          RE("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:9,lineHeight:1.5}},
+            tot===null
+              ?"Une semaine blanche reprend la consultation entière. Un créneau de tour n'en reprend qu'une part, et vous demandera alors le total."
+              :RE("span",null,"Il reste ",RE("b",null,enLet(reste)+" patient"+(reste>1?"s":""))," à replacer sur les "+enLet(tot)+".")),
+          /* ── 1 ── */
+          g1.length>0&&grpT(tot===null?"Semaines blanches — reprennent la consultation entière":"Semaines blanches — reprennent tout ce qui reste"),
+          g1.map((C,k)=>{const ko=!C.libre||!!C.val;
+            return ligne("a"+k,[
+              RE("span",{key:"d",style:{fontSize:11.5,fontWeight:800,color:"var(--txt)",minWidth:104}},fmtD(C.o)+" "+C.sl),
+              metas([tag(ecLbl(C.ec),"var(--th)","var(--txt2)"),
+                tag("semaine blanche","rgba(245,158,11,.2)","#b45309"),
+                C.val?tag("✓ validée — "+fmtD(C.val)+" "+C.val.sl,"rgba(239,68,68,.10)","#ef4444")
+                  :(!C.libre?tag("occupée","rgba(239,68,68,.10)","#ef4444")
+                    :(C.prop?tag("proposée — "+fmtD(C.prop)+" "+C.prop.sl,"var(--th)","var(--txt2)",true)
+                      :tag("libre","rgba(22,163,74,.14)","#16a34a")))])],
+              {border:"1.5px "+(C.prop?"dashed":"solid")+" "+(ko?"rgba(239,68,68,.45)":"#16a34a"),
+               background:ko?"rgba(239,68,68,.04)":"rgba(22,163,74,.07)"},ko,
+              ()=>{poseBlanche(L,{y:C.o.y,m:C.o.m,d:C.o.d,sl:C.sl});setRepModal(null);});}),
+          /* ── 2 ── */
+          g2.length>0&&grpT("Créneaux pendant vos tours — vous choisissez le nombre"),
+          g2.map((C,k)=>{const ko=C.salles!==null&&C.salles.length===0;
+            return ligne("b"+k,[
+              RE("span",{key:"d",style:{fontSize:11.5,fontWeight:800,color:"var(--txt)",minWidth:104}},fmtD(C.o)+" "+C.sl),
+              metas([tag(ecLbl(C.ec),"var(--th)","var(--txt2)"),
+                tag("tour · rien d'autre posé","rgba(29,78,216,.14)","#1d4ed8"),
+                C.salles===null?tag("sans salle","var(--th)","var(--txt2)",true)
+                  :(ko?tag("aucune salle libre","rgba(239,68,68,.10)","#ef4444")
+                    :tag(enLet(C.salles.length)+(C.salles.length>1?" salles libres":" salle libre"),"rgba(22,163,74,.14)","#16a34a"))])],
+              {border:"1.5px solid "+(ko?"rgba(239,68,68,.45)":"#1d4ed8"),background:ko?"rgba(239,68,68,.04)":"rgba(29,78,216,.05)"},
+              ko,()=>ouvrir(C));}),
+          /* ── 3, replie ── */
+          g3.length>0&&RE("button",{onClick:()=>setShowG3(s=>!s),
+            style:{display:"flex",alignItems:"center",gap:7,width:"100%",textAlign:"left",padding:"7px 9px",borderRadius:8,
+              border:"1.5px dashed #7c3aed",background:"rgba(124,58,237,.06)",color:"#7c3aed",cursor:"pointer",
+              fontFamily:"inherit",fontSize:10.5,fontWeight:800,marginTop:11}},
+            (showG3?"▾ Masquer les autres jours de la semaine":"▸ Aucun "+JR[dwL]+" ne convient ? Chercher un autre jour de la semaine"),
+            RE("span",{style:{marginLeft:"auto",fontWeight:800,fontSize:9,background:"rgba(124,58,237,.14)",borderRadius:9,padding:"1px 7px"}},String(g3.length))),
+          g3.length>0&&showG3&&RE("div",null,
+            grpT("Autres jours — demi-journées libres, hors semaines de tour"),
+            g3.map((C,k)=>{const ko=C.salles!==null&&C.salles.length===0;
+              return ligne("c"+k,[
+                RE("span",{key:"d",style:{fontSize:11.5,fontWeight:800,color:"var(--txt)",minWidth:104}},
+                  RE("span",{style:{display:"inline-block",width:30,color:"#7c3aed"}},JR[new Date(C.o.y,C.o.m,C.o.d).getDay()]),
+                  C.o.d+" "+MOIS[C.o.m].slice(0,4)+" "+C.sl),
+                metas([tag(ecLbl(C.ec),"var(--th)","var(--txt2)"),
+                  C.salles===null?tag("sans salle","var(--th)","var(--txt2)",true)
+                    :(ko?tag("aucune salle libre","rgba(239,68,68,.10)","#ef4444")
+                      :tag(enLet(C.salles.length)+(C.salles.length>1?" salles libres":" salle libre"),"rgba(22,163,74,.14)","#16a34a"))])],
+                {border:"1.5px solid "+(ko?"rgba(239,68,68,.45)":"#7c3aed"),background:ko?"rgba(239,68,68,.04)":"rgba(124,58,237,.05)"},
+                ko,()=>ouvrir(C));}),
+            RE("div",{style:{fontSize:9.5,color:"var(--txt3)",lineHeight:1.6,marginTop:6}},
+              "Un autre jour crée la consultation dans le planning, comme un créneau de tour : la salle vous sera demandée. Le repère « semaine blanche » ne s'y applique pas — il signifie que votre secrétaire a vidé votre consultation, ce qui n'a pas de sens un jour où vous n'en tenez jamais.")),
+          (g1.length+g2.length+g3.length)===0&&RE("div",{style:{fontSize:11,color:"#ef4444",fontWeight:700}},"Aucune destination possible sur la période."),
+          RE("div",{style:{fontSize:9.5,color:"var(--txt3)",lineHeight:1.6,marginTop:10,borderTop:"1px solid var(--border2)",paddingTop:8}},
+            "Hors période affichée, rien n'est proposé : ces reports-là se règlent directement avec le secrétariat."),
+          RE("button",{onClick:()=>{setRepModal(null);setRepStep(null);},style:{marginTop:10,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",cursor:"pointer",fontWeight:700}},"Fermer")));
+    })(),
+    /* ── v10.25 : 2e temps — combien de patients, et dans quelle salle ────────── */
+    repStep&&(()=>{
+      const L=repStep.L,tot=totOf(L),besoinTot=(tot===null);
+      const dest={y:repStep.o.y,m:repStep.o.m,d:repStep.o.d,sl:repStep.sl};
+      const salles=repStep.salles;
+      const num=(v)=>{const q=parseInt(v,10);return isNaN(q)?0:q;};
+      const champ=(lbl,val,fn,gros)=>RE("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:9,flexWrap:"wrap",
+        background:gros?"rgba(124,58,237,.07)":"transparent",border:gros?"1px solid rgba(124,58,237,.3)":"none",
+        borderRadius:gros?8:0,padding:gros?"8px 10px":0}},
+        RE("label",{style:{fontSize:11,fontWeight:700,color:"var(--txt)"}},lbl),
+        RE("input",{value:val,placeholder:"—",onChange:e=>fn(e.target.value.replace(/[^0-9]/g,"")),
+          style:{width:56,padding:"4px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",
+            color:"var(--txt)",fontSize:13,fontWeight:800,textAlign:"center",fontFamily:"inherit"}}));
+      const valider=()=>{
+        const t=besoinTot?num(repStep.tot):tot;
+        const nb=num(repStep.nb);
+        if(besoinTot&&t<=0){if(toast)toast("Indiquez d'abord le nombre total de patients de la consultation","warn");return;}
+        if(nb<=0){if(toast)toast("Indiquez le nombre de patients repris ce jour-là","warn");return;}
+        if(nb>t){if(toast)toast("Vous reprenez plus de patients que n'en comptait la consultation","warn");return;}
+        if(salles!==null&&salles.length>0&&!repStep.salle){if(toast)toast("Choisissez une salle","warn");return;}
+        if(besoinTot)setTot(L,t);
+        poseCree(L,dest,nb,repStep.salle);
+        setRepStep(null);setRepModal(null);
+      };
+      return RE("div",{onClick:()=>setRepStep(null),
+        style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.6)",zIndex:950,display:"flex",alignItems:"center",justifyContent:"center",padding:12}},
+        RE("div",{onClick:e=>e.stopPropagation(),style:{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:12,padding:14,width:"100%",maxWidth:450,maxHeight:"85vh",overflowY:"auto"}},
+          RE("div",{style:{fontWeight:800,fontSize:13,color:"var(--txt)",marginBottom:3}},"➕ Consultation — "+fmtD(repStep.o)+" "+repStep.sl),
+          RE("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:9,lineHeight:1.5}},
+            (inTour(repStep.o.y,repStep.o.m,repStep.o.d)
+              ?"Vous êtes en tour cette semaine-là : la consultation sera créée dans le planning, à côté du tour."
+              :"Ce jour n'est pas un de vos jours de consultation : elle sera créée dans le planning.")
+            +(besoinTot?" Comme vous n'en reprenez qu'une partie, il me faut d'abord savoir sur combien.":"")),
+          besoinTot&&champ("Patients sur la consultation du "+fmtD(L)+" "+L.sl,repStep.tot,v=>setRepStep(s=>Object.assign({},s,{tot:v})),true),
+          champ("Patients repris ce jour-là",repStep.nb,v=>setRepStep(s=>Object.assign({},s,{nb:v})),false),
+          !besoinTot&&RE("div",{style:{fontSize:10,color:"var(--txt3)",marginTop:-4,marginBottom:9}},"sur les "+enLet(resteOf(L))+" restants"),
+          salles!==null&&salles.length>0&&RE("div",{style:{marginBottom:9}},
+            RE("label",{style:{display:"block",fontSize:11,fontWeight:700,color:"var(--txt)",marginBottom:5}},"Salle"),
+            RE("div",null,salles.map(s=>RE("button",{key:s,onClick:()=>setRepStep(st=>Object.assign({},st,{salle:s})),
+              style:{fontSize:11,padding:"5px 11px",borderRadius:8,cursor:"pointer",fontWeight:800,fontFamily:"inherit",margin:"0 5px 5px 0",
+                border:"1.5px solid "+(repStep.salle===s?"#16a34a":"var(--border)"),
+                background:repStep.salle===s?"rgba(22,163,74,.10)":"var(--bg)",
+                color:repStep.salle===s?"#16a34a":"var(--txt2)"}},s)))),
+          salles===null&&RE("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:9}},"Cette activité ne demande pas de salle."),
+          besoinTot&&RE("div",{style:{fontSize:9.5,color:"var(--txt3)",lineHeight:1.6,marginBottom:9}},
+            "Le premier nombre remplit la case patients de la ligne et ouvre la jauge : la ligne saura dès lors ce qui reste. Il ne vous sera plus demandé ensuite."),
+          RE("div",null,
+            RE("button",{onClick:valider,style:{fontSize:12,padding:"6px 14px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"none",background:"#16a34a",color:"#fff",fontFamily:"inherit"}},"✓ Créer la consultation"),
+            RE("button",{onClick:()=>setRepStep(null),style:{marginLeft:6,fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",cursor:"pointer",fontWeight:700,fontFamily:"inherit"}},"Annuler"))));
+    })(),
+    /* ── v10.25 : le bouton violet ouvre le choix des semaines, il ne decide plus ── */
+    weekModal&&(()=>{
+      const it=weekModal.it,src=new Date(it.lost[0].y,it.lost[0].m,it.lost[0].d);
+      const cands=weeks.filter(w=>w.key!==it.wk&&it.lost.every(L=>{
+          const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===L.dw);
+          return o&&isBl(o.y,o.m,o.d)&&!isFerie(o.y,o.m,o.d)&&slotFreeCS(o.y,o.m,o.d,L.sl);}))
+        .map(w=>{const o0=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===it.lost[0].dw);
+          return {w,ec:Math.round((new Date(o0.y,o0.m,o0.d)-src)/86400000)};})
+        .sort((A,B)=>Math.abs(A.ec)-Math.abs(B.ec));
+      const poser=(w)=>{it.lost.forEach(L=>{const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===L.dw);
+          if(o)poseBlanche(L,{y:o.y,m:o.m,d:o.d,sl:L.sl});});
+        setWeekModal(null);
+        if(toast)toast("Reporté sur la semaine du "+w.days[0].d+" "+MOIS[w.days[0].m].slice(0,4));};
+      return RE("div",{onClick:()=>setWeekModal(null),
         style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.55)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:12}},
         RE("div",{onClick:e=>e.stopPropagation(),style:{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:12,padding:14,width:"100%",maxWidth:450,maxHeight:"85vh",overflowY:"auto"}},
-          RE("div",{style:{fontWeight:800,fontSize:13,color:"var(--txt)",marginBottom:4}},"⇄ Reporter "+fmtD(L)+" "+L.sl),
+          RE("div",{style:{fontWeight:800,fontSize:13,color:"var(--txt)",marginBottom:3}},"⇄ Reporter la semaine du "+it.days[0].d+" "+MOIS[it.days[0].m].slice(0,4)),
           RE("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:9,lineHeight:1.5}},
-            "Semaines blanches du même jour de la semaine, de la plus proche à la plus lointaine. Au-delà de la période affichée, rien n'est proposé : ces reports-là se règlent directement avec le secrétariat."),
+            "Semaines blanches où "+(it.lost.length>1?("les "+enLet(it.lost.length)+" demi-journées tiennent"):"la demi-journée tient")
+            +". La limite d'un mois ne s'applique pas ici : c'est le rattrapage manuel, à vous de juger l'écart."),
           cands.length===0
-            ?RE("div",{style:{fontSize:11,color:"#ef4444",fontWeight:700}},"Aucune date blanche ce jour-là sur la période.")
-            :RE("div",null,cands.map((C,k)=>{
-              const ko=!C.libre||!!C.val;
-              return RE("button",{key:k,disabled:ko,
-                onClick:ko?undefined:()=>{validRep(L,{y:C.o.y,m:C.o.m,d:C.o.d,sl:L.sl});setRepModal(null);},
-                style:{display:"flex",alignItems:"center",gap:8,width:"100%",textAlign:"left",padding:"6px 9px",borderRadius:8,
-                  marginBottom:5,fontFamily:"inherit",cursor:ko?"not-allowed":"pointer",opacity:ko?.8:1,
-                  border:"1.5px "+(C.prop?"dashed":"solid")+" "+(ko?"rgba(239,68,68,.45)":"#16a34a"),
-                  background:ko?"rgba(239,68,68,.04)":"rgba(22,163,74,.07)"}},
-                RE("span",{style:{fontSize:11.5,fontWeight:800,color:"var(--txt)",minWidth:104}},fmtD(C.o)+" "+L.sl),
-                RE("span",{style:{fontSize:9,display:"flex",gap:4,flexWrap:"wrap",alignItems:"center",marginLeft:"auto",justifyContent:"flex-end"}},
-                  RE("span",{style:tagS("var(--th)","var(--txt2)",false)},ecLbl(C.ec)),
-                  RE("span",{style:tagS("rgba(245,158,11,.2)","#b45309",false)},"semaine blanche"),
-                  C.val?RE("span",{style:tagS("rgba(239,68,68,.10)","#ef4444",false)},"✓ validée — "+fmtD(C.val)+" "+C.val.sl)
-                    :(!C.libre?RE("span",{style:tagS("rgba(239,68,68,.10)","#ef4444",false)},"occupée")
-                      :(C.prop?RE("span",{style:tagS("var(--th)","var(--txt2)",true)},"proposée — "+fmtD(C.prop)+" "+C.prop.sl)
-                        :RE("span",{style:tagS("rgba(22,163,74,.14)","#16a34a",false)},"libre")))));
-            })),
-          RE("button",{onClick:()=>setRepModal(null),style:{marginTop:10,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",cursor:"pointer",fontWeight:700}},"Fermer")));
+            ?RE("div",{style:{fontSize:11,color:"#ef4444",fontWeight:700}},"Aucune semaine blanche ne peut reprendre la semaine entière. Reportez alors chaque consultation séparément, avec « choisir une date ».")
+            :RE("div",null,cands.map((C,k)=>RE("button",{key:k,onClick:()=>poser(C.w),
+              style:{display:"flex",alignItems:"center",gap:8,width:"100%",textAlign:"left",padding:"6px 9px",borderRadius:8,
+                marginBottom:5,fontFamily:"inherit",cursor:"pointer",border:"1.5px solid #16a34a",background:"rgba(22,163,74,.07)"}},
+              RE("span",{style:{fontSize:11.5,fontWeight:800,color:"var(--txt)",minWidth:120}},"Semaine du "+C.w.days[0].d+" "+MOIS[C.w.days[0].m].slice(0,4)),
+              RE("span",{style:{fontSize:9,display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}},
+                RE("span",{style:{fontSize:8.5,fontWeight:800,padding:"1px 6px",borderRadius:9,background:"var(--th)",color:"var(--txt2)",fontFamily:"'JetBrains Mono',monospace"}},ecLbl(C.ec)),
+                RE("span",{style:{fontSize:8.5,fontWeight:800,padding:"1px 6px",borderRadius:9,background:"rgba(245,158,11,.2)",color:"#b45309"}},"semaine blanche"))))),
+          RE("button",{onClick:()=>setWeekModal(null),style:{marginTop:10,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",cursor:"pointer",fontWeight:700}},"Fermer")));
     })(),
     freeModal&&RE("div",{onClick:()=>{setFreeModal(null);setFreeStep(null);},
       style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.55)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:12}},
@@ -6982,7 +7219,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} year={year} month={month} toast={toast}/></div>}
+      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
