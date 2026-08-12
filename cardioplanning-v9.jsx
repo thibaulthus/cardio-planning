@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.27 — 12/08/2026";
+const APP_VERSION="v10.28 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5195,6 +5195,7 @@ function CardioPlanning(){
     setFbStatus("connecting");
     const unsub=onSnapshot(PLANNING_DOC,
       (snap)=>{
+        fromServer.current=true;   /* v10.28 : tout ce qui suit vient du serveur */
         if(snap.metadata&&snap.metadata.fromCache===false)serverSeen.current=true;
         if(snap.exists){
           const data0=snap.data();
@@ -5825,6 +5826,12 @@ function CardioPlanning(){
   const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"))&&!netOff; // hors ligne : lecture seule
   // ─── Undo/Redo history (edit mode) ───
   const histRef=useRef({stack:[],idx:-1,restoring:0});
+  /* v10.28 : un changement recu du SERVEUR n'est pas une action de cette personne.
+     Sans ce drapeau, le travail d'un collegue entrait dans MA pile et mon retour
+     arriere le defaisait. Il est leve par le gestionnaire de messages Firestore et
+     rabaisse apres CHAQUE rendu (effet sans dependances, declare juste apres celui
+     de l'historique) : meme un message qui ne change rien ne le laisse pas colle. */
+  const fromServer=useRef(false);
   const [histVer,setHistVer]=useState(0);
   /* v10.27 : les trois donnees de l'onglet Reports entrent dans l'historique.
      Avant, poser un report ecrivait un commentaire (donc creait un cran) mais le
@@ -5853,6 +5860,7 @@ function CardioPlanning(){
        aussitôt la branche de rétablissement — d'où le bouton « avant » qui s'allumait puis
        se grisait. On compte désormais les cinq signaux avant de rendre la main. */
     if(h.restoring>0){h.restoring--;return;}
+    if(fromServer.current)return;   /* v10.28 : pas mon geste, pas mon cran */
     if(h.stack.length===0&&h.depart){h.stack.push(h.depart);h.idx=0;}
     /* v10.7 : une seule pose déclenche DEUX fois cet effet — la modification, puis l'écho
        du serveur qui repose le même contenu dans un nouvel objet. Deux crans identiques
@@ -5869,27 +5877,68 @@ function CardioPlanning(){
     h.idx=h.stack.length-1;
     setHistVer(v=>v+1);
   },[plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel]);
-  /* compte les cases du planning qui vont réellement changer — sert au garde-fou */
-  const histDiff=(snap)=>{
+  /* Sans dependances : s'execute a chaque rendu, donc toujours APRES l'effet
+     ci-dessus (les effets s'executent dans l'ordre de declaration). */
+  useEffect(()=>{fromServer.current=false;});
+  /* ── v10.28 : un retour arriere applique la DIFFERENCE entre le cran quitte et
+     le cran vise, jamais la photo entiere. Une case modifiee entre-temps par
+     quelqu'un d'autre n'apparait dans aucun des deux crans : elle est donc laissee
+     telle quelle au lieu d'etre ecrasee par un etat perime. ── */
+  const memeVal=(a,b)=>histStr(a===undefined?null:a)===histStr(b===undefined?null:b);
+  /* un niveau de cles (notes, astreinte, tour, planning type, donnees de Reports) */
+  const deltaObj=(av,ap,cur)=>{
+    const A=av||{},B=ap||{},out={...(cur||{})};
+    const cles={};Object.keys(A).forEach(k=>cles[k]=1);Object.keys(B).forEach(k=>cles[k]=1);
+    Object.keys(cles).forEach(k=>{
+      if(memeVal(A[k],B[k]))return;                 /* l'action n'a pas touche a cette cle */
+      if(B[k]===undefined)delete out[k];else out[k]=B[k];
+    });
+    return out;
+  };
+  /* le planning a DEUX niveaux : demi-journee, puis medecin — deux personnes
+     peuvent modifier la meme demi-journee sur des lignes differentes */
+  const deltaPlan=(av,ap,cur)=>{
+    const A=av||{},B=ap||{},out={...(cur||{})};
+    const cles={};Object.keys(A).forEach(k=>cles[k]=1);Object.keys(B).forEach(k=>cles[k]=1);
+    Object.keys(cles).forEach(k=>{
+      const a2=A[k]||{},b2=B[k]||{};
+      if(memeVal(a2,b2))return;
+      const c2={...(out[k]||{})};const ids={};
+      Object.keys(a2).forEach(x=>ids[x]=1);Object.keys(b2).forEach(x=>ids[x]=1);
+      Object.keys(ids).forEach(x=>{
+        if(cellKey(a2[x])===cellKey(b2[x]))return;
+        if(b2[x]===undefined)delete c2[x];else c2[x]=b2[x];
+      });
+      if(Object.keys(c2).length===0)delete out[k];else out[k]=c2;
+    });
+    return out;
+  };
+  /* compte les cases du planning que le pas va reellement changer — garde-fou.
+     v10.28 : compte le PAS (cran quitte -> cran vise), plus l'ecart avec l'etat
+     courant, qui incluait a tort les modifications des autres. */
+  const histDiff=(snAv,snAp)=>{
     try{
-      const s=JSON.parse(snap);const av=s.plan||{};let n=0;
-      const cles={};Object.keys(av).forEach(k=>cles[k]=1);Object.keys(plan).forEach(k=>cles[k]=1);
+      const A=(JSON.parse(snAv).plan)||{},B=(JSON.parse(snAp).plan)||{};let n=0;
+      const cles={};Object.keys(A).forEach(k=>cles[k]=1);Object.keys(B).forEach(k=>cles[k]=1);
       Object.keys(cles).forEach(k=>{
-        const A=av[k]||{},B=plan[k]||{};const ids={};
-        Object.keys(A).forEach(x=>ids[x]=1);Object.keys(B).forEach(x=>ids[x]=1);
-        Object.keys(ids).forEach(x=>{if(cellKey(A[x])!==cellKey(B[x]))n++;});
+        const a2=A[k]||{},b2=B[k]||{};const ids={};
+        Object.keys(a2).forEach(x=>ids[x]=1);Object.keys(b2).forEach(x=>ids[x]=1);
+        Object.keys(ids).forEach(x=>{if(cellKey(a2[x])!==cellKey(b2[x]))n++;});
       });
       return n;
     }catch(e){return 0;}
   };
-  const applySnapshot=(snap)=>{
-    const s=JSON.parse(snap);
-    histRef.current.restoring=1;   /* React regroupe les 5 changements en un seul rendu */
-    setPlan(s.plan);setTourMed(s.tourMed);setAstreinte(s.astreinte);
-    setNotes(s.notes);setPlanningType(s.planningType);
-    /* v10.27 : reposees dans le MEME lot que les cinq autres — React n'en fait
-       qu'un seul rendu, le compteur `restoring` reste donc a 1. */
-    setCsBlanches(s.csBlanches||{});setCsRep(s.csRep||{});setCsActsSel(s.csActsSel||{});
+  const applyStep=(snAv,snAp)=>{
+    const A=JSON.parse(snAv),B=JSON.parse(snAp);
+    histRef.current.restoring=1;   /* React regroupe les huit changements en un seul rendu */
+    setPlan(c=>deltaPlan(A.plan,B.plan,c));
+    setTourMed(c=>deltaObj(A.tourMed,B.tourMed,c));
+    setAstreinte(c=>deltaObj(A.astreinte,B.astreinte,c));
+    setNotes(c=>deltaObj(A.notes,B.notes,c));
+    setPlanningType(c=>deltaObj(A.planningType,B.planningType,c));
+    setCsBlanches(c=>deltaObj(A.csBlanches,B.csBlanches,c));
+    setCsRep(c=>deltaObj(A.csRep,B.csRep,c));
+    setCsActsSel(c=>deltaObj(A.csActsSel,B.csActsSel,c));
   };
   const canUndo=histRef.current.idx>0;
   const canRedo=histRef.current.idx<histRef.current.stack.length-1;
@@ -5897,23 +5946,23 @@ function CardioPlanning(){
   const doUndo=()=>{
     const h=histRef.current;
     if(h.idx<=0)return;
-    const n=histDiff(h.stack[h.idx-1]);
+    const n=histDiff(h.stack[h.idx],h.stack[h.idx-1]);
     if(n>HIST_SEUIL){setHistConf({sens:"undo",n});return;}
-    h.idx--;applySnapshot(h.stack[h.idx]);setHistVer(v=>v+1);
+    applyStep(h.stack[h.idx],h.stack[h.idx-1]);h.idx--;setHistVer(v=>v+1);
   };
   const [histConf,setHistConf]=useState(null);
   const histGo=()=>{
     const h=histRef.current;
-    if(histConf&&histConf.sens==="undo"){if(h.idx>0){h.idx--;applySnapshot(h.stack[h.idx]);setHistVer(v=>v+1);}}
-    else{if(h.idx<h.stack.length-1){h.idx++;applySnapshot(h.stack[h.idx]);setHistVer(v=>v+1);}}
+    if(histConf&&histConf.sens==="undo"){if(h.idx>0){applyStep(h.stack[h.idx],h.stack[h.idx-1]);h.idx--;setHistVer(v=>v+1);}}
+    else{if(h.idx<h.stack.length-1){applyStep(h.stack[h.idx],h.stack[h.idx+1]);h.idx++;setHistVer(v=>v+1);}}
     setHistConf(null);
   };
   const doRedo=()=>{
     const h=histRef.current;
     if(h.idx>=h.stack.length-1)return;
-    const n=histDiff(h.stack[h.idx+1]);
+    const n=histDiff(h.stack[h.idx],h.stack[h.idx+1]);
     if(n>HIST_SEUIL){setHistConf({sens:"redo",n});return;}
-    h.idx++;applySnapshot(h.stack[h.idx]);setHistVer(v=>v+1);
+    applyStep(h.stack[h.idx],h.stack[h.idx+1]);h.idx++;setHistVer(v=>v+1);
   };
   /* ── v9.11 : niveaux de droits (basic | inter | editeur) portés par la fiche médecin ── */
   const medLvl=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic"):null;
