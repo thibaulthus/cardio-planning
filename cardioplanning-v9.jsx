@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.26 — 12/08/2026";
+const APP_VERSION="v10.27 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4136,6 +4136,16 @@ function ReportsView(p){
   /* Une proposition ne s'ecarte JAMAIS de plus d'un mois de la semaine d'origine */
   const MAXEC=31;
   const jourMois=()=>{const t=new Date();return t.getDate()+"/"+(t.getMonth()+1<10?"0":"")+(t.getMonth()+1);};
+  /* ── v10.27 : SIGNATURE COURTE des lignes de commentaire. Meme regle que
+     `whoNow` ci-dessous, mais les INITIALES pour un medecin — un commentaire
+     est une ligne, pas une pastille, et « TH » suffit a dire qui a ecrit.
+     L'administratif garde son prenom : il n'a pas d'initiales dans l'equipe. ── */
+  const sigNow=()=>{
+    if(accessMode==="medecinEdit"&&editMedId){const me=medecins.find(m=>m.id===editMedId);
+      if(me)return (me.init||"?");}
+    if(p.adminReports&&p.adminName)return String(p.adminName).trim();
+    return "Éditeur";
+  };
   /* Qui rouvre : le medecin connecte avec son PIN, sinon le prenom saisi par
      l'administratif, sinon l'editeur (toujours la meme personne). */
   const whoNow=()=>{
@@ -4203,10 +4213,15 @@ function ReportsView(p){
   const slotFreeCS=(y,m,d,sl)=>{const es=getEntries(mid,y,m,d,sl);if(es.length===0)return true;if(es[0]&&es[0]._blocked)return false;return es.every(e=>myActs.indexOf(e.acteId)>=0);};
   /* ── v10.24 : « des que l'on modifie quelque chose d'une consultation il faut le
      preciser dans le commentaire ». On AJOUTE une ligne, on n'ecrase jamais ce qui
-     a ete ecrit a la main — y compris quand un report est annule. ── */
+     a ete ecrit a la main — y compris quand un report est annule.
+     v10.27 : chaque ligne ajoutee est ESTAMPILLEE « 12/08 · TH — … ». Les lignes
+     s'empilent : sans date ni auteur, on ne sait plus ce qui a ete fait quand ni
+     par qui. L'estampille est en TETE pour que les lignes s'alignent et se lisent
+     comme un journal. Les commentaires tapes a la main ne sont pas touches. ── */
   const addNote=(dest,txt)=>{if(!p.setNotes)return;
+    const lg=jourMois()+" · "+sigNow()+" — "+txt;
     p.setNotes(pn=>{const k=nk(mid,dest.y,dest.m,dest.d,dest.sl);const cur=(pn[k]||"").trim();
-      const nn={...pn};nn[k]=cur?(cur+"\n"+txt):txt;return nn;});};
+      const nn={...pn};nn[k]=cur?(cur+"\n"+lg):lg;return nn;});};
   /* ── v10.25 : une consultation perdue peut etre DIVISEE ────────────────────
      csRep[mid].to[<demi-journee perdue>] = {
        tot   : nombre total de patients, ou null tant qu'il n'est pas divise
@@ -4248,8 +4263,8 @@ function ReportsView(p){
     addNote(dest,"Report du "+fmtD(L)+" "+L.sl+txtPat(nb)+(a2?" ("+(a2.short||a2.label)+")":""));};
   const annulPart=(L,i)=>{const q=partsOf(L)[i];if(!q)return;const D=dkParse(q.d);
     if(q.cree&&p.removeEntry)p.removeEntry(mid,D.y,D.m,D.d,q.sl,L.acte);
-    addNote({y:D.y,m:D.m,d:D.d,sl:q.sl},"Report annulé le "+jourMois()
-      +(q.cree?" — consultation retirée du planning":" — demi-journée redevenue libre"));
+    addNote({y:D.y,m:D.m,d:D.d,sl:q.sl},"Report annulé"
+      +(q.cree?", consultation retirée du planning":", demi-journée redevenue libre"));
     delPart(L,i);};
   /* Salles reellement libres pour l'activite reportee ; null = activite sans salle */
   const sallesLibres=(L,o,sl)=>{const a2=acteOf(L.acte);
@@ -5811,7 +5826,12 @@ function CardioPlanning(){
   // ─── Undo/Redo history (edit mode) ───
   const histRef=useRef({stack:[],idx:-1,restoring:0});
   const [histVer,setHistVer]=useState(0);
-  const histSnapshot=()=>({plan,tourMed,astreinte,notes,planningType});
+  /* v10.27 : les trois donnees de l'onglet Reports entrent dans l'historique.
+     Avant, poser un report ecrivait un commentaire (donc creait un cran) mais le
+     report lui-meme restait hors photo : un retour arriere retirait le commentaire
+     et laissait le report en place — les deux donnees se contredisaient. Cocher
+     « rouvert » ou une semaine blanche ne creait, lui, aucun cran du tout. */
+  const histSnapshot=()=>({plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel});
   /* v10.8 : sérialisation à CLÉS TRIÉES. Mon dédoublonnage de la v10.7 comparait deux
      textes bruts ; or l'écho du serveur renvoie les mêmes données dans un ORDRE DE CLÉS
      différent, donc le doublon passait quand même et le premier « retour » revenait sur
@@ -5848,7 +5868,7 @@ function CardioPlanning(){
     if(h.stack.length>50)h.stack.shift();
     h.idx=h.stack.length-1;
     setHistVer(v=>v+1);
-  },[plan,tourMed,astreinte,notes,planningType]);
+  },[plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel]);
   /* compte les cases du planning qui vont réellement changer — sert au garde-fou */
   const histDiff=(snap)=>{
     try{
@@ -5867,6 +5887,9 @@ function CardioPlanning(){
     histRef.current.restoring=1;   /* React regroupe les 5 changements en un seul rendu */
     setPlan(s.plan);setTourMed(s.tourMed);setAstreinte(s.astreinte);
     setNotes(s.notes);setPlanningType(s.planningType);
+    /* v10.27 : reposees dans le MEME lot que les cinq autres — React n'en fait
+       qu'un seul rendu, le compteur `restoring` reste donc a 1. */
+    setCsBlanches(s.csBlanches||{});setCsRep(s.csRep||{});setCsActsSel(s.csActsSel||{});
   };
   const canUndo=histRef.current.idx>0;
   const canRedo=histRef.current.idx<histRef.current.stack.length-1;
@@ -6931,7 +6954,9 @@ header::-webkit-scrollbar { display: none; }
       <header style={S.hdr}>
         <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
           <span onClick={()=>{setPinInput("");setPinError(false);setIsCadre(false);setAccessMode("ask");}} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
-          {(isEdit||isMedEdit)&&<div style={{display:"flex",gap:3}}>
+          {/* v10.27 : l'administratif y a droit aussi — c'est lui qui remplit le plus
+              souvent les semaines blanches et les reports. */}
+          {(isEdit||isMedEdit||isAdminEdit)&&<div style={{display:"flex",gap:3}}>
             <button onClick={doUndo} disabled={!canUndo} title="Annuler (retour arrière)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canUndo?"rgba(255,255,255,.1)":"transparent",color:canUndo?"#f0f6fc":"#484f58",cursor:canUndo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↶</button>
             <button onClick={doRedo} disabled={!canRedo} title="Rétablir (retour avant)"
