@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.32 — 12/08/2026";
+const APP_VERSION="v10.33 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4931,6 +4931,11 @@ function ReportsView(p){
 const BUILD_DEM=[["conges","🏖️","Poser vos congés de la période","pers","Congés"],
                  ["tour","🔄","Dire vos préférences de tour","prefT","Préférences de tour"],
                  ["garde","🌙","Dire vos préférences de gardes","prefG","Préférences de gardes"]];
+/* v10.33, SA REGLE : une demande ne part qu'aux personnes CONCERNEES — les
+   preferences de tour aux medecins qui tournent, celles de gardes a ceux qui en
+   prennent. Les autres ne recoivent rien et ne comptent nulle part. */
+const demConcerne=(m,id)=>!m?false:(id==="tour"?m.tourMed===true:id==="garde"?m.garde===true:true);
+const demPop=(meds,id)=>meds.filter(m=>demConcerne(m,id));
 /* l'annee de fin est dite quand la periode change d'annee (comme _titlePeriod) :
    un bandeau se lit hors contexte, il ne doit pas laisser d'ambiguite. */
 const perLibelle=(sy,sm)=>{const a=String(sy).split("_");const y=+a[0],m=(sm===undefined?+String(sy).split("_")[1]:sm);
@@ -5003,13 +5008,8 @@ function BuildLien({txt,onClick}){
 }
 
 /* Cadre des ecrans montes : rappelle qu'on regarde l'onglet d'origine, entier. */
-function BuildEmbed({titre,children}){
-  return(
-    <div style={{border:"1px dashed var(--border)",borderRadius:8,padding:"4px 6px 6px",background:"var(--bg)"}}>
-      <div style={{fontSize:10,fontWeight:800,letterSpacing:".05em",color:"var(--txt3)",margin:"1px 0 4px"}}>{titre}</div>
-      {children}
-    </div>
-  );
+function BuildEmbed({children}){
+  return <div style={{border:"1px dashed var(--border)",borderRadius:8,padding:"5px 6px 6px",background:"var(--bg)"}}>{children}</div>;
 }
 
 /* v10.32 : LE RAPPEL DU MEDECIN. Il s'affiche dans l'onglet Planning QUELLE QUE
@@ -5024,7 +5024,7 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
   Object.keys(build||{}).forEach(k=>{
     const B=(build||{})[k]||{};
     BUILD_DEM.forEach(([id,ic,txt,champ])=>{
-      if((B.dem||{})[id]&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ});
+      if((B.dem||{})[id]&&demConcerne(moi,id)&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ});
     });
   });
   if(!att.length)return null;
@@ -5042,19 +5042,6 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
           <button onClick={()=>onRepondre(a.k,a.champ)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #3fb950",background:"rgba(63,185,80,.13)",color:"#3fb950",fontWeight:800,cursor:"pointer"}}>✓ C'est fait</button>
         </div>
       ))}
-    </div>
-  );
-}
-
-/* Liste compacte d'initiales, pour les deux demandes de preferences. */
-function BuildInitList({gens,etat,onSet,peut}){
-  if(!gens.length)return null;
-  return(
-    <div style={{display:"grid",gap:4,justifyContent:"start",gridTemplateColumns:"repeat(auto-fill,minmax(46px,58px))"}}>
-      {gens.map(m=>{const on=!!(etat||{})[m.id];return(
-        <button key={m.id} disabled={!peut} onClick={()=>onSet(m.id,!on)}
-          style={{padding:"3px 4px",borderRadius:6,fontSize:11,fontWeight:800,cursor:peut?"pointer":"default",overflow:"hidden",
-            border:"1px solid "+(on?"#3fb950":"var(--border)"),background:on?"rgba(63,185,80,.13)":"var(--bg3)",color:on?"#3fb950":"var(--txt3)"}}>{(on?"✓":"")+m.init}</button>);})}
     </div>
   );
 }
@@ -5152,15 +5139,15 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:6,marginBottom:10}}>
          {BUILD_DEM.map(([id,ic,txt,champ,titre])=>{
            const ouverte=(B.dem||{})[id];
-           const n=meds.filter(m=>(B[champ]||{})[m.id]).length;
+           const pop=demPop(meds,id);
+           const n=pop.filter(m=>(B[champ]||{})[m.id]).length;
            return(
              <div key={id} style={{border:"1px solid "+(ouverte?"#8b5cf6":"var(--border)"),borderRadius:8,padding:"7px 9px",background:"var(--bg3)"}}>
                <div style={{fontSize:12,fontWeight:800,color:"var(--txt)"}}>{ic+" "+titre}</div>
-               <div style={{fontSize:11,color:"var(--txt3)",margin:"2px 0 6px"}}>{n+" réponse"+(n>1?"s":"")+" sur "+meds.length}</div>
+               <div style={{fontSize:11,color:"var(--txt3)",margin:"2px 0 6px"}}>{n+" réponse"+(n>1?"s":"")+" sur "+pop.length+(id==="tour"?" qui tournent":id==="garde"?" de garde":"")}</div>
                {isEdit&&<button onClick={()=>setDem(id)} style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",
                  border:"1.5px solid #8b5cf6",background:ouverte?"#8b5cf6":"rgba(139,92,246,.10)",color:ouverte?"#fff":"#8b5cf6"}}>{ouverte?"✓ Demande ouverte":"Ouvrir la demande"}</button>}
                {ouverte&&ouverte.at&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"ouverte le "+ouverte.at}</div>}
-               {id!=="conges"&&ouverte&&<div style={{marginTop:6}}><BuildInitList gens={meds} etat={B[champ]} onSet={(mid,v)=>setRep(champ,mid,v)} peut={isEdit}/></div>}
              </div>);
          })}
        </div>
@@ -5170,11 +5157,11 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     {n:2,icon:"🔄",titre:"Distribution du tour",
      sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
      alerte:mTour?(mTour+" semaine"+(mTour>1?"s":"")+" sans tour attribué"):null,
-     body:<BuildEmbed titre="⟨ l'onglet Tour, entier et inchangé ⟩"><TourTab {...tourProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     body:<BuildEmbed><TourTab {...tourProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
     {n:3,icon:"🌙",titre:"Gardes",
      sous:gardes.ok+" jour"+(gardes.ok>1?"s":"")+" sur "+gardes.tot+" ont une garde",
      alerte:mGar?(mGar+" jour"+(mGar>1?"s":"")+" sans garde sur la période"):null,
-     body:<BuildEmbed titre="⟨ l'onglet Gardes, entier et inchangé ⟩"><GardeView {...gardeProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     body:<BuildEmbed><GardeView {...gardeProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
     {n:4,icon:"🚫",titre:"Absences de tout le monde",
      sous:nAutres+" sur "+autres.length+" renseigné"+(nAutres>1?"s":""),
      alerte:mAut?(mAut+" personne"+(mAut>1?"s":"")+" hors médecins sans réponse"):null,
@@ -5182,14 +5169,12 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
        <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES. Seuls ceux dont la fiche Équipe porte « absences à recueillir » figurent ici.</div>
        <BuildPersonList gens={autres} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun attaché ni IDE dans l'équipe."/>
        <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
-         <BuildLien txt="→ Saisir dans le Planning" onClick={()=>goTab("planning")}/>
          <BuildLien txt="→ Onglet Attachés" onClick={()=>goTab("attache")}/>
        </div></div>},
     {n:5,icon:"📋",titre:"Appliquer le planning type",
      sous:"s'applique d'ici, sur la période affichée",
      alerte:null,
      body:<div>
-       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>La même fenêtre que dans l'onglet Type, mais bornée à la période de cet onglet — pas besoin d'en sortir.</div>
        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
          {isEdit&&<button onClick={()=>onApplyPT(bPer)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}}>📋 Appliquer le planning type</button>}
          {isEdit&&<button onClick={()=>onRemovePT(bPer)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}}>🗑 Retirer</button>}
