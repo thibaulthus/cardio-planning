@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.25 — 12/08/2026";
+const APP_VERSION="v10.26 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -7376,7 +7376,7 @@ header::-webkit-scrollbar { display: none; }
               </div>
             )}
             {/* Stats — au-dessus, style onglet Gardes */}
-            <div style={{maxWidth:560,marginBottom:14,padding:12,borderRadius:10,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+            <div style={{maxWidth:620,marginBottom:14,padding:12,borderRadius:10,border:"1px solid var(--border)",background:"var(--bg2)"}}>
               <div style={{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>📞 Astreintes posées — {pLabel}</div>
               <table style={{borderCollapse:"collapse",width:"100%"}}>
                 <thead><tr>
@@ -7416,11 +7416,13 @@ header::-webkit-scrollbar { display: none; }
                 const fmtJ=(o)=>o.d+" "+MOIS[o.m].slice(0,4).toLowerCase()+".";
                 /* v10.23 : les tuiles s'alignent sur le cadre recapitulatif du dessus
                    (meme maxWidth 560) — pleine largeur, elles etaient peu pratiques. */
-                return <div style={{padding:"4px 0",maxWidth:560}}>
+                return <div style={{padding:"4px 0",maxWidth:620}}>
                   {sems.map(sem=>{
                     const j0=sem.jours[0],j9=sem.jours[sem.jours.length-1];
                     const exc=sem.jours.filter(o=>{const dk=o.y+"-"+o.m+"-"+o.d;return dk!==sem.wk&&typeof astreinte[dk]==="string";});
-                    const ouvert=astSemOuv[sem.wk]!==undefined?astSemOuv[sem.wk]:exc.length>0;
+                    /* v10.26 : les semaines a exception ne s'ouvrent plus d'elles-memes —
+                       la bande des jours (a droite) dit deja qui remplace qui et quand. */
+                    const ouvert=astSemOuv[sem.wk]===true;
                     const midS=astreinte[sem.wk];
                     const medS=midS?medecins.find(x=>String(x.id)===String(midS)):null;
                     const auj=sem.jours.some(o=>o.d===astToday.getDate()&&o.m===astToday.getMonth()&&o.y===astToday.getFullYear());
@@ -7440,11 +7442,31 @@ header::-webkit-scrollbar { display: none; }
                             <span style={{fontSize:12.5,fontWeight:700}}>{medS.prenom} {medS.nom}</span>
                           </>:<span style={{color:"var(--txt3)",fontSize:12.5}}>— non renseignée</span>}
                         </span>
-                        <span style={{marginLeft:"auto",fontSize:10,fontWeight:800,borderRadius:11,padding:"2px 9px",
-                          background:exc.length?"rgba(124,58,237,.12)":(medS?"transparent":"rgba(220,38,38,.10)"),
-                          border:exc.length?"1px solid #c4b5fd":(medS?"none":"1px solid #fca5a5"),
-                          color:exc.length?"#5b21b6":(medS?"transparent":"#991b1b")}}>
-                          {exc.length?(exc.length+" exception"+(exc.length>1?"s":"")):(medS?"":"à remplir")}
+                        {/* v10.26 : BANDE DES JOURS DE LA SEMAINE, a la place du compte
+                            textuel « n exceptions ». Une case par jour reellement affiche
+                            (les semaines de bord de periode en comptent moins de sept) :
+                            initiale du jour si l'astreinte est celle de la semaine, initiales
+                            du praticien sur sa couleur si le jour porte une exception. La
+                            largeur ne depend donc plus du nombre d'exceptions. L'export CSV
+                            et l'impression restent jour par jour, inchanges. */}
+                        <span style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
+                          {exc.length>0&&<span style={{display:"flex",gap:2,alignItems:"center"}}>
+                            {sem.jours.map(({y,m,d})=>{
+                              const dkB=y+"-"+m+"-"+d;
+                              const isE=dkB!==sem.wk&&typeof astreinte[dkB]==="string";
+                              const eMed=isE?medecins.find(x=>String(x.id)===String(astreinte[dkB])):null;
+                              const dwB=new Date(y,m,d).getDay();
+                              return <span key={dkB} title={["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dwB]+" "+d+" "+MOIS[m]+(eMed?" — "+eMed.prenom+" "+eMed.nom:(isE?" — personne":""))}
+                                style={{width:21,height:21,borderRadius:5,display:"flex",alignItems:"center",
+                                  justifyContent:"center",fontSize:8.5,fontWeight:800,flexShrink:0,
+                                  background:eMed?eMed.color:"var(--bg)",
+                                  color:eMed?"#fff":(isE?"#7c3aed":"var(--txt3)"),
+                                  border:"1px solid "+(eMed?"transparent":(isE?"#7c3aed":"var(--border2)"))}}>
+                                {eMed?eMed.init:["D","L","M","M","J","V","S"][dwB]}</span>;
+                            })}
+                          </span>}
+                          {!medS&&<span style={{fontSize:10,fontWeight:800,borderRadius:11,padding:"2px 9px",
+                            background:"rgba(220,38,38,.10)",border:"1px solid #fca5a5",color:"#991b1b"}}>à remplir</span>}
                         </span>
                       </div>
                       {ouvert&&<div style={{borderTop:"1px solid var(--border)",background:"var(--bg)"}}>

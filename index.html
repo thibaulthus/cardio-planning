@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.25 — 12/08/2026";
+var APP_VERSION = "v10.26 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -8362,7 +8362,7 @@ function CardioPlanning() {
                     astReport && (React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid " + (astReport.includes("⚠") ? "#f59e0b" : "#16a34a"), background: astReport.includes("⚠") ? "rgba(245,158,11,.08)" : "rgba(22,163,74,.08)", fontSize: 11, color: "var(--txt)", lineHeight: 1.5 } },
                         React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
                         React.createElement("span", { style: { flex: 1 } }, astReport))),
-                    React.createElement("div", { style: { maxWidth: 560, marginBottom: 14, padding: 12, borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                    React.createElement("div", { style: { maxWidth: 620, marginBottom: 14, padding: 12, borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "var(--txt2)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 } },
                             "\uD83D\uDCDE Astreintes pos\u00E9es \u2014 ",
                             pLabel),
@@ -8395,10 +8395,10 @@ function CardioPlanning() {
                             cur.jours.push({ y: y, m: m, d: d });
                         });
                         var fmtJ = function (o) { return o.d + " " + MOIS[o.m].slice(0, 4).toLowerCase() + "."; };
-                        return React.createElement("div", { style: { padding: "4px 0", maxWidth: 560 } }, sems.map(function (sem) {
+                        return React.createElement("div", { style: { padding: "4px 0", maxWidth: 620 } }, sems.map(function (sem) {
                             var j0 = sem.jours[0], j9 = sem.jours[sem.jours.length - 1];
                             var exc = sem.jours.filter(function (o) { var dk = o.y + "-" + o.m + "-" + o.d; return dk !== sem.wk && typeof astreinte[dk] === "string"; });
-                            var ouvert = astSemOuv[sem.wk] !== undefined ? astSemOuv[sem.wk] : exc.length > 0;
+                            var ouvert = astSemOuv[sem.wk] === true;
                             var midS = astreinte[sem.wk];
                             var medS = midS ? medecins.find(function (x) { return String(x.id) === String(midS); }) : null;
                             var auj = sem.jours.some(function (o) { return o.d === astToday.getDate() && o.m === astToday.getMonth() && o.y === astToday.getFullYear(); });
@@ -8427,10 +8427,22 @@ function CardioPlanning() {
                                             medS.prenom,
                                             " ",
                                             medS.nom)) : React.createElement("span", { style: { color: "var(--txt3)", fontSize: 12.5 } }, "\u2014 non renseign\u00E9e")),
-                                    React.createElement("span", { style: { marginLeft: "auto", fontSize: 10, fontWeight: 800, borderRadius: 11, padding: "2px 9px",
-                                            background: exc.length ? "rgba(124,58,237,.12)" : (medS ? "transparent" : "rgba(220,38,38,.10)"),
-                                            border: exc.length ? "1px solid #c4b5fd" : (medS ? "none" : "1px solid #fca5a5"),
-                                            color: exc.length ? "#5b21b6" : (medS ? "transparent" : "#991b1b") } }, exc.length ? (exc.length + " exception" + (exc.length > 1 ? "s" : "")) : (medS ? "" : "à remplir"))),
+                                    React.createElement("span", { style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 } },
+                                        exc.length > 0 && React.createElement("span", { style: { display: "flex", gap: 2, alignItems: "center" } }, sem.jours.map(function (_b) {
+                                            var y = _b.y, m = _b.m, d = _b.d;
+                                            var dkB = y + "-" + m + "-" + d;
+                                            var isE = dkB !== sem.wk && typeof astreinte[dkB] === "string";
+                                            var eMed = isE ? medecins.find(function (x) { return String(x.id) === String(astreinte[dkB]); }) : null;
+                                            var dwB = new Date(y, m, d).getDay();
+                                            return React.createElement("span", { key: dkB, title: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dwB] + " " + d + " " + MOIS[m] + (eMed ? " \u2014 " + eMed.prenom + " " + eMed.nom : (isE ? " \u2014 personne" : "")),
+                                                style: { width: 21, height: 21, borderRadius: 5, display: "flex", alignItems: "center",
+                                                    justifyContent: "center", fontSize: 8.5, fontWeight: 800, flexShrink: 0,
+                                                    background: eMed ? eMed.color : "var(--bg)",
+                                                    color: eMed ? "#fff" : (isE ? "#7c3aed" : "var(--txt3)"),
+                                                    border: "1px solid " + (eMed ? "transparent" : (isE ? "#7c3aed" : "var(--border2)")) } }, eMed ? eMed.init : ["D", "L", "M", "M", "J", "V", "S"][dwB]);
+                                        })),
+                                        !medS && React.createElement("span", { style: { fontSize: 10, fontWeight: 800, borderRadius: 11, padding: "2px 9px",
+                                                background: "rgba(220,38,38,.10)", border: "1px solid #fca5a5", color: "#991b1b" } }, "\u00e0 remplir"))),
                                 ouvert && React.createElement("div", { style: { borderTop: "1px solid var(--border)", background: "var(--bg)" } }, sem.jours.map(function (_a) {
                                     var y = _a.y, m = _a.m, d = _a.d;
                                     var dk = y + "-" + m + "-" + d;
