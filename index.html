@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.29 — 12/08/2026";
+var APP_VERSION = "v10.30 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -3778,7 +3778,7 @@ function TourTab(_a) {
             React.createElement("span", { style: { flex: 1 } },
                 lastReport,
                 (function () { var all = []; weeksT.forEach(function (w2) { return weekTPInfo(w2.key).forEach(function (t3) { return all.push(t3); }); }); return all.length > 0 ? " ✂ Remplacements TP : " + all.join(" · ") + "." : ""; })())),
-        React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 4, position: "sticky", top: 44, zIndex: 30, background: "var(--bg)", paddingTop: 4 } }, tourMeds.map(function (m) {
+        React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 4, position: "sticky", top: noNav ? (HDR_H + BUILD_BAR_H) : 44, zIndex: noNav ? 10 : 30, background: "var(--bg)", paddingTop: 4 } }, tourMeds.map(function (m) {
             var hcCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.HC || []).includes(m.id) ? n + 1 : n; }, 0);
             var usicCount = weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || {}; return (wm2.USIC || []).includes(m.id) ? n + 1 : n; }, 0);
             var total = hcCount + usicCount;
@@ -5121,61 +5121,77 @@ function ReportsView(p){
         })())));
 }
 
-/* ═══════════════ v10.29 : onglet CONSTRUIRE (lot 1) ═══════════════
+/* ═══════════════ v10.29 : onglet CONSTRUIRE ═══════════════
    Chef d'orchestre de la construction d'un planning. N'INVENTE AUCUNE
    FONCTION : les tuiles Tour et Gardes montent les écrans EXISTANTS (mêmes
    composants, mêmes props, via tourProps/gardeProps partagés avec les onglets
    d'origine), les autres pointent à la main et renvoient vers l'onglet concerné.
    UNE SEULE PÉRIODE, choisie dans la barre figée du haut : aucune flèche de mois
    dans les tuiles (prop noNav), pour ne jamais remplir deux périodes à la fois.
-   Les alertes sont NON BLOQUANTES : elles signalent, elles n'empêchent pas. */
+   Les alertes sont NON BLOQUANTES : elles signalent, elles n'empêchent pas.
+   v10.30 : pointage à UNE COCHE, étape terminée d'elle-même quand elle est
+   mesurable, repli à la validation, jauge, rail numéroté, et le planning type
+   s'applique SANS QUITTER l'onglet (la fenêtre reçoit la période de Construire). */
 var BUILD_SPECS = ["Coro", "EEP", "FOP", "Stim"];
 var BIP_MIN_SEM = 3; /* un jour sans bip est normal ; on alerte sous 3 bips/semaine */
+var BUILD_BAR_H = 46; /* hauteur de la barre de période — les zones figées des écrans montés se calent dessous */
 function BuildTile(_a) {
-    var n = _a.n, icon = _a.icon, titre = _a.titre, ouvert = _a.ouvert, onToggle = _a.onToggle, alerte = _a.alerte, fait = _a.fait, onFait = _a.onFait, peutFaire = _a.peutFaire, sous = _a.sous, children = _a.children;
-    var col = fait ? "#3fb950" : (alerte ? "#f59e0b" : "var(--border)");
-    return (React.createElement("div", { style: { border: "1px solid var(--border)", borderLeft: "4px solid " + col, borderRadius: 8, marginBottom: 8, background: "var(--bg2)", overflow: "hidden" } },
-        React.createElement("div", { onClick: onToggle, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", cursor: "pointer" } },
-            React.createElement("span", { style: { width: 22, height: 22, borderRadius: 11, background: fait ? "#3fb950" : "var(--bg3)", color: fait ? "#fff" : "var(--txt2)", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" } }, n),
-            React.createElement("span", { style: { fontSize: 13 } }, icon),
-            React.createElement("span", { style: { fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, titre),
-            fait && React.createElement("span", { style: { fontSize: 10, color: "#3fb950", fontWeight: 700 } }, "\u2713 fait"),
-            React.createElement("span", { style: { marginLeft: "auto", fontSize: 12, color: "var(--txt3)" } }, ouvert ? "▾" : "▸")),
-        alerte && React.createElement("div", { style: { margin: "0 10px 8px", padding: "5px 9px", borderRadius: 6, background: "rgba(245,158,11,.13)", border: "1px solid #f59e0b", color: "#b45309", fontSize: 11, fontWeight: 600 } },
-            "\u26A0 ",
-            alerte),
-        ouvert && React.createElement("div", { style: { padding: "0 10px 10px" } },
-            sous && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, sous),
-            children,
-            peutFaire && React.createElement("div", { style: { marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-                React.createElement("button", { onClick: onFait, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, fontWeight: 800, cursor: "pointer", border: fait ? "1.5px solid #3fb950" : "1.5px solid var(--border)", background: fait ? "rgba(63,185,80,.13)" : "var(--bg3)", color: fait ? "#3fb950" : "var(--txt2)" } }, fait ? "✓ Étape validée" : "Marquer cette étape comme faite"),
-                fait && fait.by && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "par " + fait.by + " le " + fait.at)))));
+    var n = _a.n, icon = _a.icon, titre = _a.titre, sous = _a.sous, ouvert = _a.ouvert, onToggle = _a.onToggle, alerte = _a.alerte, fait = _a.fait, auto = _a.auto, onFait = _a.onFait, peutFaire = _a.peutFaire, children = _a.children;
+    var ok = !!(fait || auto);
+    var col = ok ? "#3fb950" : (alerte ? "#f59e0b" : "var(--border)");
+    return (React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "stretch" } },
+        React.createElement("div", { style: { width: 24, flex: "0 0 24px", display: "flex", flexDirection: "column", alignItems: "center" } },
+            React.createElement("div", { style: { width: 24, height: 24, borderRadius: 12, marginTop: 10, flex: "0 0 24px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
+                    border: "1px solid " + (ok ? "#3fb950" : "var(--border)"), background: ok ? "#3fb950" : "var(--bg2)", color: ok ? "#fff" : "var(--txt3)" } }, ok ? "✓" : n),
+            React.createElement("div", { style: { flex: 1, width: 2, background: "var(--border2)", margin: "2px 0" } })),
+        React.createElement("div", { style: { flex: 1, minWidth: 0, border: "1px solid " + col, borderRadius: 9, background: "var(--bg2)", marginBottom: 8, overflow: "hidden" } },
+            React.createElement("div", { onClick: onToggle, style: { display: "flex", alignItems: "center", gap: 9, padding: "9px 11px", cursor: "pointer" } },
+                React.createElement("span", { style: { fontSize: 13 } }, icon),
+                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                    React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "var(--txt)" } }, titre),
+                    sous && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 1 } }, sous)),
+                ok && React.createElement("span", { style: { fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 20, border: "1px solid #3fb950", color: "#3fb950", background: "rgba(63,185,80,.10)" } }, fait ? "validé" : "terminé"),
+                !ok && alerte && React.createElement("span", { style: { fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 20, border: "1px solid #f59e0b", color: "#b45309", background: "rgba(245,158,11,.13)" } }, "\u00E0 finir"),
+                React.createElement("span", { style: { fontSize: 12, color: "var(--txt3)" } }, ouvert ? "▾" : "▸")),
+            ouvert && React.createElement("div", { style: { padding: "0 11px 11px" } },
+                alerte && React.createElement("div", { style: { margin: "0 0 9px", padding: "5px 9px", borderRadius: 6, background: "rgba(245,158,11,.13)", border: "1px solid #f59e0b", color: "#b45309", fontSize: 11, fontWeight: 600 } },
+                    "\u26A0 ",
+                    alerte),
+                children,
+                peutFaire && React.createElement("div", { style: { marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+                    React.createElement("button", { onClick: onFait, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, fontWeight: 800, cursor: "pointer", border: fait ? "1.5px solid #3fb950" : "1.5px solid var(--border)", background: fait ? "rgba(63,185,80,.13)" : "var(--bg3)", color: fait ? "#3fb950" : "var(--txt2)" } }, fait ? "✓ Étape validée" : "Marquer cette étape comme faite"),
+                    fait && fait.by && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "par " + fait.by + " le " + fait.at))))));
 }
-function BuildStatus(_a) {
-    var v = _a.v, onSet = _a.onSet, peut = _a.peut;
-    var OPT = [["oui", "oui", "#3fb950"], ["non", "non", "var(--txt3)"], ["na", "pas besoin", "#8b5cf6"]];
-    return (React.createElement("div", { style: { display: "flex", gap: 3 } }, OPT.map(function (_a) {
-        var k = _a[0], lbl = _a[1], c = _a[2];
-        return (React.createElement("button", { key: k, disabled: !peut, onClick: function () { return onSet(v === k ? null : k); }, style: { fontSize: 10, padding: "2px 7px", borderRadius: 5, fontWeight: 700, cursor: peut ? "pointer" : "default",
-                border: "1px solid " + (v === k ? c : "var(--border)"), background: v === k ? c : "var(--bg3)", color: v === k ? "#fff" : "var(--txt3)", opacity: peut ? 1 : .6 } }, lbl));
-    })));
-}
+/* v10.30 : une seule coche, sa demande — « j'ai juste besoin de cocher si la
+   personne a posé ses vacances ». Le oui / non / pas besoin est retiré. */
 function BuildPersonList(_a) {
     var gens = _a.gens, etat = _a.etat, onSet = _a.onSet, peut = _a.peut, vide = _a.vide;
     if (!gens.length)
         return React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, vide);
-    return (React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 4 } }, gens.map(function (m) { return (React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 6, padding: "3px 6px", borderRadius: 6, background: "var(--bg3)" } },
-        React.createElement("span", { style: { width: 26, height: 20, borderRadius: 5, background: m.color || "#888", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" } }, m.init),
-        React.createElement("span", { style: { fontSize: 11, color: "var(--txt2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, m.prenom + " " + m.nom),
-        React.createElement("span", { style: { marginLeft: "auto" } },
-            React.createElement(BuildStatus, { v: (etat || {})[m.id] || null, onSet: function (x) { return onSet(m.id, x); }, peut: peut })))); })));
+    return (React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 4 } }, gens.map(function (m) {
+        var on = !!(etat || {})[m.id];
+        return (React.createElement("div", { key: m.id, onClick: function () { if (peut)
+                onSet(m.id, !on); }, style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 7px", borderRadius: 6, cursor: peut ? "pointer" : "default",
+                background: on ? "rgba(63,185,80,.10)" : "var(--bg3)", border: "1px solid " + (on ? "#3fb950" : "transparent") } },
+            React.createElement("span", { style: { width: 15, height: 15, borderRadius: 4, flex: "0 0 15px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800,
+                    border: "1.5px solid " + (on ? "#3fb950" : "var(--border)"), background: on ? "#3fb950" : "transparent", color: "#fff" } }, on ? "✓" : ""),
+            React.createElement("span", { style: { width: 26, height: 20, borderRadius: 5, background: m.color || "#888", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 26px" } }, m.init),
+            React.createElement("span", { style: { fontSize: 11, color: "var(--txt2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, m.prenom + " " + m.nom)));
+    })));
 }
 function BuildLien(_a) {
     var txt = _a.txt, onClick = _a.onClick;
     return React.createElement("button", { onClick: onClick, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, txt);
 }
+/* Cadre des ecrans montes : rappelle qu'on regarde l'onglet d'origine, entier. */
+function BuildEmbed(_a) {
+    var titre = _a.titre, children = _a.children;
+    return (React.createElement("div", { style: { border: "1px dashed var(--border)", borderRadius: 8, padding: "4px 6px 6px", background: "var(--bg)" } },
+        React.createElement("div", { style: { fontSize: 10, fontWeight: 800, letterSpacing: ".05em", color: "var(--txt3)", margin: "1px 0 4px" } }, titre),
+        children));
+}
 function BuildTab(_a) {
-    var build = _a.build, setBuild = _a.setBuild, medecins = _a.medecins, getEntries = _a.getEntries, tourMed = _a.tourMed, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, author = _a.author, goTab = _a.goTab, onOpenBip = _a.onOpenBip, tourProps = _a.tourProps, gardeProps = _a.gardeProps;
+    var build = _a.build, setBuild = _a.setBuild, medecins = _a.medecins, getEntries = _a.getEntries, tourMed = _a.tourMed, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, author = _a.author, goTab = _a.goTab, onOpenBip = _a.onOpenBip, onApplyPT = _a.onApplyPT, onRemovePT = _a.onRemovePT, tourProps = _a.tourProps, gardeProps = _a.gardeProps;
     /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
     var _b = React.useState(function () { var t = new Date(); var p0 = perStart(t.getFullYear(), t.getMonth()); return perNext(p0.sy, p0.sm); }), bPer = _b[0], setBPer = _b[1];
     var pKey = bPer.sy + "_" + bPer.sm;
@@ -5186,56 +5202,47 @@ function BuildTab(_a) {
         return __assign(__assign({}, (p || {})), (_a = {}, _a[pKey] = __assign(__assign({}, cur), patch), _a));
     }); };
     var sign = function () { return ({ by: author || "?", at: new Date().toLocaleDateString("fr-FR") }); };
-    var setEtape = function (n) { var st = __assign({}, (B.etapes || {})); if (st[n])
-        delete st[n];
-    else
-        st[n] = sign(); patchB({ etapes: st }); };
     var setPers = function (medId, v) { var c = __assign({}, (B.pers || {})); if (v)
-        c[medId] = v;
+        c[medId] = 1;
     else
         delete c[medId]; patchB({ pers: c }); };
     var setSpec = function (nom) { var s = __assign({}, (B.specs || {})); if (s[nom])
         delete s[nom];
     else
         s[nom] = sign(); patchB({ specs: s }); };
-    /* changement de période : on RECALCULE mais on NE REPLIE PAS (décision 12/08) */
-    var _c = React.useState({ 1: true }), ouv = _c[0], setOuv = _c[1];
-    var toggle = function (n) { return setOuv(function (o) {
-        var _a;
-        return (__assign(__assign({}, o), (_a = {}, _a[n] = !o[n], _a)));
-    }); };
     var perLbl = MOIS[bPer.sm] + " — " + MOIS[(bPer.sm + PCFG.len - 1) % 12] + " " + bPer.sy;
     var bDays = useMemo(function () { return perDaysList(bPer.sy, bPer.sm); }, [bPer.sy, bPer.sm, PCFG.len]);
     var meds = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") === "medecin"; }); }, [medecins]);
     var autres = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") !== "medecin"; }); }, [medecins]);
-    /* ── alertes, toutes non bloquantes ── */
-    var manqMeds = meds.filter(function (m) { var v = (B.pers || {})[m.id]; return v !== "oui" && v !== "na"; }).length;
-    var manqAutres = autres.filter(function (m) { var v = (B.pers || {})[m.id]; return v !== "oui" && v !== "na"; }).length;
-    var semVides = useMemo(function () {
-        var vus = {}, manq = [];
+    /* ── mesures : elles servent A LA FOIS d'alerte et de fin d'etape ── */
+    var nMeds = meds.filter(function (m) { return (B.pers || {})[m.id]; }).length;
+    var nAutres = autres.filter(function (m) { return (B.pers || {})[m.id]; }).length;
+    var tour = useMemo(function () {
+        var vus = {};
+        var tot = 0, ok = 0;
         bDays.forEach(function (_a) {
             var y = _a.y, m = _a.m, d = _a.d;
             var wk = wKey(y, m, d);
             if (vus[wk])
                 return;
             vus[wk] = 1;
+            tot++;
             var wm = tourMed[wk] || {};
-            if (!((wm.HC || []).length) && !((wm.USIC || []).length))
-                manq.push(wk);
+            if (((wm.HC || []).length) || ((wm.USIC || []).length))
+                ok++;
         });
-        return manq.length;
+        return { tot: tot, ok: ok };
     }, [bDays, tourMed]);
-    var jSansGarde = useMemo(function () {
-        var n = 0;
+    var gardes = useMemo(function () {
+        var ok = 0;
         bDays.forEach(function (_a) {
             var y = _a.y, m = _a.m, d = _a.d;
-            var pris = medecins.some(function (md) { return ["N", "JOUR"].some(function (sl) { return getEntries(md.id, y, m, d, sl).some(function (e) { return e && e.acteId === "GARDE"; }); }); });
-            if (!pris)
-                n++;
+            if (medecins.some(function (md) { return ["N", "JOUR"].some(function (sl) { return getEntries(md.id, y, m, d, sl).some(function (e) { return e && e.acteId === "GARDE"; }); }); }))
+                ok++;
         });
-        return n;
+        return { tot: bDays.length, ok: ok };
     }, [bDays, medecins, getEntries]);
-    var semBip = useMemo(function () {
+    var bips = useMemo(function () {
         var par = {};
         bDays.forEach(function (_a) {
             var y = _a.y, m = _a.m, d = _a.d;
@@ -5249,36 +5256,91 @@ function BuildTab(_a) {
                     par[wk]++;
             });
         });
-        return Object.keys(par).filter(function (k) { return par[k] < BIP_MIN_SEM; }).length;
+        var ks = Object.keys(par);
+        return { tot: ks.length, ok: ks.filter(function (k) { return par[k] >= BIP_MIN_SEM; }).length };
     }, [bDays, medecins, getEntries]);
-    var specManq = BUILD_SPECS.filter(function (s) { return !(B.specs || {})[s]; }).length;
-    var fait = function (n) { return (B.etapes || {})[n] || null; };
+    var nSpec = BUILD_SPECS.filter(function (s) { return (B.specs || {})[s]; }).length;
+    var valide = function (n) { return (B.etapes || {})[n] || null; };
+    /* ETAPE TERMINEE D'ELLE-MEME des qu'elle est mesurable : sa demande du 12/08.
+       L'etape 5 (planning type) est la seule qui ne se mesure pas — elle garde
+       donc son bouton de validation a la main. */
+    var autoOk = { 1: meds.length > 0 && nMeds === meds.length,
+        2: tour.tot > 0 && tour.ok === tour.tot,
+        3: gardes.tot > 0 && gardes.ok === gardes.tot,
+        4: autres.length > 0 && nAutres === autres.length,
+        5: false,
+        6: nSpec === BUILD_SPECS.length,
+        7: bips.tot > 0 && bips.ok === bips.tot };
+    var estFait = function (n) { return !!(valide(n) || autoOk[n]); };
+    /* la premiere etape non terminee est ouverte au premier affichage ; une etape
+       validee se REFERME (sa demande) et ne se rouvre jamais toute seule */
+    var _c = React.useState(function () {
+        var _a;
+        for (var n = 1; n <= 7; n++) {
+            if (!autoOk[n])
+                return _a = {}, _a[n] = true, _a;
+        }
+        return {};
+    }), ouv = _c[0], setOuv = _c[1];
+    var toggle = function (n) { return setOuv(function (o) {
+        var _a;
+        return (__assign(__assign({}, o), (_a = {}, _a[n] = !o[n], _a)));
+    }); };
+    var setEtape = function (n) {
+        var st = __assign({}, (B.etapes || {}));
+        if (st[n])
+            delete st[n];
+        else {
+            st[n] = sign();
+            setOuv(function (o) {
+                var _a;
+                return (__assign(__assign({}, o), (_a = {}, _a[n] = false, _a)));
+            });
+        }
+        patchB({ etapes: st });
+    };
+    var manq = function (n, t) { return n < t ? (t - n) : 0; };
+    var mMeds = manq(nMeds, meds.length), mAut = manq(nAutres, autres.length);
+    var mTour = manq(tour.ok, tour.tot), mGar = manq(gardes.ok, gardes.tot);
+    var mSpec = manq(nSpec, BUILD_SPECS.length), mBip = manq(bips.ok, bips.tot);
     var tuiles = [
         { n: 1, icon: "🏖️", titre: "Congés de l'équipe",
-            alerte: manqMeds ? (manqMeds + " médecin" + (manqMeds > 1 ? "s n'ont" : " n'a") + " pas encore donné ses congés") : null,
-            sous: "Les médecins d'abord — ce sont les seuls nécessaires pour distribuer le tour. Les attachés et les IDE peuvent être pointés ici aussi, l'étape 4 les rappelle.",
-            body: React.createElement(BuildPersonList, { gens: meds, etat: B.pers, onSet: setPers, peut: isEdit, vide: "Aucun m\u00E9decin dans l'\u00E9quipe." }) },
-        { n: 2, icon: "🔄", titre: "Distribution du tour",
-            alerte: semVides ? (semVides + " semaine" + (semVides > 1 ? "s" : "") + " sans tour attribué") : null,
-            body: React.createElement(TourTab, __assign({}, tourProps, { noNav: true, year: bPer.sy, month: bPer.sm })) },
-        { n: 3, icon: "🌙", titre: "Gardes",
-            alerte: jSansGarde ? (jSansGarde + " jour" + (jSansGarde > 1 ? "s" : "") + " sans garde sur la période") : null,
-            body: React.createElement(GardeView, __assign({}, gardeProps, { noNav: true, year: bPer.sy, month: bPer.sm })) },
-        { n: 4, icon: "🚫", titre: "Absences de tout le monde",
-            alerte: manqAutres ? (manqAutres + " personne" + (manqAutres > 1 ? "s" : "") + " hors médecins sans réponse") : null,
-            sous: "Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES.",
+            sous: nMeds + " médecin" + (nMeds > 1 ? "s" : "") + " sur " + meds.length + " ont posé leurs congés",
+            alerte: mMeds ? (mMeds + " médecin" + (mMeds > 1 ? "s n'ont" : " n'a") + " pas encore posé ses congés") : null,
             body: React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Une coche par personne d\u00E8s qu'elle a pos\u00E9 ses vacances. Les m\u00E9decins d'abord \u2014 ce sont les seuls n\u00E9cessaires au tour ; les attach\u00E9s et les IDE sont rappel\u00E9s \u00E0 l'\u00E9tape 4."),
+                React.createElement(BuildPersonList, { gens: meds, etat: B.pers, onSet: setPers, peut: isEdit, vide: "Aucun m\u00E9decin dans l'\u00E9quipe." })) },
+        { n: 2, icon: "🔄", titre: "Distribution du tour",
+            sous: tour.ok + " semaine" + (tour.ok > 1 ? "s" : "") + " sur " + tour.tot + " ont un tourneur",
+            alerte: mTour ? (mTour + " semaine" + (mTour > 1 ? "s" : "") + " sans tour attribué") : null,
+            body: React.createElement(BuildEmbed, { titre: "\u27E8 l'onglet Tour, entier et inchang\u00E9 \u27E9" },
+                React.createElement(TourTab, __assign({}, tourProps, { noNav: true, year: bPer.sy, month: bPer.sm }))) },
+        { n: 3, icon: "🌙", titre: "Gardes",
+            sous: gardes.ok + " jour" + (gardes.ok > 1 ? "s" : "") + " sur " + gardes.tot + " ont une garde",
+            alerte: mGar ? (mGar + " jour" + (mGar > 1 ? "s" : "") + " sans garde sur la période") : null,
+            body: React.createElement(BuildEmbed, { titre: "\u27E8 l'onglet Gardes, entier et inchang\u00E9 \u27E9" },
+                React.createElement(GardeView, __assign({}, gardeProps, { noNav: true, year: bPer.sy, month: bPer.sm }))) },
+        { n: 4, icon: "🚫", titre: "Absences de tout le monde",
+            sous: nAutres + " sur " + autres.length + " renseigné" + (nAutres > 1 ? "s" : ""),
+            alerte: mAut ? (mAut + " personne" + (mAut > 1 ? "s" : "") + " hors médecins sans réponse") : null,
+            body: React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Attach\u00E9s et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PR\u00C9SENCES."),
                 React.createElement(BuildPersonList, { gens: autres, etat: B.pers, onSet: setPers, peut: isEdit, vide: "Aucun attach\u00E9 ni IDE dans l'\u00E9quipe." }),
                 React.createElement("div", { style: { marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" } },
                     React.createElement(BuildLien, { txt: "\u2192 Saisir dans le Planning", onClick: function () { return goTab("planning"); } }),
                     React.createElement(BuildLien, { txt: "\u2192 Onglet Attach\u00E9s", onClick: function () { return goTab("attache"); } }))) },
         { n: 5, icon: "📋", titre: "Appliquer le planning type",
+            sous: "s'applique d'ici, sur la période affichée",
             alerte: null,
-            sous: "Le planning type s'applique depuis son onglet, semaine par semaine ou sur la période.",
-            body: React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
-                React.createElement(BuildLien, { txt: "\u2192 Onglet Type", onClick: function () { return goTab("plantype"); } })) },
+            body: React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "La m\u00EAme fen\u00EAtre que dans l'onglet Type, mais born\u00E9e \u00E0 la p\u00E9riode de cet onglet \u2014 pas besoin d'en sortir."),
+                React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+                    isEdit && React.createElement("button", { onClick: function () { return onApplyPT(bPer); }, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCCB Appliquer le planning type"),
+                    isEdit && React.createElement("button", { onClick: function () { return onRemovePT(bPer); }, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer"),
+                    React.createElement(BuildLien, { txt: "\u2192 Modifier le planning type", onClick: function () { return goTab("plantype"); } }))) },
         { n: 6, icon: "🔬", titre: "Plannings par surspécialité",
-            alerte: specManq ? (specManq + " surspécialité" + (specManq > 1 ? "s" : "") + " non terminée" + (specManq > 1 ? "s" : "")) : null,
+            sous: nSpec + " sur " + BUILD_SPECS.length + " terminée" + (nSpec > 1 ? "s" : ""),
+            alerte: mSpec ? (mSpec + " surspécialité" + (mSpec > 1 ? "s" : "") + " non terminée" + (mSpec > 1 ? "s" : "")) : null,
             body: React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 } }, BUILD_SPECS.map(function (s) {
                     var f = (B.specs || {})[s];
@@ -5288,25 +5350,33 @@ function BuildTab(_a) {
                     React.createElement(BuildLien, { txt: "\u2192 PT Cardio", onClick: function () { return goTab("plateau"); } }),
                     React.createElement(BuildLien, { txt: "\u2192 PT Angio", onClick: function () { return goTab("angio"); } }))) },
         { n: 7, icon: "📟", titre: "Bip de Béthune",
-            alerte: semBip ? (semBip + " semaine" + (semBip > 1 ? "s" : "") + " sous " + BIP_MIN_SEM + " bips") : null,
-            sous: "Un jour sans bip est normal ; l'alerte se déclenche sous " + BIP_MIN_SEM + " bips dans une semaine.",
-            body: React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
-                isEdit && React.createElement("button", { onClick: onOpenBip, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #46bdc6", background: "rgba(70,189,198,.10)", color: "#46bdc6", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCDF R\u00E9partition du Bip"),
-                React.createElement(BuildLien, { txt: "\u2192 Onglet CHB", onClick: function () { return goTab("chb"); } })) }
+            sous: bips.ok + " semaine" + (bips.ok > 1 ? "s" : "") + " sur " + bips.tot + " à " + BIP_MIN_SEM + " bips ou plus",
+            alerte: mBip ? (mBip + " semaine" + (mBip > 1 ? "s" : "") + " sous " + BIP_MIN_SEM + " bips") : null,
+            body: React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } },
+                    "Un jour sans bip est normal ; l'alerte se d\u00E9clenche sous ",
+                    BIP_MIN_SEM,
+                    " bips dans une semaine."),
+                React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+                    isEdit && React.createElement("button", { onClick: onOpenBip, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #46bdc6", background: "rgba(70,189,198,.10)", color: "#46bdc6", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCDF R\u00E9partition du Bip"),
+                    React.createElement(BuildLien, { txt: "\u2192 Onglet CHB", onClick: function () { return goTab("chb"); } }))) }
     ];
-    var nFaits = tuiles.filter(function (t) { return fait(t.n); }).length;
+    var nFaits = tuiles.filter(function (t) { return estFait(t.n); }).length;
     return (React.createElement("div", null,
-        React.createElement("div", { style: __assign(__assign({}, S.bar), { position: "sticky", top: HDR_H, zIndex: 30, background: "var(--bg)", paddingTop: 6, paddingBottom: 6, marginBottom: 8 }) },
+        React.createElement("div", { style: __assign(__assign({}, S.bar), { position: "sticky", top: HDR_H, zIndex: 60, background: "var(--bg)", paddingTop: 6, paddingBottom: 6, marginBottom: 0, minHeight: BUILD_BAR_H }) },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
                 React.createElement("button", { onClick: function () { var p = perPrev(bPer.sy, bPer.sm); setBPer({ sy: p.sy, sm: p.sm }); }, style: S.arr }, "\u2039"),
                 React.createElement("h2", { style: S.mTit }, "🏗️ Construire — " + perLbl),
                 React.createElement("button", { onClick: function () { var p = perNext(bPer.sy, bPer.sm); setBPer({ sy: p.sy, sm: p.sm }); }, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" } },
-                React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)", fontWeight: 700 } }, nFaits + "/7"),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, margin: "8px 0 14px" } },
+            React.createElement("div", { style: { flex: 1, height: 6, borderRadius: 3, background: "var(--bg3)", overflow: "hidden" } },
+                React.createElement("div", { style: { height: "100%", width: Math.round(nFaits / 7 * 100) + "%", background: "#3fb950" } })),
+            React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", fontWeight: 700, whiteSpace: "nowrap" } }, nFaits + " étape" + (nFaits > 1 ? "s" : "") + " sur 7")),
         !isEdit && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Lecture seule : le pointage est r\u00E9serv\u00E9 aux personnes qui peuvent modifier le planning."),
-        tuiles.map(function (t) { return (React.createElement(BuildTile, { key: t.n, n: t.n, icon: t.icon, titre: t.titre, ouvert: !!ouv[t.n], onToggle: function () { return toggle(t.n); }, alerte: t.alerte, fait: fait(t.n), onFait: function () { return setEtape(t.n); }, peutFaire: isEdit, sous: t.sous }, t.body)); }),
-        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", textAlign: "center", marginTop: 10 } }, "Les alertes signalent, elles ne bloquent pas : une \u00E9tape non valid\u00E9e n'emp\u00EAche jamais d'avancer.")));
+        tuiles.map(function (t) { return (React.createElement(BuildTile, { key: t.n, n: t.n, icon: t.icon, titre: t.titre, sous: t.sous, ouvert: !!ouv[t.n], onToggle: function () { return toggle(t.n); }, alerte: t.alerte, fait: valide(t.n), auto: autoOk[t.n], onFait: function () { return setEtape(t.n); }, peutFaire: isEdit && !autoOk[t.n] }, t.body)); }),
+        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", textAlign: "center", marginTop: 10 } }, "Les alertes signalent, elles ne bloquent pas : une \u00E9tape non termin\u00E9e n'emp\u00EAche jamais d'avancer.")));
 }
 
 function CardioPlanning() {
@@ -7649,14 +7719,15 @@ function CardioPlanning() {
     var _34 = React.useState([]), ptMonths = _34[0], setPtMonths = _34[1]; // indices cochés
     var _35 = React.useState(false), ptFromToday = _35[0], setPtFromToday = _35[1];
     var ptPeriodMonths = React.useMemo(function () {
-        var p = perStart(year, month);
+        /* v10.30 : depuis Construire, la fenetre porte sur la periode de CET onglet */
+        var p = (ptModal && ptModal.per) ? ptModal.per : perStart(year, month);
         var arr = [];
         for (var i = 0; i < PCFG.len; i++) {
             var mm = (p.sm + i) % 12, yy = p.sm + i > 11 ? p.sy + 1 : p.sy;
             arr.push({ y: yy, m: mm });
         }
         return arr;
-    }, [year, month, PCFG.len, PCFG.startM]);
+    }, [ptModal, year, month, PCFG.len, PCFG.startM]);
     var removePTFlex = useCallback(function (medId, monthsList, fromToday) {
         var tod = new Date();
         tod.setHours(0, 0, 0, 0);
@@ -7697,10 +7768,10 @@ function CardioPlanning() {
         });
         toast("Affectations retirées (" + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + "). Gardes, absences, formations et tour conservés.", "info");
     }, [medecins]);
-    var openPtModal = function (medId, mode) {
+    var openPtModal = function (medId, mode, per) {
         setPtMonths(ptPeriodMonths.map(function (_, i) { return i; })); // tous cochés par défaut
         setPtFromToday(false); // nominal : depuis le début de la période
-        setPtModal({ medId: medId || null, mode: mode || "apply" });
+        setPtModal({ medId: medId || null, mode: mode || "apply", per: per || null });
     };
     var runPtModal = function () {
         var list = ptPeriodMonths.filter(function (_, i) { return ptMonths.includes(i); });
@@ -8307,7 +8378,7 @@ function CardioPlanning() {
                     medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); })),
                 React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, tourProps),
-            tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medecins, getEntries: getEntries, tourMed: tourMed, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, tourProps: tourProps, gardeProps: gardeProps }),
+            tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medecins, getEntries: getEntries, tourMed: tourMed, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: function (per) { return openPtModal(null, "apply", per); }, onRemovePT: function (per) { return openPtModal(null, "remove", per); }, tourProps: tourProps, gardeProps: gardeProps }),
             tab === "chl" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });

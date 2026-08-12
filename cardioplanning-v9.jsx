@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.29 — 12/08/2026";
+const APP_VERSION="v10.30 — 12/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -3536,7 +3536,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         <span style={{flex:1}}>{lastReport}{(()=>{const all=[];weeksT.forEach(w2=>weekTPInfo(w2.key).forEach(t3=>all.push(t3)));return all.length>0?" ✂ Remplacements TP : "+all.join(" · ")+".":"";})()}</span>
         
       </div>}
-      <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:14,paddingBottom:4,position:"sticky",top:44,zIndex:30,background:"var(--bg)",paddingTop:4}}>
+      <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:14,paddingBottom:4,position:"sticky",top:noNav?(HDR_H+BUILD_BAR_H):44,zIndex:noNav?10:30,background:"var(--bg)",paddingTop:4}}>
         {tourMeds.map(m=>{
           const hcCount=weeksT.reduce((n,w)=>{const wm2=tourMed[w.key]||{};return (wm2.HC||[]).includes(m.id)?n+1:n;},0);
           const usicCount=weeksT.reduce((n,w)=>{const wm2=tourMed[w.key]||{};return (wm2.USIC||[]).includes(m.id)?n+1:n;},0);
@@ -4909,65 +4909,69 @@ function ReportsView(p){
         })())));
 }
 
-/* ═══════════════ v10.29 : onglet CONSTRUIRE (lot 1) ═══════════════
+/* ═══════════════ v10.29 : onglet CONSTRUIRE ═══════════════
    Chef d'orchestre de la construction d'un planning. N'INVENTE AUCUNE
    FONCTION : les tuiles Tour et Gardes montent les écrans EXISTANTS (mêmes
    composants, mêmes props, via tourProps/gardeProps partagés avec les onglets
    d'origine), les autres pointent à la main et renvoient vers l'onglet concerné.
    UNE SEULE PÉRIODE, choisie dans la barre figée du haut : aucune flèche de mois
    dans les tuiles (prop noNav), pour ne jamais remplir deux périodes à la fois.
-   Les alertes sont NON BLOQUANTES : elles signalent, elles n'empêchent pas. */
+   Les alertes sont NON BLOQUANTES : elles signalent, elles n'empêchent pas.
+   v10.30 : pointage à UNE COCHE, étape terminée d'elle-même quand elle est
+   mesurable, repli à la validation, jauge, rail numéroté, et le planning type
+   s'applique SANS QUITTER l'onglet (la fenêtre reçoit la période de Construire). */
 const BUILD_SPECS=["Coro","EEP","FOP","Stim"];
 const BIP_MIN_SEM=3;   /* un jour sans bip est normal ; on alerte sous 3 bips/semaine */
+const BUILD_BAR_H=46;  /* hauteur de la barre de période — les zones figées des écrans montés se calent dessous */
 
-function BuildTile({n,icon,titre,ouvert,onToggle,alerte,fait,onFait,peutFaire,sous,children}){
-  const col=fait?"#3fb950":(alerte?"#f59e0b":"var(--border)");
+function BuildTile({n,icon,titre,sous,ouvert,onToggle,alerte,fait,auto,onFait,peutFaire,children}){
+  const ok=!!(fait||auto);
+  const col=ok?"#3fb950":(alerte?"#f59e0b":"var(--border)");
   return(
-    <div style={{border:"1px solid var(--border)",borderLeft:"4px solid "+col,borderRadius:8,marginBottom:8,background:"var(--bg2)",overflow:"hidden"}}>
-      <div onClick={onToggle} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer"}}>
-        <span style={{width:22,height:22,borderRadius:11,background:fait?"#3fb950":"var(--bg3)",color:fait?"#fff":"var(--txt2)",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto"}}>{n}</span>
-        <span style={{fontSize:13}}>{icon}</span>
-        <span style={{fontSize:13,fontWeight:800,color:"var(--txt)"}}>{titre}</span>
-        {fait&&<span style={{fontSize:10,color:"#3fb950",fontWeight:700}}>✓ fait</span>}
-        <span style={{marginLeft:"auto",fontSize:12,color:"var(--txt3)"}}>{ouvert?"▾":"▸"}</span>
+    <div style={{display:"flex",gap:8,alignItems:"stretch"}}>
+      <div style={{width:24,flex:"0 0 24px",display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <div style={{width:24,height:24,borderRadius:12,marginTop:10,flex:"0 0 24px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,
+          border:"1px solid "+(ok?"#3fb950":"var(--border)"),background:ok?"#3fb950":"var(--bg2)",color:ok?"#fff":"var(--txt3)"}}>{ok?"✓":n}</div>
+        <div style={{flex:1,width:2,background:"var(--border2)",margin:"2px 0"}}/>
       </div>
-      {alerte&&<div style={{margin:"0 10px 8px",padding:"5px 9px",borderRadius:6,background:"rgba(245,158,11,.13)",border:"1px solid #f59e0b",color:"#b45309",fontSize:11,fontWeight:600}}>⚠ {alerte}</div>}
-      {ouvert&&<div style={{padding:"0 10px 10px"}}>
-        {sous&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>{sous}</div>}
-        {children}
-        {peutFaire&&<div style={{marginTop:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <button onClick={onFait} style={{fontSize:11,padding:"4px 13px",borderRadius:6,fontWeight:800,cursor:"pointer",border:fait?"1.5px solid #3fb950":"1.5px solid var(--border)",background:fait?"rgba(63,185,80,.13)":"var(--bg3)",color:fait?"#3fb950":"var(--txt2)"}}>{fait?"✓ Étape validée":"Marquer cette étape comme faite"}</button>
-          {fait&&fait.by&&<span style={{fontSize:10,color:"var(--txt3)"}}>{"par "+fait.by+" le "+fait.at}</span>}
+      <div style={{flex:1,minWidth:0,border:"1px solid "+col,borderRadius:9,background:"var(--bg2)",marginBottom:8,overflow:"hidden"}}>
+        <div onClick={onToggle} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 11px",cursor:"pointer"}}>
+          <span style={{fontSize:13}}>{icon}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:800,color:"var(--txt)"}}>{titre}</div>
+            {sous&&<div style={{fontSize:11,color:"var(--txt3)",marginTop:1}}>{sous}</div>}
+          </div>
+          {ok&&<span style={{fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:20,border:"1px solid #3fb950",color:"#3fb950",background:"rgba(63,185,80,.10)"}}>{fait?"validé":"terminé"}</span>}
+          {!ok&&alerte&&<span style={{fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:20,border:"1px solid #f59e0b",color:"#b45309",background:"rgba(245,158,11,.13)"}}>à finir</span>}
+          <span style={{fontSize:12,color:"var(--txt3)"}}>{ouvert?"▾":"▸"}</span>
+        </div>
+        {ouvert&&<div style={{padding:"0 11px 11px"}}>
+          {alerte&&<div style={{margin:"0 0 9px",padding:"5px 9px",borderRadius:6,background:"rgba(245,158,11,.13)",border:"1px solid #f59e0b",color:"#b45309",fontSize:11,fontWeight:600}}>⚠ {alerte}</div>}
+          {children}
+          {peutFaire&&<div style={{marginTop:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <button onClick={onFait} style={{fontSize:11,padding:"4px 13px",borderRadius:6,fontWeight:800,cursor:"pointer",border:fait?"1.5px solid #3fb950":"1.5px solid var(--border)",background:fait?"rgba(63,185,80,.13)":"var(--bg3)",color:fait?"#3fb950":"var(--txt2)"}}>{fait?"✓ Étape validée":"Marquer cette étape comme faite"}</button>
+            {fait&&fait.by&&<span style={{fontSize:10,color:"var(--txt3)"}}>{"par "+fait.by+" le "+fait.at}</span>}
+          </div>}
         </div>}
-      </div>}
+      </div>
     </div>
   );
 }
 
-function BuildStatus({v,onSet,peut}){
-  const OPT=[["oui","oui","#3fb950"],["non","non","var(--txt3)"],["na","pas besoin","#8b5cf6"]];
-  return(
-    <div style={{display:"flex",gap:3}}>
-      {OPT.map(([k,lbl,c])=>(
-        <button key={k} disabled={!peut} onClick={()=>onSet(v===k?null:k)}
-          style={{fontSize:10,padding:"2px 7px",borderRadius:5,fontWeight:700,cursor:peut?"pointer":"default",
-            border:"1px solid "+(v===k?c:"var(--border)"),background:v===k?c:"var(--bg3)",color:v===k?"#fff":"var(--txt3)",opacity:peut?1:.6}}>{lbl}</button>
-      ))}
-    </div>
-  );
-}
-
+/* v10.30 : une seule coche, sa demande — « j'ai juste besoin de cocher si la
+   personne a posé ses vacances ». Le oui / non / pas besoin est retiré. */
 function BuildPersonList({gens,etat,onSet,peut,vide}){
   if(!gens.length)return <div style={{fontSize:11,color:"var(--txt3)"}}>{vide}</div>;
   return(
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:4}}>
-      {gens.map(m=>(
-        <div key={m.id} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 6px",borderRadius:6,background:"var(--bg3)"}}>
-          <span style={{width:26,height:20,borderRadius:5,background:m.color||"#888",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto"}}>{m.init}</span>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:4}}>
+      {gens.map(m=>{const on=!!(etat||{})[m.id];return(
+        <div key={m.id} onClick={()=>{if(peut)onSet(m.id,!on);}} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 7px",borderRadius:6,cursor:peut?"pointer":"default",
+          background:on?"rgba(63,185,80,.10)":"var(--bg3)",border:"1px solid "+(on?"#3fb950":"transparent")}}>
+          <span style={{width:15,height:15,borderRadius:4,flex:"0 0 15px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,
+            border:"1.5px solid "+(on?"#3fb950":"var(--border)"),background:on?"#3fb950":"transparent",color:"#fff"}}>{on?"✓":""}</span>
+          <span style={{width:26,height:20,borderRadius:5,background:m.color||"#888",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 26px"}}>{m.init}</span>
           <span style={{fontSize:11,color:"var(--txt2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.prenom+" "+m.nom}</span>
-          <span style={{marginLeft:"auto"}}><BuildStatus v={(etat||{})[m.id]||null} onSet={(x)=>onSet(m.id,x)} peut={peut}/></span>
-        </div>
-      ))}
+        </div>);})}
     </div>
   );
 }
@@ -4976,50 +4980,54 @@ function BuildLien({txt,onClick}){
   return <button onClick={onClick} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>{txt}</button>;
 }
 
-function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,setDarkMode,author,goTab,onOpenBip,tourProps,gardeProps}){
+/* Cadre des ecrans montes : rappelle qu'on regarde l'onglet d'origine, entier. */
+function BuildEmbed({titre,children}){
+  return(
+    <div style={{border:"1px dashed var(--border)",borderRadius:8,padding:"4px 6px 6px",background:"var(--bg)"}}>
+      <div style={{fontSize:10,fontWeight:800,letterSpacing:".05em",color:"var(--txt3)",margin:"1px 0 4px"}}>{titre}</div>
+      {children}
+    </div>
+  );
+}
+
+function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps}){
   /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
   const [bPer,setBPer]=React.useState(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
   const pKey=bPer.sy+"_"+bPer.sm;
   const B=(build||{})[pKey]||{};
   const patchB=(patch)=>setBuild(p=>{const cur=(p||{})[pKey]||{};return {...(p||{}),[pKey]:{...cur,...patch}};});
   const sign=()=>({by:author||"?",at:new Date().toLocaleDateString("fr-FR")});
-  const setEtape=(n)=>{const st={...(B.etapes||{})};if(st[n])delete st[n];else st[n]=sign();patchB({etapes:st});};
-  const setPers=(medId,v)=>{const c={...(B.pers||{})};if(v)c[medId]=v;else delete c[medId];patchB({pers:c});};
+  const setPers=(medId,v)=>{const c={...(B.pers||{})};if(v)c[medId]=1;else delete c[medId];patchB({pers:c});};
   const setSpec=(nom)=>{const s={...(B.specs||{})};if(s[nom])delete s[nom];else s[nom]=sign();patchB({specs:s});};
-
-  /* changement de période : on RECALCULE mais on NE REPLIE PAS (décision 12/08) */
-  const [ouv,setOuv]=React.useState({1:true});
-  const toggle=(n)=>setOuv(o=>({...o,[n]:!o[n]}));
 
   const perLbl=MOIS[bPer.sm]+" — "+MOIS[(bPer.sm+PCFG.len-1)%12]+" "+bPer.sy;
   const bDays=useMemo(()=>perDaysList(bPer.sy,bPer.sm),[bPer.sy,bPer.sm,PCFG.len]);
   const meds=useMemo(()=>medecins.filter(m=>(m.role||"medecin")==="medecin"),[medecins]);
   const autres=useMemo(()=>medecins.filter(m=>(m.role||"medecin")!=="medecin"),[medecins]);
 
-  /* ── alertes, toutes non bloquantes ── */
-  const manqMeds=meds.filter(m=>{const v=(B.pers||{})[m.id];return v!=="oui"&&v!=="na";}).length;
-  const manqAutres=autres.filter(m=>{const v=(B.pers||{})[m.id];return v!=="oui"&&v!=="na";}).length;
+  /* ── mesures : elles servent A LA FOIS d'alerte et de fin d'etape ── */
+  const nMeds=meds.filter(m=>(B.pers||{})[m.id]).length;
+  const nAutres=autres.filter(m=>(B.pers||{})[m.id]).length;
 
-  const semVides=useMemo(()=>{
-    const vus={},manq=[];
+  const tour=useMemo(()=>{
+    const vus={};let tot=0,ok=0;
     bDays.forEach(({y,m,d})=>{
-      const wk=wKey(y,m,d);if(vus[wk])return;vus[wk]=1;
+      const wk=wKey(y,m,d);if(vus[wk])return;vus[wk]=1;tot++;
       const wm=tourMed[wk]||{};
-      if(!((wm.HC||[]).length)&&!((wm.USIC||[]).length))manq.push(wk);
+      if(((wm.HC||[]).length)||((wm.USIC||[]).length))ok++;
     });
-    return manq.length;
+    return{tot:tot,ok:ok};
   },[bDays,tourMed]);
 
-  const jSansGarde=useMemo(()=>{
-    let n=0;
+  const gardes=useMemo(()=>{
+    let ok=0;
     bDays.forEach(({y,m,d})=>{
-      const pris=medecins.some(md=>["N","JOUR"].some(sl=>getEntries(md.id,y,m,d,sl).some(e=>e&&e.acteId==="GARDE")));
-      if(!pris)n++;
+      if(medecins.some(md=>["N","JOUR"].some(sl=>getEntries(md.id,y,m,d,sl).some(e=>e&&e.acteId==="GARDE"))))ok++;
     });
-    return n;
+    return{tot:bDays.length,ok:ok};
   },[bDays,medecins,getEntries]);
 
-  const semBip=useMemo(()=>{
+  const bips=useMemo(()=>{
     const par={};
     bDays.forEach(({y,m,d})=>{
       const wk=wKey(y,m,d);
@@ -5029,38 +5037,78 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
         if(["M","AM"].some(sl=>getEntries(md.id,y,m,d,sl).some(e=>e&&e.acteId==="BIP")))par[wk]++;
       });
     });
-    return Object.keys(par).filter(k=>par[k]<BIP_MIN_SEM).length;
+    const ks=Object.keys(par);
+    return{tot:ks.length,ok:ks.filter(k=>par[k]>=BIP_MIN_SEM).length};
   },[bDays,medecins,getEntries]);
 
-  const specManq=BUILD_SPECS.filter(s=>!(B.specs||{})[s]).length;
-  const fait=(n)=>(B.etapes||{})[n]||null;
+  const nSpec=BUILD_SPECS.filter(s=>(B.specs||{})[s]).length;
+  const valide=(n)=>(B.etapes||{})[n]||null;
+  /* ETAPE TERMINEE D'ELLE-MEME des qu'elle est mesurable : sa demande du 12/08.
+     L'etape 5 (planning type) est la seule qui ne se mesure pas — elle garde
+     donc son bouton de validation a la main. */
+  const autoOk={1:meds.length>0&&nMeds===meds.length,
+    2:tour.tot>0&&tour.ok===tour.tot,
+    3:gardes.tot>0&&gardes.ok===gardes.tot,
+    4:autres.length>0&&nAutres===autres.length,
+    5:false,
+    6:nSpec===BUILD_SPECS.length,
+    7:bips.tot>0&&bips.ok===bips.tot};
+  const estFait=(n)=>!!(valide(n)||autoOk[n]);
+
+  /* la premiere etape non terminee est ouverte au premier affichage ; une etape
+     validee se REFERME (sa demande) et ne se rouvre jamais toute seule */
+  const [ouv,setOuv]=React.useState(()=>{for(let n=1;n<=7;n++){if(!autoOk[n])return {[n]:true};}return {};});
+  const toggle=(n)=>setOuv(o=>({...o,[n]:!o[n]}));
+  const setEtape=(n)=>{
+    const st={...(B.etapes||{})};
+    if(st[n])delete st[n];else{st[n]=sign();setOuv(o=>({...o,[n]:false}));}
+    patchB({etapes:st});
+  };
+
+  const manq=(n,t)=>n<t?(t-n):0;
+  const mMeds=manq(nMeds,meds.length),mAut=manq(nAutres,autres.length);
+  const mTour=manq(tour.ok,tour.tot),mGar=manq(gardes.ok,gardes.tot);
+  const mSpec=manq(nSpec,BUILD_SPECS.length),mBip=manq(bips.ok,bips.tot);
 
   const tuiles=[
     {n:1,icon:"🏖️",titre:"Congés de l'équipe",
-     alerte:manqMeds?(manqMeds+" médecin"+(manqMeds>1?"s n'ont":" n'a")+" pas encore donné ses congés"):null,
-     sous:"Les médecins d'abord — ce sont les seuls nécessaires pour distribuer le tour. Les attachés et les IDE peuvent être pointés ici aussi, l'étape 4 les rappelle.",
-     body:<BuildPersonList gens={meds} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>},
-    {n:2,icon:"🔄",titre:"Distribution du tour",
-     alerte:semVides?(semVides+" semaine"+(semVides>1?"s":"")+" sans tour attribué"):null,
-     body:<TourTab {...tourProps} noNav={true} year={bPer.sy} month={bPer.sm}/>},
-    {n:3,icon:"🌙",titre:"Gardes",
-     alerte:jSansGarde?(jSansGarde+" jour"+(jSansGarde>1?"s":"")+" sans garde sur la période"):null,
-     body:<GardeView {...gardeProps} noNav={true} year={bPer.sy} month={bPer.sm}/>},
-    {n:4,icon:"🚫",titre:"Absences de tout le monde",
-     alerte:manqAutres?(manqAutres+" personne"+(manqAutres>1?"s":"")+" hors médecins sans réponse"):null,
-     sous:"Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES.",
+     sous:nMeds+" médecin"+(nMeds>1?"s":"")+" sur "+meds.length+" ont posé leurs congés",
+     alerte:mMeds?(mMeds+" médecin"+(mMeds>1?"s n'ont":" n'a")+" pas encore posé ses congés"):null,
      body:<div>
+       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Une coche par personne dès qu'elle a posé ses vacances. Les médecins d'abord — ce sont les seuls nécessaires au tour ; les attachés et les IDE sont rappelés à l'étape 4.</div>
+       <BuildPersonList gens={meds} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>
+     </div>},
+    {n:2,icon:"🔄",titre:"Distribution du tour",
+     sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
+     alerte:mTour?(mTour+" semaine"+(mTour>1?"s":"")+" sans tour attribué"):null,
+     body:<BuildEmbed titre="⟨ l'onglet Tour, entier et inchangé ⟩"><TourTab {...tourProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+    {n:3,icon:"🌙",titre:"Gardes",
+     sous:gardes.ok+" jour"+(gardes.ok>1?"s":"")+" sur "+gardes.tot+" ont une garde",
+     alerte:mGar?(mGar+" jour"+(mGar>1?"s":"")+" sans garde sur la période"):null,
+     body:<BuildEmbed titre="⟨ l'onglet Gardes, entier et inchangé ⟩"><GardeView {...gardeProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+    {n:4,icon:"🚫",titre:"Absences de tout le monde",
+     sous:nAutres+" sur "+autres.length+" renseigné"+(nAutres>1?"s":""),
+     alerte:mAut?(mAut+" personne"+(mAut>1?"s":"")+" hors médecins sans réponse"):null,
+     body:<div>
+       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES.</div>
        <BuildPersonList gens={autres} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun attaché ni IDE dans l'équipe."/>
        <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
          <BuildLien txt="→ Saisir dans le Planning" onClick={()=>goTab("planning")}/>
          <BuildLien txt="→ Onglet Attachés" onClick={()=>goTab("attache")}/>
        </div></div>},
     {n:5,icon:"📋",titre:"Appliquer le planning type",
+     sous:"s'applique d'ici, sur la période affichée",
      alerte:null,
-     sous:"Le planning type s'applique depuis son onglet, semaine par semaine ou sur la période.",
-     body:<div style={{display:"flex",gap:6,flexWrap:"wrap"}}><BuildLien txt="→ Onglet Type" onClick={()=>goTab("plantype")}/></div>},
+     body:<div>
+       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>La même fenêtre que dans l'onglet Type, mais bornée à la période de cet onglet — pas besoin d'en sortir.</div>
+       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+         {isEdit&&<button onClick={()=>onApplyPT(bPer)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}}>📋 Appliquer le planning type</button>}
+         {isEdit&&<button onClick={()=>onRemovePT(bPer)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}}>🗑 Retirer</button>}
+         <BuildLien txt="→ Modifier le planning type" onClick={()=>goTab("plantype")}/>
+       </div></div>},
     {n:6,icon:"🔬",titre:"Plannings par surspécialité",
-     alerte:specManq?(specManq+" surspécialité"+(specManq>1?"s":"")+" non terminée"+(specManq>1?"s":"")):null,
+     sous:nSpec+" sur "+BUILD_SPECS.length+" terminée"+(nSpec>1?"s":""),
+     alerte:mSpec?(mSpec+" surspécialité"+(mSpec>1?"s":"")+" non terminée"+(mSpec>1?"s":"")):null,
      body:<div>
        <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
          {BUILD_SPECS.map(s=>{const f=(B.specs||{})[s];return(
@@ -5071,37 +5119,44 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
          <BuildLien txt="→ PT Angio" onClick={()=>goTab("angio")}/>
        </div></div>},
     {n:7,icon:"📟",titre:"Bip de Béthune",
-     alerte:semBip?(semBip+" semaine"+(semBip>1?"s":"")+" sous "+BIP_MIN_SEM+" bips"):null,
-     sous:"Un jour sans bip est normal ; l'alerte se déclenche sous "+BIP_MIN_SEM+" bips dans une semaine.",
-     body:<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-       {isEdit&&<button onClick={onOpenBip} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}}>📟 Répartition du Bip</button>}
-       <BuildLien txt="→ Onglet CHB" onClick={()=>goTab("chb")}/>
-     </div>}
+     sous:bips.ok+" semaine"+(bips.ok>1?"s":"")+" sur "+bips.tot+" à "+BIP_MIN_SEM+" bips ou plus",
+     alerte:mBip?(mBip+" semaine"+(mBip>1?"s":"")+" sous "+BIP_MIN_SEM+" bips"):null,
+     body:<div>
+       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un jour sans bip est normal ; l'alerte se déclenche sous {BIP_MIN_SEM} bips dans une semaine.</div>
+       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+         {isEdit&&<button onClick={onOpenBip} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}}>📟 Répartition du Bip</button>}
+         <BuildLien txt="→ Onglet CHB" onClick={()=>goTab("chb")}/>
+       </div></div>}
   ];
 
-  const nFaits=tuiles.filter(t=>fait(t.n)).length;
+  const nFaits=tuiles.filter(t=>estFait(t.n)).length;
 
   return(
     <div>
-      <div style={{...S.bar,position:"sticky",top:HDR_H,zIndex:30,background:"var(--bg)",paddingTop:6,paddingBottom:6,marginBottom:8}}>
+      <div style={{...S.bar,position:"sticky",top:HDR_H,zIndex:60,background:"var(--bg)",paddingTop:6,paddingBottom:6,marginBottom:0,minHeight:BUILD_BAR_H}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={()=>{const p=perPrev(bPer.sy,bPer.sm);setBPer({sy:p.sy,sm:p.sm});}} style={S.arr}>‹</button>
           <h2 style={S.mTit}>{"🏗️ Construire — "+perLbl}</h2>
           <button onClick={()=>{const p=perNext(bPer.sy,bPer.sm);setBPer({sy:p.sy,sm:p.sm});}} style={S.arr}>›</button>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
-          <span style={{fontSize:11,color:"var(--txt3)",fontWeight:700}}>{nFaits+"/7"}</span>
           <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         </div>
       </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,margin:"8px 0 14px"}}>
+        <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg3)",overflow:"hidden"}}>
+          <div style={{height:"100%",width:Math.round(nFaits/7*100)+"%",background:"#3fb950"}}/>
+        </div>
+        <div style={{fontSize:11,color:"var(--txt2)",fontWeight:700,whiteSpace:"nowrap"}}>{nFaits+" étape"+(nFaits>1?"s":"")+" sur 7"}</div>
+      </div>
       {!isEdit&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Lecture seule : le pointage est réservé aux personnes qui peuvent modifier le planning.</div>}
       {tuiles.map(t=>(
-        <BuildTile key={t.n} n={t.n} icon={t.icon} titre={t.titre} ouvert={!!ouv[t.n]} onToggle={()=>toggle(t.n)}
-          alerte={t.alerte} fait={fait(t.n)} onFait={()=>setEtape(t.n)} peutFaire={isEdit} sous={t.sous}>
+        <BuildTile key={t.n} n={t.n} icon={t.icon} titre={t.titre} sous={t.sous} ouvert={!!ouv[t.n]} onToggle={()=>toggle(t.n)}
+          alerte={t.alerte} fait={valide(t.n)} auto={autoOk[t.n]} onFait={()=>setEtape(t.n)} peutFaire={isEdit&&!autoOk[t.n]}>
           {t.body}
         </BuildTile>
       ))}
-      <div style={{fontSize:10,color:"var(--txt3)",textAlign:"center",marginTop:10}}>Les alertes signalent, elles ne bloquent pas : une étape non validée n'empêche jamais d'avancer.</div>
+      <div style={{fontSize:10,color:"var(--txt3)",textAlign:"center",marginTop:10}}>Les alertes signalent, elles ne bloquent pas : une étape non terminée n'empêche jamais d'avancer.</div>
     </div>
   );
 }
@@ -6711,10 +6766,12 @@ function CardioPlanning(){
   const [ptMonths,setPtMonths]=React.useState([]); // indices cochés
   const [ptFromToday,setPtFromToday]=React.useState(false);
   const ptPeriodMonths=React.useMemo(()=>{
-    const p=perStart(year,month);const arr=[];
+    /* v10.30 : depuis Construire, la fenetre porte sur la periode de CET onglet,
+       pas sur le mois global — sinon on appliquerait le planning type a cote. */
+    const p=(ptModal&&ptModal.per)?ptModal.per:perStart(year,month);const arr=[];
     for(let i=0;i<PCFG.len;i++){const mm=(p.sm+i)%12,yy=p.sm+i>11?p.sy+1:p.sy;arr.push({y:yy,m:mm});}
     return arr;
-  },[year,month,PCFG.len,PCFG.startM]);
+  },[ptModal,year,month,PCFG.len,PCFG.startM]);
   const removePTFlex=useCallback((medId,monthsList,fromToday)=>{
     const tod=new Date();tod.setHours(0,0,0,0);
     const KEEP=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"];
@@ -6741,10 +6798,10 @@ function CardioPlanning(){
     });
     toast("Affectations retirées ("+monthsList.length+" mois"+(fromToday?", à partir d'aujourd'hui":"")+"). Gardes, absences, formations et tour conservés.","info");
   },[medecins]);
-  const openPtModal=(medId,mode)=>{
+  const openPtModal=(medId,mode,per)=>{
     setPtMonths(ptPeriodMonths.map((_,i)=>i)); // tous cochés par défaut
     setPtFromToday(false); // nominal : depuis le début de la période
-    setPtModal({medId:medId||null,mode:mode||"apply"});
+    setPtModal({medId:medId||null,mode:mode||"apply",per:per||null});
   };
   const runPtModal=()=>{
     const list=ptPeriodMonths.filter((_,i)=>ptMonths.includes(i));
@@ -7337,7 +7394,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="tourmedical"&&<TourTab {...tourProps}/>}
 
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
-      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medecins} getEntries={getEntries} tourMed={tourMed} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} tourProps={tourProps} gardeProps={gardeProps}/>}
+      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medecins} getEntries={getEntries} tourMed={tourMed} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
 
       {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
