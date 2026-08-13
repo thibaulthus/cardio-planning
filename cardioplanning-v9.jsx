@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.34 — 13/08/2026";
+const APP_VERSION="v10.35 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5236,6 +5236,195 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
   );
 }
 
+/* ═══════════════ v10.35 : SAUVEGARDE EXPLOITABLE ═══════════════
+   Sortir le planning dans un fichier qu'il ouvre lui-même, pour rediffuser vite
+   le jour où l'application ou Firebase tombe. Deux principes :
+   — AUCUNE BIBLIOTHÈQUE : le fichier est un tableau écrit à la main, que Sheets
+     et Excel ouvrent comme une feuille. Rien à télécharger au moment où le
+     réseau est justement en panne.
+   — AUCUNE LECTURE DUPLIQUÉE : `expEntries` est la fonction que `getEntries`
+     utilise elle-même — l'export ne peut donc pas lire le planning autrement
+     que l'écran. Elle sert aussi bien au planning courant qu'à une sauvegarde. */
+const EXP_WE_BG="#ffd966";     /* jaune clair 1 de Google Sheets, sa demande */
+const EXP_WE_VIDE="#fff9e6";   /* même teinte très diluée pour les cases vides du week-end */
+const EXP_SEUIL=200;           /* cases modifiées avant rappel — réglable dans Paramètres */
+const EXP_JOURS=7;             /* ou une semaine, au premier des deux atteint */
+const EXP_JSEM=["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+const EXP_MOIS=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+
+/* Lecture d'une case — LA MÊME que celle de l'application (getEntries l'appelle).
+   `p` est le planning déjà fusionné avec les archives s'il y a lieu. */
+function expEntries(p,tourMed,tourDerog,medId,y2,m2,d2,slot){
+  if(slot!=="JOUR"){
+    const absE=cellEs((p[sk(y2,m2,d2,"JOUR")]||{})[medId]).find(e=>e&&ABS_IDS.includes(e.acteId));
+    if(absE) return slot==="M"?[{...absE,_fullDay:true}]:slot==="AM"?[{_blocked:true}]:[];
+  }
+  if(slot==="JOUR"){const e=(p[sk(y2,m2,d2,"JOUR")]||{})[medId];return e?(Array.isArray(e)?e:[e]):[];}
+  const entries=(p[sk(y2,m2,d2,slot)]||{})[medId];
+  if(entries)return Array.isArray(entries)?entries:[entries];
+  if(!isWE(y2,m2,d2)&&(slot==="M"||slot==="AM")){
+    const wk=wKey(y2,m2,d2),wm=(tourMed||{})[wk]||{HC:[],USIC:[]};
+    const dgS=((tourDerog||{})[dKey(y2,m2,d2)]||{})[medId];
+    if(dgS===true||(dgS&&dgS[slot]))return [];
+    if((wm.HC||[]).includes(medId))return [{acteId:"TOUR_HC",salle:null}];
+    if((wm.USIC||[]).includes(medId))return [{acteId:"TOUR_USIC",salle:null}];
+  }
+  return[];
+}
+
+const expEsc=(s)=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const expDate=(y,m,d)=>EXP_JSEM[new Date(y,m,d).getDay()]+" "+d+" "+EXP_MOIS[m]+" "+y;
+
+/* Construit le tableau d'une période. Rend une chaîne, n'écrit aucun fichier :
+   la même sortie sert au téléchargement et pourra servir à un aperçu. */
+function expTable(per,src){
+  const plan=src.plan||{},notes=src.notes||{},tourMed=src.tourMed||{},tourDerog=src.tourDerog||{};
+  const medecins=src.medecins||[],actes=src.actes||[],salleReg=src.salleReg||[];
+  const acte=(id)=>actes.find(a=>a.id===id)||null;
+  const meds=medecins.filter(m=>(m.role||"medecin")==="medecin");
+  const salles=[];
+  (salleReg||[]).forEach(x=>{if(x&&x.n&&salles.indexOf(x.n)<0)salles.push(x.n);});
+  const jours=perDaysList(per.sy,per.sm);
+
+  /* libellé d'une case : le nom court de l'activité, la salle si elle en porte une */
+  const libelle=(es)=>{
+    const out=[];
+    (es||[]).forEach(e=>{
+      if(!e||e._blocked||!e.acteId)return;
+      const a=acte(e.acteId);
+      let t=a?(a.short||a.label||e.acteId):e.acteId;
+      if(e.salle)t+=" "+e.salle;
+      if(e.cond)t="? "+t;
+      out.push(t);
+    });
+    return out.join(" + ");
+  };
+  const cellHTML=(txt,note,bg)=>{
+    let st=bg?' style="background:'+bg+'"':"";
+    let c=expEsc(txt||"");
+    if(note){
+      /* Un vrai commentaire de cellule n'existe pas dans ce format : on garde le
+         REPÈRE visible (✎) et le texte, en plus petit, dans la cellule. */
+      c=(c?c+" ":"")+'<span style="font-size:8pt;font-style:italic">✎ '+expEsc(note)+"</span>";
+      st=' title="'+expEsc(note)+'"'+st;
+    }
+    return "<td"+st+">"+c+"</td>";
+  };
+
+  const ent=["j","Garde","Garde Interne"].concat(meds.map(m=>m.init)).concat(salles);
+  const L=['<html><head><meta charset="utf-8"></head><body>',
+    '<table border="1" cellspacing="0" cellpadding="2" style="border-collapse:collapse;font-family:Arial;font-size:10pt">',
+    "<tr>"+ent.map(e=>'<th style="background:#efefef">'+expEsc(e)+"</th>").join("")+"</tr>"];
+
+  jours.forEach(({y,m,d})=>{
+    const we=isWE(y,m,d)||isFerie(y,m,d);
+    const slots=we?["JOUR"]:["M","AM"];
+    slots.forEach((sl,i)=>{
+      const tds=[];
+      /* colonne A : la date, une seule fois par jour */
+      tds.push('<td style="background:'+(we?EXP_WE_BG:"#ffffff")+';text-align:left;white-space:nowrap">'
+        +(i===0?expEsc(expDate(y,m,d)):"")+"</td>");
+      /* gardes : celui qui porte GARDE sur N ou JOUR */
+      let g="";
+      if(i===0)meds.forEach(md=>{
+        if(["N","JOUR"].some(s2=>expEntries(plan,tourMed,tourDerog,md.id,y,m,d,s2).some(e=>e&&e.acteId==="GARDE")))g=g?g+" "+md.init:md.init;
+      });
+      tds.push(cellHTML(g,null,we?EXP_WE_VIDE:null));
+      tds.push(cellHTML("",null,we?EXP_WE_VIDE:null));   /* garde interne : tenue à la main */
+      /* une colonne par médecin */
+      meds.forEach(md=>{
+        const es=expEntries(plan,tourMed,tourDerog,md.id,y,m,d,sl);
+        const txt=libelle(es);
+        const note=notes[nk(md.id,y,m,d,sl)]||null;
+        const a=es.length?acte(es[0].acteId):null;
+        const bg=txt?((a&&a.color)||null):(we?EXP_WE_VIDE:null);
+        tds.push(cellHTML(txt,note,bg));
+      });
+      /* une colonne par salle du registre : on y lit les initiales */
+      salles.forEach(nom=>{
+        const qui=[];
+        meds.forEach(md=>{
+          expEntries(plan,tourMed,tourDerog,md.id,y,m,d,sl).forEach(e=>{
+            if(e&&e.salle===nom&&qui.indexOf(md.init)<0)qui.push(md.init);
+          });
+        });
+        tds.push(cellHTML(qui.join(" "),null,we?EXP_WE_VIDE:null));
+      });
+      L.push("<tr>"+tds.join("")+"</tr>");
+    });
+  });
+  L.push("</table></body></html>");
+  return L.join("\n");
+}
+
+/* Téléchargement — même mécanique que les exports CSV déjà présents. */
+function expTelecharge(nom,contenu,type){
+  const blob=new Blob(["\ufeff"+contenu],{type:type||"application/vnd.ms-excel;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=nom;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
+/* Rappel dans le Planning de l'éditeur : premier des deux seuils atteint. */
+function ExportRappel({nModifs,seuil,dernier,onAller,onPlusTard}){
+  const jours=dernier?Math.floor((Date.now()-dernier)/86400000):999;
+  const parTemps=jours>=EXP_JOURS, parCases=nModifs>=(seuil||EXP_SEUIL);
+  if(!parTemps&&!parCases)return null;
+  const motif=parCases
+    ?(nModifs+" case"+(nModifs>1?"s":"")+" modifiée"+(nModifs>1?"s":"")+" depuis votre dernière sauvegarde")
+    :(dernier?("dernière sauvegarde il y a "+jours+" jours"):"aucune sauvegarde sur cet ordinateur");
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:9,flexWrap:"wrap",padding:"7px 11px",marginBottom:10,borderRadius:8,
+      border:"1px solid #f59e0b",background:"rgba(245,158,11,.13)"}}>
+      <span style={{fontSize:14}}>💾</span>
+      <div style={{flex:1,minWidth:150}}>
+        <div style={{fontSize:12.5,fontWeight:800,color:"#b45309"}}>Sauvegarde sur votre ordinateur</div>
+        <div style={{fontSize:11,color:"var(--txt2)"}}>{motif}</div>
+      </div>
+      <button onClick={onAller} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #f59e0b",background:"var(--bg2)",color:"#b45309",fontWeight:800,cursor:"pointer"}}>→ Sauvegarder</button>
+      <button onClick={onPlusTard} style={{fontSize:11,padding:"4px 11px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt3)",fontWeight:700,cursor:"pointer"}}>Plus tard</button>
+    </div>
+  );
+}
+
+/* L'encart de Paramètres : source, période, et les deux fichiers. */
+function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,onExport,occupe}){
+  const lbl=perLibelle(per.sy,per.sm);
+  const dat=(ts)=>new Date(ts).toLocaleDateString("fr-FR")+" "+new Date(ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  return(
+    <div style={{...S.card,marginBottom:10}} id="set-export">
+      <div style={{fontWeight:700,color:"#f59e0b",fontSize:13,marginBottom:6}}>💾 Sauvegarde sur mon ordinateur</div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un fichier gardé chez vous, indépendant de l'application et de sa synchronisation. Le tableau sert à rediffuser le planning ; le fichier de données sert à le remettre en place.</div>
+
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+        <button onClick={()=>setPer(perPrev(per.sy,per.sm))} style={S.arr}>‹</button>
+        <span style={{fontSize:12,fontWeight:800,color:"var(--txt)",minWidth:190,textAlign:"center"}}>{lbl}</span>
+        <button onClick={()=>setPer(perNext(per.sy,per.sm))} style={S.arr}>›</button>
+      </div>
+
+      <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>À partir de</div>
+      <select value={source} onChange={e=>setSource(e.target.value)}
+        style={{...S.fi,marginBottom:8}}>
+        <option value="now">Le planning tel qu'il est maintenant</option>
+        {(backups||[]).map((b,i)=><option key={b.id} value={b.id}>{"Sauvegarde du "+dat(b.ts)+(i===0?" (la plus récente)":"")}</option>)}
+      </select>
+
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+        <button disabled={occupe} onClick={()=>onExport("tableau")} style={{fontSize:11,padding:"5px 13px",borderRadius:6,border:"1.5px solid #f59e0b",background:"rgba(245,158,11,.10)",color:"#b45309",fontWeight:800,cursor:occupe?"default":"pointer",opacity:occupe?.6:1}}>📊 Le tableau (Excel / Sheets)</button>
+        <button disabled={occupe} onClick={()=>onExport("donnees")} style={{fontSize:11,padding:"5px 13px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontWeight:700,cursor:occupe?"default":"pointer",opacity:occupe?.6:1}}>🗄 Les données brutes</button>
+      </div>
+
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6}}>{dernier?("Dernière sauvegarde : "+dat(dernier)):"Aucune sauvegarde faite depuis cet ordinateur."}</div>
+      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+        <span style={{fontSize:11,color:"var(--txt3)"}}>Me le rappeler au bout de</span>
+        <input type="number" min="20" max="5000" step="10" value={seuil} onChange={e=>setSeuil(Math.max(20,parseInt(e.target.value)||EXP_SEUIL))}
+          style={{...S.fi,width:80,padding:"3px 6px",textAlign:"center"}}/>
+        <span style={{fontSize:11,color:"var(--txt3)"}}>cases modifiées, ou de {EXP_JOURS} jours.</span>
+      </div>
+    </div>
+  );
+}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -5364,6 +5553,18 @@ function CardioPlanning(){
   const [tourDerog,setTourDerog]=useState({});   // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
   const [tourReport,setTourReport]=useState(null); // rapport persistant de la dernière répartition auto du tour
   const [astReport,setAstReport]=useState(null);
+  /* v10.35 : sauvegarde sur SON ordinateur. Tout est LOCAL a l'appareil
+     (localStorage) — la date de derniere sauvegarde et le compteur de cases n'ont
+     de sens que pour la machine qui detient le fichier. */
+  const [expPer,setExpPer]=useState(()=>{const t=new Date();return perStart(t.getFullYear(),t.getMonth());});
+  const [expSrc,setExpSrc]=useState("now");
+  const [expBusy,setExpBusy]=useState(false);
+  const [expSnooze,setExpSnooze]=useState(false);
+  const [expSeuil,setExpSeuil]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expSeuil"))||EXP_SEUIL;}catch(e){return EXP_SEUIL;}});
+  const [expLast,setExpLast]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expLast"))||0;}catch(e){return 0;}});
+  const [expN,setExpN]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expN"))||0;}catch(e){return 0;}});
+  const expBump=useCallback((n)=>{if(!n)return;setExpN(v=>{const t=v+n;try{localStorage.setItem("cp6_expN",String(t));}catch(e){}return t;});},[]);
+  useEffect(()=>{try{localStorage.setItem("cp6_expSeuil",String(expSeuil));}catch(e){}},[expSeuil]);
   const [salleReg,setSalleReg]=useState([]); // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
   const [salleEdit,setSalleEdit]=useState(null); // salle en cours d'édition (activités associées)
   const [archPlan,setArchPlan]=useState({});   // cases archivées chargées pour consultation (lecture)
@@ -5449,6 +5650,7 @@ function CardioPlanning(){
     Object.keys(prev).forEach(k=>{if(!(k in cur)){pairs.push([["planV2",k],"__DELETE__"]);planPending.current[k]=null;}});
     planSynced.current=cur;
     if(pairs.length===0)return;
+    expBump(pairs.length);   /* v10.35 : cases modifiees depuis la derniere sauvegarde */
     localChange.current=true;
     (async()=>{
       try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
@@ -6354,24 +6556,13 @@ function CardioPlanning(){
   },[year,month]);
 
 
+  /* v10.35 : le corps est passe dans `expEntries` au niveau module, pour que
+     l'export lise le planning EXACTEMENT comme l'ecran. tourDerog rejoint les
+     dependances au passage — il manquait, une derogation ne rafraichissait pas. */
   const getEntries=useCallback((medId,y2,m2,d2,slot)=>{
     const _p=Object.keys(archPlan).length>0?{...archPlan,...plan}:plan;
-    if(slot!=="JOUR"){
-      const absE=cellEs((_p[sk(y2,m2,d2,"JOUR")]||{})[medId]).find(e=>e&&ABS_IDS.includes(e.acteId));
-      if(absE) return slot==="M"?[{...absE,_fullDay:true}]:slot==="AM"?[{_blocked:true}]:[];
-    }
-    if(slot==="JOUR"){const e=(_p[sk(y2,m2,d2,"JOUR")]||{})[medId];return e?(Array.isArray(e)?e:[e]):[];}
-    const entries=(_p[sk(y2,m2,d2,slot)]||{})[medId];
-    if(entries)return Array.isArray(entries)?entries:[entries];
-    if(!isWE(y2,m2,d2)&&(slot==="M"||slot==="AM")){
-      const wk=wKey(y2,m2,d2),wm=tourMed[wk]||{HC:[],USIC:[]};
-      const dgS=((tourDerog||{})[dKey(y2,m2,d2)]||{})[medId];
-      if(dgS===true||(dgS&&dgS[slot]))return [];
-      if((wm.HC||[]).includes(medId))return [{acteId:"TOUR_HC",salle:null}];
-      if((wm.USIC||[]).includes(medId))return [{acteId:"TOUR_USIC",salle:null}];
-    }
-    return[];
-  },[plan,archPlan,tourMed]);
+    return expEntries(_p,tourMed,tourDerog,medId,y2,m2,d2,slot);
+  },[plan,archPlan,tourMed,tourDerog]);
 
   const getEntry=useCallback((medId,y2,m2,d2,slot)=>getEntries(medId,y2,m2,d2,slot)[0]||null,[getEntries]);
 
@@ -7249,6 +7440,27 @@ function CardioPlanning(){
     </div>
   );
 
+  const doExport=useCallback(async(kind)=>{
+    setExpBusy(true);
+    try{
+      let src;
+      if(expSrc==="now")src={plan:plan,notes:notes,tourMed:tourMed,tourDerog:tourDerog,medecins:medecins,actes:actes,salleReg:salleReg};
+      else{
+        const dd=(await window.firebaseDB.collection("backups").doc(expSrc).get()).data()||{};
+        const pj=(x,def)=>{try{return typeof x==="string"?JSON.parse(x):(x||def);}catch(e){return def;}};
+        src={plan:dd.planV2||{},notes:pj(dd.notes,{}),tourMed:pj(dd.tourMed,{}),tourDerog:pj(dd.tourDerog,{}),
+             medecins:pj(dd.medecins,[]),actes:pj(dd.actes,[]),salleReg:pj(dd.salleReg,[])};
+      }
+      const nom="planning-"+expPer.sy+"-"+String(expPer.sm+1).padStart(2,"0");
+      if(kind==="tableau")expTelecharge(nom+".xls",expTable(expPer,src));
+      else expTelecharge(nom+"-donnees.json",JSON.stringify(src),"application/json;charset=utf-8");
+      const t=Date.now();setExpLast(t);setExpN(0);setExpSnooze(false);
+      try{localStorage.setItem("cp6_expLast",String(t));localStorage.setItem("cp6_expN","0");}catch(e){}
+      toast("Sauvegarde téléchargée","info");
+    }catch(e){console.log("export:",e);toast("Échec de la sauvegarde","warn");}
+    setExpBusy(false);
+  },[expSrc,expPer,plan,notes,tourMed,tourDerog,medecins,actes,salleReg]);
+
   const _per=getPeriodRange(year,month);
   const _pem=(_per.sm+PCFG.len-1)%12,_pey=_per.sm+PCFG.len-1>11?_per.sy+1:_per.sy;
   const _titlePeriod=MOIS[_per.sm]+" — "+MOIS[_pem]+" "+(_per.sy!==_pey?_per.sy+"/"+_pey:_pey);
@@ -7403,6 +7615,8 @@ header::-webkit-scrollbar { display: none; }
       {/* PLANNING */}
       {tab==="planning"&&(
         <div>
+          {isEdit&&!expSnooze&&<ExportRappel nModifs={expN} seuil={expSeuil} dernier={expLast}
+            onAller={()=>goTab("partage")} onPlusTard={()=>setExpSnooze(true)}/>}
           {/* v10.32 : rappel des demandes ouvertes. Il apparait quelle que soit la
               periode affichee — la demande porte sur la periode suivante, mais
               personne n'y va spontanement (sa remarque du 12/08). */}
@@ -8025,6 +8239,10 @@ header::-webkit-scrollbar { display: none; }
             <div style={{fontWeight:700,color:"#3fb950",fontSize:13,marginBottom:6}}>👁 Lecture seule<div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
             <div style={{fontSize:11,color:"var(--txt3)"}}>Partagez l'URL directement. Sans PIN, le planning est consultable mais non modifiable.</div>
           </div>
+
+          {isEdit&&<ExportCard per={expPer} setPer={setExpPer} source={expSrc} setSource={setExpSrc}
+            backups={backupList} seuil={expSeuil} setSeuil={setExpSeuil} dernier={expLast}
+            onExport={doExport} occupe={expBusy}/>}
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>🔐 Code PIN éditeur</div>

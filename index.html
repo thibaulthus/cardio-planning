@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.34 — 13/08/2026";
+var APP_VERSION = "v10.35 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5463,6 +5463,193 @@ function BuildTab(_a) {
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", textAlign: "center", marginTop: 10 } }, "Les alertes signalent, elles ne bloquent pas : une \u00E9tape non termin\u00E9e n'emp\u00EAche jamais d'avancer.")));
 }
 
+/* ═══════════════ v10.35 : SAUVEGARDE EXPLOITABLE ═══════════════
+   Sortir le planning dans un fichier qu'il ouvre lui-même, pour rediffuser vite
+   le jour où l'application ou Firebase tombe. Deux principes :
+   — AUCUNE BIBLIOTHÈQUE : le fichier est un tableau écrit à la main, que Sheets
+     et Excel ouvrent comme une feuille. Rien à télécharger au moment où le
+     réseau est justement en panne.
+   — AUCUNE LECTURE DUPLIQUÉE : `expEntries` est la fonction que `getEntries`
+     utilise elle-même — l'export ne peut donc pas lire le planning autrement
+     que l'écran. Elle sert aussi bien au planning courant qu'à une sauvegarde. */
+var EXP_WE_BG = "#ffd966"; /* jaune clair 1 de Google Sheets, sa demande */
+var EXP_WE_VIDE = "#fff9e6"; /* même teinte très diluée pour les cases vides du week-end */
+var EXP_SEUIL = 200; /* cases modifiées avant rappel — réglable dans Paramètres */
+var EXP_JOURS = 7; /* ou une semaine, au premier des deux atteint */
+var EXP_JSEM = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+var EXP_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+/* Lecture d'une case — LA MÊME que celle de l'application (getEntries l'appelle).
+   `p` est le planning déjà fusionné avec les archives s'il y a lieu. */
+function expEntries(p, tourMed, tourDerog, medId, y2, m2, d2, slot) {
+    if (slot !== "JOUR") {
+        var absE = cellEs((p[sk(y2, m2, d2, "JOUR")] || {})[medId]).find(function (e) { return e && ABS_IDS.includes(e.acteId); });
+        if (absE)
+            return slot === "M" ? [__assign(__assign({}, absE), { _fullDay: true })] : slot === "AM" ? [{ _blocked: true }] : [];
+    }
+    if (slot === "JOUR") {
+        var e = (p[sk(y2, m2, d2, "JOUR")] || {})[medId];
+        return e ? (Array.isArray(e) ? e : [e]) : [];
+    }
+    var entries = (p[sk(y2, m2, d2, slot)] || {})[medId];
+    if (entries)
+        return Array.isArray(entries) ? entries : [entries];
+    if (!isWE(y2, m2, d2) && (slot === "M" || slot === "AM")) {
+        var wk = wKey(y2, m2, d2), wm = (tourMed || {})[wk] || { HC: [], USIC: [] };
+        var dgS = ((tourDerog || {})[dKey(y2, m2, d2)] || {})[medId];
+        if (dgS === true || (dgS && dgS[slot]))
+            return [];
+        if ((wm.HC || []).includes(medId))
+            return [{ acteId: "TOUR_HC", salle: null }];
+        if ((wm.USIC || []).includes(medId))
+            return [{ acteId: "TOUR_USIC", salle: null }];
+    }
+    return [];
+}
+var expEsc = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
+var expDate = function (y, m, d) { return EXP_JSEM[new Date(y, m, d).getDay()] + " " + d + " " + EXP_MOIS[m] + " " + y; };
+/* Construit le tableau d'une période. Rend une chaîne, n'écrit aucun fichier :
+   la même sortie sert au téléchargement et pourra servir à un aperçu. */
+function expTable(per, src) {
+    var plan = src.plan || {}, notes = src.notes || {}, tourMed = src.tourMed || {}, tourDerog = src.tourDerog || {};
+    var medecins = src.medecins || [], actes = src.actes || [], salleReg = src.salleReg || [];
+    var acte = function (id) { return actes.find(function (a) { return a.id === id; }) || null; };
+    var meds = medecins.filter(function (m) { return (m.role || "medecin") === "medecin"; });
+    var salles = [];
+    (salleReg || []).forEach(function (x) { if (x && x.n && salles.indexOf(x.n) < 0)
+        salles.push(x.n); });
+    var jours = perDaysList(per.sy, per.sm);
+    /* libellé d'une case : le nom court de l'activité, la salle si elle en porte une */
+    var libelle = function (es) {
+        var out = [];
+        (es || []).forEach(function (e) {
+            if (!e || e._blocked || !e.acteId)
+                return;
+            var a = acte(e.acteId);
+            var t = a ? (a.short || a.label || e.acteId) : e.acteId;
+            if (e.salle)
+                t += " " + e.salle;
+            if (e.cond)
+                t = "? " + t;
+            out.push(t);
+        });
+        return out.join(" + ");
+    };
+    var cellHTML = function (txt, note, bg) {
+        var st = bg ? ' style="background:' + bg + '"' : "";
+        var c = expEsc(txt || "");
+        if (note) {
+            /* Un vrai commentaire de cellule n'existe pas dans ce format : on garde le
+               REPÈRE visible (✎) et le texte, en plus petit, dans la cellule. */
+            c = (c ? c + " " : "") + '<span style="font-size:8pt;font-style:italic">✎ ' + expEsc(note) + "</span>";
+            st = ' title="' + expEsc(note) + '"' + st;
+        }
+        return "<td" + st + ">" + c + "</td>";
+    };
+    var ent = ["j", "Garde", "Garde Interne"].concat(meds.map(function (m) { return m.init; })).concat(salles);
+    var L = ['<html><head><meta charset="utf-8"></head><body>',
+        '<table border="1" cellspacing="0" cellpadding="2" style="border-collapse:collapse;font-family:Arial;font-size:10pt">',
+        "<tr>" + ent.map(function (e) { return '<th style="background:#efefef">' + expEsc(e) + "</th>"; }).join("") + "</tr>"];
+    jours.forEach(function (_a) {
+        var y = _a.y, m = _a.m, d = _a.d;
+        var we = isWE(y, m, d) || isFerie(y, m, d);
+        var slots = we ? ["JOUR"] : ["M", "AM"];
+        slots.forEach(function (sl, i) {
+            var tds = [];
+            /* colonne A : la date, une seule fois par jour */
+            tds.push('<td style="background:' + (we ? EXP_WE_BG : "#ffffff") + ';text-align:left;white-space:nowrap">'
+                + (i === 0 ? expEsc(expDate(y, m, d)) : "") + "</td>");
+            /* gardes : celui qui porte GARDE sur N ou JOUR */
+            var g = "";
+            if (i === 0)
+                meds.forEach(function (md) {
+                    if (["N", "JOUR"].some(function (s2) { return expEntries(plan, tourMed, tourDerog, md.id, y, m, d, s2).some(function (e) { return e && e.acteId === "GARDE"; }); }))
+                        g = g ? g + " " + md.init : md.init;
+                });
+            tds.push(cellHTML(g, null, we ? EXP_WE_VIDE : null));
+            tds.push(cellHTML("", null, we ? EXP_WE_VIDE : null)); /* garde interne : tenue à la main */
+            /* une colonne par médecin */
+            meds.forEach(function (md) {
+                var es = expEntries(plan, tourMed, tourDerog, md.id, y, m, d, sl);
+                var txt = libelle(es);
+                var note = notes[nk(md.id, y, m, d, sl)] || null;
+                var a = es.length ? acte(es[0].acteId) : null;
+                var bg = txt ? ((a && a.color) || null) : (we ? EXP_WE_VIDE : null);
+                tds.push(cellHTML(txt, note, bg));
+            });
+            /* une colonne par salle du registre : on y lit les initiales */
+            salles.forEach(function (nom) {
+                var qui = [];
+                meds.forEach(function (md) {
+                    expEntries(plan, tourMed, tourDerog, md.id, y, m, d, sl).forEach(function (e) {
+                        if (e && e.salle === nom && qui.indexOf(md.init) < 0)
+                            qui.push(md.init);
+                    });
+                });
+                tds.push(cellHTML(qui.join(" "), null, we ? EXP_WE_VIDE : null));
+            });
+            L.push("<tr>" + tds.join("") + "</tr>");
+        });
+    });
+    L.push("</table></body></html>");
+    return L.join("\n");
+}
+/* Téléchargement — même mécanique que les exports CSV déjà présents. */
+function expTelecharge(nom, contenu, type) {
+    var blob = new Blob(["\ufeff" + contenu], { type: type || "application/vnd.ms-excel;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nom;
+    a.click();
+    setTimeout(function () { return URL.revokeObjectURL(a.href); }, 4000);
+}
+/* Rappel dans le Planning de l'éditeur : premier des deux seuils atteint. */
+function ExportRappel(_a) {
+    var nModifs = _a.nModifs, seuil = _a.seuil, dernier = _a.dernier, onAller = _a.onAller, onPlusTard = _a.onPlusTard;
+    var jours = dernier ? Math.floor((Date.now() - dernier) / 86400000) : 999;
+    var parTemps = jours >= EXP_JOURS, parCases = nModifs >= (seuil || EXP_SEUIL);
+    if (!parTemps && !parCases)
+        return null;
+    var motif = parCases
+        ? (nModifs + " case" + (nModifs > 1 ? "s" : "") + " modifiée" + (nModifs > 1 ? "s" : "") + " depuis votre dernière sauvegarde")
+        : (dernier ? ("dernière sauvegarde il y a " + jours + " jours") : "aucune sauvegarde sur cet ordinateur");
+    return (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", padding: "7px 11px", marginBottom: 10, borderRadius: 8,
+            border: "1px solid #f59e0b", background: "rgba(245,158,11,.13)" } },
+        React.createElement("span", { style: { fontSize: 14 } }, "\uD83D\uDCBE"),
+        React.createElement("div", { style: { flex: 1, minWidth: 150 } },
+            React.createElement("div", { style: { fontSize: 12.5, fontWeight: 800, color: "#b45309" } }, "Sauvegarde sur votre ordinateur"),
+            React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)" } }, motif)),
+        React.createElement("button", { onClick: onAller, style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #f59e0b", background: "var(--bg2)", color: "#b45309", fontWeight: 800, cursor: "pointer" } }, "\u2192 Sauvegarder"),
+        React.createElement("button", { onClick: onPlusTard, style: { fontSize: 11, padding: "4px 11px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt3)", fontWeight: 700, cursor: "pointer" } }, "Plus tard")));
+}
+/* L'encart de Paramètres : source, période, et les deux fichiers. */
+function ExportCard(_a) {
+    var per = _a.per, setPer = _a.setPer, source = _a.source, setSource = _a.setSource, backups = _a.backups, seuil = _a.seuil, setSeuil = _a.setSeuil, dernier = _a.dernier, onExport = _a.onExport, occupe = _a.occupe;
+    var lbl = perLibelle(per.sy, per.sm);
+    var dat = function (ts) { return new Date(ts).toLocaleDateString("fr-FR") + " " + new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); };
+    return (React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }), id: "set-export" },
+        React.createElement("div", { style: { fontWeight: 700, color: "#f59e0b", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde sur mon ordinateur"),
+        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Un fichier gard\u00E9 chez vous, ind\u00E9pendant de l'application et de sa synchronisation. Le tableau sert \u00E0 rediffuser le planning ; le fichier de donn\u00E9es sert \u00E0 le remettre en place."),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" } },
+            React.createElement("button", { onClick: function () { return setPer(perPrev(per.sy, per.sm)); }, style: S.arr }, "\u2039"),
+            React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "var(--txt)", minWidth: 190, textAlign: "center" } }, lbl),
+            React.createElement("button", { onClick: function () { return setPer(perNext(per.sy, per.sm)); }, style: S.arr }, "\u203A")),
+        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 4 } }, "\u00C0 partir de"),
+        React.createElement("select", { value: source, onChange: function (e) { return setSource(e.target.value); }, style: __assign(__assign({}, S.fi), { marginBottom: 8 }) },
+            React.createElement("option", { value: "now" }, "Le planning tel qu'il est maintenant"),
+            (backups || []).map(function (b, i) { return React.createElement("option", { key: b.id, value: b.id }, "Sauvegarde du " + dat(b.ts) + (i === 0 ? " (la plus récente)" : "")); })),
+        React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 } },
+            React.createElement("button", { disabled: occupe, onClick: function () { return onExport("tableau"); }, style: { fontSize: 11, padding: "5px 13px", borderRadius: 6, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.10)", color: "#b45309", fontWeight: 800, cursor: occupe ? "default" : "pointer", opacity: occupe ? .6 : 1 } }, "\uD83D\uDCCA Le tableau (Excel / Sheets)"),
+            React.createElement("button", { disabled: occupe, onClick: function () { return onExport("donnees"); }, style: { fontSize: 11, padding: "5px 13px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", fontWeight: 700, cursor: occupe ? "default" : "pointer", opacity: occupe ? .6 : 1 } }, "\uD83D\uDDC4 Les donn\u00E9es brutes")),
+        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 6 } }, dernier ? ("Dernière sauvegarde : " + dat(dernier)) : "Aucune sauvegarde faite depuis cet ordinateur."),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
+            React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "Me le rappeler au bout de"),
+            React.createElement("input", { type: "number", min: "20", max: "5000", step: "10", value: seuil, onChange: function (e) { return setSeuil(Math.max(20, parseInt(e.target.value) || EXP_SEUIL)); }, style: __assign(__assign({}, S.fi), { width: 80, padding: "3px 6px", textAlign: "center" }) }),
+            React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } },
+                "cases modifi\u00E9es, ou de ",
+                EXP_JOURS,
+                " jours."))));
+}
+
 function CardioPlanning() {
     var _this = this;
     var today = new Date();
@@ -5633,6 +5820,40 @@ function CardioPlanning() {
     var _8 = useState({}), tourDerog = _8[0], setTourDerog = _8[1]; // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
     var _9 = useState(null), tourReport = _9[0], setTourReport = _9[1]; // rapport persistant de la dernière répartition auto du tour
     var _10 = useState(null), astReport = _10[0], setAstReport = _10[1];
+    /* v10.35 : sauvegarde sur SON ordinateur. Tout est LOCAL a l'appareil
+       (localStorage) — la date de derniere sauvegarde et le compteur de cases n'ont
+       de sens que pour la machine qui detient le fichier. */
+    var _38 = useState(function () { var t = new Date(); return perStart(t.getFullYear(), t.getMonth()); }), expPer = _38[0], setExpPer = _38[1];
+    var _39 = useState("now"), expSrc = _39[0], setExpSrc = _39[1];
+    var _40 = useState(false), expBusy = _40[0], setExpBusy = _40[1];
+    var _41 = useState(false), expSnooze = _41[0], setExpSnooze = _41[1];
+    var _42 = useState(function () { try {
+        return parseInt(localStorage.getItem("cp6_expSeuil")) || EXP_SEUIL;
+    }
+    catch (e) {
+        return EXP_SEUIL;
+    } }), expSeuil = _42[0], setExpSeuil = _42[1];
+    var _43 = useState(function () { try {
+        return parseInt(localStorage.getItem("cp6_expLast")) || 0;
+    }
+    catch (e) {
+        return 0;
+    } }), expLast = _43[0], setExpLast = _43[1];
+    var _44 = useState(function () { try {
+        return parseInt(localStorage.getItem("cp6_expN")) || 0;
+    }
+    catch (e) {
+        return 0;
+    } }), expN = _44[0], setExpN = _44[1];
+    var expBump = useCallback(function (n) { if (!n)
+        return; setExpN(function (v) { var t = v + n; try {
+        localStorage.setItem("cp6_expN", String(t));
+    }
+    catch (e) { } return t; }); }, []);
+    useEffect(function () { try {
+        localStorage.setItem("cp6_expSeuil", String(expSeuil));
+    }
+    catch (e) { } }, [expSeuil]);
     var _11 = useState([]), salleReg = _11[0], setSalleReg = _11[1]; // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
     var _12 = useState(null), salleEdit = _12[0], setSalleEdit = _12[1]; // salle en cours d'édition (activités associées)
     var _13 = useState({}), archPlan = _13[0], setArchPlan = _13[1]; // cases archivées chargées pour consultation (lecture)
@@ -5721,6 +5942,7 @@ function CardioPlanning() {
         planSynced.current = cur;
         if (pairs.length === 0)
             return;
+        expBump(pairs.length); /* v10.35 : cases modifiees depuis la derniere sauvegarde */
         localChange.current = true;
         var pr = Promise.resolve();
         var mk = function (c) { pr = pr.then(function () { return updatePaths(PLANNING_DOC, c); }); };
@@ -7125,30 +7347,8 @@ function CardioPlanning() {
     }, [year, month]);
     var getEntries = useCallback(function (medId, y2, m2, d2, slot) {
         var _p = Object.keys(archPlan).length > 0 ? __assign(__assign({}, archPlan), plan) : plan;
-        if (slot !== "JOUR") {
-            var absE = cellEs((_p[sk(y2, m2, d2, "JOUR")] || {})[medId]).find(function (e) { return e && ABS_IDS.includes(e.acteId); });
-            if (absE)
-                return slot === "M" ? [__assign(__assign({}, absE), { _fullDay: true })] : slot === "AM" ? [{ _blocked: true }] : [];
-        }
-        if (slot === "JOUR") {
-            var e = (_p[sk(y2, m2, d2, "JOUR")] || {})[medId];
-            return e ? (Array.isArray(e) ? e : [e]) : [];
-        }
-        var entries = (_p[sk(y2, m2, d2, slot)] || {})[medId];
-        if (entries)
-            return Array.isArray(entries) ? entries : [entries];
-        if (!isWE(y2, m2, d2) && (slot === "M" || slot === "AM")) {
-            var wk = wKey(y2, m2, d2), wm = tourMed[wk] || { HC: [], USIC: [] };
-            var dgS = ((tourDerog || {})[dKey(y2, m2, d2)] || {})[medId];
-            if (dgS === true || (dgS && dgS[slot]))
-                return [];
-            if ((wm.HC || []).includes(medId))
-                return [{ acteId: "TOUR_HC", salle: null }];
-            if ((wm.USIC || []).includes(medId))
-                return [{ acteId: "TOUR_USIC", salle: null }];
-        }
-        return [];
-    }, [plan, archPlan, tourMed]);
+        return expEntries(_p, tourMed, tourDerog, medId, y2, m2, d2, slot);
+    }, [plan, archPlan, tourMed, tourDerog]);
     var getEntry = useCallback(function (medId, y2, m2, d2, slot) { return getEntries(medId, y2, m2, d2, slot)[0] || null; }, [getEntries]);
     /* ── isMedAvailable ── */
     var isMedAvailable = useCallback(function (med, y2, m2, d2, slot) {
@@ -8319,6 +8519,59 @@ function CardioPlanning() {
                         }
                         catch (e) { } setAccessMode("adminEdit"); setAdminAsk(false); } }, "Entrer (administratif)")),
                 React.createElement("div", { style: { marginTop: 14, fontSize: 10, color: "var(--txt3)", textAlign: "center" } }, APP_VERSION))));
+    var doExport = useCallback(function (kind) { return __awaiter(_this, void 0, void 0, function () {
+        var src, dd, pj, nom, t, e_16;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    setExpBusy(true);
+                    _a.label = 1;
+                case 1:
+                    _a.trys.push([1, 5, , 6]);
+                    src = void 0;
+                    if (!(expSrc === "now")) return [3 /*break*/, 2];
+                    src = { plan: plan, notes: notes, tourMed: tourMed, tourDerog: tourDerog, medecins: medecins, actes: actes, salleReg: salleReg };
+                    return [3 /*break*/, 4];
+                case 2: return [4 /*yield*/, window.firebaseDB.collection("backups").doc(expSrc).get()];
+                case 3:
+                    dd = (_a.sent()).data() || {};
+                    pj = function (x, def) { try {
+                        return typeof x === "string" ? JSON.parse(x) : (x || def);
+                    }
+                    catch (e) {
+                        return def;
+                    } };
+                    src = { plan: dd.planV2 || {}, notes: pj(dd.notes, {}), tourMed: pj(dd.tourMed, {}), tourDerog: pj(dd.tourDerog, {}),
+                        medecins: pj(dd.medecins, []), actes: pj(dd.actes, []), salleReg: pj(dd.salleReg, []) };
+                    _a.label = 4;
+                case 4:
+                    nom = "planning-" + expPer.sy + "-" + String(expPer.sm + 1).padStart(2, "0");
+                    if (kind === "tableau")
+                        expTelecharge(nom + ".xls", expTable(expPer, src));
+                    else
+                        expTelecharge(nom + "-donnees.json", JSON.stringify(src), "application/json;charset=utf-8");
+                    t = Date.now();
+                    setExpLast(t);
+                    setExpN(0);
+                    setExpSnooze(false);
+                    try {
+                        localStorage.setItem("cp6_expLast", String(t));
+                        localStorage.setItem("cp6_expN", "0");
+                    }
+                    catch (e) { }
+                    toast("Sauvegarde téléchargée", "info");
+                    return [3 /*break*/, 6];
+                case 5:
+                    e_16 = _a.sent();
+                    console.log("export:", e_16);
+                    toast("Échec de la sauvegarde", "warn");
+                    return [3 /*break*/, 6];
+                case 6:
+                    setExpBusy(false);
+                    return [2 /*return*/];
+            }
+        });
+    }); }, [expSrc, expPer, plan, notes, tourMed, tourDerog, medecins, actes, salleReg]);
     var _per = getPeriodRange(year, month);
     var _pem = (_per.sm + PCFG.len - 1) % 12, _pey = _per.sm + PCFG.len - 1 > 11 ? _per.sy + 1 : _per.sy;
     var _titlePeriod = MOIS[_per.sm] + " — " + MOIS[_pem] + " " + (_per.sy !== _pey ? _per.sy + "/" + _pey : _pey);
@@ -8390,6 +8643,7 @@ function CardioPlanning() {
                     React.createElement("button", { onClick: function () { return setShowFull(true); }, style: { fontSize: 11, fontWeight: 800, padding: "5px 12px", borderRadius: 6, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.15)", color: "#b45309", cursor: "pointer" } }, "\ud83d\udcc5 Afficher la p\u00e9riode compl\u00e8te")));
             })(),
             tab === "planning" && (React.createElement("div", null,
+                isEdit && !expSnooze && React.createElement(ExportRappel, { nModifs: expN, seuil: expSeuil, dernier: expLast, onAller: function () { return goTab("partage"); }, onPlusTard: function () { return setExpSnooze(true); } }),
                 React.createElement(BuildAsk, { build: build, medecins: medecins, editMedId: accessMode === "medecinEdit" ? editMedId : null, onRepondre: function (k, champ) { return setBuild(function (p) {
                         var _a, _b;
                         var B0 = (p || {})[k] || {};
@@ -9026,6 +9280,7 @@ function CardioPlanning() {
                 React.createElement("h2", { style: __assign(__assign({}, S.mTit), { marginBottom: 16 }) },
                     "\u2699\uFE0F Param\u00E8tres ",
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
+                isEdit && React.createElement(ExportCard, { per: expPer, setPer: setExpPer, source: expSrc, setSource: setExpSrc, backups: backupList, seuil: expSeuil, setSeuil: setExpSeuil, dernier: expLast, onExport: doExport, occupe: expBusy }),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD10 Code PIN \u00E9diteur"),
                     React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
