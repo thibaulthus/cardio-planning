@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.36 — 13/08/2026";
+const APP_VERSION="v10.37 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5428,6 +5428,66 @@ function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,
   );
 }
 
+/* ═══════════════ v10.37 : PARAMÈTRES REPLIABLES ═══════════════
+   Sa question décisive : « est-ce que ce plan de visualisation va suivre ? »
+   — c'est-à-dire, un encart ajouté dans six mois sera-t-il pris en compte ?
+   D'où ce mécanisme posé UNE SEULE FOIS sur le conteneur, et non encart par
+   encart : les titres sont LUS dans la page, le repli se fait par rang. Un
+   encart écrit comme les autres est donc géré sans qu'on ait rien à ajouter,
+   et cela règle aussi le fait que les deux fichiers ne rangent pas les encarts
+   dans le même ordre — chacun lit le sien. */
+const PSET_MAX=40;   /* rangs couverts par les règles de repli */
+
+/* Le rappel figé : un bouton par encart, plus tout replier / tout déplier. */
+function SetQuick({items,replies,onGo,onTout}){
+  if(!items.length)return null;
+  const nRep=replies.length;
+  return(
+    <div style={{position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,paddingBottom:6,marginBottom:10,maxHeight:"34vh",overflowY:"auto"}}>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+        {items.map(it=>{
+          const rep=replies.indexOf(it.i)>=0;
+          return <button key={it.i} onClick={()=>onGo(it.i)}
+            style={{fontSize:11,padding:"3px 9px",borderRadius:6,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",
+              border:"1px solid var(--border)",background:"var(--bg2)",color:rep?"var(--txt3)":"var(--txt2)",opacity:rep?.7:1}}>{it.titre}</button>;
+        })}
+        <button onClick={onTout} style={{fontSize:11,padding:"3px 9px",borderRadius:6,fontWeight:800,cursor:"pointer",marginLeft:"auto",
+          border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt3)",whiteSpace:"nowrap"}}>{nRep>=items.length?"Tout déplier":"Tout replier"}</button>
+      </div>
+    </div>
+  );
+}
+
+/* Les règles de repli : masquer tout ce qui suit le titre d'un encart replié.
+   Écrites une fois pour tous les rangs — aucune n'est à ajouter plus tard. */
+function setFoldCSS(){
+  let out="";
+  for(let i=1;i<=PSET_MAX;i++){
+    out+=".pset.pf"+i+" > *:nth-child("+i+") > *:not(:first-child){display:none!important}\n";
+    out+=".pset.pf"+i+" > *:nth-child("+i+"){padding-bottom:8px}\n";
+  }
+  out+=".pset > *[data-fold] > *:first-child{cursor:pointer}\n";
+  return out;
+}
+
+/* Lit les encarts présents dans la page : rang et titre. Un encart = un enfant
+   direct qui a un premier enfant porteur de texte et au moins un frère ensuite. */
+function setScan(el){
+  if(!el)return [];
+  const out=[];
+  const kids=el.children;
+  for(let i=0;i<kids.length;i++){
+    const k=kids[i];
+    if(k.getAttribute&&k.getAttribute("data-noskip")==="1")continue;
+    if(k.children.length<2)continue;
+    const t=(k.children[0].textContent||"").trim();
+    if(t.length<3||t.length>70)continue;   /* « Tour médical — minimums par surspécialité » fait 43 caractères */
+    k.setAttribute("data-fold","1");
+    out.push({i:i+1,titre:t.length>26?t.slice(0,25)+"…":t});
+  }
+  return out;
+}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -7388,6 +7448,41 @@ function CardioPlanning(){
   const attIssues=useMemo(()=>issuesFor(medAttacheAll),[issuesFor,medAttacheAll]);
   const goIssue=(it)=>{setMData({medId:it.med.id,y:it.y,m:it.m,d:it.d,slot:it.sl});setModal("cell");};
 
+  /* v10.37 : repli des encarts de Paramètres. `psetItems` est LU dans la page
+     après chaque affichage — c'est ce qui rend le mécanisme insensible à l'ajout
+     d'un encart, et au fait que les deux fichiers ne les rangent pas pareil. */
+  const psetRef=useRef(null);
+  const [psetItems,setPsetItems]=useState([]);
+  const [psetFold,setPsetFold]=useState([]);
+  useEffect(()=>{
+    if(tab!=="partage"){if(psetItems.length)setPsetItems([]);return;}
+    const l=setScan(psetRef.current);
+    const a=l.map(x=>x.i+x.titre).join("|"),b=psetItems.map(x=>x.i+x.titre).join("|");
+    if(a!==b)setPsetItems(l);
+  });
+  const psetClick=useCallback((e)=>{
+    let n=e.target,box=null;
+    const root=psetRef.current;if(!root)return;
+    while(n&&n!==root){if(n.parentNode===root){box=n;break;}n=n.parentNode;}
+    if(!box||box.getAttribute("data-fold")!=="1")return;
+    /* on ne replie qu'au clic sur la PREMIÈRE ligne de l'encart (son titre) */
+    let t=e.target,dansTitre=false;
+    while(t&&t!==box){if(t===box.children[0]){dansTitre=true;break;}t=t.parentNode;}
+    if(e.target===box.children[0])dansTitre=true;
+    if(!dansTitre)return;
+    const idx=Array.prototype.indexOf.call(root.children,box)+1;
+    setPsetFold(p=>p.indexOf(idx)>=0?p.filter(x=>x!==idx):p.concat([idx]));
+  },[]);
+  const psetGo=useCallback((i)=>{
+    const root=psetRef.current;if(!root)return;
+    const el=root.children[i-1];if(!el)return;
+    setPsetFold(p=>p.filter(x=>x!==i));
+    setTimeout(()=>{const y=el.getBoundingClientRect().top+window.scrollY-(HDR_H+110);window.scrollTo({top:y<0?0:y,behavior:"smooth"});},30);
+  },[]);
+  const psetTout=useCallback(()=>{
+    setPsetFold(p=>p.length>=psetItems.length?[]:psetItems.map(x=>x.i));
+  },[psetItems]);
+
   /* v10.35.1 : DÉCLARÉE ICI, et pas plus bas — l'écran de connexion sort par
      un `return` anticipé, et un hook placé après ne s'exécute pas à tous les
      rendus (erreur React #310 à l'ouverture). Tous les hooks doivent rester
@@ -7477,7 +7572,7 @@ function CardioPlanning(){
   const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+      <style>{setFoldCSS()+`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:var(--bg)}
@@ -8238,8 +8333,9 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="stats"&&(isEdit||isInterEdit)&&<StatsTab medecins={medecins} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
       {tab==="partage"&&accessMode!=="adminEdit"&&!isMedEdit&&(
-        <div style={{maxWidth:500}}>
-          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
+        <div style={{maxWidth:500}} className={"pset "+psetFold.map(i=>"pf"+i).join(" ")} ref={psetRef} onClick={psetClick}>
+          <div data-noskip="1" style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
+          <div data-noskip="1"><SetQuick items={psetItems} replies={psetFold} onGo={psetGo} onTout={psetTout}/></div>
           <h2 style={{...S.mTit,marginBottom:16}}>⚙️ Paramètres <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2>
 
           <div style={{...S.card,marginBottom:10}}>

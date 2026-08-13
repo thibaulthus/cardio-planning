@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.36 — 13/08/2026";
+var APP_VERSION = "v10.37 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5653,6 +5653,64 @@ function ExportCard(_a) {
                 " jours."))));
 }
 
+/* ═══════════════ v10.37 : PARAMÈTRES REPLIABLES ═══════════════
+   Sa question décisive : « est-ce que ce plan de visualisation va suivre ? »
+   — c'est-à-dire, un encart ajouté dans six mois sera-t-il pris en compte ?
+   D'où ce mécanisme posé UNE SEULE FOIS sur le conteneur, et non encart par
+   encart : les titres sont LUS dans la page, le repli se fait par rang. Un
+   encart écrit comme les autres est donc géré sans qu'on ait rien à ajouter,
+   et cela règle aussi le fait que les deux fichiers ne rangent pas les encarts
+   dans le même ordre — chacun lit le sien. */
+var PSET_MAX = 40; /* rangs couverts par les règles de repli */
+/* Le rappel figé : un bouton par encart, plus tout replier / tout déplier. */
+function SetQuick(_a) {
+    var items = _a.items, replies = _a.replies, onGo = _a.onGo, onTout = _a.onTout;
+    if (!items.length)
+        return null;
+    var nRep = replies.length;
+    return (React.createElement("div", { style: { position: "sticky", top: HDR_H, zIndex: 40, background: "var(--bg)", paddingTop: 6, paddingBottom: 6, marginBottom: 10, maxHeight: "34vh", overflowY: "auto" } },
+        React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" } },
+            items.map(function (it) {
+                var rep = replies.indexOf(it.i) >= 0;
+                return React.createElement("button", { key: it.i, onClick: function () { return onGo(it.i); }, style: { fontSize: 11, padding: "3px 9px", borderRadius: 6, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+                        border: "1px solid var(--border)", background: "var(--bg2)", color: rep ? "var(--txt3)" : "var(--txt2)", opacity: rep ? .7 : 1 } }, it.titre);
+            }),
+            React.createElement("button", { onClick: onTout, style: { fontSize: 11, padding: "3px 9px", borderRadius: 6, fontWeight: 800, cursor: "pointer", marginLeft: "auto",
+                    border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt3)", whiteSpace: "nowrap" } }, nRep >= items.length ? "Tout déplier" : "Tout replier"))));
+}
+/* Les règles de repli : masquer tout ce qui suit le titre d'un encart replié.
+   Écrites une fois pour tous les rangs — aucune n'est à ajouter plus tard. */
+function setFoldCSS() {
+    var out = "";
+    for (var i = 1; i <= PSET_MAX; i++) {
+        out += ".pset.pf" + i + " > *:nth-child(" + i + ") > *:not(:first-child){display:none!important}\n";
+        out += ".pset.pf" + i + " > *:nth-child(" + i + "){padding-bottom:8px}\n";
+    }
+    out += ".pset > *[data-fold] > *:first-child{cursor:pointer}\n";
+    return out;
+}
+/* Lit les encarts présents dans la page : rang et titre. Un encart = un enfant
+   direct qui a un premier enfant porteur de texte et au moins un frère ensuite. */
+function setScan(el) {
+    if (!el)
+        return [];
+    var out = [];
+    var kids = el.children;
+    for (var i = 0; i < kids.length; i++) {
+        var k = kids[i];
+        if (k.getAttribute && k.getAttribute("data-noskip") === "1")
+            continue;
+        if (k.children.length < 2)
+            continue;
+        var t = (k.children[0].textContent || "").trim();
+        if (t.length < 3 || t.length > 70)
+            continue; /* « Tour médical — minimums par surspécialité » fait 43 caractères */
+        k.setAttribute("data-fold", "1");
+        out.push({ i: i + 1, titre: t.length > 26 ? t.slice(0, 25) + "…" : t });
+    }
+    return out;
+}
+
 function CardioPlanning() {
     var _this = this;
     var today = new Date();
@@ -8446,6 +8504,66 @@ function CardioPlanning() {
     var planIssues = useMemo(function () { return issuesFor(medPlan); }, [issuesFor, medecins]);
     var attIssues = useMemo(function () { return issuesFor(medAttacheAll); }, [issuesFor, medAttacheAll]);
     var goIssue = function (it) { setMData({ medId: it.med.id, y: it.y, m: it.m, d: it.d, slot: it.sl }); setModal("cell"); };
+    /* v10.37 : repli des encarts de Paramètres. `psetItems` est LU dans la page
+       après chaque affichage — c'est ce qui rend le mécanisme insensible à l'ajout
+       d'un encart, et au fait que les deux fichiers ne les rangent pas pareil. */
+    var psetRef = useRef(null);
+    var _76 = useState([]), psetItems = _76[0], setPsetItems = _76[1];
+    var _77 = useState([]), psetFold = _77[0], setPsetFold = _77[1];
+    useEffect(function () {
+        if (tab !== "partage") {
+            if (psetItems.length)
+                setPsetItems([]);
+            return;
+        }
+        var l = setScan(psetRef.current);
+        var a = l.map(function (x) { return x.i + x.titre; }).join("|"), b = psetItems.map(function (x) { return x.i + x.titre; }).join("|");
+        if (a !== b)
+            setPsetItems(l);
+    });
+    var psetClick = useCallback(function (e) {
+        var n = e.target, box = null;
+        var root = psetRef.current;
+        if (!root)
+            return;
+        while (n && n !== root) {
+            if (n.parentNode === root) {
+                box = n;
+                break;
+            }
+            n = n.parentNode;
+        }
+        if (!box || box.getAttribute("data-fold") !== "1")
+            return;
+        /* on ne replie qu'au clic sur la PREMIÈRE ligne de l'encart (son titre) */
+        var t = e.target, dansTitre = false;
+        while (t && t !== box) {
+            if (t === box.children[0]) {
+                dansTitre = true;
+                break;
+            }
+            t = t.parentNode;
+        }
+        if (e.target === box.children[0])
+            dansTitre = true;
+        if (!dansTitre)
+            return;
+        var idx = Array.prototype.indexOf.call(root.children, box) + 1;
+        setPsetFold(function (p) { return p.indexOf(idx) >= 0 ? p.filter(function (x) { return x !== idx; }) : p.concat([idx]); });
+    }, []);
+    var psetGo = useCallback(function (i) {
+        var root = psetRef.current;
+        if (!root)
+            return;
+        var el = root.children[i - 1];
+        if (!el)
+            return;
+        setPsetFold(function (p) { return p.filter(function (x) { return x !== i; }); });
+        setTimeout(function () { var y = el.getBoundingClientRect().top + window.scrollY - (HDR_H + 110); window.scrollTo({ top: y < 0 ? 0 : y, behavior: "smooth" }); }, 30);
+    }, []);
+    var psetTout = useCallback(function () {
+        setPsetFold(function (p) { return p.length >= psetItems.length ? [] : psetItems.map(function (x) { return x.i; }); });
+    }, [psetItems]);
     /* v10.35.1 : DÉCLARÉE ICI — un hook placé après le `return` de l'écran de
        connexion ne s'exécute pas à tous les rendus (erreur React #310). */
     var doExport = useCallback(function (kind) { return __awaiter(_this, void 0, void 0, function () {
@@ -8584,7 +8702,7 @@ function CardioPlanning() {
     var tourProps = { specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, medecins: medecins, getEntries: getEntries, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast };
     var gardeProps = { onRemoveGarde: removeGardeDay, printWk: printWk, onPrint: function () { return setModal("print"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, getEntry: getEntry, allDays: allDays, isEdit: isEdit, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast };
     return (React.createElement("div", { style: S.app },
-        React.createElement("style", null, "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav::-webkit-scrollbar { display: none; }\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
+        React.createElement("style", null, setFoldCSS() + "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav::-webkit-scrollbar { display: none; }\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
         notif && React.createElement("div", { style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", borderColor: "#4ade80" }) }, notif.msg),
         netOff && React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, "\uD83D\uDCF4 Hors ligne \u2014 dernier planning re\u00E7u \u00B7 lecture seule"),
         isMedEdit && React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1d4ed8", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
@@ -9280,8 +9398,11 @@ function CardioPlanning() {
                         !isWeek && dayKey && astreinte[dayKey] !== undefined && (React.createElement("button", { onClick: function () { setAstreinte(function (p) { var n = __assign({}, p); delete n[dayKey]; return n; }); setAstPickModal(null); }, style: { marginTop: 8, width: "100%", padding: "6px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", cursor: "pointer", color: "var(--txt3)", fontSize: 11 } }, "\u21BA Supprimer exception \u2014 revenir \u00E0 la semaine")))));
             })(),
             tab === "stats" && (isEdit || isInterEdit) && React.createElement(StatsTab, { medecins: medecins, actes: actes, plan: plan, year: year, month: month, darkMode: darkMode, setDarkMode: setDarkMode, tourMed: tourMed }),
-            tab === "partage" && accessMode !== "adminEdit" && !isMedEdit && (React.createElement("div", { style: { maxWidth: 500 } },
-                React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
+            tab === "partage" && accessMode !== "adminEdit" && !isMedEdit && (React.createElement("div", { style: { maxWidth: 500 }, className: "pset " + psetFold.map(function (i) { return "pf" + i; }).join(" "), ref: psetRef, onClick: psetClick },
+                React.createElement("div", { "data-noskip": "1", style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } },
+                    React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
+                React.createElement("div", { "data-noskip": "1" },
+                    React.createElement(SetQuick, { items: psetItems, replies: psetFold, onGo: psetGo, onTout: psetTout })),
                 React.createElement("h2", { style: __assign(__assign({}, S.mTit), { marginBottom: 16 }) },
                     "\u2699\uFE0F Param\u00E8tres ",
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
