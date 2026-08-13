@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.38 — 13/08/2026";
+var APP_VERSION = "v10.39 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5662,21 +5662,17 @@ function ExportCard(_a) {
    et cela règle aussi le fait que les deux fichiers ne rangent pas les encarts
    dans le même ordre — chacun lit le sien. */
 var PSET_MAX = 40; /* rangs couverts par les règles de repli */
-/* Le rappel figé : un bouton par encart, plus tout replier / tout déplier. */
+/* v10.39 : à l'usage, la rangée de boutons du haut ne servait pas — avec tous
+   les encarts repliés, la page EST déjà son propre sommaire. Il ne reste qu'un
+   bouton pour tout ouvrir d'un coup. */
 function SetQuick(_a) {
-    var items = _a.items, replies = _a.replies, onGo = _a.onGo, onTout = _a.onTout;
+    var items = _a.items, replies = _a.replies, onTout = _a.onTout;
     if (!items.length)
         return null;
-    var nRep = replies.length;
-    return (React.createElement("div", { style: { position: "sticky", top: HDR_H, zIndex: 40, background: "var(--bg)", paddingTop: 6, paddingBottom: 6, marginBottom: 10, maxHeight: "34vh", overflowY: "auto" } },
-        React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" } },
-            items.map(function (it) {
-                var rep = replies.indexOf(it.i) >= 0;
-                return React.createElement("button", { key: it.i, onClick: function () { return onGo(it.i); }, style: { fontSize: 11, padding: "3px 9px", borderRadius: 6, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-                        border: "1px solid var(--border)", background: "var(--bg2)", color: rep ? "var(--txt3)" : "var(--txt2)", opacity: rep ? .7 : 1 } }, it.titre);
-            }),
-            React.createElement("button", { onClick: onTout, style: { fontSize: 11, padding: "3px 9px", borderRadius: 6, fontWeight: 800, cursor: "pointer", marginLeft: "auto",
-                    border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt3)", whiteSpace: "nowrap" } }, nRep >= items.length ? "Tout déplier" : "Tout replier"))));
+    var tout = replies.length >= items.length;
+    return (React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 } },
+        React.createElement("button", { onClick: onTout, style: { fontSize: 11, padding: "3px 10px", borderRadius: 6, fontWeight: 700, cursor: "pointer",
+                border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt3)" } }, tout ? "Tout déplier" : "Tout replier")));
 }
 /* Les règles de repli : masquer tout ce qui suit le titre d'un encart replié.
    Écrites une fois pour tous les rangs — aucune n'est à ajouter plus tard. */
@@ -8510,8 +8506,10 @@ function CardioPlanning() {
     var psetRef = useRef(null);
     var _76 = useState([]), psetItems = _76[0], setPsetItems = _76[1];
     var _77 = useState([]), psetFold = _77[0], setPsetFold = _77[1];
+    var psetInit = useRef(false);
     useEffect(function () {
         if (tab !== "partage") {
+            psetInit.current = false;
             if (psetItems.length)
                 setPsetItems([]);
             return;
@@ -8520,6 +8518,12 @@ function CardioPlanning() {
         var a = l.map(function (x) { return x.i + x.titre; }).join("|"), b = psetItems.map(function (x) { return x.i + x.titre; }).join("|");
         if (a !== b)
             setPsetItems(l);
+        /* v10.39 : à l'arrivée dans l'onglet, TOUT est replié — sa demande. Une seule
+           fois par visite : sinon un encart qui apparaît replierait ce qu'il vient d'ouvrir. */
+        if (!psetInit.current && l.length) {
+            psetInit.current = true;
+            setPsetFold(l.map(function (x) { return x.i; }));
+        }
     });
     var psetClick = useCallback(function (e) {
         var n = e.target, box = null;
@@ -8550,16 +8554,6 @@ function CardioPlanning() {
             return;
         var idx = Array.prototype.indexOf.call(root.children, box) + 1;
         setPsetFold(function (p) { return p.indexOf(idx) >= 0 ? p.filter(function (x) { return x !== idx; }) : p.concat([idx]); });
-    }, []);
-    var psetGo = useCallback(function (i) {
-        var root = psetRef.current;
-        if (!root)
-            return;
-        var el = root.children[i - 1];
-        if (!el)
-            return;
-        setPsetFold(function (p) { return p.filter(function (x) { return x !== i; }); });
-        setTimeout(function () { var y = el.getBoundingClientRect().top + window.scrollY - (HDR_H + 110); window.scrollTo({ top: y < 0 ? 0 : y, behavior: "smooth" }); }, 30);
     }, []);
     var psetTout = useCallback(function () {
         setPsetFold(function (p) { return p.length >= psetItems.length ? [] : psetItems.map(function (x) { return x.i; }); });
@@ -9402,7 +9396,7 @@ function CardioPlanning() {
                 React.createElement("div", { "data-noskip": "1", style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } },
                     React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                 React.createElement("div", { "data-noskip": "1" },
-                    React.createElement(SetQuick, { items: psetItems, replies: psetFold, onGo: psetGo, onTout: psetTout })),
+                    React.createElement(SetQuick, { items: psetItems, replies: psetFold, onTout: psetTout })),
                 React.createElement("h2", { style: __assign(__assign({}, S.mTit), { marginBottom: 16 }) },
                     "\u2699\uFE0F Param\u00E8tres ",
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),

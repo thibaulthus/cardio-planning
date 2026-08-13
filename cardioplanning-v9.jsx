@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.38 — 13/08/2026";
+const APP_VERSION="v10.39 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5438,22 +5438,16 @@ function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,
    dans le même ordre — chacun lit le sien. */
 const PSET_MAX=40;   /* rangs couverts par les règles de repli */
 
-/* Le rappel figé : un bouton par encart, plus tout replier / tout déplier. */
-function SetQuick({items,replies,onGo,onTout}){
+/* v10.39 : à l'usage, la rangée de boutons du haut ne servait pas — avec tous
+   les encarts repliés, la page EST déjà son propre sommaire. Il ne reste qu'un
+   bouton pour tout ouvrir d'un coup. */
+function SetQuick({items,replies,onTout}){
   if(!items.length)return null;
-  const nRep=replies.length;
+  const tout=replies.length>=items.length;
   return(
-    <div style={{position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,paddingBottom:6,marginBottom:10,maxHeight:"34vh",overflowY:"auto"}}>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
-        {items.map(it=>{
-          const rep=replies.indexOf(it.i)>=0;
-          return <button key={it.i} onClick={()=>onGo(it.i)}
-            style={{fontSize:11,padding:"3px 9px",borderRadius:6,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",
-              border:"1px solid var(--border)",background:"var(--bg2)",color:rep?"var(--txt3)":"var(--txt2)",opacity:rep?.7:1}}>{it.titre}</button>;
-        })}
-        <button onClick={onTout} style={{fontSize:11,padding:"3px 9px",borderRadius:6,fontWeight:800,cursor:"pointer",marginLeft:"auto",
-          border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt3)",whiteSpace:"nowrap"}}>{nRep>=items.length?"Tout déplier":"Tout replier"}</button>
-      </div>
+    <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+      <button onClick={onTout} style={{fontSize:11,padding:"3px 10px",borderRadius:6,fontWeight:700,cursor:"pointer",
+        border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt3)"}}>{tout?"Tout déplier":"Tout replier"}</button>
     </div>
   );
 }
@@ -7454,11 +7448,15 @@ function CardioPlanning(){
   const psetRef=useRef(null);
   const [psetItems,setPsetItems]=useState([]);
   const [psetFold,setPsetFold]=useState([]);
+  const psetInit=useRef(false);
   useEffect(()=>{
-    if(tab!=="partage"){if(psetItems.length)setPsetItems([]);return;}
+    if(tab!=="partage"){psetInit.current=false;if(psetItems.length)setPsetItems([]);return;}
     const l=setScan(psetRef.current);
     const a=l.map(x=>x.i+x.titre).join("|"),b=psetItems.map(x=>x.i+x.titre).join("|");
     if(a!==b)setPsetItems(l);
+    /* v10.39 : à l'arrivée dans l'onglet, TOUT est replié — sa demande. Une seule
+       fois par visite : sinon un encart qui apparaît replierait ce qu'il vient d'ouvrir. */
+    if(!psetInit.current&&l.length){psetInit.current=true;setPsetFold(l.map(x=>x.i));}
   });
   const psetClick=useCallback((e)=>{
     let n=e.target,box=null;
@@ -7472,12 +7470,6 @@ function CardioPlanning(){
     if(!dansTitre)return;
     const idx=Array.prototype.indexOf.call(root.children,box)+1;
     setPsetFold(p=>p.indexOf(idx)>=0?p.filter(x=>x!==idx):p.concat([idx]));
-  },[]);
-  const psetGo=useCallback((i)=>{
-    const root=psetRef.current;if(!root)return;
-    const el=root.children[i-1];if(!el)return;
-    setPsetFold(p=>p.filter(x=>x!==i));
-    setTimeout(()=>{const y=el.getBoundingClientRect().top+window.scrollY-(HDR_H+110);window.scrollTo({top:y<0?0:y,behavior:"smooth"});},30);
   },[]);
   const psetTout=useCallback(()=>{
     setPsetFold(p=>p.length>=psetItems.length?[]:psetItems.map(x=>x.i));
@@ -8335,7 +8327,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="partage"&&accessMode!=="adminEdit"&&!isMedEdit&&(
         <div style={{maxWidth:500}} className={"pset "+psetFold.map(i=>"pf"+i).join(" ")} ref={psetRef} onClick={psetClick}>
           <div data-noskip="1" style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
-          <div data-noskip="1"><SetQuick items={psetItems} replies={psetFold} onGo={psetGo} onTout={psetTout}/></div>
+          <div data-noskip="1"><SetQuick items={psetItems} replies={psetFold} onTout={psetTout}/></div>
           <h2 style={{...S.mTit,marginBottom:16}}>⚙️ Paramètres <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2>
 
           <div style={{...S.card,marginBottom:10}}>
