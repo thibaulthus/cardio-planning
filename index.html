@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.39 — 13/08/2026";
+var APP_VERSION = "v10.40 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2169,16 +2169,27 @@ function PTOccRooms(_a) {
                         }))); }); })))))); })));
 }
 function PlanTypeGrid(_a) {
-    var medecins = _a.medecins, actes = _a.actes, planningType = _a.planningType, setPlanningType = _a.setPlanningType, isEdit = _a.isEdit, acteById = _a.acteById, setMData = _a.setMData, setModal = _a.setModal;
+    var medecins = _a.medecins, actes = _a.actes, planningType = _a.planningType, setPlanningType = _a.setPlanningType, isEdit = _a.isEdit, acteById = _a.acteById, setMData = _a.setMData, setModal = _a.setModal, _b = _a.perDays, perDays = _b === void 0 ? [] : _b, _c = _a.onMedClick, onMedClick = _c === void 0 ? null : _c;
     var jours = ["", "Lun", "Mar", "Mer", "Jeu", "Ven"];
+    /* v10.40 : état d'activité sur la période affichée. La colonne d'un médecin
+       désactivé sur TOUTE la période est hachurée — son planning type reste
+       visible, c'est son APPLICATION qui s'interrompt, jamais son contenu. */
+    var offIds = new Set(medecins.filter(function (m) { return offEtat(m, perDays) === "off"; }).map(function (m) { return m.id; }));
+    var HACH = "repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.16) 5px,rgba(120,130,150,.16) 10px)";
     return (React.createElement(TableScroll, { memId: "type", mh: 150 },
         React.createElement("table", { style: { borderCollapse: "collapse" } },
             React.createElement("thead", null,
                 React.createElement("tr", null,
                     React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 48 }) }, "Jour"),
                     React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 48, zIndex: 40, minWidth: 26, borderRight: "2px solid var(--border)" }) }, "Sl"),
-                    medecins.map(function (med) { return React.createElement("th", { key: med.id, style: __assign(__assign({}, S.th), { minWidth: 46, position: "sticky", top: 0, zIndex: 20 }), title: "Dr. ".concat(med.prenom, " ").concat(med.nom) },
-                        React.createElement("div", { style: __assign(__assign({}, S.avT), { background: med.color, margin: "0 auto" }) }, med.init)); }))),
+                    medecins.map(function (med) {
+                        var oe = offEtat(med, perDays);
+                        var tt = "Dr. " + (med.prenom || "") + " " + (med.nom || "") + (oe ? (" — indisponible " + medOffL(med).map(function (r) { return "du " + offFr(r.du) + " au " + offFr(r.au); }).join(", ")) : (onMedClick ? " — cliquer pour activer / désactiver" : ""));
+                        return React.createElement("th", { key: med.id, style: __assign(__assign({}, S.th), { minWidth: 46, position: "sticky", top: 0, zIndex: 20 }), title: tt },
+                            React.createElement("div", { onClick: function () { if (onMedClick)
+                                    onMedClick(med); }, style: __assign(__assign({}, S.avT), { background: med.color, margin: "0 auto", cursor: onMedClick ? "pointer" : "default", opacity: oe === "off" ? .38 : 1, filter: oe === "off" ? "grayscale(.8)" : "none", outline: oe === "part" ? "2px dashed #f59e0b" : "none", outlineOffset: 1 }) }, med.init),
+                            oe && React.createElement("div", { style: { fontSize: 8, lineHeight: "9px", color: oe === "off" ? "var(--txt3)" : "#b45309" } }, oe === "off" ? "⏸" : "◐"));
+                    }))),
             React.createElement("tbody", null, [1, 2, 3, 4, 5].map(function (dw) { return ["M", "AM"].map(function (sl, si) { return (React.createElement("tr", { key: dw + sl, style: { borderBottom: si === 1 ? "1px solid var(--border)" : "1px solid var(--border2)" } },
                 si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: 48 }), rowSpan: 2 },
                     React.createElement("div", { style: { fontWeight: 800, color: "var(--txt)", fontSize: 13, textAlign: "center" } }, jours[dw])),
@@ -2194,7 +2205,7 @@ function PlanTypeGrid(_a) {
                     var ptEs = [{ acteId: acteId, salle: salle }, { acteId: acteId2, salle: salle2 }, { acteId: acteId3, salle: salle3 }].filter(function (x) { return x.acteId; });
                     if (ptEs.length > 1 || c1f)
                         ptEs.forEach(function (x) { x.cond = 1; });
-                    return (React.createElement("td", { key: med.id, style: __assign(__assign({}, S.td), { padding: 2, cursor: isEdit ? "pointer" : "default", position: "relative" }), title: ptIss ? "⚠ salle non attribuée" : undefined, onClick: function () { if (!isEdit)
+                    return (React.createElement("td", { key: med.id, style: __assign(__assign(__assign({}, S.td), { padding: 2, cursor: isEdit ? "pointer" : "default", position: "relative" }), (offIds.has(med.id) ? { background: HACH } : {})), title: ptIss ? "⚠ salle non attribuée" : undefined, onClick: function () { if (!isEdit)
                             return; setMData({ medId: med.id, dayOfWeek: dw, slot: sl }); setModal("editPT"); } },
                         ptIss && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }),
                         React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1 } },
@@ -2202,6 +2213,7 @@ function PlanTypeGrid(_a) {
                 }))); }); })))));
 }
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
+
 function PickMedActModal(_a) {
     var mData = _a.mData, setMData = _a.setMData, medecins = _a.medecins, actes = _a.actes, getEntries = _a.getEntries, isMedAvailable = _a.isMedAvailable, addEntry = _a.addEntry, removeEntry = _a.removeEntry, patchAct = _a.patchAct, _b = _a.canDif, canDif = _b === void 0 ? false : _b, onClose = _a.onClose, _c = _a.adminOnly, adminOnly = _c === void 0 ? false : _c, _d = _a.selfOnly, selfOnly = _d === void 0 ? null : _d;
     var row = mData.row, d = mData.d, sl = mData.sl, y2 = mData.y, m2 = mData.m;
@@ -5707,6 +5719,78 @@ function setScan(el) {
     return out;
 }
 
+/* ═══════════════ v10.40 : DÉSACTIVER UN MÉDECIN ═══════════════
+   Rotation des juniors et longs congés. Ce qui est enregistré : des DATES
+   (m.off = [{du,au}] en ISO, sur la fiche), JAMAIS un numéro de période — sa
+   contrainte du 13/08 : un changement de durée de période ne doit rien
+   déplacer. « Sur la période » n'est qu'un raccourci qui remplit les deux
+   dates avec les bornes affichées. Le champ vit sur la fiche médecin : il
+   voyage avec la synchro existante de l'équipe, aucun document nouveau. */
+var medOffL = function (m) { return Array.isArray(m && m.off) ? m.off.filter(function (r) { return r && r.du && r.au; }) : []; };
+var offOn = function (m, y2, m2, d2) { var k = dKey(y2, m2, d2); return medOffL(m).some(function (r) { return r.du <= k && k <= r.au; }); };
+/* état sur une liste de jours : null (actif), "part", ou "off" (tous couverts) */
+var offEtat = function (m, jours) {
+    var L = medOffL(m);
+    if (!L.length || !jours || !jours.length)
+        return null;
+    var n = 0;
+    jours.forEach(function (j) { if (offOn(m, j.y, j.m, j.d))
+        n++; });
+    return n === 0 ? null : n === jours.length ? "off" : "part";
+};
+var offFr = function (iso) { var a = String(iso).split("-"); return a[2] + "/" + a[1] + "/" + a[0]; };
+/* La fenêtre, centrée comme toutes celles de l'application. Réservée à
+   l'éditeur par construction : la pastille n'est cliquable que pour lui. */
+function DeactModal(_a) {
+    var med = _a.med, perDays = _a.perDays, perLbl = _a.perLbl, onSave = _a.onSave, onClose = _a.onClose;
+    var du0 = perDays.length ? dKey(perDays[0].y, perDays[0].m, perDays[0].d) : "";
+    var fin = perDays.length ? perDays[perDays.length - 1] : null;
+    var au0 = fin ? dKey(fin.y, fin.m, fin.d) : "";
+    var _b = useState(0), mode = _b[0], setMode = _b[1];
+    var _c = useState(du0), d1 = _c[0], setD1 = _c[1];
+    var _d = useState(au0), d2 = _d[0], setD2 = _d[1];
+    if (!med)
+        return null;
+    var ranges = medOffL(med);
+    var ajouter = function () {
+        var r = mode === 0 ? { du: du0, au: au0 } : { du: d1, au: d2 };
+        if (!r.du || !r.au || r.au < r.du)
+            return;
+        onSave(ranges.concat([r]));
+    };
+    var bt = function (sel) { return ({ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 9px", border: "1px solid " + (sel ? "#8b5cf6" : "var(--border)"), borderRadius: 8, marginBottom: 6, cursor: "pointer", background: sel ? "rgba(139,92,246,.08)" : "transparent" }); };
+    return (React.createElement("div", { onClick: function (e) { if (e.target === e.currentTarget)
+            onClose(); }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 } },
+        React.createElement("div", { style: { background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, width: 360, maxWidth: "94vw", maxHeight: "88vh", overflowY: "auto" } },
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 } },
+                React.createElement("div", { style: __assign(__assign({}, S.avT), { background: med.color }) }, med.init),
+                React.createElement("div", { style: { fontWeight: 800, fontSize: 14, color: "var(--txt)" } }, (med.prenom || "") + " " + (med.nom || ""))),
+            ranges.length > 0 && React.createElement("div", { style: { marginBottom: 10 } },
+                React.createElement("div", { style: { fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--txt3)", marginBottom: 4 } }, "Indisponibilit\u00E9s enregistr\u00E9es"),
+                ranges.map(function (r, i) { return (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", border: "1px solid var(--border)", borderRadius: 8, marginBottom: 4, background: "var(--bg3)" } },
+                    React.createElement("span", { style: { flex: 1, fontSize: 12, color: "var(--txt)" } }, "du " + offFr(r.du) + " au " + offFr(r.au)),
+                    React.createElement("button", { onClick: function () { return onSave(ranges.filter(function (_, k) { return k !== i; })); }, title: "R\u00E9activer sur ces dates", style: { fontSize: 11, padding: "2px 9px", borderRadius: 6, border: "1.5px solid #3fb950", background: "rgba(63,185,80,.10)", color: "#3fb950", fontWeight: 800, cursor: "pointer" } }, "\u25B6 R\u00E9activer"))); })),
+            React.createElement("div", { style: { fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--txt3)", marginBottom: 4 } }, "Désactiver" + (ranges.length ? " aussi" : "")),
+            React.createElement("div", { style: bt(mode === 0), onClick: function () { return setMode(0); } },
+                React.createElement("input", { type: "radio", checked: mode === 0, readOnly: true, style: { marginTop: 2 } }),
+                React.createElement("div", null,
+                    React.createElement("div", { style: { fontSize: 12, fontWeight: 800, color: "var(--txt)" } }, "Sur toute la p\u00E9riode affich\u00E9e"),
+                    React.createElement("div", { style: { fontSize: 10.5, color: "var(--txt2)" } }, "du " + offFr(du0) + " au " + offFr(au0) + " (" + perLbl + ")"))),
+            React.createElement("div", { style: bt(mode === 1), onClick: function () { return setMode(1); } },
+                React.createElement("input", { type: "radio", checked: mode === 1, readOnly: true, style: { marginTop: 2 } }),
+                React.createElement("div", null,
+                    React.createElement("div", { style: { fontSize: 12, fontWeight: 800, color: "var(--txt)" } }, "De date \u00E0 date"),
+                    React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginTop: 5, flexWrap: "wrap", fontSize: 11, color: "var(--txt2)" } },
+                        "du ",
+                        React.createElement("input", { type: "date", value: d1, onChange: function (e) { return setD1(e.target.value); }, style: __assign(__assign({}, S.fi), { width: 132, padding: "3px 6px" }) }),
+                        "au ",
+                        React.createElement("input", { type: "date", value: d2, onChange: function (e) { return setD2(e.target.value); }, style: __assign(__assign({}, S.fi), { width: 132, padding: "3px 6px" }) })))),
+            React.createElement("div", { style: { fontSize: 10.5, color: "var(--txt3)", margin: "6px 0 10px" } }, "Pendant ses dates : le planning type le saute et ses cases sont indisponibles. Sa fiche et son planning type sont conserv\u00E9s \u2014 il redevient disponible le jour de son retour."),
+            React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+                React.createElement("button", { onClick: ajouter, style: { fontSize: 12, padding: "6px 14px", borderRadius: 7, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.10)", color: "#b45309", fontWeight: 800, cursor: "pointer" } }, "\u23F8 D\u00E9sactiver"),
+                React.createElement("button", { onClick: onClose, style: { fontSize: 12, padding: "6px 13px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "Fermer")))));
+}
+
 function CardioPlanning() {
     var _this = this;
     var today = new Date();
@@ -8016,6 +8100,8 @@ function CardioPlanning() {
                     targets.forEach(function (med) {
                         if (allTm.includes(med.id))
                             return;
+                        if (offOn(med, ay, am, d))
+                            return; /* v10.40 : désactivé ce jour-là — sauté */
                         if (med.partTime && (med.workDays || {})[String(dw)] === false) {
                             ["M", "AM"].forEach(function (sl) {
                                 var _a;
@@ -8037,7 +8123,7 @@ function CardioPlanning() {
                             var k = sk(ay, am, d, sl), ex = (next[k] || {})[med.id];
                             if (cellHasAny(ex, PROT_TOUR))
                                 return;
-                            var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], a2x = _b[2] || null, s2x = _b[3] || null, a3x = _b[4] || null, s3x = _b[5] || null, c1x = _b[6] || null;
+                            var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], _c = _b[2], a2x = _c === void 0 ? null : _c, _d = _b[3], s2x = _d === void 0 ? null : _d, _e = _b[4], a3x = _e === void 0 ? null : _e, _f = _b[5], s3x = _f === void 0 ? null : _f, _g = _b[6], c1x = _g === void 0 ? null : _g;
                             if (!acteId)
                                 return;
                             if (!next[k])
@@ -8056,6 +8142,12 @@ function CardioPlanning() {
         var medLbl = medId ? (medecins.find(function (m) { return m.id === medId; }) || {}).init || "" : "tous";
         toast("Planning type appliqué (" + medLbl + ", " + monthsList.length + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")", "info");
     }, [medecins, planningType, tourMed]);
+    /* v10.40 : désactivation — état et écriture. Le champ `off` voyage avec la
+       fiche : la synchro de l'équipe l'emporte, aucun document nouveau. */
+    var _72 = React.useState(null), deactMed = _72[0], setDeactMed = _72[1];
+    var saveOff = useCallback(function (medId, ranges) {
+        setMedecins(function (list) { return list.map(function (m) { return m.id === medId ? __assign(__assign({}, m), { off: ranges }) : m; }); });
+    }, []);
     /* ── Modale d'application du PT ── */
     var _33 = React.useState(null), ptModal = _33[0], setPtModal = _33[1]; // null | {medId:null|number}
     var _34 = React.useState([]), ptMonths = _34[0], setPtMonths = _34[1]; // indices cochés
@@ -8887,7 +8979,8 @@ function CardioPlanning() {
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type"),
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: function () { return openPtModal(null, "remove"); } }, "\uD83D\uDDD1 Retirer")),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Semaine type par m\u00E9decin. Le bouton \u25B6 PT l'applique aux mois de la p\u00E9riode affich\u00E9e (choix des mois et du point de d\u00E9part dans la fen\u00EAtre). TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
-                React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit || isInterEdit, acteById: acteById, setMData: setMData, setModal: setModal }),
+                React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit || isInterEdit, acteById: acteById, setMData: setMData, setModal: setModal, perDays: allDays4, onMedClick: isEdit ? (function (med) { return setDeactMed(med.id); }) : null }),
+                deactMed && React.createElement(DeactModal, { med: medecins.find(function (m) { return m.id === deactMed; }), perDays: allDays4, perLbl: perLibelle(perStart(year, month).sy, perStart(year, month).sm), onSave: function (rgs) { return saveOff(deactMed, rgs); }, onClose: function () { return setDeactMed(null); } }),
                 React.createElement(PTOccRooms, { medecins: medecins, planningType: planningType, actes: actes, acteById: acteById, salleReg: salleReg, darkMode: darkMode }))),
             tab === "attache" && (React.createElement("div", null,
                 isEdit && React.createElement(IssuePanel, { iss: attIssues, open: plIssOpen, setOpen: setPlIssOpen, onGo: goIssue }),

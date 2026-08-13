@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.39 — 13/08/2026";
+const APP_VERSION="v10.40 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1963,8 +1963,13 @@ function PTOccRooms({medecins,planningType,actes,acteById,salleReg,darkMode}){
   );
 }
 
-function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteById,setMData,setModal}){
+function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteById,setMData,setModal,perDays=[],onMedClick=null}){
   const jours=["","Lun","Mar","Mer","Jeu","Ven"];
+  /* v10.40 : état d'activité sur la période affichée. La colonne d'un médecin
+     désactivé sur TOUTE la période est hachurée — son planning type reste
+     visible, c'est son APPLICATION qui s'interrompt, jamais son contenu. */
+  const offIds=new Set(medecins.filter(m=>offEtat(m,perDays)==="off").map(m=>m.id));
+  const HACH="repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.16) 5px,rgba(120,130,150,.16) 10px)";
 
     return(
     <TableScroll memId="type" mh={150}>
@@ -1973,9 +1978,15 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
           <tr>
             <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:48}}>Jour</th>
             <th style={{...S.thFix,position:"sticky",top:0,left:48,zIndex:40,minWidth:26,borderRight:"2px solid var(--border)"}}>Sl</th>
-            {medecins.map(med=><th key={med.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20}} title={`Dr. ${med.prenom} ${med.nom}`}>
-              <div style={{...S.avT,background:med.color,margin:"0 auto"}}>{med.init}</div>
-            </th>)}
+            {medecins.map(med=>{const oe=offEtat(med,perDays);
+              const tt="Dr. "+(med.prenom||"")+" "+(med.nom||"")+(oe?(" — indisponible "+medOffL(med).map(r=>"du "+offFr(r.du)+" au "+offFr(r.au)).join(", ")):(onMedClick?" — cliquer pour activer / désactiver":""));
+              return <th key={med.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20}} title={tt}>
+              <div onClick={()=>{if(onMedClick)onMedClick(med);}}
+                style={{...S.avT,background:med.color,margin:"0 auto",cursor:onMedClick?"pointer":"default",
+                  opacity:oe==="off"?.38:1,filter:oe==="off"?"grayscale(.8)":"none",
+                  outline:oe==="part"?"2px dashed #f59e0b":"none",outlineOffset:1}}>{med.init}</div>
+              {oe&&<div style={{fontSize:8,lineHeight:"9px",color:oe==="off"?"var(--txt3)":"#b45309"}}>{oe==="off"?"⏸":"◐"}</div>}
+            </th>;})}
           </tr>
         </thead>
         <tbody>
@@ -1993,7 +2004,7 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
                 const ptEs=[{acteId,salle},{acteId:acteId2,salle:salle2},{acteId:acteId3,salle:salle3}].filter(x=>x.acteId);
                 if(ptEs.length>1||c1f)ptEs.forEach(x=>{x.cond=1;});
                 return(
-                  <td key={med.id} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative"}} title={ptIss?"⚠ salle non attribuée":undefined}
+                  <td key={med.id} style={{...S.td,padding:2,cursor:isEdit?"pointer":"default",position:"relative",...(offIds.has(med.id)?{background:HACH}:{})}} title={ptIss?"⚠ salle non attribuée":undefined}
                     onClick={()=>{ if(!isEdit)return; setMData({medId:med.id,dayOfWeek:dw,slot:sl}); setModal("editPT"); }}>{ptIss&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}
                     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}><CondBadges es={ptEs} acteById={acteById} noteT={null}/></div>
                   </td>
@@ -5482,6 +5493,80 @@ function setScan(el){
   return out;
 }
 
+/* ═══════════════ v10.40 : DÉSACTIVER UN MÉDECIN ═══════════════
+   Rotation des juniors et longs congés. Ce qui est enregistré : des DATES
+   (m.off = [{du,au}] en ISO, sur la fiche), JAMAIS un numéro de période — sa
+   contrainte du 13/08 : un changement de durée de période ne doit rien
+   déplacer. « Sur la période » n'est qu'un raccourci qui remplit les deux
+   dates avec les bornes affichées. Le champ vit sur la fiche médecin : il
+   voyage avec la synchro existante de l'équipe, aucun document nouveau. */
+const medOffL=(m)=>Array.isArray(m&&m.off)?m.off.filter(r=>r&&r.du&&r.au):[];
+const offOn=(m,y2,m2,d2)=>{const k=dKey(y2,m2,d2);return medOffL(m).some(r=>r.du<=k&&k<=r.au);};
+/* état sur une liste de jours : null (actif), "part", ou "off" (tous couverts) */
+const offEtat=(m,jours)=>{
+  const L=medOffL(m);if(!L.length||!jours||!jours.length)return null;
+  let n=0;jours.forEach(j=>{if(offOn(m,j.y,j.m,j.d))n++;});
+  return n===0?null:n===jours.length?"off":"part";
+};
+const offFr=(iso)=>{const a=String(iso).split("-");return a[2]+"/"+a[1]+"/"+a[0];};
+
+/* La fenêtre, centrée comme toutes celles de l'application. Réservée à
+   l'éditeur par construction : la pastille n'est cliquable que pour lui. */
+function DeactModal({med,perDays,perLbl,onSave,onClose}){
+  const du0=perDays.length?dKey(perDays[0].y,perDays[0].m,perDays[0].d):"";
+  const fin=perDays.length?perDays[perDays.length-1]:null;
+  const au0=fin?dKey(fin.y,fin.m,fin.d):"";
+  const [mode,setMode]=useState(0);
+  const [d1,setD1]=useState(du0);
+  const [d2,setD2]=useState(au0);
+  if(!med)return null;
+  const ranges=medOffL(med);
+  const ajouter=()=>{
+    const r=mode===0?{du:du0,au:au0}:{du:d1,au:d2};
+    if(!r.du||!r.au||r.au<r.du)return;
+    onSave(ranges.concat([r]));
+  };
+  const bt=(sel)=>({display:"flex",gap:8,alignItems:"flex-start",padding:"8px 9px",border:"1px solid "+(sel?"#8b5cf6":"var(--border)"),borderRadius:8,marginBottom:6,cursor:"pointer",background:sel?"rgba(139,92,246,.08)":"transparent"});
+  return(
+    <div onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
+      <div style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:12,padding:16,width:360,maxWidth:"94vw",maxHeight:"88vh",overflowY:"auto"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+          <div style={{...S.avT,background:med.color}}>{med.init}</div>
+          <div style={{fontWeight:800,fontSize:14,color:"var(--txt)"}}>{(med.prenom||"")+" "+(med.nom||"")}</div>
+        </div>
+        {ranges.length>0&&<div style={{marginBottom:10}}>
+          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",color:"var(--txt3)",marginBottom:4}}>Indisponibilités enregistrées</div>
+          {ranges.map((r,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",border:"1px solid var(--border)",borderRadius:8,marginBottom:4,background:"var(--bg3)"}}>
+              <span style={{flex:1,fontSize:12,color:"var(--txt)"}}>{"du "+offFr(r.du)+" au "+offFr(r.au)}</span>
+              <button onClick={()=>onSave(ranges.filter((_,k)=>k!==i))} title="Réactiver sur ces dates"
+                style={{fontSize:11,padding:"2px 9px",borderRadius:6,border:"1.5px solid #3fb950",background:"rgba(63,185,80,.10)",color:"#3fb950",fontWeight:800,cursor:"pointer"}}>▶ Réactiver</button>
+            </div>))}
+        </div>}
+        <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",color:"var(--txt3)",marginBottom:4}}>{"Désactiver"+(ranges.length?" aussi":"")}</div>
+        <div style={bt(mode===0)} onClick={()=>setMode(0)}>
+          <input type="radio" checked={mode===0} readOnly style={{marginTop:2}}/>
+          <div><div style={{fontSize:12,fontWeight:800,color:"var(--txt)"}}>Sur toute la période affichée</div>
+            <div style={{fontSize:10.5,color:"var(--txt2)"}}>{"du "+offFr(du0)+" au "+offFr(au0)+" ("+perLbl+")"}</div></div>
+        </div>
+        <div style={bt(mode===1)} onClick={()=>setMode(1)}>
+          <input type="radio" checked={mode===1} readOnly style={{marginTop:2}}/>
+          <div><div style={{fontSize:12,fontWeight:800,color:"var(--txt)"}}>De date à date</div>
+            <div style={{display:"flex",gap:6,alignItems:"center",marginTop:5,flexWrap:"wrap",fontSize:11,color:"var(--txt2)"}}>
+              du <input type="date" value={d1} onChange={e=>setD1(e.target.value)} style={{...S.fi,width:132,padding:"3px 6px"}}/>
+              au <input type="date" value={d2} onChange={e=>setD2(e.target.value)} style={{...S.fi,width:132,padding:"3px 6px"}}/>
+            </div></div>
+        </div>
+        <div style={{fontSize:10.5,color:"var(--txt3)",margin:"6px 0 10px"}}>Pendant ses dates : le planning type le saute et ses cases sont indisponibles. Sa fiche et son planning type sont conservés — il redevient disponible le jour de son retour.</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <button onClick={ajouter} style={{fontSize:12,padding:"6px 14px",borderRadius:7,border:"1.5px solid #f59e0b",background:"rgba(245,158,11,.10)",color:"#b45309",fontWeight:800,cursor:"pointer"}}>⏸ Désactiver</button>
+          <button onClick={onClose} style={{fontSize:12,padding:"6px 13px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -7058,6 +7143,7 @@ function CardioPlanning(){
           const allTm=[...(wm.HC||[]),...(wm.USIC||[])];
           targets.forEach(med=>{
             if(allTm.includes(med.id))return;
+            if(offOn(med,ay,am,d))return;   /* v10.40 : désactivé ce jour-là — sauté */
             if(med.partTime&&(med.workDays||{})[String(dw)]===false){
               ["M","AM"].forEach(sl=>{
                 const k=sk(ay,am,d,sl),ex=(next[k]||{})[med.id];
@@ -7085,6 +7171,13 @@ function CardioPlanning(){
     const medLbl=medId?(medecins.find(m=>m.id===medId)||{}).init||"":"tous";
     toast("Planning type appliqué ("+medLbl+", "+monthsList.length+" mois"+(fromToday?", à partir d'aujourd'hui":"")+")","info");
   },[medecins,planningType,tourMed]);
+
+  /* v10.40 : désactivation — état et écriture. Le champ `off` voyage avec la
+     fiche : la synchro de l'équipe l'emporte, aucun document nouveau. */
+  const [deactMed,setDeactMed]=React.useState(null);
+  const saveOff=useCallback((medId,ranges)=>{
+    setMedecins(list=>list.map(m=>m.id===medId?{...m,off:ranges}:m));
+  },[]);
 
   /* ── Modale d'application du PT ── */
   const [ptModal,setPtModal]=React.useState(null); // null | {medId:null|number}
@@ -7845,7 +7938,8 @@ header::-webkit-scrollbar { display: none; }
             <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}} onClick={()=>openPtModal(null,"remove")}>🗑 Retirer</button>
           </div>}
           <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Semaine type par médecin. Le bouton ▶ PT l'applique aux mois de la période affichée (choix des mois et du point de départ dans la fenêtre). TM exclus automatiquement. Clic sur une case pour définir.</div>
-          <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit||isInterEdit} acteById={acteById} setMData={setMData} setModal={setModal}/>
+          <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit||isInterEdit} acteById={acteById} setMData={setMData} setModal={setModal} perDays={allDays4} onMedClick={isEdit?((med)=>setDeactMed(med.id)):null}/>
+          {deactMed&&<DeactModal med={medecins.find(m=>m.id===deactMed)} perDays={allDays4} perLbl={perLibelle(perStart(year,month).sy,perStart(year,month).sm)} onSave={(rgs)=>saveOff(deactMed,rgs)} onClose={()=>setDeactMed(null)}/>}
           <PTOccRooms medecins={medecins} planningType={planningType} actes={actes} acteById={acteById} salleReg={salleReg} darkMode={darkMode}/>
         </div>
       )}
