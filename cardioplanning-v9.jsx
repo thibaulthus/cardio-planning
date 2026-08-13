@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.35 — 13/08/2026";
+const APP_VERSION="v10.35.1 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4108,8 +4108,10 @@ function ReportsView(p){
     year=p.year,month=p.month,toast=p.toast;
   const medsCS=medecins.filter(m=>m.role==="medecin");
   const [selId,setSelId]=React.useState(accessMode==="medecinEdit"?editMedId:(medsCS[0]?medsCS[0].id:null));
-  const medSel=medecins.find(m=>m.id===(accessMode==="medecinEdit"?editMedId:selId));
-  if(!medSel)return RE("div",{style:{color:"var(--txt3)",fontSize:12}},"Aucun médecin.");
+  const medSelRaw=medecins.find(m=>m.id===(accessMode==="medecinEdit"?editMedId:selId));
+  /* v10.35.1 : valeur de repli — les hooks qui suivent doivent s'exécuter à TOUS
+     les rendus. La garde est descendue juste avant le rendu (règle des hooks). */
+  const medSel=medSelRaw||{id:"__aucun__",init:"",nom:"",prenom:""};
   const mid=medSel.id;
   const editable=isEdit||(accessMode==="medecinEdit"&&editMedId===mid)||p.adminReports===true;
   const dk3=(y,m,d)=>y+"-"+m+"-"+d;
@@ -4424,6 +4426,7 @@ function ReportsView(p){
     const absD=slotState(o.y,o.m,o.d,"M")==="abs"||slotState(o.y,o.m,o.d,"AM")==="abs";
     return {blanche,tour,fer,absD};
   };
+  if(!medSelRaw)return RE("div",{style:{color:"var(--txt3)",fontSize:12}},"Aucun médecin.");
   return RE("div",{style:{maxWidth:820}},
     RE("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap",position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,paddingBottom:6}},
       RE("h2",{style:{fontSize:17,fontWeight:800,color:"var(--txt)",margin:0}},"📥 Reports de consultations"),
@@ -7385,6 +7388,31 @@ function CardioPlanning(){
   const attIssues=useMemo(()=>issuesFor(medAttacheAll),[issuesFor,medAttacheAll]);
   const goIssue=(it)=>{setMData({medId:it.med.id,y:it.y,m:it.m,d:it.d,slot:it.sl});setModal("cell");};
 
+  /* v10.35.1 : DÉCLARÉE ICI, et pas plus bas — l'écran de connexion sort par
+     un `return` anticipé, et un hook placé après ne s'exécute pas à tous les
+     rendus (erreur React #310 à l'ouverture). Tous les hooks doivent rester
+     au-dessus de ce point. */
+  const doExport=useCallback(async(kind)=>{
+    setExpBusy(true);
+    try{
+      let src;
+      if(expSrc==="now")src={plan:plan,notes:notes,tourMed:tourMed,tourDerog:tourDerog,medecins:medecins,actes:actes,salleReg:salleReg};
+      else{
+        const dd=(await window.firebaseDB.collection("backups").doc(expSrc).get()).data()||{};
+        const pj=(x,def)=>{try{return typeof x==="string"?JSON.parse(x):(x||def);}catch(e){return def;}};
+        src={plan:dd.planV2||{},notes:pj(dd.notes,{}),tourMed:pj(dd.tourMed,{}),tourDerog:pj(dd.tourDerog,{}),
+             medecins:pj(dd.medecins,[]),actes:pj(dd.actes,[]),salleReg:pj(dd.salleReg,[])};
+      }
+      const nom="planning-"+expPer.sy+"-"+String(expPer.sm+1).padStart(2,"0");
+      if(kind==="tableau")expTelecharge(nom+".xls",expTable(expPer,src));
+      else expTelecharge(nom+"-donnees.json",JSON.stringify(src),"application/json;charset=utf-8");
+      const t=Date.now();setExpLast(t);setExpN(0);setExpSnooze(false);
+      try{localStorage.setItem("cp6_expLast",String(t));localStorage.setItem("cp6_expN","0");}catch(e){}
+      toast("Sauvegarde téléchargée","info");
+    }catch(e){console.log("export:",e);toast("Échec de la sauvegarde","warn");}
+    setExpBusy(false);
+  },[expSrc,expPer,plan,notes,tourMed,tourDerog,medecins,actes,salleReg]);
+
   /* ── Login ── */
   // Show loading while Firebase connects (so medPins are available for login)
   if(accessMode==="ask"&&fbStatus==="connecting"&&!PLANNING_DOC) return(
@@ -7439,27 +7467,6 @@ function CardioPlanning(){
       </div>
     </div>
   );
-
-  const doExport=useCallback(async(kind)=>{
-    setExpBusy(true);
-    try{
-      let src;
-      if(expSrc==="now")src={plan:plan,notes:notes,tourMed:tourMed,tourDerog:tourDerog,medecins:medecins,actes:actes,salleReg:salleReg};
-      else{
-        const dd=(await window.firebaseDB.collection("backups").doc(expSrc).get()).data()||{};
-        const pj=(x,def)=>{try{return typeof x==="string"?JSON.parse(x):(x||def);}catch(e){return def;}};
-        src={plan:dd.planV2||{},notes:pj(dd.notes,{}),tourMed:pj(dd.tourMed,{}),tourDerog:pj(dd.tourDerog,{}),
-             medecins:pj(dd.medecins,[]),actes:pj(dd.actes,[]),salleReg:pj(dd.salleReg,[])};
-      }
-      const nom="planning-"+expPer.sy+"-"+String(expPer.sm+1).padStart(2,"0");
-      if(kind==="tableau")expTelecharge(nom+".xls",expTable(expPer,src));
-      else expTelecharge(nom+"-donnees.json",JSON.stringify(src),"application/json;charset=utf-8");
-      const t=Date.now();setExpLast(t);setExpN(0);setExpSnooze(false);
-      try{localStorage.setItem("cp6_expLast",String(t));localStorage.setItem("cp6_expN","0");}catch(e){}
-      toast("Sauvegarde téléchargée","info");
-    }catch(e){console.log("export:",e);toast("Échec de la sauvegarde","warn");}
-    setExpBusy(false);
-  },[expSrc,expPer,plan,notes,tourMed,tourDerog,medecins,actes,salleReg]);
 
   const _per=getPeriodRange(year,month);
   const _pem=(_per.sm+PCFG.len-1)%12,_pey=_per.sm+PCFG.len-1>11?_per.sy+1:_per.sy;
