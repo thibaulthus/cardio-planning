@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.37 — 13/08/2026";
+var APP_VERSION = "v10.38 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5629,7 +5629,7 @@ function ExportCard(_a) {
     var per = _a.per, setPer = _a.setPer, source = _a.source, setSource = _a.setSource, backups = _a.backups, seuil = _a.seuil, setSeuil = _a.setSeuil, dernier = _a.dernier, onExport = _a.onExport, occupe = _a.occupe;
     var lbl = perLibelle(per.sy, per.sm);
     var dat = function (ts) { return new Date(ts).toLocaleDateString("fr-FR") + " " + new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); };
-    return (React.createElement("div", { style: { marginBottom: 20, padding: "14px 16px", background: "var(--bg)", borderRadius: 10, border: "1px solid var(--border)" }, id: "set-export" },
+    return (React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }), id: "set-export" },
         React.createElement("div", { style: { fontWeight: 700, color: "#f59e0b", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde sur mon ordinateur"),
         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Un fichier gard\u00E9 chez vous, ind\u00E9pendant de l'application et de sa synchronisation. Le tableau sert \u00E0 rediffuser le planning ; le fichier de donn\u00E9es sert \u00E0 le remettre en place."),
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" } },
@@ -9426,7 +9426,7 @@ function CardioPlanning() {
                                 ["pinOld", "pinN1", "pinN2"].forEach(function (x) { document.getElementById(x).value = ""; });
                                 toast("PIN mis \u00E0 jour");
                             } } }, "Changer le PIN"))),
-                React.createElement("div", { style: { marginBottom: 20, padding: "14px 16px", background: "var(--bg)", borderRadius: 10, border: "1px solid var(--border)" } },
+                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                         React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "var(--txt)", marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
                         React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, "Saisies ici, elles grisent les jours concern\u00E9s dans tous les onglets. Elles ne sont plus t\u00E9l\u00E9charg\u00E9es : une donn\u00E9e qui arrive apr\u00E8s l'affichage rendrait les bornes de p\u00E9riode changeantes."),
                         (function () {
@@ -9698,8 +9698,8 @@ function CardioPlanning() {
                         })(),
                         React.createElement("button", { onClick: function () { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
+                isEdit && React.createElement(ExportCard, { per: expPer, setPer: setExpPer, source: expSrc, setSource: setExpSrc, backups: backupList, seuil: expSeuil, setSeuil: setExpSeuil, dernier: expLast, onExport: doExport, occupe: expBusy }),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    isEdit && React.createElement(ExportCard, { per: expPer, setPer: setExpPer, source: expSrc, setSource: setExpSrc, backups: backupList, seuil: expSeuil, setSeuil: setExpSeuil, dernier: expLast, onExport: doExport, occupe: expBusy }),
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde des donn\u00E9es"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "T\u00E9l\u00E9chargez une copie de toutes vos donn\u00E9es. En cas de probl\u00E8me, importez ce fichier pour tout restaurer."),
                     React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },

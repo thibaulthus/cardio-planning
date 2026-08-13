@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.37 — 13/08/2026";
+const APP_VERSION="v10.38 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5395,7 +5395,7 @@ function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,
   const lbl=perLibelle(per.sy,per.sm);
   const dat=(ts)=>new Date(ts).toLocaleDateString("fr-FR")+" "+new Date(ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
   return(
-    <div style={{marginBottom:20,padding:"14px 16px",background:"var(--bg)",borderRadius:10,border:"1px solid var(--border)"}} id="set-export">
+    <div style={{...S.card,marginBottom:10}} id="set-export">
       <div style={{fontWeight:700,color:"#f59e0b",fontSize:13,marginBottom:6}}>💾 Sauvegarde sur mon ordinateur</div>
       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un fichier gardé chez vous, indépendant de l'application et de sa synchronisation. Le tableau sert à rediffuser le planning ; le fichier de données sert à le remettre en place.</div>
 
@@ -8486,9 +8486,12 @@ header::-webkit-scrollbar { display: none; }
             </div>
           </div>}
 
+          {isEdit&&<ExportCard per={expPer} setPer={setExpPer} source={expSrc} setSource={setExpSrc}
+            backups={backupList} seuil={expSeuil} setSeuil={setExpSeuil} dernier={expLast}
+            onExport={doExport} occupe={expBusy}/>}
           <div style={{...S.card,marginBottom:10}}>
             {/* Vacances scolaires */}
-            <div style={{marginBottom:20,padding:"14px 16px",background:"var(--bg)",borderRadius:10,border:"1px solid var(--border)"}}>
+            <div style={{...S.card,marginBottom:10}}>
               <div style={{fontWeight:700,fontSize:13,color:"var(--txt)",marginBottom:8}}>🏖 Vacances scolaires</div>
               <div style={{fontSize:12,color:"var(--txt2)",marginBottom:10}}>
                 Saisies ici, elles grisent les jours concernés dans tous les onglets. Elles ne sont plus téléchargées :
@@ -8712,10 +8715,7 @@ header::-webkit-scrollbar { display: none; }
                 <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Limite Firebase : 1 Mo par document. {pct<60?"Large marge.":pct<85?"À surveiller — un archivage des anciens mois sera à prévoir.":"⚠ Proche de la limite : archivez les anciens mois rapidement."}</div>
               </div>);
             })()}
-            {/* v10.36 : rangé avec les autres sauvegardes, en premier */}
-            {isEdit&&<ExportCard per={expPer} setPer={setExpPer} source={expSrc} setSource={setExpSrc}
-            backups={backupList} seuil={expSeuil} setSeuil={setExpSeuil} dernier={expLast}
-            onExport={doExport} occupe={expBusy}/>}
+
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>💾 Sauvegarde des données</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
               Téléchargez une copie de toutes vos données. En cas de problème, importez ce fichier pour tout restaurer.
