@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.33 — 12/08/2026";
+const APP_VERSION="v10.34 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -3907,7 +3907,7 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
 
   return(
     <div>
-      <div style={S.bar}>
+      <div style={{...S.bar,position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,paddingBottom:6}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={prevP} style={S.arr}>‹</button>
           <h2 style={S.mTit}>{"📊 Stats — "+perLabelS+" "+per.startY}</h2>
@@ -4082,14 +4082,15 @@ function HelpView(){
   const toggleH=(id)=>setHOpen(p=>Object.assign({},p,{[id]:!p[id]}));
   const goH=(id)=>{setHOpen(p=>Object.assign({},p,{[id]:true}));setTimeout(()=>{const el=document.getElementById("help-"+id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},80);};
   return HE("div",{style:{maxWidth:760}},
-    HE("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}},
+    HE("div",{style:{position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,maxHeight:"38vh",overflowY:"auto"}},
+      HE("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}},
       HE("h2",{style:{fontSize:17,fontWeight:800,color:"var(--txt)",margin:0}},"❓ Aide"),
       HE("span",{style:{fontSize:11,color:"var(--txt3)"}},"— cliquez sur une tuile pour l'ouvrir")),
     HE("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:6,marginBottom:14}},
       HELP_SECTIONS.map(s=>HE("button",{key:s.id,onClick:()=>goH(s.id),
         style:{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"left"}},
-        HE("span",null,s.icon),HE("span",{style:{lineHeight:1.25}},s.title)))),
-    HELP_SECTIONS.map(s=>HE("div",{key:s.id,id:"help-"+s.id,style:{marginBottom:8,borderRadius:10,border:"1px solid var(--border)",background:"var(--card)",overflow:"hidden",scrollMarginTop:70}},
+        HE("span",null,s.icon),HE("span",{style:{lineHeight:1.25}},s.title))))),
+    HELP_SECTIONS.map(s=>HE("div",{key:s.id,id:"help-"+s.id,style:{marginBottom:8,borderRadius:10,border:"1px solid var(--border)",background:"var(--card)",overflow:"hidden",scrollMarginTop:150}},
       HE("button",{onClick:()=>toggleH(s.id),
         style:{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"11px 13px",border:"none",background:"transparent",cursor:"pointer",textAlign:"left"}},
         HE("span",{style:{fontSize:16}},s.icon),
@@ -4424,7 +4425,7 @@ function ReportsView(p){
     return {blanche,tour,fer,absD};
   };
   return RE("div",{style:{maxWidth:820}},
-    RE("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}},
+    RE("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap",position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,paddingBottom:6}},
       RE("h2",{style:{fontSize:17,fontWeight:800,color:"var(--txt)",margin:0}},"📥 Reports de consultations"),
       accessMode==="medecinEdit"
         ?RE("span",{style:{fontSize:12,fontWeight:700,color:"var(--txt)"}},medSel.prenom+" "+medSel.nom)
@@ -7519,7 +7520,7 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="plantype"&&(
         <div>
-          <div style={S.bar}>
+          <div style={{...S.bar,position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,paddingBottom:6}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <button onClick={prevM} style={S.arr}>‹</button>
               <h2 style={S.mTit}>{"📋 Planning type — "+(MOIS[perStart(year,month).sm]+" — "+MOIS[(perStart(year,month).sm+PCFG.len-1)%12]+" "+perStart(year,month).sy)}</h2>
@@ -7777,7 +7778,7 @@ header::-webkit-scrollbar { display: none; }
         };
         return(
           <div style={{padding:16}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,flexWrap:"wrap",position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,paddingBottom:6}}>
               <button onClick={prevP} style={S.arr}>‹</button>
               <h2 style={{...S.mTit,margin:0}}><span style={{color:"#7c3aed"}}>📞</span> {pLabel}</h2>
               <button onClick={nextP} style={S.arr}>›</button>
