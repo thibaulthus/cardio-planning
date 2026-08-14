@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.43 — 14/08/2026";
+var APP_VERSION = "v10.45 — 14/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -495,7 +495,7 @@ var S = {
     oriTog: { display: "flex", background: "var(--bg2)", borderRadius: 6, padding: 2, gap: 1, border: "1px solid var(--border)" },
     oriB: { padding: "3px 7px", borderRadius: 4, border: "none", background: "transparent", color: "var(--txt2)", cursor: "pointer", fontSize: 10, fontWeight: 600 },
     oriBa: { background: "#1d4ed8", color: "#fff" },
-    main: { padding: "10px", maxWidth: 1900, margin: "0 auto" },
+    main: { padding: "10px 10px 110px", maxWidth: 1900, margin: "0 auto" } /* v10.45 : le bandeau du PIN ne masque plus le bas */,
     bar: { display: "flex", alignItems: "center", marginBottom: 10, gap: 7 },
     thFix: { padding: "5px 9px", background: "var(--th)", fontWeight: 700, fontSize: 10, color: "var(--txt2)", textTransform: "uppercase", letterSpacing: .4, borderRight: "2px solid var(--border)", whiteSpace: "nowrap" },
     th: { padding: "3px 2px", textAlign: "center", background: "var(--th)", fontSize: 10, color: "var(--txt2)", minWidth: 30, borderRight: "1px solid var(--border)", borderBottom: "1px solid var(--border)" },
@@ -2130,7 +2130,39 @@ function GardeView(_a) {
 /* ════ BIP TAB ════ */
 
 function PTOccRooms(_a) {
-    var medecins = _a.medecins, planningType = _a.planningType, actes = _a.actes, acteById = _a.acteById, salleReg = _a.salleReg, darkMode = _a.darkMode;
+    var medecins = _a.medecins, planningType = _a.planningType, actes = _a.actes, acteById = _a.acteById, salleReg = _a.salleReg, darkMode = _a.darkMode, _b = _a.perDays, perDays = _b === void 0 ? [] : _b;
+    /* v10.44 : la désactivation entre dans l'occupation théorique — couvert sur
+       TOUTE la période : exclu du tableau « fictif » ; couvert en partie :
+       hachurage ORANGE sur sa pastille, pour prévenir, avec les dates en infobulle. */
+    var oeOf = {};
+    medecins.forEach(function (m) { oeOf[m.id] = offEtat(m, perDays || []); });
+    var medsAct = medecins.filter(function (m) { return oeOf[m.id] !== "off"; });
+    var HACHO = "repeating-linear-gradient(45deg,rgba(245,158,11,.35),rgba(245,158,11,.35) 3px,transparent 3px,transparent 7px)";
+    var Rond = function (_a) {
+        var m = _a.m;
+        var part = oeOf[m.id] === "part";
+        var tt = ((m.prenom || "") + " " + (m.nom || "")).trim() + (part ? (" — indisponible " + medOffL(m).map(function (r) { return "du " + offFr(r.du) + " au " + offFr(r.au); }).join(", ")) : "");
+        return (React.createElement("div", { title: tt, style: { padding: part ? 2 : 0, borderRadius: 6, background: part ? HACHO : "none", flexShrink: 0 } },
+            React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, m.init)));
+    };
+    /* v10.44 : les « sans salle » de chaque site. Une activité ferme sans salle va
+       dans le tableau de SON site ; un choix ouvert va dans CHAQUE site que ses
+       branches sans salle demandent — une seule fois par site (« CsL ou ETT » :
+       une fois à Lens ; « ETT et Cs Béthune » : dans les deux tableaux). Les
+       activités de site « tous » (CHU, FMC, RG…) ne vont dans aucun tableau. */
+    var sansSalle = function (dw, sl, key) {
+        var out = [];
+        medsAct.forEach(function (m) {
+            var e = ((planningType[m.id] || {})[dw] || {})[sl];
+            if (!e)
+                return;
+            var brs = [[e[0], e[1]], [e[2], e[3]], [e[4], e[5]]].filter(function (b) { return b[0] && !b[1]; });
+            var mine = brs.filter(function (b) { var a = acteById(b[0]); return a && a.site === key; });
+            if (mine.length)
+                out.push({ m: m, aids: mine.map(function (b) { return b[0]; }), cond: !!e[6] || mine.length > 1 });
+        });
+        return out;
+    };
     var jours = ["", "Lun", "Mar", "Mer", "Jeu", "Ven"];
     var reg = function (site) { return (salleReg || []).filter(function (x) { return Array.isArray(x.s) ? x.s.indexOf(site) >= 0 : x.s === site; }).map(function (x) { return x.n; }); };
     var uniq = function (arr) { return arr.filter(function (s, i2, a2) { return s && a2.indexOf(s) === i2; }); };
@@ -2140,7 +2172,7 @@ function PTOccRooms(_a) {
         { key: "CHB", titre: "🏥 CHB — occupation type des salles", color: "#3fb950", salles: uniq(["CHB-1", "CHB-2", "CHB-3", "CHB-VASC", "EE-CHB", "Rythmo-CHB"].concat(reg("CHB"))).filter(function (s) { return s !== "CHB-BIP"; }) },
         { key: "ANGIO", titre: "🩸 PT Angio — occupation type des salles", color: "#76a5af", salles: angioAll.length ? angioAll : ["Angio-1", "Angio-2", "Angio-3"] }
     ];
-    var occ = function (dw, sl, salle) { return medecins.filter(function (m) { var e = ((planningType[m.id] || {})[dw] || {})[sl]; return e && ((e[0] && e[1] === salle) || (e[2] && e[3] === salle) || (e[4] && e[5] === salle)); }); };
+    var occ = function (dw, sl, salle) { return medsAct.filter(function (m) { var e = ((planningType[m.id] || {})[dw] || {})[sl]; return e && ((e[0] && e[1] === salle) || (e[2] && e[3] === salle) || (e[4] && e[5] === salle)); }); };
     return (React.createElement("div", { style: { marginTop: 26 } },
         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 2 } }, "Occupation th\u00E9orique des salles si tout le monde est pr\u00E9sent \u2014 refl\u00E8te uniquement le planning type ci-dessus, jamais le planning r\u00E9el."),
         SECTIONS.map(function (sec) { return (React.createElement("div", { key: sec.key, style: { marginTop: 20, paddingTop: 16, borderTop: "2px solid var(--border)" } },
@@ -2151,7 +2183,8 @@ function PTOccRooms(_a) {
                         React.createElement("tr", null,
                             React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", left: 0, zIndex: 20, minWidth: 46 }) }, "JOUR"),
                             React.createElement("th", { style: __assign(__assign({}, S.th), { minWidth: 28, fontSize: 9 }) }, "SL"),
-                            sec.salles.map(function (s) { return React.createElement("th", { key: s, style: __assign(__assign({}, S.th), { minWidth: 64, fontSize: 10 }) }, s); }))),
+                            sec.salles.map(function (s) { return React.createElement("th", { key: s, style: __assign(__assign({}, S.th), { minWidth: 64, fontSize: 10 }) }, s); }),
+                            React.createElement("th", { style: __assign(__assign({}, S.th), { minWidth: 74, fontSize: 10, borderLeft: "2px solid var(--border)" }) }, "Sans salle"))),
                     React.createElement("tbody", null, [1, 2, 3, 4, 5].map(function (dw) { return ["M", "AM"].map(function (sl) { return (React.createElement("tr", { key: dw + sl, style: sl === "AM" ? { borderBottom: "2px solid var(--border)" } : { borderBottom: "1px solid var(--border2)" } },
                         sl === "M" && React.createElement("td", { rowSpan: 2, style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, fontWeight: 700, fontSize: 11, textAlign: "center" }) }, jours[dw]),
                         React.createElement("td", { style: __assign(__assign({}, S.td), { fontSize: 9, color: "var(--txt3)", textAlign: "center", padding: "2px 1px" }) }, sl),
@@ -2176,10 +2209,16 @@ function PTOccRooms(_a) {
                             return (React.createElement("td", { key: salle, style: __assign(__assign({}, S.td), { padding: 2, verticalAlign: "middle", textAlign: "center", background: confl ? conflBg(darkMode) : undefined }) },
                                 React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" } }, grps.map(function (g, gi) { return (React.createElement("div", { key: g.aid || gi, style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, padding: "2px 0",
                                         borderTop: gi ? "1px dashed " + (confl ? conflSep(darkMode) : "var(--border)") : "none" } },
-                                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, g.meds.map(function (m) { return (React.createElement("div", { key: m.id, title: ((m.prenom || "") + " " + (m.nom || "")).trim(), style: { width: 22, height: 22, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, m.init)); })),
+                                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, g.meds.map(function (m) { return React.createElement(Rond, { key: m.id, m: m }); })),
                                     React.createElement(ActPill, { a: g.acte, night: darkMode }))); }))));
-                        }))); }); })))))); })));
+                        }),
+                        React.createElement("td", { style: __assign(__assign({}, S.td), { padding: 2, verticalAlign: "middle", textAlign: "center", borderLeft: "2px solid var(--border)" }) },
+                            React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 3 } }, sansSalle(dw, sl, sec.key).map(function (x) { return (React.createElement("div", { key: x.m.id, style: { display: "flex", alignItems: "center", gap: 3, padding: x.cond ? "2px 4px" : "0",
+                                    border: x.cond ? "1.5px dashed #8b5cf6" : "none", borderRadius: 6 } },
+                                React.createElement(Rond, { m: x.m }),
+                                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-start" } }, x.aids.map(function (aid, ai) { return React.createElement(ActPill, { key: ai, a: acteById(aid), night: darkMode }); })))); }))))); }); })))))); })));
 }
+
 function PlanTypeGrid(_a) {
     var medecins = _a.medecins, actes = _a.actes, planningType = _a.planningType, setPlanningType = _a.setPlanningType, isEdit = _a.isEdit, acteById = _a.acteById, setMData = _a.setMData, setModal = _a.setModal, _b = _a.perDays, perDays = _b === void 0 ? [] : _b, _c = _a.onMedClick, onMedClick = _c === void 0 ? null : _c;
     var jours = ["", "Lun", "Mar", "Mer", "Jeu", "Ven"];
@@ -2636,7 +2675,7 @@ function EditPTModal(_a) {
             return cur ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "6px 10px", background: isC ? COND_BG : "var(--bg)", borderRadius: 8, border: isC ? "1.5px dashed " + COND_C : "1px solid var(--border)" } },
                 React.createElement("span", { style: { fontSize: 11, color: isC ? COND_C : "var(--txt3)", fontWeight: 700 } }, isC ? "Choix ouvert ①" : "Activité actuelle :"),
                 React.createElement(Badge, { a: cur }),
-                curSalle && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, curSalle),
+                React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontStyle: curSalle ? "normal" : "italic" } }, curSalle || "sans salle"),
                 React.createElement("button", { onClick: function () { dropBr(0); afterPick(); }, style: { marginLeft: "auto", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 900, padding: "1px 6px" } }, "\u00D7"))) : null;
         })(),
         acteId2 && (function () {
@@ -2644,7 +2683,7 @@ function EditPTModal(_a) {
             return cur2 ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "6px 10px", background: "var(--bg)", borderRadius: 8, border: "1px solid var(--border)" } },
                 React.createElement("span", { style: { fontSize: 11, color: COND_C, fontWeight: 700 } }, "Choix ouvert \u2461"),
                 React.createElement(Badge, { a: cur2 }),
-                curSalle2 && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, curSalle2),
+                React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontStyle: curSalle2 ? "normal" : "italic" } }, curSalle2 || "sans salle"),
                 React.createElement("button", { onClick: function () { dropBr(1); afterPick(); }, style: { marginLeft: "auto", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 900, padding: "1px 6px" } }, "\u00D7"))) : null;
         })(),
         acteId3 && (function () {
@@ -2652,7 +2691,7 @@ function EditPTModal(_a) {
             return cur3 ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "6px 10px", background: COND_BG, borderRadius: 8, border: "1.5px dashed " + COND_C } },
                 React.createElement("span", { style: { fontSize: 11, color: COND_C, fontWeight: 700 } }, "Choix ouvert \u2462"),
                 React.createElement(Badge, { a: cur3 }),
-                curSalle3 && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, curSalle3),
+                React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontStyle: curSalle3 ? "normal" : "italic" } }, curSalle3 || "sans salle"),
                 React.createElement("button", { onClick: function () { dropBr(2); afterPick(); }, style: { marginLeft: "auto", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 900, padding: "1px 6px" } }, "\u00D7"))) : null;
         })(),
         acteId && !isC && !addIdx && React.createElement("button", { style: { marginBottom: 10, marginRight: 8, padding: "5px 11px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, color: COND_C, cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { return writePT([acteId, curSalle || null, null, null, null, null, 1]); } }, "\u25C7 Transformer en choix ouvert"),
@@ -2700,6 +2739,20 @@ function EditPTModal(_a) {
         })()));
 }
 /* ════ ABS MODAL ════ */
+/* v9.92 : ÉCRAN UNIFIÉ « Modifier sur une période ». Il remplace trois boutons de la
+   modale de case — poser/retirer une absence, effacer les activités, effacer le mois —
+   qui posaient au fond la même question : quoi, sur quelle période, pour qui.
+   Vérifié avant fusion : « effacer le mois » appelait la MÊME fonction que le retrait du
+   planning type, avec la même liste de conservation que la case à cocher. Rien n'est
+   donc perdu, et il n'y a plus qu'un seul écran à faire évoluer.
+   Les demi-journées de début et de fin sont réglables mais déjà sur le bon défaut
+   (matin → après-midi), le cas courant restant « deux dates et je valide ».
+   Un week-end n'ayant qu'une case JOUR, les demi-journées y sont ignorées : c'est déjà
+   le comportement de toutes les fonctions appelées ici. */
+/* v10.2 : la restauration ciblée, depuis la modale de case — là où l'on est quand on
+   s'aperçoit de la perte. Réservée à l'éditeur : restaurer écrase le travail d'autrui sur
+   la période, ce n'est pas le même risque que modifier ses propres cases. */
+
 function RestoreModal(_a) {
     var _this = this;
     var med = _a.med, backups = _a.backups, y = _a.y, m = _a.m, d = _a.d, onDiff = _a.onDiff, onGo = _a.onGo, onClose = _a.onClose;
@@ -4252,8 +4305,14 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"Vos propres activités")," : modifier le contenu de vos cases (activité, salle, note)."]}),
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
- {id:"creer",icon:"🚀",title:"Créer un planning de A à Z",body:()=>HE("div",null,
-  HP({children:["🧱 Depuis la v10.29, l'onglet ",HE("b",null,"Construire")," guide tout ce parcours étape par étape — voir sa section. Le détail ci-dessous reste valable : ce sont les mêmes fonctions."]}),
+ {id:"construire",icon:"🧱",title:"Construire — créer le planning pas à pas",body:()=>HE("div",null,
+  HP({children:["L'onglet ",HE("b",null,"Construire")," guide la fabrication d'une période en ",HE("b",null,"7 étapes"),", dans l'ordre réel du travail : congés, tour, gardes, absences de tout le monde, planning type, surspécialités, bip. Chaque étape est une tuile qui s'ouvre et se replie ; la première non terminée est ouverte à l'arrivée."]}),
+  HP({children:["La ",HE("b",null,"période se choisit en haut"),", une seule fois, et vaut pour toutes les tuiles — l'onglet s'ouvre sur la ",HE("b",null,"période suivante"),", celle qu'on construit. Les tuiles Tour et Gardes contiennent les onglets entiers, inchangés."]}),
+  HP({children:["Une étape mesurable se termine ",HE("b",null,"d'elle-même"),' (pastille « terminé ») ; seule l\'étape 5, planning type, se valide à la main. Rien n\'est bloquant : une étape en retard n\'empêche jamais d\'avancer.']}),
+  HT({children:"Les demandes à l'équipe"}),
+  HP({children:["Depuis la tuile 1, trois demandes s'ouvrent séparément : ",HE("b",null,"poser ses congés"),", ",HE("b",null,"préférences de tour"),", ",HE("b",null,"préférences de gardes"),". Chaque médecin concerné voit alors un ",HE("b",null,"bandeau dans son Planning"),", quelle que soit la période affichée, avec un bouton pour aller à la bonne période et « ✓ C'est fait » qui coche sa ligne. Les préférences de tour ne partent qu'à ceux qui tournent, celles de gardes à ceux qui en prennent."]}),
+  HP({children:["Accès : éditeur et intermédiaires. Le bouton du ",HE("b",null,"Bip de Béthune")," vit dans la tuile 7 (il n'est plus dans l'onglet CHB)."]}),
+  HT({children:"Le détail, étape par étape"}),
   HP({children:["L'ordre compte : chaque étape s'appuie sur la précédente. Tout se fait sur la ",HE("b",null,"période affichée")," (généralement 4 mois). La période s'étend jusqu'au ",HE("b",null,"dimanche qui clôt la dernière semaine"),", et rattache le lundi suivant s'il est férié (ex. 1er novembre) : la répartition se fait en semaines complètes, et la période suivante démarre le lendemain."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
   HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — onglet Tour : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫."]}),
@@ -4262,14 +4321,6 @@ const HELP_SECTIONS=[
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
   HStep({n:"6",children:[HE("b",null,"Ajuster")," — cases individuelles, échanges de gardes ⇄, dérogations de tour, notes 📝."]}),
   HP({last:true,children:["En fin de période : archiver les mois écoulés (voir la tuile Archiver)."]}))},
-
- {id:"construire",icon:"🧱",title:"Construire — le planning pas à pas",body:()=>HE("div",null,
-  HP({children:["L'onglet ",HE("b",null,"Construire")," guide la fabrication d'une période en ",HE("b",null,"7 étapes"),", dans l'ordre réel du travail : congés, tour, gardes, absences de tout le monde, planning type, surspécialités, bip. Chaque étape est une tuile qui s'ouvre et se replie ; la première non terminée est ouverte à l'arrivée."]}),
-  HP({children:["La ",HE("b",null,"période se choisit en haut"),", une seule fois, et vaut pour toutes les tuiles — l'onglet s'ouvre sur la ",HE("b",null,"période suivante"),", celle qu'on construit. Les tuiles Tour et Gardes contiennent les onglets entiers, inchangés."]}),
-  HP({children:["Une étape mesurable se termine ",HE("b",null,"d'elle-même"),' (pastille « terminé ») ; seule l\'étape 5, planning type, se valide à la main. Rien n\'est bloquant : une étape en retard n\'empêche jamais d\'avancer.']}),
-  HT({children:"Les demandes à l'équipe"}),
-  HP({children:["Depuis la tuile 1, trois demandes s'ouvrent séparément : ",HE("b",null,"poser ses congés"),", ",HE("b",null,"préférences de tour"),", ",HE("b",null,"préférences de gardes"),". Chaque médecin concerné voit alors un ",HE("b",null,"bandeau dans son Planning"),", quelle que soit la période affichée, avec un bouton pour aller à la bonne période et « ✓ C'est fait » qui coche sa ligne. Les préférences de tour ne partent qu'à ceux qui tournent, celles de gardes à ceux qui en prennent."]}),
-  HP({children:["Accès : éditeur et intermédiaires. Le bouton du ",HE("b",null,"Bip de Béthune")," vit dans la tuile 7 (il n'est plus dans l'onglet CHB)."]}))},
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
   HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible."]}),
   HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip."]}),
@@ -9049,7 +9100,7 @@ function CardioPlanning() {
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Semaine type par m\u00E9decin. Le bouton \u25B6 PT l'applique aux mois de la p\u00E9riode affich\u00E9e (choix des mois et du point de d\u00E9part dans la fen\u00EAtre). TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
                 React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit || isInterEdit, acteById: acteById, setMData: setMData, setModal: setModal, perDays: allDays4, onMedClick: isEdit ? (function (med) { return setDeactMed(med.id); }) : null }),
                 deactMed && React.createElement(DeactModal, { med: medecins.find(function (m) { return m.id === deactMed; }), perDays: allDays4, perLbl: perLibelle(perStart(year, month).sy, perStart(year, month).sm), onSave: function (rgs) { return saveOff(deactMed, rgs); }, onClose: function () { return setDeactMed(null); }, countActs: function (du, au) { return offCount(deactMed, du, au); }, onClear: function (du, au) { return offClear(deactMed, du, au); } }),
-                React.createElement(PTOccRooms, { medecins: medecins, planningType: planningType, actes: actes, acteById: acteById, salleReg: salleReg, darkMode: darkMode }))),
+                React.createElement(PTOccRooms, { medecins: medecins, planningType: planningType, actes: actes, acteById: acteById, salleReg: salleReg, darkMode: darkMode, perDays: allDays4 }))),
             tab === "attache" && (React.createElement("div", null,
                 isEdit && React.createElement(IssuePanel, { iss: attIssues, open: plIssOpen, setOpen: setPlIssOpen, onGo: goIssue }),
                 React.createElement("div", { style: S.bar },
