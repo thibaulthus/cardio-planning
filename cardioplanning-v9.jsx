@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.46 — 14/08/2026";
+const APP_VERSION="v10.47 — 14/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -887,10 +887,30 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false}){
   const doFit=React.useCallback(()=>{
     if(!fit)return;
     const el=ref.current;if(!el)return;
+    /* v10.47, ses deux retours de test :
+       (1) TÉLÉPHONE (fenêtre étroite ou place trop petite) : l'ANCIEN
+       comportement, voulu — les bandeaux du haut doivent pouvoir partir au
+       défilement, sinon la grille devient « un petit carré peu lisible ».
+       (2) ORDINATEUR : la mesure géométrique laissait encore déborder
+       CHL/CHB/PT alors que le Planning était bon — cause invisible d'ici.
+       Donc boucle fermée : on pose la hauteur, on RELIT le débordement réel
+       de la page et on l'absorbe, quelle qu'en soit l'origine.
+       Ne jamais VIDER maxHeight : React croirait sa valeur inchangée et ne
+       la réécrirait pas. On pose toujours soit la hauteur calculée, soit la
+       valeur d'origine. */
+    const legacy="calc(100vh - "+mh+"px)";
+    if(window.innerWidth<760){if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
+    const de=document.documentElement;
     const top=el.getBoundingClientRect().top+(window.scrollY||window.pageYOffset||0);
-    const v=Math.max(260,window.innerHeight-top-56)+"px";
+    let h=window.innerHeight-top-56;
+    const v0=Math.max(260,h)+"px";
+    if(el.style.maxHeight!==v0)el.style.maxHeight=v0;
+    const over=de.scrollHeight-de.clientHeight;   /* lu APRÈS la pose : la mise en page vient d'être refaite */
+    if(over>0)h-=over;
+    if(h<380){if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
+    const v=h+"px";
     if(el.style.maxHeight!==v)el.style.maxHeight=v;
-  },[fit]);
+  },[fit,mh]);
   React.useLayoutEffect(()=>{doFit();});
   React.useEffect(()=>{
     if(!fit)return;
