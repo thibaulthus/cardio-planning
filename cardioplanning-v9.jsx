@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.40 — 13/08/2026";
+const APP_VERSION="v10.41 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -620,6 +620,11 @@ function MedBtn({med,avail,onClick,extra}){
 let _gvLpF=false,_gvLpT=null;
 
 function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
+  /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
+     disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
+     partie → la case du jour est hachurée et verrouillée, et la personne
+     redevient disponible le jour de son retour. Des dates, jamais une période. */
+  meds=(meds||[]).filter(m=>offEtat(m,allDays4||[])!=="off");
   const today=new Date();
   const C0=42,C1=24,CG=44;
   // Find garde med for a given day (slot N)
@@ -627,7 +632,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
   const pickGardeDay=pickGardeDayFull?pickGardeDayFull.d:null;
   const setPickGardeDay=(v)=>setPickGardeDayFull(v?{d:v,y:year,m:month}:null);
   const [gardeSearch,setGardeSearch]=useState("");
-  const gardePickMeds=(allMeds||meds).filter(m=>m.garde===true);
+  const gardePickMeds=(allMeds||meds).filter(m=>m.garde===true&&!(pickGardeDayFull&&offOn(m,pickGardeDayFull.y,pickGardeDayFull.m,pickGardeDayFull.d)));
   // 4-month view: flatten allDays4 by month groups
   const today2=new Date();
   const effectiveDays=useMemo(()=>{
@@ -787,6 +792,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   const es=getEntries(med.id,ey,em,d,sl);
                   const bl=es[0]&&es[0]._blocked;
                   const noteT=notes[nk(med.id,ey,em,d,sl)];const issueT=planIssues[med.id+"|"+ey+"|"+em+"|"+d+"|"+sl];
+                  const offC=offOn(med,ey,em,d);   /* v10.41 : indisponible ce jour-là */
                   const astId=getAstreinteForDay?getAstreinteForDay(ey,em,d):null;
                   const isAst=astId!==null&&String(astId)===String(med.id);
                   let astSh=null;
@@ -799,13 +805,13 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                     if(si===slots.length-1&&!contNext)parts.push("inset 0 -1px 0 var(--ast-bord)");
                     astSh=parts.join(", ");
                   }
-                  return <td key={med.id} title={(issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined}
-                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),display:"table-cell",verticalAlign:"middle",position:"relative"}}
+                  return <td key={med.id} title={offC?("Indisponible — désactivé "+medOffL(med).map(r=>"du "+offFr(r.du)+" au "+offFr(r.au)).join(", ")):((issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined)}
+                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),...(offC?{background:"repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)",opacity:.55,cursor:"default"}:{}),display:"table-cell",verticalAlign:"middle",position:"relative"}}
                     onContextMenu={onCellHistory?e=>{e.preventDefault();onCellHistory(med.id,ey,em,d,sl);}:undefined}
                     onTouchStart={onCellHistory?()=>{_gvLpF=false;clearTimeout(_gvLpT);_gvLpT=setTimeout(()=>{_gvLpF=true;onCellHistory(med.id,ey,em,d,sl);},600);}:undefined}
                     onTouchEnd={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
                     onTouchMove={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
-                    onClick={bl||!isEdit?undefined:()=>{if(_gvLpF){_gvLpF=false;return;}onCell(med.id,ey,em,d,sl);}}>
+                    onClick={bl||offC||!isEdit?undefined:()=>{if(_gvLpF){_gvLpF=false;return;}onCell(med.id,ey,em,d,sl);}}>
                     {issueT&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}{!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       <CondBadges es={es} acteById={acteById} noteT={noteT}/>
                     </div>}
@@ -1417,10 +1423,12 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
     const canTake=(m,y2,m2,d2)=>{
       const dw=dow(y2,m2,d2);
       if((m.gardeDays||{})[String(dw)]===false)return false;
+      if(offOn(m,y2,m2,d2))return false;   /* v10.41 : désactivé ce jour-là */
       if(isAbsFor(m.id,y2,m2,d2))return false;
       if(inTourWeek(m.id,y2,m2,d2))return false;
       const nx=new Date(y2,m2,d2+1);
       if(isAbsFor(m.id,nx.getFullYear(),nx.getMonth(),nx.getDate()))return false; // repos de garde impossible
+      if(offOn(m,nx.getFullYear(),nx.getMonth(),nx.getDate()))return false;   /* v10.41 : désactivé le lendemain — même raison */
       if(((gardeAvoid||{})[dKey(y2,m2,d2)]||{})[m.id])return false;
       return true;
     };
@@ -3060,9 +3068,11 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
   const tmCountPeriod=(medId)=>weeksT.reduce((n,w)=>{const wm2=tourMed[w.key]||{HC:[],USIC:[]};return((wm2.HC||[]).includes(medId)||(wm2.USIC||[]).includes(medId))?n+1:n;},0);
   const isBlockedInWeek=(medId,wk2)=>{
     const[wy2,wm2,wd2]=wk2.split("-").map(Number);
+    const _mo=medecins.find(m=>String(m.id)===String(medId));   /* v10.41 */
     for(let i=0;i<5;i++){
       const dt=new Date(wy2,wm2,wd2+i);
       const dy=dt.getFullYear(),dm=dt.getMonth(),dd=dt.getDate();
+      if(_mo&&offOn(_mo,dy,dm,dd))return true;   /* désactivé ce jour-là → semaine bloquée */
       const es1=getEntries(medId,dy,dm,dd,"M");
       const es2=getEntries(medId,dy,dm,dd,"AM");
       if([...es1,...es2].some(e=>ABS_IDS.includes(e.acteId)))return true;
@@ -4950,7 +4960,7 @@ const BUILD_DEM=[["conges","🏖️","Poser vos congés de la période","pers","
    preferences de tour aux medecins qui tournent, celles de gardes a ceux qui en
    prennent. Les autres ne recoivent rien et ne comptent nulle part. */
 const demConcerne=(m,id)=>!m?false:(id==="tour"?m.tourMed===true:id==="garde"?m.garde===true:true);
-const demPop=(meds,id)=>meds.filter(m=>demConcerne(m,id));
+const demPop=(meds,id,jours)=>meds.filter(m=>demConcerne(m,id)&&offEtat(m,jours||[])!=="off");   /* v10.41 : hors désactivés période entière */
 /* l'annee de fin est dite quand la periode change d'annee (comme _titlePeriod) :
    un bandeau se lit hors contexte, il ne doit pas laisser d'ambiguite. */
 const perLibelle=(sy,sm)=>{const a=String(sy).split("_");const y=+a[0],m=(sm===undefined?+String(sy).split("_")[1]:sm);
@@ -5038,8 +5048,9 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
   const att=[];
   Object.keys(build||{}).forEach(k=>{
     const B=(build||{})[k]||{};
+    const jrsK=perDaysList(+String(k).split("_")[0],+String(k).split("_")[1]);   /* v10.41 */
     BUILD_DEM.forEach(([id,ic,txt,champ])=>{
-      if((B.dem||{})[id]&&demConcerne(moi,id)&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ});
+      if((B.dem||{})[id]&&demConcerne(moi,id)&&offEtat(moi,jrsK)!=="off"&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ});
     });
   });
   if(!att.length)return null;
@@ -5076,7 +5087,10 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
 
   const perLbl=perLibelle(bPer.sy,bPer.sm);
   const bDays=useMemo(()=>perDaysList(bPer.sy,bPer.sm),[bPer.sy,bPer.sm,PCFG.len]);
-  const meds=useMemo(()=>medecins.filter(m=>(m.role||"medecin")==="medecin"),[medecins]);
+  const bJours=React.useMemo(()=>perDaysList(bPer.sy,bPer.sm),[bPer.sy,bPer.sm,PCFG.len]);
+  /* v10.41 : un médecin désactivé sur TOUTE la période sort des listes et des
+     comptes de l'onglet — une étape peut se terminer sans lui. */
+  const meds=useMemo(()=>medecins.filter(m=>(m.role||"medecin")==="medecin"&&offEtat(m,bJours)!=="off"),[medecins,bJours]);
   /* v10.31 : la coche « absences a recueillir » de la fiche Equipe decide qui parait ici */
   const autres=useMemo(()=>medecins.filter(m=>(m.role||"medecin")!=="medecin"&&m.suiviAbs!==false),[medecins]);
 
@@ -5154,7 +5168,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:6,marginBottom:10}}>
          {BUILD_DEM.map(([id,ic,txt,champ,titre])=>{
            const ouverte=(B.dem||{})[id];
-           const pop=demPop(meds,id);
+           const pop=demPop(meds,id,bJours);
            const n=pop.filter(m=>(B[champ]||{})[m.id]).length;
            return(
              <div key={id} style={{border:"1px solid "+(ouverte?"#8b5cf6":"var(--border)"),borderRadius:8,padding:"7px 9px",background:"var(--bg3)"}}>
@@ -6917,6 +6931,7 @@ function CardioPlanning(){
         /* v9.59 : est disponible celui qui n'a rien de ferme, ET dont l'éventuel choix
            ouvert contient BIP — l'algorithme ne décide donc jamais à la place de l'humain. */
         const dispo=elig.filter(m=>{
+          if(offOn(m,o.y,o.m,o.d))return false;   /* v10.41 : désactivé ce jour-là */
           const es=getEntries(m.id,o.y,o.m,o.d,sl)||[];
           if(es.some(e=>e&&e.acteId&&!e.cond))return false;
           const cd=es.filter(e=>e&&e.cond);
@@ -7870,7 +7885,7 @@ header::-webkit-scrollbar { display: none; }
             <button onClick={()=>setPlanFilter([])} style={{padding:"2px 8px",borderRadius:10,border:"1px solid var(--border)",background:planFilter.length===0?"#1d4ed8":"var(--bg2)",color:planFilter.length===0?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:600}}>Tous</button>
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -7954,7 +7969,7 @@ header::-webkit-scrollbar { display: none; }
            {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
              <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
            </div>}
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 

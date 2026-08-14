@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.40 — 13/08/2026";
+var APP_VERSION = "v10.41 — 13/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -741,6 +741,11 @@ function MedBtn(_a) {
 var _gvLpF = false, _gvLpT = null;
 function GridV(_a) {
     var _b = _a.onRemoveGarde, onRemoveGarde = _b === void 0 ? null : _b, _c = _a.planIssues, planIssues = _c === void 0 ? {} : _c, allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _d = _a.notes, notes = _d === void 0 ? {} : _d, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _e = _a.showGarde, showGarde = _e === void 0 ? true : _e, _f = _a.gardeLocked, gardeLocked = _f === void 0 ? false : _f, _g = _a.onCellHistory, onCellHistory = _g === void 0 ? null : _g, getAstreinteForDay = _a.getAstreinteForDay, _h = _a.printWk, printWk = _h === void 0 ? null : _h;
+    /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
+       disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
+       partie → la case du jour est hachurée et verrouillée, et la personne
+       redevient disponible le jour de son retour. Des dates, jamais une période. */
+    meds = (meds || []).filter(function (m) { return offEtat(m, allDays4 || []) !== "off"; });
     var today = new Date();
     var C0 = 42, C1 = 24, CG = 44;
     // Find garde med for a given day (slot N)
@@ -748,7 +753,7 @@ function GridV(_a) {
     var pickGardeDay = pickGardeDayFull ? pickGardeDayFull.d : null;
     var setPickGardeDay = function (v) { return setPickGardeDayFull(v ? { d: v, y: year, m: month } : null); };
     var _k = useState(""), gardeSearch = _k[0], setGardeSearch = _k[1];
-    var gardePickMeds = (allMeds || meds).filter(function (m) { return m.garde === true; });
+    var gardePickMeds = (allMeds || meds).filter(function (m) { return m.garde === true && !(pickGardeDayFull && offOn(m, pickGardeDayFull.y, pickGardeDayFull.m, pickGardeDayFull.d)); });
     // 4-month view: flatten allDays4 by month groups
     var today2 = new Date();
     var effectiveDays = useMemo(function () {
@@ -925,6 +930,7 @@ function GridV(_a) {
                             var bl = es[0] && es[0]._blocked;
                             var noteT = notes[nk(med.id, ey, em, d, sl)];
                             var issueT = planIssues[med.id + "|" + ey + "|" + em + "|" + d + "|" + sl];
+                            var offC = offOn(med, ey, em, d); /* v10.41 : indisponible ce jour-là */
                             var astId = getAstreinteForDay ? getAstreinteForDay(ey, em, d) : null;
                             var isAst = astId !== null && String(astId) === String(med.id);
                             var astSh = null;
@@ -939,7 +945,7 @@ function GridV(_a) {
                                     parts.push("inset 0 -1px 0 var(--ast-bord)");
                                 astSh = parts.join(", ");
                             }
-                            return React.createElement("td", { key: med.id, title: (issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined, style: __assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), { display: "table-cell", verticalAlign: "middle", position: "relative" }), onContextMenu: onCellHistory ? function (e) { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onTouchMove: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onClick: bl || !isEdit ? undefined : function () { if (_gvLpF) {
+                            return React.createElement("td", { key: med.id, title: offC ? ("Indisponible — désactivé " + medOffL(med).map(function (r) { return "du " + offFr(r.du) + " au " + offFr(r.au); }).join(", ")) : ((issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined), style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), (offC ? { background: "repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)", opacity: .55, cursor: "default" } : {})), { display: "table-cell", verticalAlign: "middle", position: "relative" }), onContextMenu: onCellHistory ? function (e) { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onTouchMove: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onClick: bl || offC || !isEdit ? undefined : function () { if (_gvLpF) {
                                     _gvLpF = false;
                                     return;
                                 } onCell(med.id, ey, em, d, sl); } },
@@ -972,6 +978,7 @@ function GridV(_a) {
    — les autres onglets retrouvent simplement l'endroit où ils étaient.
    Rien ne survit au rechargement : on revient alors au jour courant, ce qui convient. */
 var SCROLL_MEM = { jour: null, pos: {} };
+
 function TableScroll(_a) {
     var children = _a.children, style = _a.style, _b = _a.mh, mh = _b === void 0 ? 150 : _b, _c = _a.jours, jours = _c === void 0 ? false : _c, _d = _a.memId, memId = _d === void 0 ? null : _d;
     var ref = React.useRef(null);
@@ -1442,14 +1449,14 @@ function GardeCandidateList(_a) {
         meds.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", textAlign: "center", padding: "8px 0" } }, "Aucun m\u00E9decin de garde configur\u00E9.")));
 }
 function GardeView(_a) {
-    var _nn = _a.noNav, noNav = _nn === void 0 ? false : _nn, _b = _a.onRemoveGarde, onRemoveGarde = _b === void 0 ? null : _b, _c = _a.printWk, printWk = _c === void 0 ? null : _c, _d = _a.onPrint, onPrint = _d === void 0 ? null : _d, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
+    var _b = _a.noNav, noNav = _b === void 0 ? false : _b, _c = _a.onRemoveGarde, onRemoveGarde = _c === void 0 ? null : _c, _d = _a.printWk, printWk = _d === void 0 ? null : _d, _e = _a.onPrint, onPrint = _e === void 0 ? null : _e, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
     /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
        l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
     var removeGarde = function (d3, y3, m3) { if (onRemoveGarde)
         onRemoveGarde(y3, m3, d3); };
     var today = new Date();
     // Période globale pour les gardes
-    var _e = perStart(year, month), gvSy = _e.sy, gvSm = _e.sm;
+    var _f = perStart(year, month), gvSy = _f.sy, gvSm = _f.sm;
     var gvEffDays = useMemo(function () {
         var days = perDaysList(gvSy, gvSm);
         if (!showFull) {
@@ -1462,7 +1469,7 @@ function GardeView(_a) {
         }
         return days;
     }, [gvSm, gvSy, showFull, PCFG.len]);
-    var _f = React.useState(false), gvSwapOpen = _f[0], setGvSwapOpen = _f[1];
+    var _g = React.useState(false), gvSwapOpen = _g[0], setGvSwapOpen = _g[1];
     var exportGardesCSV = function () {
         var rows = [["Date", "Jour", "Garde"]];
         var JX = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
@@ -1485,11 +1492,11 @@ function GardeView(_a) {
                 || cellHasAny((plan[sk(y2, m2, d2, "JOUR")] || {})[mid], ABS_IDS);
         });
     };
-    var _g = React.useState(null), pickerDay = _g[0], setPickerDay = _g[1];
+    var _h = React.useState(null), pickerDay = _h[0], setPickerDay = _h[1];
     /* ═══ Répartition automatique des gardes ═══ */
-    var _h = React.useState(false), gardeModal = _h[0], setGardeModal = _h[1];
-    var _j = React.useState(null), lastGReport = _j[0], setLastGReport = _j[1];
-    var _k = React.useState({}), gMax = _k[0], setGMax = _k[1]; // {medId: maxGardes} optionnel
+    var _j = React.useState(false), gardeModal = _j[0], setGardeModal = _j[1];
+    var _k = React.useState(null), lastGReport = _k[0], setLastGReport = _k[1];
+    var _l = React.useState({}), gMax = _l[0], setGMax = _l[1]; // {medId: maxGardes} optionnel
     var gardeMeds = medecins.filter(function (m) { return m.garde; });
     var FACT = { less: 0.75, normal: 1, more: 1.25 };
     // Tous les jours de la période (complets, indépendants de showFull)
@@ -1576,6 +1583,8 @@ function GardeView(_a) {
             var dw = dow(y2, m2, d2);
             if ((m.gardeDays || {})[String(dw)] === false)
                 return false;
+            if (offOn(m, y2, m2, d2))
+                return false; /* v10.41 : désactivé ce jour-là */
             if (isAbsFor(m.id, y2, m2, d2))
                 return false;
             if (inTourWeek(m.id, y2, m2, d2))
@@ -1583,6 +1592,8 @@ function GardeView(_a) {
             var nx = new Date(y2, m2, d2 + 1);
             if (isAbsFor(m.id, nx.getFullYear(), nx.getMonth(), nx.getDate()))
                 return false; // repos de garde impossible
+            if (offOn(m, nx.getFullYear(), nx.getMonth(), nx.getDate()))
+                return false; /* v10.41 : désactivé le lendemain — même raison */
             if (((gardeAvoid || {})[dKey(y2, m2, d2)] || {})[m.id])
                 return false;
             return true;
@@ -2117,6 +2128,7 @@ function GardeView(_a) {
         })()));
 }
 /* ════ BIP TAB ════ */
+
 function PTOccRooms(_a) {
     var medecins = _a.medecins, planningType = _a.planningType, actes = _a.actes, acteById = _a.acteById, salleReg = _a.salleReg, darkMode = _a.darkMode;
     var jours = ["", "Lun", "Mar", "Mer", "Jeu", "Ven"];
@@ -3153,7 +3165,7 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var _nn = _a.noNav, noNav = _nn === void 0 ? false : _nn, _b = _a.specColors, specColors = _b === void 0 ? null : _b, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
+    var _b = _a.noNav, noNav = _b === void 0 ? false : _b, _c = _a.specColors, specColors = _c === void 0 ? null : _c, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast;
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
@@ -3175,9 +3187,12 @@ function TourTab(_a) {
     var tmCountPeriod = function (medId) { return weeksT.reduce(function (n, w) { var wm2 = tourMed[w.key] || { HC: [], USIC: [] }; return ((wm2.HC || []).includes(medId) || (wm2.USIC || []).includes(medId)) ? n + 1 : n; }, 0); };
     var isBlockedInWeek = function (medId, wk2) {
         var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
+        var _mo = medecins.find(function (m) { return String(m.id) === String(medId); }); /* v10.41 */
         for (var i = 0; i < 5; i++) {
             var dt = new Date(wy2, wm2, wd2 + i);
             var dy = dt.getFullYear(), dm = dt.getMonth(), dd = dt.getDate();
+            if (_mo && offOn(_mo, dy, dm, dd))
+                return true; /* désactivé ce jour-là → semaine bloquée */
             var es1 = getEntries(medId, dy, dm, dd, "M");
             var es2 = getEntries(medId, dy, dm, dd, "AM");
             if (__spreadArray(__spreadArray([], es1, true), es2, true).some(function (e) { return ABS_IDS.includes(e.acteId); }))
@@ -3186,12 +3201,12 @@ function TourTab(_a) {
         return false;
     };
     /* ═══ Échange de semaines de tour ═══ */
-    var _c = React.useState(false), swapOpen = _c[0], setSwapOpen = _c[1];
-    var _d = React.useState(null), swapSrcKey = _d[0], setSwapSrcKey = _d[1];
-    var _e = React.useState(null), swapSrcMed = _e[0], setSwapSrcMed = _e[1];
-    var _f = React.useState(null), swapDstKey = _f[0], setSwapDstKey = _f[1];
-    var _g = React.useState(null), swapDstMed = _g[0], setSwapDstMed = _g[1];
-    var _h = React.useState(true), swapUpdPlan = _h[0], setSwapUpdPlan = _h[1];
+    var _d = React.useState(false), swapOpen = _d[0], setSwapOpen = _d[1];
+    var _e = React.useState(null), swapSrcKey = _e[0], setSwapSrcKey = _e[1];
+    var _f = React.useState(null), swapSrcMed = _f[0], setSwapSrcMed = _f[1];
+    var _g = React.useState(null), swapDstKey = _g[0], setSwapDstKey = _g[1];
+    var _h = React.useState(null), swapDstMed = _h[0], setSwapDstMed = _h[1];
+    var _j = React.useState(true), swapUpdPlan = _j[0], setSwapUpdPlan = _j[1];
     var JOURS_SW = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
     var absDaysOf = function (medId, wk2) {
         if (!medId || !wk2)
@@ -3340,15 +3355,15 @@ function TourTab(_a) {
        viennent maintenant des paramètres, avec repli sur les valeurs historiques. */
     var SPEC_COLORS = __assign(__assign({}, SPEC_COLORS_DEF), (specColors || {}));
     // ─── Auto-répartition ───
-    var _j = React.useState(false), autoModal = _j[0], setAutoModal = _j[1];
-    var _k = React.useState(1), cfgMinEEP = _k[0], setCfgMinEEP = _k[1];
-    var _l = React.useState(1), cfgMinPace = _l[0], setCfgMinPace = _l[1];
-    var _m = React.useState(1), cfgMinETT = _m[0], setCfgMinETT = _m[1];
-    var _o = React.useState(3), cfgMinCoro = _o[0], setCfgMinCoro = _o[1];
-    var _q = React.useState({}), cfgExcl = _q[0], setCfgExcl = _q[1]; // {medId: true = ne participe pas}
-    var _s = React.useState({}), cfgWeeks = _s[0], setCfgWeeks = _s[1]; // {medId: nWeeks}
-    var _t = React.useState({}), cfgPref2HC = _t[0], setCfgPref2HC = _t[1]; // {medId: bool}
-    var _u = React.useState({}), cfgPref2USIC = _u[0], setCfgPref2USIC = _u[1]; // {medId: bool}
+    var _k = React.useState(false), autoModal = _k[0], setAutoModal = _k[1];
+    var _l = React.useState(1), cfgMinEEP = _l[0], setCfgMinEEP = _l[1];
+    var _m = React.useState(1), cfgMinPace = _m[0], setCfgMinPace = _m[1];
+    var _o = React.useState(1), cfgMinETT = _o[0], setCfgMinETT = _o[1];
+    var _q = React.useState(3), cfgMinCoro = _q[0], setCfgMinCoro = _q[1];
+    var _s = React.useState({}), cfgExcl = _s[0], setCfgExcl = _s[1]; // {medId: true = ne participe pas}
+    var _t = React.useState({}), cfgWeeks = _t[0], setCfgWeeks = _t[1]; // {medId: nWeeks}
+    var _u = React.useState({}), cfgPref2HC = _u[0], setCfgPref2HC = _u[1]; // {medId: bool}
+    var _v = React.useState({}), cfgPref2USIC = _v[0], setCfgPref2USIC = _v[1]; // {medId: bool}
     var totalSlots = weeksT.length * 4; // 2 HC + 2 USIC per week
     var activeMeds = tourMeds.filter(function (m) { return !cfgExcl[m.id]; });
     var nominalW = activeMeds.length > 0 ? Math.ceil(totalSlots / activeMeds.length) : 0;
@@ -4071,6 +4086,7 @@ function TourTab(_a) {
                     React.createElement("button", { onClick: closeAutoModal, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Fermer (enregistre la config)")),
                 React.createElement("div", { style: { marginTop: 8, fontSize: 10, color: "#ef4444" } }, "\u26A0 La r\u00E9partition remplace toutes les assignations existantes de la p\u00E9riode."))))));
 }
+
 function StatsTab(_a) {
     var medecins = _a.medecins, actes = _a.actes, plan = _a.plan, year = _a.year, month = _a.month, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, tourMed = _a.tourMed;
     var _b = React.useState(function () { return new Date().getFullYear(); }), statsYear = _b[0], setStatsYear = _b[1];
@@ -5160,7 +5176,7 @@ var BUILD_DEM = [["conges", "🏖️", "Poser vos congés de la période", "pers
    preferences de tour aux medecins qui tournent, celles de gardes a ceux qui en
    prennent. Les autres ne recoivent rien et ne comptent nulle part. */
 var demConcerne = function (m, id) { return !m ? false : (id === "tour" ? m.tourMed === true : id === "garde" ? m.garde === true : true); };
-var demPop = function (meds, id) { return meds.filter(function (m) { return demConcerne(m, id); }); };
+var demPop = function (meds, id, jours) { return meds.filter(function (m) { return demConcerne(m, id) && offEtat(m, jours || []) !== "off"; }); }; /* v10.41 : hors désactivés période entière */
 /* l'annee de fin est dite quand la periode change d'annee (comme _titlePeriod) :
    un bandeau se lit hors contexte, il ne doit pas laisser d'ambiguite. */
 var perLibelle = function (sy, sm) {
@@ -5243,9 +5259,10 @@ function BuildAsk(_a) {
     var att = [];
     Object.keys(build || {}).forEach(function (k) {
         var B = (build || {})[k] || {};
+        var jrsK = perDaysList(+String(k).split("_")[0], +String(k).split("_")[1]); /* v10.41 */
         BUILD_DEM.forEach(function (_a) {
             var id = _a[0], ic = _a[1], txt = _a[2], champ = _a[3];
-            if ((B.dem || {})[id] && demConcerne(moi, id) && !((B[champ] || {})[editMedId]))
+            if ((B.dem || {})[id] && demConcerne(moi, id) && offEtat(moi, jrsK) !== "off" && !((B[champ] || {})[editMedId]))
                 att.push({ k: k, id: id, ic: ic, txt: txt, champ: champ });
         });
     });
@@ -5297,7 +5314,10 @@ function BuildTab(_a) {
         s[nom] = sign(); patchB({ specs: s }); };
     var perLbl = perLibelle(bPer.sy, bPer.sm);
     var bDays = useMemo(function () { return perDaysList(bPer.sy, bPer.sm); }, [bPer.sy, bPer.sm, PCFG.len]);
-    var meds = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") === "medecin"; }); }, [medecins]);
+    var bJours = React.useMemo(function () { return perDaysList(bPer.sy, bPer.sm); }, [bPer.sy, bPer.sm, PCFG.len]);
+    /* v10.41 : un médecin désactivé sur TOUTE la période sort des listes et des
+       comptes de l'onglet — une étape peut se terminer sans lui. */
+    var meds = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") === "medecin" && offEtat(m, bJours) !== "off"; }); }, [medecins, bJours]);
     /* v10.31 : la coche « absences a recueillir » de la fiche Equipe decide qui parait ici */
     var autres = useMemo(function () { return medecins.filter(function (m) { return (m.role || "medecin") !== "medecin" && m.suiviAbs !== false; }); }, [medecins]);
     /* ── mesures : elles servent A LA FOIS d'alerte et de fin d'etape ── */
@@ -5400,7 +5420,7 @@ function BuildTab(_a) {
                 React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 6, marginBottom: 10 } }, BUILD_DEM.map(function (_a) {
                     var id = _a[0], ic = _a[1], txt = _a[2], champ = _a[3], titre = _a[4];
                     var ouverte = (B.dem || {})[id];
-                    var pop = demPop(meds, id);
+                    var pop = demPop(meds, id, bJours);
                     var n = pop.filter(function (m) { return (B[champ] || {})[m.id]; }).length;
                     return (React.createElement("div", { key: id, style: { border: "1px solid " + (ouverte ? "#8b5cf6" : "var(--border)"), borderRadius: 8, padding: "7px 9px", background: "var(--bg3)" } },
                         React.createElement("div", { style: { fontSize: 12, fontWeight: 800, color: "var(--txt)" } }, ic + " " + titre),
@@ -5477,7 +5497,6 @@ function BuildTab(_a) {
         tuiles.map(function (t) { return (React.createElement(BuildTile, { key: t.n, n: t.n, icon: t.icon, titre: t.titre, sous: t.sous, ouvert: !!ouv[t.n], onToggle: function () { return toggle(t.n); }, alerte: t.alerte, fait: valide(t.n), auto: autoOk[t.n], onFait: function () { return setEtape(t.n); }, peutFaire: isEdit && !autoOk[t.n] }, t.body)); }),
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", textAlign: "center", marginTop: 10 } }, "Les alertes signalent, elles ne bloquent pas : une \u00E9tape non termin\u00E9e n'emp\u00EAche jamais d'avancer.")));
 }
-
 /* ═══════════════ v10.35 : SAUVEGARDE EXPLOITABLE ═══════════════
    Sortir le planning dans un fichier qu'il ouvre lui-même, pour rediffuser vite
    le jour où l'application ou Firebase tombe. Deux principes :
@@ -7756,6 +7775,7 @@ function CardioPlanning() {
         if(done)return;
         /* v9.59 : disponible = rien de ferme, ET choix ouvert contenant BIP le cas echeant. */
         const dispo=elig.filter(m=>{
+          if(offOn(m,o.y,o.m,o.d))return false;   /* v10.41 : désactivé ce jour-là */
           const es=getEntries(m.id,o.y,o.m,o.d,sl)||[];
           if(es.some(e=>e&&e.acteId&&!e.cond))return false;
           const cd=es.filter(e=>e&&e.cond);
@@ -8931,7 +8951,7 @@ function CardioPlanning() {
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginRight: 4 } }, "Filtre:"),
                     React.createElement("button", { onClick: function () { return setPlanFilter([]); }, style: { padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border)", background: planFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: planFilter.length === 0 ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: 600 } }, "Tous"),
                     medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); })),
-                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
+                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, tourProps),
             tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medecins, getEntries: getEntries, tourMed: tourMed, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: function (per) { return openPtModal(null, "apply", per); }, onRemovePT: function (per) { return openPtModal(null, "remove", per); }, tourProps: tourProps, gardeProps: gardeProps }),
             tab === "chl" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, notes: notes, onPickSite: function (_a) {
@@ -8995,7 +9015,7 @@ function CardioPlanning() {
                         React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
                 isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 8 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type")),
-                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: attIssues.map, printWk: printWk, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
+                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: attIssues.map, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit },
