@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.41 — 13/08/2026";
+var APP_VERSION = "v10.43 — 14/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4253,6 +4253,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
  {id:"creer",icon:"🚀",title:"Créer un planning de A à Z",body:()=>HE("div",null,
+  HP({children:["🧱 Depuis la v10.29, l'onglet ",HE("b",null,"Construire")," guide tout ce parcours étape par étape — voir sa section. Le détail ci-dessous reste valable : ce sont les mêmes fonctions."]}),
   HP({children:["L'ordre compte : chaque étape s'appuie sur la précédente. Tout se fait sur la ",HE("b",null,"période affichée")," (généralement 4 mois). La période s'étend jusqu'au ",HE("b",null,"dimanche qui clôt la dernière semaine"),", et rattache le lundi suivant s'il est férié (ex. 1er novembre) : la répartition se fait en semaines complètes, et la période suivante démarre le lendemain."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
   HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — onglet Tour : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫."]}),
@@ -4262,8 +4263,16 @@ const HELP_SECTIONS=[
   HStep({n:"6",children:[HE("b",null,"Ajuster")," — cases individuelles, échanges de gardes ⇄, dérogations de tour, notes 📝."]}),
   HP({last:true,children:["En fin de période : archiver les mois écoulés (voir la tuile Archiver)."]}))},
 
+ {id:"construire",icon:"🧱",title:"Construire — le planning pas à pas",body:()=>HE("div",null,
+  HP({children:["L'onglet ",HE("b",null,"Construire")," guide la fabrication d'une période en ",HE("b",null,"7 étapes"),", dans l'ordre réel du travail : congés, tour, gardes, absences de tout le monde, planning type, surspécialités, bip. Chaque étape est une tuile qui s'ouvre et se replie ; la première non terminée est ouverte à l'arrivée."]}),
+  HP({children:["La ",HE("b",null,"période se choisit en haut"),", une seule fois, et vaut pour toutes les tuiles — l'onglet s'ouvre sur la ",HE("b",null,"période suivante"),", celle qu'on construit. Les tuiles Tour et Gardes contiennent les onglets entiers, inchangés."]}),
+  HP({children:["Une étape mesurable se termine ",HE("b",null,"d'elle-même"),' (pastille « terminé ») ; seule l\'étape 5, planning type, se valide à la main. Rien n\'est bloquant : une étape en retard n\'empêche jamais d\'avancer.']}),
+  HT({children:"Les demandes à l'équipe"}),
+  HP({children:["Depuis la tuile 1, trois demandes s'ouvrent séparément : ",HE("b",null,"poser ses congés"),", ",HE("b",null,"préférences de tour"),", ",HE("b",null,"préférences de gardes"),". Chaque médecin concerné voit alors un ",HE("b",null,"bandeau dans son Planning"),", quelle que soit la période affichée, avec un bouton pour aller à la bonne période et « ✓ C'est fait » qui coche sa ligne. Les préférences de tour ne partent qu'à ceux qui tournent, celles de gardes à ceux qui en prennent."]}),
+  HP({children:["Accès : éditeur et intermédiaires. Le bouton du ",HE("b",null,"Bip de Béthune")," vit dans la tuile 7 (il n'est plus dans l'onglet CHB)."]}))},
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
   HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible."]}),
+  HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip."]}),
   HTab({t:"🔄 Tour",children:["attribution des semaines de tour HC / USIC, répartition automatique, préférences ⭐/🚫 par semaine, échanges, compteurs de disponibilité par sur-spécialité, badges ✂ temps partiel."]}),
   HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour."]}),
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
@@ -4273,7 +4282,7 @@ const HELP_SECTIONS=[
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
-  HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase."]}),
+  HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase. Les encarts arrivent repliés : cliquez un titre pour l\'ouvrir, « Tout déplier » en haut."]}),
   HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}),
   HTab({t:"📥 Reports",children:["outil individuel et facultatif : cochez vos semaines blanches, puis un tableau chronologique signale les semaines de tour reportées sur vos blanches (dates habituelles), celles sans report possible, celles déjà blanches, et les dates fermées à réouvrir ; suivi des offs par semaine. Les activités concernées se cochent « 📥 à reporter » dans l'onglet Activités. Export CSV."]}))},
 
@@ -4299,8 +4308,18 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée. En naviguant vers un mois archivé, il se recharge automatiquement en consultation. Désarchivage possible mois par mois."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète toutes les 72 h, les 10 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
-  HP({last:true,children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}))},
+  HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}),
+  HT({children:"💾 Sauvegarde sur mon ordinateur"}),
+  HP({children:["Dans Paramètres, l'encart ",HE("b",null,"Sauvegarde sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui permettent de tout remettre en place. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
+  HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). La date de dernière sauvegarde et le compteur sont propres à ",HE("b",null,"chaque ordinateur"),"."]}))},
 
+ {id:"desactiver",icon:"⏸",title:"Désactiver un médecin (juniors, longs congés)",body:()=>HE("div",null,
+  HP({children:["Pour un junior qui ne vient pas une période, ou un long congé : plutôt qu'une ligne remplie d'absences, on ",HE("b",null,"désactive")," la personne sur des dates. Dans l'onglet ",HE("b",null,"Type"),", cliquez sur ",HE("b",null,"la pastille ronde")," d'un médecin (éditeur seulement) : la fenêtre propose « sur toute la période affichée » ou « de date à date », et liste les indisponibilités déjà posées avec un bouton ▶ Réactiver chacune."]}),
+  HP({children:["Pendant ses dates : le ",HE("b",null,"planning type le saute"),", il sort des répartitions automatiques (",HE("b",null,"tour, gardes, bip"),") et des demandes de Construire, ses cases sont ",HE("b",null,"hachurées et verrouillées"),". Couvert sur ",HE("b",null,"toute"),' la période affichée, sa colonne disparaît des grilles ; sa pastille reste dans Type (grisée ⏸) pour le réactiver. Il redevient disponible ',HE("b",null,"le jour de son retour"),", sans autre manipulation. Ce sont des dates qui sont enregistrées : changer la durée des périodes ne déplace rien."]}),
+  HT({children:"⚠ Les limites à connaître"}),
+  HP({children:["• ",HE("b",null,"Retirez ses activités avant de désactiver")," : la désactivation n'efface ",HE("b",null,"rien"),' — les cases déjà posées persistent sous les hachures. La fenêtre compte ce qui est posé sur les dates choisies et propose « 🧹 Retirer ses activités sur ces dates » (gardes, tour et absences comprises).']}),
+  HP({children:["• L'",HE("b",null,"astreinte")," n'est pas couverte : gérez-la à part dans son onglet."]}),
+  HP({children:["• L'éditeur peut toujours poser ",HE("b",null,"à la main")," un tour ou une garde sur quelqu'un de désactivé depuis les onglets Tour et Gardes — le verrou porte sur les cases et les automatismes, pas sur un geste délibéré."]}))},
  {id:"legende",icon:"🎨",title:"Légende",body:()=>HE("div",null,
   HP({children:[HAvat({txt:"TH",color:"#ec4899"})," pastille d'initiales : chaque médecin a sa couleur · ",HBadg({txt:"CORO",color:"#76a5af"})," badge d'activité, dans la couleur de l'activité."]}),
   HP({children:["Fiches Équipe : ",HChip({txt:"Garde",bg:"#16a34a"})," / ",HChip({txt:"Sans garde",bg:"#dc2626"})," · ",HChip({txt:"TM",bg:"#1d4ed8"})," / ",HChip({txt:"Sans TM",bg:"#d97706"}),"."]}),
@@ -5761,13 +5780,13 @@ var offFr = function (iso) { var a = String(iso).split("-"); return a[2] + "/" +
 /* La fenêtre, centrée comme toutes celles de l'application. Réservée à
    l'éditeur par construction : la pastille n'est cliquable que pour lui. */
 function DeactModal(_a) {
-    var med = _a.med, perDays = _a.perDays, perLbl = _a.perLbl, onSave = _a.onSave, onClose = _a.onClose;
+    var med = _a.med, perDays = _a.perDays, perLbl = _a.perLbl, onSave = _a.onSave, onClose = _a.onClose, _b = _a.countActs, countActs = _b === void 0 ? null : _b, _c = _a.onClear, onClear = _c === void 0 ? null : _c;
     var du0 = perDays.length ? dKey(perDays[0].y, perDays[0].m, perDays[0].d) : "";
     var fin = perDays.length ? perDays[perDays.length - 1] : null;
     var au0 = fin ? dKey(fin.y, fin.m, fin.d) : "";
-    var _b = useState(0), mode = _b[0], setMode = _b[1];
-    var _c = useState(du0), d1 = _c[0], setD1 = _c[1];
-    var _d = useState(au0), d2 = _d[0], setD2 = _d[1];
+    var _d = useState(0), mode = _d[0], setMode = _d[1];
+    var _e = useState(du0), d1 = _e[0], setD1 = _e[1];
+    var _f = useState(au0), d2 = _f[0], setD2 = _f[1];
     if (!med)
         return null;
     var ranges = medOffL(med);
@@ -5777,6 +5796,12 @@ function DeactModal(_a) {
             return;
         onSave(ranges.concat([r]));
     };
+    /* v10.42, SA CONSIGNE : les cases déjà posées persistent sous les hachures.
+       Plutôt qu'une ligne d'Aide qu'on aura oubliée, la fenêtre COMPTE ce qui est
+       posé sur les dates choisies et propose de le retirer d'un coup. */
+    var rSel = mode === 0 ? { du: du0, au: au0 } : { du: d1, au: d2 };
+    var rOK = !!(rSel.du && rSel.au && rSel.au >= rSel.du);
+    var nAct = (countActs && rOK) ? countActs(rSel.du, rSel.au) : 0;
     var bt = function (sel) { return ({ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 9px", border: "1px solid " + (sel ? "#8b5cf6" : "var(--border)"), borderRadius: 8, marginBottom: 6, cursor: "pointer", background: sel ? "rgba(139,92,246,.08)" : "transparent" }); };
     return (React.createElement("div", { onClick: function (e) { if (e.target === e.currentTarget)
             onClose(); }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 } },
@@ -5804,6 +5829,9 @@ function DeactModal(_a) {
                         React.createElement("input", { type: "date", value: d1, onChange: function (e) { return setD1(e.target.value); }, style: __assign(__assign({}, S.fi), { width: 132, padding: "3px 6px" }) }),
                         "au ",
                         React.createElement("input", { type: "date", value: d2, onChange: function (e) { return setD2(e.target.value); }, style: __assign(__assign({}, S.fi), { width: 132, padding: "3px 6px" }) })))),
+            nAct > 0 && React.createElement("div", { style: { border: "1px solid #ef4444", background: "rgba(239,68,68,.07)", borderRadius: 8, padding: "7px 9px", margin: "2px 0 8px" } },
+                React.createElement("div", { style: { fontSize: 11.5, color: "#ef4444", fontWeight: 700, marginBottom: 5 } }, "⚠ " + nAct + " activité" + (nAct > 1 ? "s" : "") + " déjà posée" + (nAct > 1 ? "s" : "") + " sur ces dates (gardes, tour et absences comprises) — la désactivation ne les efface pas, elles resteraient sous les hachures."),
+                onClear && React.createElement("button", { onClick: function () { return onClear(rSel.du, rSel.au); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid #ef4444", background: "rgba(239,68,68,.10)", color: "#ef4444", fontWeight: 800, cursor: "pointer" } }, "\uD83E\uDDF9 Retirer ses activit\u00E9s sur ces dates")),
             React.createElement("div", { style: { fontSize: 10.5, color: "var(--txt3)", margin: "6px 0 10px" } }, "Pendant ses dates : le planning type le saute et ses cases sont indisponibles. Sa fiche et son planning type sont conserv\u00E9s \u2014 il redevient disponible le jour de son retour."),
             React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
                 React.createElement("button", { onClick: ajouter, style: { fontSize: 12, padding: "6px 14px", borderRadius: 7, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.10)", color: "#b45309", fontWeight: 800, cursor: "pointer" } }, "\u23F8 D\u00E9sactiver"),
@@ -8537,6 +8565,26 @@ function CardioPlanning() {
         });
         toast(medId ? "Planning effac\u00E9 pour ".concat((medecins.find(function (m) { return m.id === medId; }) || { nom: "?" }).nom) : "Planning effac\u00E9 pour ".concat(MOIS[month]), "info");
     }, [allDays, year, month, medecins]);
+    /* v10.42 : garde-fou de la désactivation. Le compte lit par getEntries — il
+       voit donc AUSSI le tour synthétisé et les gardes ; le nettoyage appelle
+       clearPeriodActs ET removeTourPeriod, car le tour ne vit pas dans le planning. */
+    var offCount = useCallback(function (medId, du, au) {
+        var a = String(du).split("-").map(Number), b = String(au).split("-").map(Number);
+        var fin = new Date(b[0], b[1] - 1, b[2]);
+        var n = 0;
+        var _loop_14 = function (c) {
+            var y2 = c.getFullYear(), m2 = c.getMonth(), d2 = c.getDate();
+            ["M", "AM", "JOUR", "N"].forEach(function (sl) { n += getEntries(medId, y2, m2, d2, sl).filter(function (e) { return e && e.acteId && !e._blocked; }).length; });
+        };
+        for (var c = new Date(a[0], a[1] - 1, a[2]); c <= fin; c.setDate(c.getDate() + 1)) {
+            _loop_14(c);
+        }
+        return n;
+    }, [getEntries]);
+    var offClear = useCallback(function (medId, du, au) {
+        clearPeriodActs({ medId: medId, dateFrom: du, dateTo: au, keepAbs: false, keepGardes: false });
+        removeTourPeriod(medId, du, au);
+    }, [clearPeriodActs, removeTourPeriod]);
     /* ── salleOcc ── */
     var salleOcc = useCallback(function (acteId, y2, m2, d2, slot) {
         var res = {};
@@ -9000,7 +9048,7 @@ function CardioPlanning() {
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: function () { return openPtModal(null, "remove"); } }, "\uD83D\uDDD1 Retirer")),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Semaine type par m\u00E9decin. Le bouton \u25B6 PT l'applique aux mois de la p\u00E9riode affich\u00E9e (choix des mois et du point de d\u00E9part dans la fen\u00EAtre). TM exclus automatiquement. Clic sur une case pour d\u00E9finir."),
                 React.createElement(PlanTypeGrid, { medecins: __spreadArray(__spreadArray(__spreadArray([], medPlan, true), medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), actes: actes, planningType: planningType, setPlanningType: setPlanningType, isEdit: isEdit || isInterEdit, acteById: acteById, setMData: setMData, setModal: setModal, perDays: allDays4, onMedClick: isEdit ? (function (med) { return setDeactMed(med.id); }) : null }),
-                deactMed && React.createElement(DeactModal, { med: medecins.find(function (m) { return m.id === deactMed; }), perDays: allDays4, perLbl: perLibelle(perStart(year, month).sy, perStart(year, month).sm), onSave: function (rgs) { return saveOff(deactMed, rgs); }, onClose: function () { return setDeactMed(null); } }),
+                deactMed && React.createElement(DeactModal, { med: medecins.find(function (m) { return m.id === deactMed; }), perDays: allDays4, perLbl: perLibelle(perStart(year, month).sy, perStart(year, month).sm), onSave: function (rgs) { return saveOff(deactMed, rgs); }, onClose: function () { return setDeactMed(null); }, countActs: function (du, au) { return offCount(deactMed, du, au); }, onClear: function (du, au) { return offClear(deactMed, du, au); } }),
                 React.createElement(PTOccRooms, { medecins: medecins, planningType: planningType, actes: actes, acteById: acteById, salleReg: salleReg, darkMode: darkMode }))),
             tab === "attache" && (React.createElement("div", null,
                 isEdit && React.createElement(IssuePanel, { iss: attIssues, open: plIssOpen, setOpen: setPlIssOpen, onGo: goIssue }),
