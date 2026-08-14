@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.45 — 14/08/2026";
+const APP_VERSION="v10.46 — 14/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -751,7 +751,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
         </>);})()}
       </div>
     </Ov>}
-    <TableScroll jours>
+    <TableScroll jours fit>
       <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
         <thead>
           <tr>
@@ -850,7 +850,14 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
    — les autres onglets retrouvent simplement l'endroit où ils étaient.
    Rien ne survit au rechargement : on revient alors au jour courant, ce qui convient. */
 const SCROLL_MEM={jour:null,pos:{}};
-function TableScroll({children,style,mh=150,jours=false,memId=null}){
+/* v10.46 : les onglets dont la grille occupe l'écran en entier — leur cadre
+   passe en « fit », et le bas de page n'y garde qu'une petite marge. */
+const GRID_FIT=["planning","chl","chb","plateau","angio","attache"];
+/* v10.47 : Tour et Gardes vivent dans Construire (tuiles 2 et 3) — leurs
+   boutons sont retirés pour tous, à sa demande. Les onglets restent dans le
+   code : Construire les embarque, les supprimer le casserait. */
+const HIDDEN_TABS=["tourmedical","garde"];
+function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false}){
   const ref=React.useRef(null);
   React.useLayoutEffect(()=>{
     const el=ref.current; if(!el)return;
@@ -871,6 +878,25 @@ function TableScroll({children,style,mh=150,jours=false,memId=null}){
     }
     if(memId)SCROLL_MEM.pos[memId]=el.scrollTop;
   };
+  /* v10.46 : le vrai remède au chantier v9.87, sur SON diagnostic (deux barres
+     à droite, la seconde emporte le haut de la page, la première s'arrête avant
+     la fin du tableau) : le cadre MESURE sa position et prend exactement le
+     reste de la fenêtre. La page n'a plus rien à faire défiler, l'en-tête ne
+     peut plus partir, et la barre interne va jusqu'au bout. Recalculé à chaque
+     rendu (les bandeaux au-dessus vont et viennent) et au redimensionnement. */
+  const doFit=React.useCallback(()=>{
+    if(!fit)return;
+    const el=ref.current;if(!el)return;
+    const top=el.getBoundingClientRect().top+(window.scrollY||window.pageYOffset||0);
+    const v=Math.max(260,window.innerHeight-top-56)+"px";
+    if(el.style.maxHeight!==v)el.style.maxHeight=v;
+  },[fit]);
+  React.useLayoutEffect(()=>{doFit();});
+  React.useEffect(()=>{
+    if(!fit)return;
+    window.addEventListener("resize",doFit);
+    return ()=>window.removeEventListener("resize",doFit);
+  },[fit,doFit]);
   /* v9.87.2 : RETOUR au comportement d'avant la v9.87, à sa demande.
      Mes deux tentatives ont empiré les choses : la première laissait les en-têtes partir,
      la seconde a créé DEUX barres de défilement à droite dans un ordre inversé, réduisant
@@ -1016,7 +1042,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
 
     return(
     <div>{hdr}
-      <TableScroll jours>
+      <TableScroll jours fit>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
@@ -1237,7 +1263,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
 
     return(
     <div>{hdr}
-      <TableScroll jours>
+      <TableScroll jours fit>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
             <tr>
@@ -4090,13 +4116,19 @@ const HELP_SECTIONS=[
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
   HStep({n:"6",children:[HE("b",null,"Ajuster")," — cases individuelles, échanges de gardes ⇄, dérogations de tour, notes 📝."]}),
   HP({last:true,children:["En fin de période : archiver les mois écoulés (voir la tuile Archiver)."]}))},
+ {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
+  HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
+  HP({children:["Pour chaque consultation perdue (absence, semaine de tour), l'application propose la ",HE("b",null,"semaine blanche libre la plus proche"),", jamais à plus d'",HE("b",null,"un mois"),", en avant comme en arrière, dans la période affichée. Une semaine sans solution se traite à la main : « ⇄ Chercher une autre semaine blanche » ouvre le choix complet, sans plafond. La ligne d'une blanche qui reçoit dit « peut accueillir le report de … » et se met à jour toute seule si vous décidez autrement."]}),
+  HT({children:"Valider, annuler — tout laisse une trace"}),
+  HP({children:["« ✓ valider » écrit un ",HE("b",null,"commentaire estampillé")," dans la case du planning (« 12/08 · TH — Report du 3 août M, trois patients ») ; « annuler le report » n'efface rien : une ligne s'ajoute au commentaire. Les demi-journées blanches restées libres portent la pastille ☐ ",HE("b",null,"à rouvrir"),", qui devient « rouvert par … » une fois cochée — pour ne pas oublier de rendre le créneau aux secrétaires."]}),
+  HT({children:"Le décompte des patients"}),
+  HP({children:["La case patients ",HE("b",null,"vide"),", c'est toute la consultation qui part d'un bloc ; un ",HE("b",null,"nombre"),", c'est vous qui divisez. Les ",HE("b",null,"après-midis des semaines de tour")," peuvent reprendre une partie des patients — jamais le matin — et la part posée crée alors réellement la consultation dans le planning, avec choix de salle. Le reste peut partir « ↪ en liste d'attente », gérée par les secrétaires. Un badge « ⚠ report incomplet » reste affiché tant que le compte n'est pas à zéro."]}),
+  HP({last:true,children:["En bas, « ",HE("b",null,"Demi-journées off par semaine")," » montre les créneaux libres hors semaines de tour : de quoi ouvrir une consultation, une fois tous les reports traités (export CSV). Les flèches ↶↷ couvrent aussi les reports, y compris pour les administratifs."]}))},
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
   HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible."]}),
-  HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip."]}),
-  HTab({t:"🔄 Tour",children:["attribution des semaines de tour HC / USIC, répartition automatique, préférences ⭐/🚫 par semaine, échanges, compteurs de disponibilité par sur-spécialité, badges ✂ temps partiel."]}),
+  HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip. Les anciens onglets Tour et Gardes vivent ici, entiers, dans les tuiles 2 et 3."]}),
   HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour."]}),
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
-  HTab({t:"🌙 Gardes",children:["tableau jour par jour, répartition automatique, échanges ⇄ entre deux gardes, préférences, volumes et statistiques par médecin, export CSV."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
   HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période."]}),
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
@@ -6732,8 +6764,8 @@ function CardioPlanning(){
     :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage","construire"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
-    .filter(([tid])=>hideTabs.indexOf(tid)<0);
-  useEffect(()=>{if(hideTabs.indexOf(tab)>=0)setTab("planning");},[accessMode,tab,isMedEdit]);
+    .filter(([tid])=>hideTabs.indexOf(tid)<0&&HIDDEN_TABS.indexOf(tid)<0);
+  useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0)setTab("planning");},[accessMode,tab,isMedEdit]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
@@ -7879,7 +7911,7 @@ header::-webkit-scrollbar { display: none; }
 
       </header>
 
-      <main style={S.main}>
+      <main style={{...S.main,paddingBottom:GRID_FIT.indexOf(tab)>=0?12:110}}>
 
       {/* MON PLANNING */}
       
