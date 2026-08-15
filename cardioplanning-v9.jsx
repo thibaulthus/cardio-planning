@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.55 — 15/08/2026";
+const APP_VERSION="v10.56 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5767,7 +5767,7 @@ function DeactModal({med,perDays,perLbl,onSave,onClose,countActs=null,onClear=nu
   );
 }
 
-/* ═══════════ v10.55 — INTERNES, lot 1 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
+/* ═══════════ v10.56 — INTERNES, lots 1-2 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
    Les internes ne vivent PAS dans la liste `medecins` : ils sont rangés par semestre dans intCfg.sems,
    pour ne jamais apparaître dans les filtres et listes des médecins. Leurs cases du planning utiliseront
    leurs identifiants ("I...") comme clés, exactement comme celles des médecins.
@@ -5901,20 +5901,262 @@ function InternesTile({intCfg,setIntCfg}){
   </div>;
 }
 
-function InternesView({intCfg}){
-  const tj=intISO(new Date());
-  const cur=intSemDuJour(intCfg,tj);
-  const prochains=intSemsTri(intCfg).filter(s=>s.deb>tj);
-  return <div style={{...S.card}}>
-    <div style={{fontWeight:800,fontSize:14,color:"var(--txt)",marginBottom:8}}>🎓 Internes</div>
-    {cur?<div style={{marginBottom:10}}>
-      <div style={{fontSize:12,color:"var(--txt2)",marginBottom:6}}>Semestre en cours : <b>{intSemLabel(cur.deb)}</b> ({intFmtD(cur.deb)} → {intFmtD(cur.fin)}) — {(cur.meds||[]).length} interne(s)</div>
-      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(cur.meds||[]).map(m=><span key={m.id} style={{background:m.color,color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:800}}>{m.init} · {m.nom}</span>)}</div>
-    </div>:<div style={{fontSize:12,color:"var(--txt3)",marginBottom:10}}>Aucun semestre ne couvre la date du jour — saisissez-le dans l'onglet Équipe, section « 🎓 Internes ».</div>}
-    {prochains.length>0&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>{"Préparé : "+prochains.map(s=>intSemLabel(s.deb)+" (dès le "+intFmtD(s.deb)+", "+((s.meds||[]).length)+" interne(s))").join(" · ")}</div>}
-    <div style={{background:"rgba(56,139,253,.10)",border:"1px solid #388bfd",borderRadius:8,padding:"9px 11px",fontSize:12,color:"var(--txt2)"}}>
-      La grille (demi-journées, colonne de garde, jauge, statistiques) arrive au prochain lot. Cet écran sert déjà à vérifier que les semestres et les fiches saisis dans Équipe sont enregistrés et synchronisés entre appareils.
+/* ── v10.56, LOT 2 : la grille de l'onglet Internes ──
+   Jours en lignes (M/AM), une colonne par interne du ou des semestres couvrant la
+   période affichée. Samedi : une seule case (matin). Dimanche et fériés : rien
+   (la garde arrive au lot 3, la jauge et les statistiques au lot 4).
+   Pose par modale de case : HC, USIC, activités cochées 🎓 sans salle, Absence,
+   FMC, Repos de garde. Lundi + HC/USIC → proposition de remplir la semaine en
+   sautant repos, absences et FMC. Écran « Modifier sur une période » sans les
+   activités à salle. Le repos issu d'une garde posée dans l'appli (lot 3) n'aura
+   pas de croix : il ne s'enlèvera qu'en retirant la garde. */
+function intISO2(y,m0,d){return y+"-"+String(m0+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
+function intTxt(bg){try{return hexToLum(bg)>0.35?"#111":"#fff";}catch(e){return "#fff";}}
+function intActesTuiles(actes,sam){
+  const hc={id:"TOUR_HC",short:sam?"HC · samedi matin":"HC",color:"#388bfd"};
+  if(sam)return [hc,{id:"ABSENCE",short:"Absence",color:"#e06666"},{id:"FORMATION",short:"FMC",color:"#a3e635"},{id:"REPOS_GARDE",short:"Repos de garde",color:"#ffe599"}];
+  const perso=actes.filter(a=>a.interneOk===true&&!a.isSystem&&!a.hasSalle&&ABS_IDS.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,color:a.color}));
+  return [hc,{id:"TOUR_USIC",short:"USIC",color:"#4285f4"}].concat(perso)
+    .concat([{id:"ABSENCE",short:"Absence",color:"#e06666"},{id:"FORMATION",short:"FMC",color:"#a3e635"},{id:"REPOS_GARDE",short:"Repos de garde",color:"#ffe599"}]);
+}
+function intJourBloque(getEntries,mid,y,m,d){
+  return getEntries(mid,y,m,d,"JOUR").some(e=>e&&e.acteId&&(ABS_IDS.indexOf(e.acteId)>=0||e.acteId==="REPOS_GARDE"));
+}
+function intSlotProtege(getEntries,mid,y,m,d,sl){
+  if(intJourBloque(getEntries,mid,y,m,d))return true;
+  return getEntries(mid,y,m,d,sl).some(e=>e&&(e._blocked||(e.acteId&&(ABS_IDS.indexOf(e.acteId)>=0||e.acteId==="REPOS_GARDE"))));
+}
+function intGardeVeille(getEntries,mid,y,m,d){
+  const v=intDecal(intISO2(y,m,d),-1).split("-").map(Number);
+  return ["N","JOUR"].some(sl=>getEntries(mid,v[0],v[1]-1,v[2],sl).some(e=>e&&e.acteId==="GARDE"));
+}
+
+function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry}){
+  const [cren,setCren]=useState(slot0==="AM"?"AM":"M");
+  const [per,setPer]=useState(null);
+  const [pd1,setPd1]=useState(intISO2(y,m,d));
+  const [pd2,setPd2]=useState(intISO2(y,m+1,0));
+  const [pSel,setPSel]=useState(null);
+  const iso=intISO2(y,m,d);
+  const dw=dow(y,m,d);
+  const sam=dw===6;
+  const tuiles=intActesTuiles(actes,sam);
+  const jour=JOURSL[dw]+" "+intFmtD(iso);
+  const mid=med.id;
+  const dansSem=(iso2)=>iso2>=med.sDeb&&iso2<=med.sFin;
+  const contenu=[];
+  (sam?["M"]:["M","AM"]).forEach(sl=>{
+    getEntries(mid,y,m,d,sl).forEach(e=>{
+      if(e&&e.acteId&&!e._blocked&&!e._fullDay)contenu.push({sl:sl,acteId:e.acteId});
+    });
+  });
+  getEntries(mid,y,m,d,"JOUR").forEach(e=>{if(e&&e.acteId)contenu.push({sl:"JOUR",acteId:e.acteId});});
+  const gardeV=intGardeVeille(getEntries,mid,y,m,d);
+  const retire=(c)=>{setEntry(mid,y,m,d,c.sl,null);};
+  const poseJour=(acteId)=>{
+    setEntry(mid,y,m,d,"M",null);
+    if(!sam)setEntry(mid,y,m,d,"AM",null);
+    setEntry(mid,y,m,d,"JOUR",{acteId:acteId});
+    toast((acteById(acteId)||{}).label+" posé sur la journée");onClose();
+  };
+  const remplirSemaine=(acteId)=>{
+    let poses=0,sautes=0;
+    for(let i=0;i<5;i++){
+      const p=intDecal(iso,i).split("-").map(Number);
+      const iso3=intDecal(iso,i);
+      if(!dansSem(iso3)){sautes++;continue;}
+      ["M","AM"].forEach(sl=>{
+        if(intSlotProtege(getEntries,mid,p[0],p[1]-1,p[2],sl)){sautes++;return;}
+        setEntry(mid,p[0],p[1]-1,p[2],sl,{acteId:acteId});poses++;
+      });
+    }
+    toast(poses+" demi-journée(s) posée(s)"+(sautes?", "+sautes+" sautée(s) (repos, absence, FMC ou hors semestre)":""));
+    onClose();
+  };
+  const poseDemiJ=(acteId)=>{
+    if(intJourBloque(getEntries,mid,y,m,d)){toast("La journée porte une absence, une FMC ou un repos — retirez-les d'abord","warn");return;}
+    if(sam){setEntry(mid,y,m,d,"M",{acteId:acteId});toast("Posé — samedi matin");onClose();return;}
+    if(dw===1&&(acteId==="TOUR_HC"||acteId==="TOUR_USIC")){
+      const a=acteById(acteId)||{};
+      if(confirm("Remplir la semaine (lundi → vendredi) en "+(a.short||acteId)+" ?\nLes repos de garde, absences et FMC déjà posés sont préservés.\n\nAnnuler = poser seulement "+(cren==="J"?"la journée":(cren==="M"?"le matin":"l'après-midi"))+".")){remplirSemaine(acteId);return;}
+    }
+    const slots=cren==="J"?["M","AM"]:[cren];
+    slots.forEach(sl=>setEntry(mid,y,m,d,sl,{acteId:acteId}));
+    toast("Posé");onClose();
+  };
+  const clic=(acteId)=>{
+    if(acteId==="ABSENCE"||acteId==="FORMATION"||acteId==="REPOS_GARDE")poseJour(acteId);
+    else poseDemiJ(acteId);
+  };
+  const appliquePeriode=()=>{
+    if(!pSel){toast("Choisissez une tuile à appliquer","warn");return;}
+    if(!pd1||!pd2||pd2<pd1){toast("Vérifiez les deux dates","warn");return;}
+    let poses=0,sautes=0,it=pd1,n=0;
+    while(it<=pd2&&n<92){
+      n++;
+      const p=it.split("-").map(Number);const yy=p[0],mm=p[1]-1,dd=p[2];
+      const t=dow(yy,mm,dd);const fer=isFerie(yy,mm,dd);
+      if(!dansSem(it)){sautes++;it=intDecal(it,1);continue;}
+      if(pSel==="EFF"){
+        const repos=getEntries(mid,yy,mm,dd,"JOUR").some(e=>e&&e.acteId==="REPOS_GARDE");
+        if(repos&&intGardeVeille(getEntries,mid,yy,mm,dd)){sautes++;}
+        else{setEntry(mid,yy,mm,dd,"M",null);setEntry(mid,yy,mm,dd,"AM",null);setEntry(mid,yy,mm,dd,"JOUR",null);poses++;}
+      }else if(pSel==="ABSENCE"||pSel==="FORMATION"||pSel==="REPOS_GARDE"){
+        setEntry(mid,yy,mm,dd,"M",null);setEntry(mid,yy,mm,dd,"AM",null);setEntry(mid,yy,mm,dd,"JOUR",{acteId:pSel});poses++;
+      }else{
+        if(t===0||t===6||fer){it=intDecal(it,1);continue;}
+        ["M","AM"].forEach(sl=>{
+          if(intSlotProtege(getEntries,mid,yy,mm,dd,sl)){sautes++;return;}
+          setEntry(mid,yy,mm,dd,sl,{acteId:pSel});poses++;
+        });
+      }
+      it=intDecal(it,1);
+    }
+    toast(poses+" élément(s) modifié(s)"+(sautes?", "+sautes+" sauté(s) (protégé ou hors semestre)":""));
+    onClose();
+  };
+  return <Ov onClose={onClose}>
+    <div style={{minWidth:300,maxWidth:430}} onClick={e=>e.stopPropagation()}>
+      <div style={S.mHd}>
+        <div style={S.mTit2}><span style={{display:"inline-flex",width:22,height:22,borderRadius:"50%",background:med.color,color:"#fff",fontSize:9,fontWeight:800,alignItems:"center",justifyContent:"center",verticalAlign:"middle",marginRight:6}}>{med.init}</span>{med.nom} — {jour}</div>
+        <button onClick={onClose} style={S.xBtn}>×</button>
+      </div>
+      {contenu.length>0&&<div style={{marginBottom:10}}>
+        {contenu.map((c,i)=>{
+          const a=acteById(c.acteId)||{short:c.acteId,color:"#8b949e",label:c.acteId};
+          const reposAuto=c.acteId==="REPOS_GARDE"&&gardeV;
+          return <div key={i} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4,fontSize:12}}>
+            <span style={{fontSize:10,fontWeight:800,color:"var(--txt3)",width:44}}>{c.sl==="JOUR"?"Journée":c.sl==="M"?"Matin":"Ap.-midi"}</span>
+            <span style={{background:a.color,color:intTxt(a.color),borderRadius:5,padding:"2px 8px",fontSize:11,fontWeight:800}}>{a.short}</span>
+            {reposAuto
+              ?<span style={{fontSize:10,color:"var(--txt3)"}}>posé par la garde de la veille — retirez la garde pour l'enlever</span>
+              :<button onClick={()=>retire(c)} style={{...S.icnBtn,fontSize:10,color:"#dc2626"}}>✕ retirer</button>}
+          </div>;
+        })}
+      </div>}
+      {per===null&&<div>
+        {!sam&&<div style={{display:"flex",gap:5,marginBottom:9}}>
+          {[["M","Matin"],["AM","Après-midi"],["J","Journée"]].map(([v,l])=>
+            <button key={v} onClick={()=>setCren(v)} style={{flex:1,padding:"5px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:11,background:cren===v?"#1d4ed8":"var(--bg2)",color:cren===v?"#fff":"var(--txt2)"}}>{l}</button>)}
+        </div>}
+        {sam&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Samedi : une seule case — le HC se pose sur le matin. Absence, FMC et repos couvrent la journée.</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:6,marginBottom:10}}>
+          {tuiles.map(t=>{
+            const j=(t.id==="ABSENCE"||t.id==="FORMATION"||t.id==="REPOS_GARDE");
+            return <button key={t.id} onClick={()=>clic(t.id)} style={{padding:"9px 6px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:800,fontSize:12,background:t.color,color:intTxt(t.color)}}>{t.short}{j?<span style={{display:"block",fontSize:8.5,fontWeight:600,opacity:.85}}>journée</span>:null}</button>;
+          })}
+        </div>
+        {dw===1&&!sam&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Lundi : HC ou USIC proposera de remplir la semaine (repos, absences et FMC préservés).</div>}
+        <button onClick={()=>setPer(1)} style={{...S.icnBtn,fontSize:11,width:"100%",textAlign:"center",padding:"7px"}}>📅 Modifier sur une période</button>
+      </div>}
+      {per!==null&&<div>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:8,fontSize:12,color:"var(--txt2)"}}>
+          <span>Du</span><input type="date" value={pd1} onChange={e=>{if(e.target.value)setPd1(e.target.value);}} style={{...S.fi,width:135}}/>
+          <span>au</span><input type="date" value={pd2} onChange={e=>{if(e.target.value)setPd2(e.target.value);}} style={{...S.fi,width:135}}/>
+          <button onClick={()=>{setPd1(intISO2(y,m,1));setPd2(intISO2(y,m+1,0));}} style={{...S.icnBtn,fontSize:10}}>le mois</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:6,marginBottom:8}}>
+          {intActesTuiles(actes,false).map(t=>
+            <button key={t.id} onClick={()=>setPSel(t.id)} style={{padding:"8px 6px",borderRadius:8,cursor:"pointer",fontWeight:800,fontSize:12,background:t.color,color:intTxt(t.color),border:pSel===t.id?"2.5px solid var(--txt)":"2.5px solid transparent"}}>{t.short}</button>)}
+          <button onClick={()=>setPSel("EFF")} style={{padding:"8px 6px",borderRadius:8,cursor:"pointer",fontWeight:800,fontSize:12,background:"var(--bg2)",color:"var(--txt2)",border:pSel==="EFF"?"2.5px solid var(--txt)":"2.5px solid var(--border)"}}>🧹 Effacer</button>
+        </div>
+        <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8,lineHeight:1.5}}>
+          HC, USIC et les activités se posent du lundi au vendredi (matin + après-midi), en préservant repos, absences et FMC. Absence, FMC et repos couvrent chaque journée de la période. Les activités à salle ne se posent pas ici. Un repos issu d'une garde posée dans l'application n'est jamais effacé.
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={appliquePeriode} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer"}}>✓ Appliquer</button>
+          <button onClick={()=>setPer(null)} style={{...S.icnBtn,fontSize:11,padding:"8px 12px"}}>‹ Retour</button>
+        </div>
+      </div>}
     </div>
+  </Ov>;
+}
+
+function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,canEdit}){
+  const [sel,setSel]=useState(null);
+  const jours=useMemo(()=>{
+    if(!viewPeriod){
+      const base=allDays.map(d=>({y:year,m:month,d:d}));
+      return base;
+    }
+    const ps=perStart(year,month);
+    const l=perDaysList(ps.sy,ps.sm).map(o=>({y:o.y,m:o.m,d:o.d}));
+    if(!showFull){const tod=new Date();tod.setHours(0,0,0,0);return l.filter(o=>new Date(o.y,o.m,o.d)>=tod);}
+    return l;
+  },[viewPeriod,allDays,year,month,showFull]);
+  const cols=useMemo(()=>{
+    if(jours.length===0)return [];
+    const a=intISO2(jours[0].y,jours[0].m,jours[0].d);
+    const b=intISO2(jours[jours.length-1].y,jours[jours.length-1].m,jours[jours.length-1].d);
+    const out=[];
+    intSemsTri(intCfg).forEach(s=>{
+      if(s.deb<=b&&s.fin>=a)(s.meds||[]).forEach(mm=>out.push({...mm,sDeb:s.deb,sFin:s.fin,sLbl:intSemLabel(s.deb)}));
+    });
+    return out;
+  },[intCfg,jours]);
+  const today=new Date();
+  const semsAff=[];
+  cols.forEach(c=>{if(semsAff.indexOf(c.sLbl)<0)semsAff.push(c.sLbl);});
+  if(cols.length===0)return <div style={{...S.card}}>
+    <div style={{fontWeight:800,fontSize:14,color:"var(--txt)",marginBottom:8}}>🎓 Internes</div>
+    <div style={{fontSize:12,color:"var(--txt3)"}}>Aucun interne sur la période affichée — saisissez les semestres et les fiches dans l'onglet Équipe, section « 🎓 Internes ».</div>
+  </div>;
+  const C0=92,CW=66;
+  const cellule=(c,o,sl,haut)=>{
+    const iso=intISO2(o.y,o.m,o.d);
+    const inR=iso>=c.sDeb&&iso<=c.sFin;
+    const es=inR?getEntries(c.id,o.y,o.m,o.d,sl):[];
+    let e=es.find(x=>x&&x.acteId&&!x._blocked)||null;
+    if(!e&&es[0]&&es[0]._blocked)e=getEntries(c.id,o.y,o.m,o.d,"JOUR").find(x=>x&&x.acteId)||null;
+    const a=e?acteById(e.acteId):null;
+    return <div key={sl} onClick={(canEdit&&inR)?()=>setSel({med:c,y:o.y,m:o.m,d:o.d,slot0:sl}):undefined}
+      style={{height:haut,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9.5,fontWeight:800,
+        cursor:(canEdit&&inR)?"pointer":"default",borderBottom:"1px solid var(--border2)",borderRight:"1px solid var(--border2)",
+        background:!inR?"repeating-linear-gradient(45deg,rgba(140,150,160,.14),rgba(140,150,160,.14) 3px,transparent 3px,transparent 7px)":(a?a.color:"var(--bg)"),
+        color:a?intTxt(a.color):"var(--txt3)"}}>
+      {a?(a.short||a.id):""}
+    </div>;
+  };
+  return <div>
+    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:8}}>
+      <span style={{fontWeight:800,fontSize:14,color:"var(--txt)"}}>🎓 Internes</span>
+      {semsAff.map(l=><Chp key={l} bg="rgba(56,139,253,.12)" c="#1d4ed8">{l}</Chp>)}
+      <span style={{fontSize:10,color:"var(--txt3)"}}>La colonne de garde arrive au prochain lot, puis la jauge et les statistiques.</span>
+    </div>
+    <div style={{overflowX:"auto",border:"1px solid var(--border)",borderRadius:9}}>
+      <div style={{minWidth:C0+cols.length*CW}}>
+        <div style={{display:"flex",position:"sticky",top:0,zIndex:5,background:"var(--th)"}}>
+          <div style={{width:C0,flex:"0 0 "+C0+"px",padding:"5px 7px",fontSize:9,fontWeight:800,color:"var(--txt3)",borderRight:"1px solid var(--border2)",borderBottom:"2px solid var(--border)"}}>Jour</div>
+          {cols.map(c=><div key={c.id} title={c.nom+" — "+c.sLbl+" ("+intFmtD(c.sDeb)+" → "+intFmtD(c.sFin)+")"} style={{width:CW,flex:"0 0 "+CW+"px",padding:"4px 2px",textAlign:"center",borderRight:"1px solid var(--border2)",borderBottom:"2px solid var(--border)"}}>
+            <span style={{display:"inline-block",background:c.color,color:"#fff",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:800}}>{c.init}</span>
+          </div>)}
+        </div>
+        {jours.map(o=>{
+          const t=dow(o.y,o.m,o.d),fer=isFerie(o.y,o.m,o.d);
+          const type=(t===0||fer)?"off":(t===6?"sam":"sem");
+          const isT=o.d===today.getDate()&&o.m===today.getMonth()&&o.y===today.getFullYear();
+          const h=type==="sem"?38:22;
+          return <div key={o.y+"-"+o.m+"-"+o.d} style={{display:"flex",borderTop:t===1?"2px solid var(--border)":"none",background:isT?"rgba(56,139,253,.07)":(t===0||t===6||fer)?"rgba(245,158,11,.05)":"transparent"}}>
+            <div style={{width:C0,flex:"0 0 "+C0+"px",padding:"2px 7px",fontSize:10,fontWeight:700,color:fer||t===0?"var(--txt3)":"var(--txt2)",borderRight:"1px solid var(--border2)",borderBottom:"1px solid var(--border2)",display:"flex",alignItems:"center",gap:4,height:h}}>
+              {JOURSL[t].slice(0,3)+" "+o.d+(o.m!==month?" "+MOIS[o.m].slice(0,3):"")}
+              {isVac(o.y,o.m,o.d)&&<span style={{fontSize:8}}>🏖</span>}
+              {fer&&<span style={{fontSize:8,color:"var(--txt3)"}}>férié</span>}
+            </div>
+            {cols.map(c=>{
+              if(type==="off")return <div key={c.id} style={{width:CW,flex:"0 0 "+CW+"px",height:h,borderRight:"1px solid var(--border2)",borderBottom:"1px solid var(--border2)",background:"var(--bg2)",opacity:.55}}/>;
+              if(type==="sam")return <div key={c.id} style={{width:CW,flex:"0 0 "+CW+"px"}}>{cellule(c,o,"M",h)}</div>;
+              return <div key={c.id} style={{width:CW,flex:"0 0 "+CW+"px"}}>{cellule(c,o,"M",19)}{cellule(c,o,"AM",19)}</div>;
+            })}
+          </div>;
+        })}
+      </div>
+    </div>
+    <div style={{fontSize:9.5,color:"var(--txt3)",marginTop:6,display:"flex",gap:10,flexWrap:"wrap"}}>
+      <span>Cases hachurées : hors du semestre de l'interne.</span>
+      <span>Samedi : une seule case (matin). Dimanche et fériés : vides jusqu'à la colonne de garde.</span>
+      {canEdit?<span>Cliquez une case pour poser HC, USIC, une activité 🎓, une absence, une FMC ou un repos.</span>:<span>Lecture seule.</span>}
+    </div>
+    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry}/>}
   </div>;
 }
 
@@ -8427,7 +8669,7 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
-      {tab==="internes"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><InternesView intCfg={intCfg}/></div>}
+      {tab==="internes"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><InternesView intCfg={intCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} canEdit={isEdit||isInterEdit||isAdminEdit||isCadre}/></div>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
