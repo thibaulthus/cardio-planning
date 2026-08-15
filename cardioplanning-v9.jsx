@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.49 — 15/08/2026";
+const APP_VERSION="v10.50 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2130,7 +2130,7 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
 }
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
-function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null}){
+function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null,okKey="adminOk"}){
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
   const [difFor,setDifFor]=useState(null);
@@ -2140,7 +2140,11 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
   const rowActes=row.ids.map(id=>actes.find(a=>a.id===id)).filter(Boolean);
   const allAuth=new Set(rowActes.flatMap(a=>a.medecinsAutorise||[]));
   const eligMeds=medecins.filter(m=>allAuth.size===0||allAuth.has(m.init)).filter(m=>!selfOnly||m.id===selfOnly);
-  const eligActesForMed=(selMed?rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)):[]).filter(a=>!adminOnly||a.adminOk===true);
+  /* v10.50 : okAct = la coche du ROLE connecte (adminOk secretaires, cadreOk cadres).
+     Le filtre existait ici (eligActesForMed) mais n'etait branche sur AUCUN chemin de
+     pose — un role administratif pouvait donc poser (Stim…) sans pouvoir retirer. */
+  const okAct=a=>!adminOnly||!!(a&&a[okKey]===true);
+  const roleActes=rowActes.filter(okAct);
 
   const noMedMode=rowActes.length>0&&rowActes.every(a=>(a.medecinsAutorise||[]).includes("__AUCUN__"));
   const curOcc=[];
@@ -2190,9 +2194,9 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                 if(_rs)return <span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>{_rs}</span>;
                 if(acte&&acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
                 return null;})()}
-              {row.hasSalleChoice&&acte&&acte.hasSalle&&(!adminOnly||acte.adminOk===true)&&<button onClick={()=>setSelMedId(med.id)}
+              {row.hasSalleChoice&&acte&&acte.hasSalle&&okAct(acte)&&<button onClick={()=>setSelMedId(med.id)}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
-              {(!adminOnly||((actes.find(a2=>a2.id===acteId)||{}).adminOk===true))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+              {okAct(actes.find(a2=>a2.id===acteId))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
             </div>
             {canDif&&<div style={{margin:"-2px 0 7px 6px",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
               {(e&&e.dif)
@@ -2212,7 +2216,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
       {noMedMode&&(
         <div>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Activité sans médecin — IDE mobilisées</div>
-          {rowActes.filter(a=>!adminOnly||a.adminOk===true).map(a=>{
+          {roleActes.map(a=>{
             const cur=curOcc.find(x=>x.med.id===IDE_MED.id&&x.acteId===a.id);
             const val=(cur&&cur.e&&cur.e.n!==undefined&&cur.e.n!==null)?cur.e.n:(a.ideN||0);
             return(
@@ -2235,7 +2239,10 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
         </div>
       )}
 
-      {!selMedId&&!noMedMode&&(
+      {!selMedId&&!noMedMode&&roleActes.length===0&&(
+        <div style={{fontSize:12,color:"#b45309",background:"#fff8e6",border:"1px solid #f59e0b",borderRadius:7,padding:"8px 10px"}}>✏️ Cette activité n'est pas ouverte à votre rôle — la coche se règle dans l'onglet Activités.</div>
+      )}
+      {!selMedId&&!noMedMode&&roleActes.length>0&&(
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
           {/* Salle occupancy warning for fixed-salle rows (Stim/EEP) */}
@@ -2270,7 +2277,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                   onClick={()=>{
                     if(avail==="blocked")return;
                     // If simple row (no multiActe, no salle choice) with single eligible acte → direct assign
-                    const myActes=rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(med.init));
+                    const myActes=rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(med.init)).filter(okAct);
                     if(!row.multiActe&&!row.hasSalleChoice&&myActes.length===1){
                       const a=myActes[0];
                       const fs=a.fixedSalle||row.salle||null;
@@ -2294,7 +2301,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
 
       {selMedId&&selMed&&(()=>{
         // Recompute eligible actes now that selMed is known
-        const myEligActes=rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init));
+        const myEligActes=rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)).filter(okAct);
         const isSimple=!row.multiActe&&!row.hasSalleChoice;
         return(
           <>
@@ -2382,7 +2389,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
 }
 
 /* ════ PICK MED SITE MODAL (CHL/CHB) ════ */
-function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null,darkMode=false}){
+function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null,darkMode=false,okKey="adminOk"}){
   const {salle,siteActes,d,sl,y:y2,m:m2}=mData;
   const [step,setStep]=useState("med"); // med | acte | salle
   const [selMedId,setSelMedId]=useState(null);
@@ -2407,7 +2414,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
     });
   });
   const [selBipSalle,setSelBipSalle]=useState(null);
-  const eligActes0=(selMed?(isRecapCol?[recapActe].filter(Boolean):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init))):[]).filter(a=>!adminOnly||a.adminOk===true);
+  const eligActes0=(selMed?(isRecapCol?[recapActe].filter(Boolean):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init))):[]).filter(a=>!adminOnly||a[okKey]===true);
   /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches.
      Si aucune n'est offerte par cette salle, on ne le bloque pas — on le prévient. */
   const selCond=selMed?condOn(getEntries,selMed.id,y2,m2,d,sl):[];
@@ -2440,9 +2447,9 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
                 if(_r)return <SallePill nom={_r} acte={curOcc[i]&&curOcc[i].acte} night={darkMode}/>;
                 if(acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
                 return null;})()}
-              {isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!adminOnly||acte.adminOk===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
+              {isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
-              {(!adminOnly||acte.adminOk===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+              {(!adminOnly||acte[okKey]===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
             </div>
           ))}
         </div>
@@ -4180,7 +4187,7 @@ const HELP_SECTIONS=[
   HP({children:["Trois niveaux d'accès depuis la page d'accueil :"]}),
   HP({children:["• ",HBtn({kind:"ghost",children:"👁 Consulter"})," — lecture seule, sans code."]}),
   HP({children:["• ",HE("b",null,"PIN médecin")," — édition personnelle : uniquement sa propre ligne (voir la première tuile). Défini par un éditeur dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"."]}),
-  HP({children:["• ",HE("b",null,"PIN administratif")," — pour les secrétaires et cadres : un code partagé (défini dans Paramètres) ; chacun saisit son prénom à la connexion. Il permet de poser, modifier ou retirer les activités cochées « ✏️ administratif » (consultations…) sur la ligne de n'importe quel médecin, et de remplir les semaines blanches de l'onglet Reports. Gardes, tours, astreintes et réglages restent hors de portée."]}),
+  HP({children:["• ",HE("b",null,"PIN administratif")," — pour les secrétaires et cadres : un code partagé (défini dans Paramètres) ; chacun saisit son prénom à la connexion. Chaque activité porte deux coches : « ✏️ secrétaires » et « ✏️ cadres » — le rôle ne peut poser, modifier ou retirer que les activités cochées pour lui (sur la ligne de n'importe quel médecin), et remplir les semaines blanches de l'onglet Reports. Le PIN cadre, distinct, ouvre en plus le planning IDE. Gardes, tours, astreintes et réglages restent hors de portée."]}),
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
   HP({children:["🔐 ",HE("b",null,"Niveaux de droits")," : chaque médecin a un niveau dans sa fiche ✏️ (onglet Équipe), qui s'applique quand il se connecte avec son PIN personnel. ",HE("b",null,"Basique")," = sa propre ligne, plus ses activités dans CHL, CHB et les plateaux. ",HE("b",null,"Intermédiaire")," = le planning de tous les médecins, gardes et échanges, semaines de tour, planning type et attachés — sans Paramètres, Équipe ni Activités. ",HE("b",null,"Éditeur")," = accès complet. Récapitulatif dans Paramètres."]}),
   HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
@@ -4549,7 +4556,7 @@ function ReportsView(p){
   },[p.salleReg,actes]);
   const myActesAll=actes.filter(a=>!a.isSystem&&a.id!=="TP"
     &&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.indexOf(medSel.init)>=0)
-    &&(!p.adminReports||a.adminOk===true));
+    &&(!p.adminReports||a[p.adminOkKey||"adminOk"]===true));
   const myActesOff=myActesAll.filter(a=>a.hasSalle&&(a.salles||[]).some(s=>offSalleSet.has(s)));   /* v10.49 : ouvrables — au moins une salle participante */
   const occSalles=(yy,mm,dd,ss)=>{const s={};medecins.forEach(mb=>getEntries(mb.id,yy,mm,dd,ss).forEach(e=>{if(e&&e.salle)s[e.salle]=true;}));return s;};
   const freeFor=(a,occ)=>(a.salles||[]).filter(s=>offSalleSet.has(s)&&!occ[s]);   /* v10.49 : participantes seulement */
@@ -6832,6 +6839,7 @@ function CardioPlanning(){
     .filter(([tid])=>hideTabs.indexOf(tid)<0&&HIDDEN_TABS.indexOf(tid)<0);
   useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0)setTab("planning");},[accessMode,tab,isMedEdit]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
+  const roleOkKey=isCadre?"cadreOk":"adminOk"; // v10.50 : la coche d'activité du rôle connecté
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
@@ -8177,7 +8185,8 @@ header::-webkit-scrollbar { display: none; }
                 {(a.id==="GARDE"||a.id==="REPOS_GARDE")&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Garde » de l'onglet Équipe</div>}
                       {a.id==="TP"&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⚙ Synchronisé avec la coche « Temps partiel » des fiches médecins</div>}
                       {a.csReport&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>📥 Proposée dans l'onglet Reports</div>}
-                      {a.adminOk&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>✏️ Modifiable par le rôle administratif</div>}
+                      {a.adminOk&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>✏️ Secrétaires</div>}
+                      {a.cadreOk&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>✏️ Cadres</div>}
                     </div>
                     {isEdit&&<div style={{display:"flex",gap:4}}>
                       <button style={{...S.icnBtn}} onClick={()=>{setMData({...a,_new:false,sallesStr:(a.salles||[]).join(","),medStr:(a.medecinsAutorise||[]).join(",")});setModal("editActe");}}>✏️</button>
@@ -8239,7 +8248,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
+      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -8643,7 +8652,7 @@ header::-webkit-scrollbar { display: none; }
               <input type="password" id="nap" placeholder={adminPin?"PIN défini — nouveau PIN":"Définir le PIN"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
               <button style={S.btnP} onClick={()=>{const v=document.getElementById("nap").value;if(v.length>=4){setAdminPin(v);toast("PIN administratif mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
             </div>
-            <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 4px"}}>PIN cadre : mêmes droits que l'administratif + gestion du planning IDE (PT cardio).</div>
+            <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 4px"}}>PIN cadre : suit sa propre coche « ✏️ cadres » sur chaque activité, plus la gestion du planning IDE (PT cardio) et les départs différés.</div>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <input type="password" id="ncp" placeholder={cadrePin?"PIN cadre défini — nouveau PIN":"Définir le PIN cadre"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
               <button style={S.btnP} onClick={()=>{const v=document.getElementById("ncp").value;if(v.length>=4){if(v===adminPin||v===editPin){toast("Ce PIN est déjà utilisé par un autre rôle","warn");return;}setCadrePin(v);toast("PIN cadre mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
@@ -8653,12 +8662,16 @@ header::-webkit-scrollbar { display: none; }
               <label style={{display:"flex",gap:8,alignItems:"center",fontSize:12,color:"var(--txt2)",cursor:"pointer"}}><input type="checkbox" checked={adminCanReports} onChange={e=>setAdminCanReports(e.target.checked)} style={{width:14,height:14}}/>Peut remplir les semaines blanches (onglet Reports)</label>
               <label style={{display:"flex",gap:8,alignItems:"center",fontSize:12,color:"var(--txt2)",cursor:"pointer"}}><input type="checkbox" checked={adminCanNotes} onChange={e=>setAdminCanNotes(e.target.checked)} style={{width:14,height:14}}/>Peut ajouter des notes 📝 sur les cases</label>
             </div>
-            <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>Activités ouvertes au rôle</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:4}}>
-              {actes.filter(a=>a.adminOk===true).map(a=><span key={a.id} style={{padding:"1px 7px",borderRadius:5,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a.color,color:"#111"}}>{a.short}</span>)}
-              {actes.filter(a=>a.adminOk===true).length===0&&<span style={{fontSize:11,color:"#b45309",fontWeight:700}}>aucune — cochez « ✏️ administratif » sur les activités concernées</span>}
-            </div>
-            <div style={{fontSize:9,color:"var(--txt3)"}}>⚙ Se gère dans l'onglet Activités (case « ✏️ Modifiable par le rôle administratif »).</div>
+            {[["Activités ouvertes aux secrétaires","adminOk","secrétaires"],["Activités ouvertes aux cadres","cadreOk","cadres"]].map(([tit,key,rl])=>(
+              <React.Fragment key={key}>
+                <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>{tit}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:4}}>
+                  {actes.filter(a=>a[key]===true).map(a=><span key={a.id} style={{padding:"1px 7px",borderRadius:5,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a.color,color:"#111"}}>{a.short}</span>)}
+                  {actes.filter(a=>a[key]===true).length===0&&<span style={{fontSize:11,color:"#b45309",fontWeight:700}}>aucune — cochez « ✏️ {rl} » sur les activités concernées</span>}
+                </div>
+              </React.Fragment>
+            ))}
+            <div style={{fontSize:9,color:"var(--txt3)"}}>⚙ Se gère dans l'onglet Activités (cases « ✏️ secrétaires » et « ✏️ cadres » de chaque activité).</div>
           </div>}
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
@@ -9352,7 +9365,7 @@ header::-webkit-scrollbar { display: none; }
           // Check if medecin is authorized for this activity
           if((a.medecinsAutorise&&a.medecinsAutorise.length)>0&&!(med&&a.medecinsAutorise.includes(med.init)))return false;
           return true;
-        }).filter(a=>!isAdminEdit||a.adminOk===true||a.id==="ABSENCE"||a.id==="FORMATION"); // rôle administratif : activités cochées ✏️ + absences/formations
+        }).filter(a=>!isAdminEdit||a[roleOkKey]===true||a.id==="ABSENCE"||a.id==="FORMATION"); // secrétaires/cadres : activités cochées ✏️ pour CE rôle + absences/formations
 
         const doGarde=()=>{ applyGarde(medId,y2,m2,d2); setModal(null); };
         const doAdd=(acteId,salle=null)=>{
@@ -9454,11 +9467,11 @@ header::-webkit-scrollbar { display: none; }
                           return(<>
                             <span style={{fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"#f85149",border:"1px solid rgba(248,81,73,.5)",background:"rgba(248,81,73,.10)",borderRadius:4,padding:"3px 7px",whiteSpace:"nowrap"}}>sans salle</span>
                             {tot>0&&<span style={{fontSize:10,fontWeight:700,color:fr.length?"#2f9440":"#f85149"}}>{fr.length?fr.length+"/"+tot+" libre"+(fr.length>1?"s":"")+" : "+fr.join(", "):"aucune salle libre"}</span>}
-                            {canEditThisMed&&tot>0&&<button onClick={()=>setMData(p=>({...p,_pickSalle:a.id}))}
+                            {canEditThisMed&&tot>0&&(!isAdminEdit||a[roleOkKey]===true)&&<button onClick={()=>setMData(p=>({...p,_pickSalle:a.id}))}
                               style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>Choisir la salle…</button>}
                           </>);
                         })()}
-                        {canEditThisMed&&(!isAdminEdit||a.adminOk===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
+                        {canEditThisMed&&(!isAdminEdit||a[roleOkKey]===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
                           if(e.acteId==="GARDE"){
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);
                             const dt=new Date(y2,m2,d2+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd3=dt.getDate();
@@ -9611,7 +9624,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
               <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>📝 Note</div>
               <textarea value={notes[nk(medId,y2,m2,d2,slot)]||""} onChange={e=>setNotes(p=>({...p,[nk(medId,y2,m2,d2,slot)]:e.target.value}))}
-                placeholder="Note visible au survol..." readOnly={!canEditThisMed||(isAdminEdit&&!adminCanNotes)}
+                placeholder="Note visible au survol..." readOnly={!canEditThisMed||(isAdminEdit&&!adminCanNotes&&!entries.some(e2=>{const a2=acteById(e2.acteId);return a2&&a2[roleOkKey]===true;}))}
                 style={{width:"100%",padding:"6px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)",fontSize:12,fontFamily:"'Sora',sans-serif",resize:"vertical",minHeight:48,outline:"none"}}/>
             </div>
           </Ov>
@@ -9803,8 +9816,8 @@ header::-webkit-scrollbar { display: none; }
         </div>);
       })()}
 
-      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
-      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
       {modal==="editActe"&&mData&&(
@@ -9835,7 +9848,8 @@ header::-webkit-scrollbar { display: none; }
             <div style={{gridColumn:"1/-1"}}><label style={S.fl}>Site</label><div style={{display:"flex",gap:5}}>{["tous","CHL","CHB"].map(s=><button key={s} onClick={()=>setMData(p=>({...p,site:s}))} style={{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,background:mData.site===s?"#1d4ed8":"var(--bg2)",color:mData.site===s?"#fff":"var(--txt2)"}}>{s}</button>)}</div></div>
             <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={mData.hasSalle} onChange={e=>setMData(p=>({...p,hasSalle:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>A une salle associée</label></div>
             <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.csReport} onChange={e=>setMData(p=>({...p,csReport:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>📥 Consultation à reporter (proposée dans l'onglet Reports)</label></div>
-            {!(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")&&<div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.adminOk} onChange={e=>setMData(p=>({...p,adminOk:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>✏️ Modifiable par le rôle administratif (secrétaires, cadres)</label></div>}
+            {!(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")&&<div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.adminOk} onChange={e=>setMData(p=>({...p,adminOk:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>✏️ Modifiable par les secrétaires (rôle administratif)</label></div>}
+            {!(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")&&<div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.cadreOk} onChange={e=>setMData(p=>({...p,cadreOk:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>✏️ Modifiable par les cadres (PIN cadre)</label></div>}
             <div style={{gridColumn:"1/-1"}}>
               <label style={{color:"var(--txt2)",fontSize:12,display:"block",marginBottom:3}}>↩ Colonne/ligne de reprise dans :</label>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
