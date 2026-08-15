@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.53 — 15/08/2026";
+const APP_VERSION="v10.53.1 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2198,9 +2198,9 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                 if(_rs)return <span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>{_rs}</span>;
                 if(acte&&acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
                 return null;})()}
-              {row.hasSalleChoice&&acte&&acte.hasSalle&&okAct(acte)&&<button onClick={()=>setSelMedId(med.id)}
+              {row.hasSalleChoice&&acte&&acte.hasSalle&&(!selfOnly||med.id===selfOnly)&&okAct(acte)&&<button onClick={()=>setSelMedId(med.id)}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
-              {okAct(actes.find(a2=>a2.id===acteId))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+              {(!selfOnly||med.id===selfOnly)&&okAct(actes.find(a2=>a2.id===acteId))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
               {(()=>{/* v10.53 : note liée à CE médecin (jamais à la ligne IDE) */
                 if(med.id===IDE_MED.id)return null;
                 const _nk=nk(med.id,y2,m2,d,sl);
@@ -2457,9 +2457,9 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
                 if(_r)return <SallePill nom={_r} acte={curOcc[i]&&curOcc[i].acte} night={darkMode}/>;
                 if(acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
                 return null;})()}
-              {isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
+              {isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!selfOnly||med.id===selfOnly)&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
-              {(!adminOnly||acte[okKey]===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+              {(!selfOnly||med.id===selfOnly)&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
               {(()=>{/* v10.53 : note liée à CE médecin, mêmes règles que la coche du rôle */
                 const _nk=nk(med.id,y2,m2,d,sl);
                 const _cn=!!setNotes&&(!selfOnly||med.id===selfOnly)&&(!adminOnly||canNotes||acte[okKey]===true);

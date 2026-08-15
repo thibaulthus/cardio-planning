@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.53 — 15/08/2026";
+var APP_VERSION = "v10.53.1 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2433,8 +2433,8 @@ function PickMedActModal(_a) {
                                 return React.createElement("span", { style: { fontSize: 9, fontWeight: 800, background: "#fff3cd", color: "#8a6100", border: "1px solid #f59e0b88", borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap" } }, "\u26A0 sans salle");
                             return null;
                         })(),
-                        row.hasSalleChoice && acte && acte.hasSalle && okAct(acte) && React.createElement("button", { onClick: function () { return setSelMedId(med.id); }, style: { background: "transparent", border: "1px solid var(--border)", color: "var(--txt2)", borderRadius: 5, cursor: "pointer", fontSize: 9, fontWeight: 800, padding: "2px 7px", whiteSpace: "nowrap" } }, "salle\u2026"),
-                        okAct(actes.find(function (a2) { return a2.id === acteId; })) && React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acteId); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7"),
+                        row.hasSalleChoice && acte && acte.hasSalle && (!selfOnly || med.id === selfOnly) && okAct(acte) && React.createElement("button", { onClick: function () { return setSelMedId(med.id); }, style: { background: "transparent", border: "1px solid var(--border)", color: "var(--txt2)", borderRadius: 5, cursor: "pointer", fontSize: 9, fontWeight: 800, padding: "2px 7px", whiteSpace: "nowrap" } }, "salle\u2026"),
+                        (!selfOnly || med.id === selfOnly) && okAct(actes.find(function (a2) { return a2.id === acteId; })) && React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acteId); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7"),
                         (function () {
                             if (med.id === IDE_MED.id)
                                 return null;
@@ -2651,8 +2651,8 @@ function PickMedSiteModal(_a) {
                             return React.createElement("span", { style: { fontSize: 9, fontWeight: 800, background: "#fff3cd", color: "#8a6100", border: "1px solid #f59e0b88", borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap" } }, "\u26A0 sans salle");
                         return null;
                     })(),
-                    isRecapCol && acte.hasSalle && !acte.fixedSalle && (!adminOnly || acte[okKey] === true) && React.createElement("button", { onClick: function () { setSelMedId(med.id); setStep("salle"); }, style: { background: "transparent", border: "1px solid var(--border)", color: "var(--txt2)", borderRadius: 5, cursor: "pointer", fontSize: 9, fontWeight: 800, padding: "2px 7px", whiteSpace: "nowrap" } }, "salle\u2026"),
-                    (!adminOnly || acte[okKey] === true) && React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acte.id); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7"),
+                    isRecapCol && acte.hasSalle && !acte.fixedSalle && (!selfOnly || med.id === selfOnly) && (!adminOnly || acte[okKey] === true) && React.createElement("button", { onClick: function () { setSelMedId(med.id); setStep("salle"); }, style: { background: "transparent", border: "1px solid var(--border)", color: "var(--txt2)", borderRadius: 5, cursor: "pointer", fontSize: 9, fontWeight: 800, padding: "2px 7px", whiteSpace: "nowrap" } }, "salle\u2026"),
+                    (!selfOnly || med.id === selfOnly) && (!adminOnly || acte[okKey] === true) && React.createElement("button", { onClick: function () { return removeEntry(med.id, y2, m2, d, sl, acte.id); }, style: { background: "none", border: "none", color: "var(--txt2)", cursor: "pointer", fontSize: 15, lineHeight: 1 } }, "\u00D7"),
                     (function () {
                         var _nk = nk(med.id, y2, m2, d, sl);
                         var _cn = !!setNotes && (!selfOnly || med.id === selfOnly) && (!adminOnly || canNotes || acte[okKey] === true);
