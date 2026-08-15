@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.48 — 15/08/2026";
+var APP_VERSION = "v10.49 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -979,6 +979,18 @@ function GridV(_a) {
    Rien ne survit au rechargement : on revient alors au jour courant, ce qui convient. */
 var SCROLL_MEM = { jour: null, pos: {} };
 
+/* v10.49 : demi-journées off (onglet Reports) — participation des salles.
+   `offOuv` vit sur la fiche de salle ; non renseigné = par défaut les salles où
+   une consultation (CS_CHL / CS_CHB) peut se dérouler — son précochage. */
+var OFF_CS_IDS = ["CS_CHL", "CS_CHB"];
+function offOuvOn(entry, actes) {
+    if (!entry)
+        return false;
+    if (entry.offOuv !== undefined)
+        return !!entry.offOuv;
+    var nom = entry._origN || entry.n;
+    return !!nom && (actes || []).some(function (a) { return OFF_CS_IDS.indexOf(a.id) >= 0 && (a.salles || []).indexOf(nom) >= 0; });
+}
 /* v10.46 : les onglets dont la grille occupe l'écran en entier — leur cadre
    passe en « fit », et le bas de page n'y garde qu'une petite marge. */
 var GRID_FIT = ["planning", "chl", "chb", "plateau", "angio", "attache"];
@@ -4778,12 +4790,22 @@ function ReportsView(p){
   /* ── v9.12 : salles libres sur les demi-journées off ── */
   const [freeModal,setFreeModal]=React.useState(null);
   const [freeStep,setFreeStep]=React.useState(null);
+  /* v10.49 : les salles PARTICIPANTES — cochées « ouvrable sur un off » sur leur
+     fiche (Paramètres → Salles) ; non renseigné = les salles de consultation
+     (précochage). Tout le bas de l'onglet ne voit qu'elles ; les REPORTS du
+     haut, eux, ne passent pas par ici et ne changent pas. */
+  const offSalleSet=React.useMemo(()=>{
+    const s=new Set();
+    (p.salleReg||[]).forEach(x=>{if(offOuvOn(x,actes))s.add(x.n);});
+    return s;
+  },[p.salleReg,actes]);
   const myActesAll=actes.filter(a=>!a.isSystem&&a.id!=="TP"
     &&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.indexOf(medSel.init)>=0)
     &&(!p.adminReports||a.adminOk===true));
+  const myActesOff=myActesAll.filter(a=>a.hasSalle&&(a.salles||[]).some(s=>offSalleSet.has(s)));   /* v10.49 : ouvrables — au moins une salle participante */
   const occSalles=(yy,mm,dd,ss)=>{const s={};medecins.forEach(mb=>getEntries(mb.id,yy,mm,dd,ss).forEach(e=>{if(e&&e.salle)s[e.salle]=true;}));return s;};
-  const freeFor=(a,occ)=>(a.salles||[]).filter(s=>!occ[s]);
-  const hasFreeRoom=(yy,mm,dd,ss)=>{const occ=occSalles(yy,mm,dd,ss);return myActesAll.some(a=>a.hasSalle&&freeFor(a,occ).length>0);};
+  const freeFor=(a,occ)=>(a.salles||[]).filter(s=>offSalleSet.has(s)&&!occ[s]);   /* v10.49 : participantes seulement */
+  const hasFreeRoom=(yy,mm,dd,ss)=>{const occ=occSalles(yy,mm,dd,ss);return myActesOff.some(a=>freeFor(a,occ).length>0);};
   const dayOf=(w,dw)=>w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===dw);
   const poseFree=(a,salle,lost)=>{
     const F=freeModal;if(!F||!p.addEntry)return;
@@ -5054,21 +5076,35 @@ function ReportsView(p){
             const f=w.days[0];
             return RE("tr",{key:w.key,style:{borderTop:"1px solid var(--border2)"}},
               RE("td",{style:{padding:"3px 8px",fontSize:10,fontWeight:700,color:"var(--txt)",whiteSpace:"nowrap"}},f.d+" "+MOIS[f.m].slice(0,4)),
-              [1,2,3,4,5].map(dw=>{
-                const sls=w.slots[dw]||[];
-                const o=dayOf(w,dw);
-                const green=sls.length>0&&o&&sls.some(s2=>hasFreeRoom(o.y,o.m,o.d,s2));
-                return RE("td",{key:dw,onClick:(sls.length&&editable&&o)?()=>{setFreeStep(null);setFreeModal({y:o.y,m:o.m,d:o.d,sl:sls[0],slots:sls});}:undefined,
-                  style:{padding:"4px 2px",textAlign:"center",fontSize:9,fontWeight:800,border:"1px solid var(--border2)",
-                  cursor:(sls.length&&editable)?"pointer":"default",
-                  color:!sls.length?"var(--txt3)":green?"#16a34a":(habDW.indexOf(dw)>=0?"#7c3aed":"var(--txt2)"),
-                  background:!sls.length?"transparent":green?"rgba(22,163,74,.16)":(habDW.indexOf(dw)>=0?"rgba(124,58,237,.10)":"var(--bg2)")}},
-                  sls.length?sls.join("·"):"");
-              }));
+                    [1,2,3,4,5].map(dw=>{
+                      const sls=w.slots[dw]||[];
+                      const o=dayOf(w,dw);
+                      /* v10.49, sa règle : trois états PAR DEMI-JOURNÉE. Vide = pas
+                         de off ; vert = off avec au moins une salle participante
+                         libre (cliquable) ; hachuré gris = off mais aucune salle
+                         libre — inutile d'ouvrir la fenêtre pour le savoir. */
+                      return RE("td",{key:dw,
+                        style:{padding:"3px 2px",textAlign:"center",border:"1px solid var(--border2)",
+                          background:(sls.length&&habDW.indexOf(dw)>=0)?"rgba(124,58,237,.06)":"transparent"}},
+                        o?sls.map(s2=>{
+                          const ok=hasFreeRoom(o.y,o.m,o.d,s2);
+                          return RE("span",{key:s2,
+                            onClick:(ok&&editable)?()=>{setFreeStep(null);setFreeModal({y:o.y,m:o.m,d:o.d,sl:s2,slots:[s2]});}:undefined,
+                            title:ok?undefined:"off, mais aucune salle libre ce créneau",
+                            style:{display:"inline-block",minWidth:22,margin:"1px 2px",padding:"1px 5px",borderRadius:5,fontSize:9,fontWeight:800,
+                              cursor:(ok&&editable)?"pointer":"default",
+                              border:ok?"1.5px solid #2da44e":"1.5px dashed #b6bec7",
+                              background:ok?"rgba(22,163,74,.16)":"repeating-linear-gradient(45deg,rgba(140,150,160,.18),rgba(140,150,160,.18) 3px,transparent 3px,transparent 6px)",
+                              color:ok?"#16a34a":"var(--txt3)"}},s2);
+                        }):null);
+                    }));
           })))),
-    analysis.offWeeks.length>0&&RE("div",{style:{fontSize:9,color:"var(--txt3)",marginBottom:10}},
-      RE("span",{style:{color:"#7c3aed",fontWeight:700}},"violet")," = vos jours habituels de consultation · ",
-      RE("span",{style:{color:"#16a34a",fontWeight:700}},"vert")," = une salle est libre ce créneau",editable?" — touchez la case pour poser une activité":""),
+              analysis.offWeeks.length>0&&RE("div",{style:{fontSize:9.5,color:"var(--txt3)",marginBottom:10,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}},
+                RE("span",{style:{display:"inline-block",width:24,height:12,borderRadius:5,border:"1px solid var(--border)",background:"var(--bg2)"}}),"pas de off",
+                RE("span",null,"·"),
+                RE("span",{style:{display:"inline-block",width:24,height:12,borderRadius:5,border:"1.5px solid #2da44e",background:"rgba(22,163,74,.16)"}}),"off avec au moins une salle disponible"+(editable?" — cliquez pour ouvrir":""),
+                RE("span",null,"·"),
+                RE("span",{style:{display:"inline-block",width:24,height:12,borderRadius:5,border:"1.5px dashed #b6bec7",background:"repeating-linear-gradient(45deg,rgba(140,150,160,.18),rgba(140,150,160,.18) 3px,transparent 3px,transparent 6px)"}}),"off mais pas de salle"),
     analysis.weekPairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"),
     /* ── v10.25 : modale de report a TROIS groupes ────────────────────────────
        1. semaines blanches, meme jour de semaine — reprennent tout d'un coup
@@ -5277,30 +5313,33 @@ function ReportsView(p){
                   style:{fontSize:12,padding:"6px 12px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"}},s))),
               RE("button",{onClick:()=>setFreeStep(null),style:{marginTop:9,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",cursor:"pointer",fontWeight:700}},"‹ Retour"));
           }
-          const pinned=[];
-          analysis.weekPairs.forEach(wp=>{if(!wp.to)wp.lost.forEach(L=>{
-            const a=myActesAll.find(x=>x.id===L.acte);
-            if(a&&(!a.hasSalle||freeFor(a,occ).length>0))pinned.push({a,lost:L});
-          });});
-          const withRoom=myActesAll.filter(a=>a.hasSalle&&freeFor(a,occ).length>0);
-          const noRoom=myActesAll.filter(a=>!a.hasSalle);
-          const full=myActesAll.filter(a=>a.hasSalle&&freeFor(a,occ).length===0);
-          const go=(a,lost)=>{const fs=freeFor(a,occ);if(!a.hasSalle)return poseFree(a,null,lost);if(fs.length===1)return poseFree(a,fs[0],lost);setFreeStep({a,lost});};
-          const grp=(titre,col,items,render)=>items.length===0?null:RE("div",{key:titre,style:{marginBottom:9}},
-            RE("div",{style:{fontSize:9,fontWeight:800,color:col,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}},titre),
-            RE("div",{style:{display:"flex",flexWrap:"wrap",gap:5}},items.map(render)));
-          return RE("div",null,
-            grp("📥 À reporter","#b45309",pinned,(it,i)=>RE("button",{key:"p"+i,onClick:()=>go(it.a,it.lost),
-              style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #b45309",background:"rgba(245,158,11,.12)",color:"#b45309",textAlign:"left"}},
-              (it.a.short||it.a.label)+" — report du "+fmtD(it.lost)+" "+it.lost.sl)),
-            grp("Salle libre","#16a34a",withRoom,a=>RE("button",{key:a.id,onClick:()=>go(a,null),
-              style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"}},
-              (a.short||a.label)+" · "+freeFor(a,occ).length+(freeFor(a,occ).length>1?" salles":" salle"))),
-            grp("Sans salle","var(--txt2)",noRoom,a=>RE("button",{key:a.id,onClick:()=>go(a,null),
-              style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)"}},a.short||a.label)),
-            grp("Toutes salles occupées","var(--txt3)",full,a=>RE("span",{key:a.id,
-              style:{fontSize:11,padding:"5px 10px",borderRadius:8,fontWeight:700,border:"1px dashed var(--border)",background:"transparent",color:"var(--txt3)"}},a.short||a.label)),
-            (pinned.length+withRoom.length+noRoom.length+full.length)===0&&RE("div",{style:{fontSize:11,color:"var(--txt3)"}},"Aucune activité disponible pour vous sur ce créneau."));
+              const pinned=[];
+              analysis.weekPairs.forEach(wp=>{if(!wp.to)wp.lost.forEach(L=>{
+                const a=myActesAll.find(x=>x.id===L.acte);
+                if(a&&freeFor(a,occ).length>0)pinned.push({a,lost:L});
+              });});
+              /* v10.49 : seules les activités pouvant se dérouler dans une salle
+                 participante sont proposées ; sans salle libre ce créneau elles
+                 restent visibles mais grisées, avec la raison. Le groupe « Sans
+                 salle » (FMC…) disparaît : sans salle, rien à ouvrir sur un off. */
+              const withRoom=myActesOff.filter(a=>freeFor(a,occ).length>0);
+              const full=myActesOff.filter(a=>freeFor(a,occ).length===0);
+              const go=(a,lost)=>{const fs=freeFor(a,occ);if(fs.length===1)return poseFree(a,fs[0],lost);setFreeStep({a,lost});};
+              const grp=(titre,col,items,render)=>items.length===0?null:RE("div",{key:titre,style:{marginBottom:9}},
+                RE("div",{style:{fontSize:9,fontWeight:800,color:col,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}},titre),
+                RE("div",{style:{display:"flex",flexWrap:"wrap",gap:5}},items.map(render)));
+              const nSl=(a)=>{const n=freeFor(a,occ).length;return n+(n>1?" salles libres":" salle libre");};
+              return RE("div",null,
+                grp("📥 À reporter","#b45309",pinned,(it,i)=>RE("button",{key:"p"+i,onClick:()=>go(it.a,it.lost),
+                  style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #b45309",background:"rgba(245,158,11,.12)",color:"#b45309",textAlign:"left"}},
+                  (it.a.short||it.a.label)+" — report du "+fmtD(it.lost)+" "+it.lost.sl)),
+                grp("Ouvrir","#16a34a",withRoom,a=>RE("button",{key:a.id,onClick:()=>go(a,null),
+                  style:{fontSize:11,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"}},
+                  (a.short||a.label)+" · "+nSl(a))),
+                grp("Aucune salle libre ce créneau","var(--txt3)",full,a=>RE("span",{key:a.id,
+                  style:{fontSize:11,padding:"5px 10px",borderRadius:8,fontWeight:700,border:"1px dashed var(--border)",background:"transparent",color:"var(--txt3)",opacity:.75}},
+                  (a.short||a.label)+" · aucune salle libre")),
+                (pinned.length+withRoom.length+full.length)===0&&RE("div",{style:{fontSize:11,color:"var(--txt3)"}},"Aucune activité ouvrable pour vous sur ce créneau."));
         })())));
 }
 
@@ -9262,7 +9301,7 @@ function CardioPlanning() {
                             isEdit && React.createElement("div", { style: { display: "flex", gap: 3 } },
                                 React.createElement("button", { title: "Avancer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, -1); } }, "\u25B2"),
                                 React.createElement("button", { title: "Reculer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, 1); } }, "\u25BC"))))); })))); }))),
-            tab === "reports" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(ReportsView, { medecins: medecins, actes: actes, getEntries: getEntries, tourMed: tourMed, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminReports: isAdminEdit && adminCanReports, adminName: adminName, removeEntry: removeEntry, year: year, month: month, toast: toast })),
+            tab === "reports" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(ReportsView, { salleReg: salleReg, medecins: medecins, actes: actes, getEntries: getEntries, tourMed: tourMed, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminReports: isAdminEdit && adminCanReports, adminName: adminName, removeEntry: removeEntry, year: year, month: month, toast: toast })),
             tab === "aide" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(HelpView, null)),
             tab === "astreinte" && (function () {
                 var astMeds = medecins.filter(function (m) { return m.astreinte === true; });
@@ -11034,6 +11073,13 @@ function CardioPlanning() {
                     var v2 = _a[0], l2 = _a[1];
                     return (React.createElement("button", { key: v2, onClick: function () { return setMData(function (p) { var cur = Array.isArray(p.s) ? p.s : (p.s ? [p.s] : []); var nx = cur.includes(v2) ? cur.filter(function (x) { return x !== v2; }) : cur.concat([v2]); return __assign(__assign({}, p), { s: nx }); }); }, style: { flex: "1 1 40%", padding: "9px 6px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: (Array.isArray(mData.s) ? mData.s : [mData.s]).includes(v2) ? "#1d4ed8" : "var(--bg2)", color: (Array.isArray(mData.s) ? mData.s : [mData.s]).includes(v2) ? "#fff" : "var(--txt2)" } }, l2));
                 })),
+                React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Demi-journ\u00E9es off (onglet Reports)"),
+                React.createElement("div", { onClick: function () { return setMData(function (pp) { return (__assign(__assign({}, pp), { offOuv: !offOuvOn(pp, actes) })); }); }, style: { display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", border: "1.5px dashed #7c3aed", background: "rgba(124,58,237,.05)", borderRadius: 9, padding: "8px 11px", marginTop: 2 } },
+                    React.createElement("input", { type: "checkbox", readOnly: true, checked: offOuvOn(mData, actes), style: { width: 16, height: 16, accentColor: "#7c3aed", marginTop: 1, pointerEvents: "none" } }),
+                    React.createElement("div", { style: { fontSize: 11.5, lineHeight: 1.45, color: "var(--txt2)" } },
+                        React.createElement("b", { style: { color: "var(--txt)" } }, "Ouvrable sur un off"),
+                        React.createElement("br", null),
+                        "Une consultation peut s'ouvrir dans cette salle sur une demi-journ\u00E9e off (onglet Reports). Les activit\u00E9s propos\u00E9es en d\u00E9coulent : celles de cette salle, rien d'autre.")),
                 React.createElement("div", { style: { marginTop: 12 } },
                     React.createElement("label", { style: S.fl }, "Activit\u00E9s possibles dans cette salle"),
                     [["CHL", "CHL"], ["CHB", "CHB"], ["tous", "Communes aux deux sites"]].map(function (_a) {
@@ -11054,7 +11100,7 @@ function CardioPlanning() {
                                     }, style: { fontSize: 12, padding: "7px 12px", borderRadius: 14, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" }, title: a.label }, a.label.length <= 16 ? a.label : a.short);
                             }))));
                     })),
-                                React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 14 } },
+                React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 14 } },
                     !mData._new && React.createElement("button", { onClick: function () {
                             if (!window.confirm("Supprimer la salle " + mData._origN + " du registre ?\n(Retirée aussi des activités ; les cases déjà posées la gardent.)"))
                                 return;
@@ -11072,7 +11118,7 @@ function CardioPlanning() {
                             if (mData._new) {
                                 if (salleReg.some(function (x) { return x.n === nm; }))
                                     return toast("Cette salle existe déjà", "warn");
-                                setSalleReg(function (p) { return __spreadArray(__spreadArray([], p, true), [{ n: nm, s: sArr.length === 1 ? sArr[0] : sArr }], false); });
+                                setSalleReg(function (p) { return __spreadArray(__spreadArray([], p, true), [__assign({ n: nm, s: sArr.length === 1 ? sArr[0] : sArr }, (mData.offOuv !== undefined ? { offOuv: !!mData.offOuv } : {}))], false); });
                                 if ((mData._acts || []).length > 0)
                                     setActes(function (p) { return p.map(function (a) { return (mData._acts.includes(a.id) && !(a.salles || []).includes(nm)) ? __assign(__assign({}, a), { salles: (a.salles || []).concat([nm]) }) : a; }); });
                                 toast("Salle créée : " + nm, "info");
@@ -11080,13 +11126,13 @@ function CardioPlanning() {
                             else if (nm !== mData._origN) {
                                 if (salleReg.some(function (x) { return x.n === nm; }))
                                     return toast("Ce nom existe déjà", "warn");
-                                setSalleReg(function (p) { return p.map(function (x) { return x.n === mData._origN ? __assign(__assign({}, x), { n: nm, s: mData.s }) : x; }); });
+                                setSalleReg(function (p) { return p.map(function (x) { return x.n === mData._origN ? __assign(__assign(__assign({}, x), { n: nm, s: mData.s }), (mData.offOuv !== undefined ? { offOuv: !!mData.offOuv } : {})) : x; }); });
                                 setActes(function (p) { return p.map(function (a) { return (__assign(__assign({}, a), { salles: (a.salles || []).map(function (s2) { return s2 === mData._origN ? nm : s2; }) })); }); });
                                 setPlan(function (p) { var n2 = {}; Object.keys(p).forEach(function (k) { var dm = {}; Object.keys(p[k]).forEach(function (mid) { var e = p[k][mid]; var fx = function (o) { return o && o.salle === mData._origN ? __assign(__assign({}, o), { salle: nm }) : o; }; dm[mid] = Array.isArray(e) ? e.map(fx) : fx(e); }); n2[k] = dm; }); return n2; });
                                 toast("Salle renommée partout : " + mData._origN + " \u2192 " + nm, "info");
                             }
                             else {
-                                setSalleReg(function (p) { return p.map(function (x) { return x.n === mData._origN ? __assign(__assign({}, x), { s: mData.s }) : x; }); });
+                                setSalleReg(function (p) { return p.map(function (x) { return x.n === mData._origN ? __assign(__assign(__assign({}, x), { s: mData.s }), (mData.offOuv !== undefined ? { offOuv: !!mData.offOuv } : {})) : x; }); });
                             }
                             setModal(null);
                         }, style: { flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#1d4ed8", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, mData._new ? "Créer" : "Enregistrer"))))),
