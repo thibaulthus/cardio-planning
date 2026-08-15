@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.50 — 15/08/2026";
+const APP_VERSION="v10.52 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -339,7 +339,7 @@ const printWeekList=(y,m)=>{
 const S={
   app:{minHeight:"100vh",background:"var(--bg)",fontFamily:"'Sora','Segoe UI',sans-serif",color:"var(--txt)"},
   hdr:{background:"var(--hdr)",borderBottom:"1px solid var(--border)",padding:"0 10px",display:"flex",alignItems:"center",height:HDR_H,position:"sticky",top:0,zIndex:100,gap:6},
-  nav:{display:"flex",gap:1,flex:1,overflowX:"auto",flexWrap:"nowrap",scrollbarWidth:"none",msOverflowStyle:"none",WebkitOverflowScrolling:"touch"},
+  nav:{display:"flex",gap:1,flex:1,overflowX:"auto",flexWrap:"nowrap",WebkitOverflowScrolling:"touch"},
   nb:{padding:"4px 9px",borderRadius:6,border:"none",background:"transparent",cursor:"pointer",fontSize:11,fontWeight:500,color:"rgba(255,255,255,.65)",whiteSpace:"nowrap",flexShrink:0},
   nba:{background:"var(--nav-act)",color:"var(--nav-act-c)",fontWeight:700},
   mTit:{fontSize:16,fontWeight:800,margin:0,color:"var(--txt)"},
@@ -6843,7 +6843,7 @@ function CardioPlanning(){
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
-  useEffect(()=>{authorRef.current=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+" (administratif)"):(isEdit?"Éditeur":"?"));},[accessMode,isEdit,isMedEdit,isAdminEdit,editMedId,adminName,medecins]);
+  useEffect(()=>{authorRef.current=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+(isCadre?" (cadre)":" (secrétaire)")):(isEdit?"Éditeur":"?"));},[accessMode,isEdit,isMedEdit,isAdminEdit,editMedId,adminName,medecins]);
   useEffect(()=>{ // purge du journal au-delà de 1200 entrées (éditeur uniquement, garde les 1000 plus récentes)
     if(!isEdit||!window.firebaseDB)return;
     (async()=>{try{
@@ -7843,10 +7843,10 @@ function CardioPlanning(){
             }
           }}>✏️ Édition</button>
         {adminAsk&&<div style={{marginTop:10,padding:10,borderRadius:9,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.08)"}}>
-          <div style={{fontSize:11,color:"#7c3aed",fontWeight:800,marginBottom:6}}>🗝 Accès administratif — votre prénom :</div>
+          <div style={{fontSize:11,color:"#7c3aed",fontWeight:800,marginBottom:6}}>{"🗝 Accès "+(isCadre?"cadre":"secrétaire")+" — votre prénom :"}</div>
           <input value={adminNameInput} onChange={e=>setAdminNameInput(e.target.value)} placeholder="Prénom" style={{...S.fi,width:"100%",textAlign:"center",marginBottom:8}}/>
           <button style={{width:"100%",padding:"9px",borderRadius:9,border:"none",background:"#7c3aed",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:800}}
-            onClick={()=>{const n=(adminNameInput||"").trim();if(!n)return;setAdminName(n);try{localStorage.setItem("cp6_adminName",n);}catch(e){}setAccessMode("adminEdit");setAdminAsk(false);}}>Entrer (administratif)</button>
+            onClick={()=>{const n=(adminNameInput||"").trim();if(!n)return;setAdminName(n);try{localStorage.setItem("cp6_adminName",n);}catch(e){}setAccessMode("adminEdit");setAdminAsk(false);}}>{"Entrer ("+(isCadre?"cadre":"secrétaire")+")"}</button>
         </div>}
         <div style={{marginTop:14,fontSize:10,color:"var(--txt3)",textAlign:"center"}}>{APP_VERSION}</div>
       </div>
@@ -7869,7 +7869,14 @@ function CardioPlanning(){
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 td{background:var(--bg2)}
 
+nav{scrollbar-width:none;-ms-overflow-style:none}
 nav::-webkit-scrollbar { display: none; }
+/* v10.52 : sur ordinateur (pointeur souris), la barre reapparait — le navigateur
+   ne la dessine que si les onglets debordent, elle reste invisible sinon */
+@media (pointer:fine){
+  nav{scrollbar-width:thin}
+  nav::-webkit-scrollbar{display:block;height:5px}
+}
 header::-webkit-scrollbar { display: none; }
 
 @media print {
@@ -7939,7 +7946,7 @@ header::-webkit-scrollbar { display: none; }
         ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
       </div>}
       {isAdminEdit&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
-        🗝 Édition administrative — {adminName||"?"} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
+        🗝 {isCadre?"Édition cadre":"Édition secrétaire"} — {adminName||"?"} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
       </div>}
 
       {/* HEADER */}
@@ -8646,8 +8653,8 @@ header::-webkit-scrollbar { display: none; }
           </div>}
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#7c3aed",fontSize:13,marginBottom:6}}>🗝 Rôle administratif (secrétaires, cadres)</div>
-            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un PIN partagé : à la connexion, chaque personne saisit son prénom (mémorisé sur son appareil). Le rôle peut poser, modifier et retirer les activités cochées « ✏️ administratif » sur la ligne de n'importe quel médecin.</div>
+            <div style={{fontWeight:700,color:"#7c3aed",fontSize:13,marginBottom:6}}>🗝 Rôles secrétaires et cadres</div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>PIN secrétaires (partagé) : à la connexion, chaque personne saisit son prénom (mémorisé sur son appareil). Le rôle peut poser, modifier et retirer les activités cochées « ✏️ secrétaires » sur la ligne de n'importe quel médecin.</div>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <input type="password" id="nap" placeholder={adminPin?"PIN défini — nouveau PIN":"Définir le PIN"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
               <button style={S.btnP} onClick={()=>{const v=document.getElementById("nap").value;if(v.length>=4){setAdminPin(v);toast("PIN administratif mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
