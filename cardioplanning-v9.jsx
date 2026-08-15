@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.54 — 15/08/2026";
+const APP_VERSION="v10.55 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5767,10 +5767,12 @@ function DeactModal({med,perDays,perLbl,onSave,onClose,countActs=null,onClear=nu
   );
 }
 
-/* ═══════════ v10.54 — INTERNES, lot 1 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
+/* ═══════════ v10.55 — INTERNES, lot 1 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
    Les internes ne vivent PAS dans la liste `medecins` : ils sont rangés par semestre dans intCfg.sems,
    pour ne jamais apparaître dans les filtres et listes des médecins. Leurs cases du planning utiliseront
-   leurs identifiants ("I...") comme clés, exactement comme celles des médecins. */
+   leurs identifiants ("I...") comme clés, exactement comme celles des médecins.
+   Prise de fonction : le 2 mai et le 2 novembre, reportée au lundi suivant si elle tombe un ven/sam/dim.
+   Les dates restent modifiables à la main pour affiner. */
 const INT_COLS=["#2fbf9e","#f59e0b","#ec4899","#388bfd","#8b5cf6","#76a5af","#e3b341","#3fb950","#f97316","#64748b"];
 function intISO(dt){return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");}
 function intDecal(iso,n){const p=iso.split("-").map(Number);return intISO(new Date(p[0],p[1]-1,p[2]+n));}
@@ -5779,10 +5781,15 @@ function intSemLabel(deb){const p=deb.split("-").map(Number);const y=p[0],m=p[1]
 function intSemsTri(cfg){return ((cfg&&cfg.sems)||[]).slice().sort((a,b)=>(a.deb<b.deb?-1:1));}
 function intSemDuJour(cfg,iso){return intSemsTri(cfg).find(s=>s.deb<=iso&&iso<=s.fin)||null;}
 function intFmtD(iso){const p=(iso||"").split("-");return p.length===3?(p[2]+"/"+p[1]+"/"+p[0]):iso;}
+function intPrise(y,m){const d=new Date(y,m-1,2);const j=d.getDay();const dec=j===5?3:(j===6?2:(j===0?1:0));return intISO(new Date(y,m-1,2+dec));}
+function intPrises(iso){const y=Number(iso.slice(0,4));const l=[];[y-1,y,y+1].forEach(yy=>{l.push(intPrise(yy,5));l.push(intPrise(yy,11));});return l;}
+function intProchainePrise(iso){return intPrises(iso).find(p=>p>iso)||intDecal(iso,183);}
+function intDernierePrise(iso){const l=intPrises(iso).filter(p=>p<=iso);return l.length?l[l.length-1]:iso;}
 
 function InternesEquipe({intCfg,setIntCfg,isEdit}){
   const [open,setOpen]=useState({});
   const [formSem,setFormSem]=useState(null);
+  const [editId,setEditId]=useState(null);
   const [fNom,setFNom]=useState("");
   const [fInit,setFInit]=useState("");
   const [fCol,setFCol]=useState(INT_COLS[0]);
@@ -5790,7 +5797,12 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
   const tj=intISO(new Date());
   const setSems=(fn)=>setIntCfg(p=>({...p,sems:fn(((p&&p.sems)||[]).slice())}));
   const majSem=(id,patch)=>setSems(l=>l.map(s=>s.id===id?{...s,...patch}:s));
-  const addSem=()=>{const last=sems[sems.length-1];const deb=last?intDecal(last.fin,1):tj;setSems(l=>l.concat([{id:"S"+Date.now(),deb:deb,fin:intDecal(intPlusMois(deb,6),-1),meds:[]}]));};
+  const addSem=()=>{
+    const last=sems[sems.length-1];
+    if(!last){const deb=intDernierePrise(tj);setSems(l=>l.concat([{id:"S"+Date.now(),deb:deb,fin:intDecal(intProchainePrise(deb),-1),meds:[]}]));return;}
+    const deb=intProchainePrise(last.fin);
+    setSems(l=>l.map(s=>s.id===last.id?{...s,fin:intDecal(deb,-1)}:s).concat([{id:"S"+Date.now(),deb:deb,fin:intDecal(intProchainePrise(deb),-1),meds:[]}]));
+  };
   const setBascule=(i,val)=>{
     if(!val)return;
     const s=sems[i],prev=sems[i-1];
@@ -5798,14 +5810,22 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
     if(val>=s.fin){toast("La bascule doit rester avant la fin du semestre","warn");return;}
     setSems(l=>l.map(x=>x.id===s.id?{...x,deb:val}:(prev&&x.id===prev.id?{...x,fin:intDecal(val,-1)}:x)));
   };
-  const ouvreForm=(s)=>{setFormSem(s.id);setFNom("");setFInit("");const pris=(s.meds||[]).map(m=>m.color);setFCol(INT_COLS.find(c=>pris.indexOf(c)<0)||INT_COLS[0]);};
-  const addInterne=(semId)=>{
+  const colLibre=(s,sauf)=>{const pris=(s.meds||[]).filter(m=>m.id!==sauf).map(m=>m.color);return INT_COLS.find(c=>pris.indexOf(c)<0)||INT_COLS[0];};
+  const ouvreForm=(s)=>{setFormSem(s.id);setEditId(null);setFNom("");setFInit("");setFCol(colLibre(s,null));};
+  const ouvreEdit=(s,m)=>{setFormSem(s.id);setEditId(m.id);setFNom(m.nom);setFInit(m.init);setFCol(m.color);};
+  const fermeForm=()=>{setFormSem(null);setEditId(null);};
+  const valideForm=(semId)=>{
     const nom=fNom.trim(),init=fInit.trim().toUpperCase();
     if(!nom||!init){toast("Nom et initiales requis","warn");return;}
     const s=sems.find(x=>x.id===semId);
-    if(s&&(s.meds||[]).some(m=>m.init===init)){toast("Initiales déjà prises dans ce semestre","warn");return;}
+    if(s&&(s.meds||[]).some(m=>m.init===init&&m.id!==editId)){toast("Initiales déjà prises dans ce semestre","warn");return;}
+    if(editId){
+      setSems(l=>l.map(x=>x.id!==semId?x:{...x,meds:(x.meds||[]).map(m=>m.id===editId?{...m,nom:nom,init:init,color:fCol}:m)}));
+      fermeForm();return;
+    }
     setSems(l=>l.map(x=>x.id!==semId?x:{...x,meds:(x.meds||[]).concat([{id:"I"+Date.now(),nom:nom,init:init,color:fCol}])}));
     setFNom("");setFInit("");
+    if(s){const pris=(s.meds||[]).map(m=>m.color).concat([fCol]);setFCol(INT_COLS.find(c=>pris.indexOf(c)<0)||INT_COLS[0]);}
   };
   const nFinis=sems.filter(s=>s.fin<tj).length;
   return <div style={{marginBottom:18}}>
@@ -5832,8 +5852,8 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
           {i<sems.length-1&&<span style={{fontSize:10,color:"var(--txt3)"}}>— la fin est la veille du semestre suivant</span>}
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-          {(s.meds||[]).map(m=><span key={m.id} style={{display:"inline-flex",alignItems:"center",gap:6,background:m.color,color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:800}}>{m.init} · {m.nom}
-            {isEdit&&<button onClick={()=>{if(confirm("Retirer "+m.nom+" de ce semestre ? Ses cases passées du planning ne sont pas touchées."))setSems(l=>l.map(x=>x.id!==s.id?x:{...x,meds:(x.meds||[]).filter(y=>y.id!==m.id)}));}} style={{border:"none",background:"transparent",color:"#fff",fontWeight:900,cursor:"pointer",padding:0,fontSize:12}}>✕</button>}
+          {(s.meds||[]).map(m=><span key={m.id} title={isEdit?"Cliquer pour renommer ou changer la couleur":undefined} onClick={isEdit?(()=>ouvreEdit(s,m)):undefined} style={{display:"inline-flex",alignItems:"center",gap:6,background:m.color,color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:800,cursor:isEdit?"pointer":"default",outline:editId===m.id?"2.5px solid var(--txt)":"none"}}>{m.init} · {m.nom}
+            {isEdit&&<button onClick={e=>{e.stopPropagation();if(confirm("Retirer "+m.nom+" de ce semestre ? Ses cases passées du planning ne sont pas touchées."))setSems(l=>l.map(x=>x.id!==s.id?x:{...x,meds:(x.meds||[]).filter(y=>y.id!==m.id)}));}} style={{border:"none",background:"transparent",color:"#fff",fontWeight:900,cursor:"pointer",padding:0,fontSize:12}}>✕</button>}
           </span>)}
           {(s.meds||[]).length===0&&<span style={{fontSize:11,color:"var(--txt3)"}}>aucun interne pour l'instant</span>}
           {isEdit&&formSem!==s.id&&<button style={{...S.icnBtn,fontSize:11}} onClick={()=>ouvreForm(s)}>+ Ajouter un interne</button>}
@@ -5841,10 +5861,10 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
         {isEdit&&formSem===s.id&&<div style={{marginTop:9,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           <input placeholder="Nom" value={fNom} onChange={e=>setFNom(e.target.value)} style={{...S.fi,width:150}}/>
           <input placeholder="Init." value={fInit} onChange={e=>setFInit(e.target.value)} style={{...S.fi,width:56}}/>
-          {INT_COLS.filter(c=>(s.meds||[]).map(m=>m.color).indexOf(c)<0).concat(INT_COLS.filter(c=>(s.meds||[]).map(m=>m.color).indexOf(c)>=0)).map(c=>
+          {INT_COLS.filter(c=>(s.meds||[]).filter(m=>m.id!==editId).map(m=>m.color).indexOf(c)<0).concat(INT_COLS.filter(c=>(s.meds||[]).filter(m=>m.id!==editId).map(m=>m.color).indexOf(c)>=0)).map(c=>
             <button key={c} onClick={()=>setFCol(c)} title={c} style={{width:20,height:20,borderRadius:"50%",background:c,border:fCol===c?"2.5px solid var(--txt)":"2.5px solid transparent",cursor:"pointer",padding:0}}/>)}
-          <button style={{...S.icnBtn,fontWeight:800,color:"#16a34a"}} onClick={()=>addInterne(s.id)}>✓ Ajouter</button>
-          <button style={{...S.icnBtn}} onClick={()=>setFormSem(null)}>annuler</button>
+          <button style={{...S.icnBtn,fontWeight:800,color:"#16a34a"}} onClick={()=>valideForm(s.id)}>{editId?"✓ Modifier":"✓ Ajouter"}</button>
+          <button style={{...S.icnBtn}} onClick={fermeForm}>annuler</button>
         </div>}
       </div>;
     })}
@@ -5852,6 +5872,7 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
       <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}} onClick={addSem}>+ Semestre suivant</button>
       {nFinis>0&&<button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.08)",color:"#dc2626",fontWeight:800,cursor:"pointer"}} onClick={()=>{if(confirm(nFinis+" semestre(s) terminé(s) — supprimer leurs fiches ? Les cases passées du planning ne sont pas touchées."))setSems(l=>l.filter(s=>!(s.fin<tj)));}}>🗑 Supprimer les semestres terminés</button>}
     </div>}
+    {isEdit&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>Prise de fonction proposée : le 2 mai et le 2 novembre, reportée au lundi suivant quand elle tombe un vendredi, samedi ou dimanche. Les dates restent modifiables ci-dessus.</div>}
   </div>;
 }
 
