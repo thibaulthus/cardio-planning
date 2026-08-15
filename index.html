@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.47 — 14/08/2026";
+var APP_VERSION = "v10.48 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1049,15 +1049,28 @@ function TableScroll(_a) {
                 el.style.maxHeight = legacy;
             return;
         }
+        /* v10.48, son retour Edge : « on perd de la place en bas ». Plus de marges
+           au doigt mouillé — les bandeaux fixés en bas (hors-ligne, PIN médecin ou
+           administratif) sont MESURÉS, et la boucle devient symétrique : elle
+           absorbe le débordement de la page ET reprend la place inutilisée tant
+           que le tableau a encore des lignes à montrer. Le tableau ne peut donc
+           qu'y gagner, jamais rétrécir. */
         var de = document.documentElement;
+        var barH = 0;
+        document.querySelectorAll('[data-botbar="1"]').forEach(function (b) { barH = Math.max(barH, b.offsetHeight || 0); });
         var top = el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0);
-        var h = window.innerHeight - top - 56;
+        var h = window.innerHeight - top - barH - 14;
         var v0 = Math.max(260, h) + "px";
         if (el.style.maxHeight !== v0)
             el.style.maxHeight = v0;
         var over = de.scrollHeight - de.clientHeight; /* lu APRÈS la pose : la mise en page vient d'être refaite */
         if (over > 0)
-            h -= over;
+            h -= over; /* la page déborde encore : absorber */
+        else if (over < 0 && el.scrollHeight - el.clientHeight > 1) {
+            var gain = (-over) - barH - 2;
+            if (gain > 0)
+                h += gain;
+        } /* place perdue ET tableau coupé : la reprendre, en s'arrêtant AU-DESSUS des bandeaux fixés (ils ne pèsent pas dans la hauteur de page) */
         if (h < 380) {
             if (el.style.maxHeight !== legacy)
                 el.style.maxHeight = legacy;
@@ -8976,13 +8989,13 @@ function CardioPlanning() {
     return (React.createElement("div", { style: S.app },
         React.createElement("style", null, setFoldCSS() + "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav::-webkit-scrollbar { display: none; }\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
         notif && React.createElement("div", { style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", borderColor: "#4ade80" }) }, notif.msg),
-        netOff && React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, "\uD83D\uDCF4 Hors ligne \u2014 dernier planning re\u00E7u \u00B7 lecture seule"),
-        isMedEdit && React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1d4ed8", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
+        netOff && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, "\uD83D\uDCF4 Hors ligne \u2014 dernier planning re\u00E7u \u00B7 lecture seule"),
+        isMedEdit && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1d4ed8", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
             "\u270F\uFE0F " + (isInterEdit ? "\u00C9dition \u00E9tendue" : "Mode \u00E9dition restreinte") + " \u2014 Dr. ",
             (medecins.find(function (m) { return m.id === editMedId; }) || { nom: "" }).nom,
             " \u00B7 ",
             React.createElement("button", { onClick: function () { return setAccessMode("view"); }, style: { background: "none", border: "1px solid rgba(255,255,255,.5)", borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 11, padding: "1px 7px", marginLeft: 8 } }, "Quitter")),
-        isAdminEdit && React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#7c3aed", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
+        isAdminEdit && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#7c3aed", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
             "\uD83D\uDDDD \u00C9dition administrative \u2014 ",
             adminName || "?",
             " \u00B7 ",

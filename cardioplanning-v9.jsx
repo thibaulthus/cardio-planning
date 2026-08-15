@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.47 — 14/08/2026";
+const APP_VERSION="v10.48 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -900,13 +900,21 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false}){
        valeur d'origine. */
     const legacy="calc(100vh - "+mh+"px)";
     if(window.innerWidth<760){if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
+    /* v10.48, son retour Edge : « on perd de la place en bas ». Plus de marges
+       au doigt mouillé — les bandeaux fixés en bas (hors-ligne, PIN médecin ou
+       administratif) sont MESURÉS, et la boucle devient symétrique : elle
+       absorbe le débordement de la page ET reprend la place inutilisée tant
+       que le tableau a encore des lignes à montrer. Le tableau ne peut donc
+       qu'y gagner, jamais rétrécir. */
     const de=document.documentElement;
+    let barH=0;document.querySelectorAll('[data-botbar="1"]').forEach(b=>{barH=Math.max(barH,b.offsetHeight||0);});
     const top=el.getBoundingClientRect().top+(window.scrollY||window.pageYOffset||0);
-    let h=window.innerHeight-top-56;
+    let h=window.innerHeight-top-barH-14;
     const v0=Math.max(260,h)+"px";
     if(el.style.maxHeight!==v0)el.style.maxHeight=v0;
     const over=de.scrollHeight-de.clientHeight;   /* lu APRÈS la pose : la mise en page vient d'être refaite */
-    if(over>0)h-=over;
+    if(over>0)h-=over;                                          /* la page déborde encore : absorber */
+    else if(over<0&&el.scrollHeight-el.clientHeight>1){const gain=(-over)-barH-2;if(gain>0)h+=gain;} /* place perdue ET tableau coupé : la reprendre, en s'arrêtant AU-DESSUS des bandeaux fixés (ils ne pèsent pas dans la hauteur de page) */
     if(h<380){if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
     const v=h+"px";
     if(el.style.maxHeight!==v)el.style.maxHeight=v;
@@ -7879,13 +7887,13 @@ header::-webkit-scrollbar { display: none; }
 `}</style>
 
       {notif&&<div style={{...S.notif,background:"var(--bg-td)",borderColor:"#4ade80"}}>{notif.msg}</div>}
-      {netOff&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
+      {netOff&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
         📴 Hors ligne — dernier planning reçu · lecture seule
       </div>}
-      {isMedEdit&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+      {isMedEdit&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
       </div>}
-      {isAdminEdit&&<div style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+      {isAdminEdit&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         🗝 Édition administrative — {adminName||"?"} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
       </div>}
 
