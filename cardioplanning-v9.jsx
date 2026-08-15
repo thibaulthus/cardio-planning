@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.52 — 15/08/2026";
+const APP_VERSION="v10.53 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1040,7 +1040,8 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
       g.meds.push(med);
     });
     const conflict=grps.length>1;
-    const noteTips=occ.map(({med})=>notes[nk(med.id,ry,rm,d,sl)]).filter(Boolean).join(" | ");
+    /* v10.53 : initiales devant chaque note — deux occupants ne se confondent plus */
+    const noteTips=occ.map(({med})=>{const n=notes[nk(med.id,ry,rm,d,sl)];return n?(med.init+" : "+n):null;}).filter(Boolean).join("  |  ");
     return(
       <td key={`${salle}-${d}-${sl}`} title={noteTips||undefined}
         style={{...S.td,...(conflict?conflBg(darkMode):{}),...(isTdRC?{background:"var(--bg-td)"}:{}),padding:2,cursor:isEdit?"pointer":"default"}}
@@ -1120,7 +1121,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint}){
+function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1231,10 +1232,13 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     /* v9.54 : deux ACTIVITÉS différentes sur le créneau passent la case en rouge —
        deux salles d'une même activité, non. */
     const _grpsA=salleGroups(row,occ);
+    /* v10.53 : notes par médecin — infobulle « INIT : note » sur la case */
+    const _nMeds=[];_grpsA.forEach(g=>(g.meds||[]).forEach(m=>{if(m&&m.id!==IDE_MED.id&&!_nMeds.find(x=>x.id===m.id))_nMeds.push(m);}));
+    const noteTips=_nMeds.map(m=>{const n=notes[nk(m.id,ry,rm,d,sl)];return n?(m.init+" : "+n):null;}).filter(Boolean).join("  |  ");
     const _idsA={};_grpsA.forEach(g=>{if(g.acte&&g.acte.id)_idsA[g.acte.id]=1;});
     const conflA=Object.keys(_idsA).length>1;
     return(
-      <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
+      <td key={`${row.label}-${d}-${sl}`} title={noteTips||undefined} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
         onClick={isEdit?()=>onPickAct({row,d,sl,y:ry,m:rm}):undefined}>
         <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"stretch"}}
           onClick={e=>{e.stopPropagation();if(isEdit)onPickAct({row,d,sl,y:ry,m:rm});}}>
@@ -1262,7 +1266,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:4,paddingTop:gi?4:0,marginTop:gi?1:0,borderTop:gi?"1px dashed "+(conflA?conflSep(darkMode):"var(--border)"):"none"}}>
             {meds.length>0&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
               {meds.map((m,mi)=>(
-                <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}</span>
+                <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{position:"relative",width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}{notes[nk(m.id,ry,rm,d,sl)]&&<span style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}</span>
               ))}
             </div>}
             {(lieu||showIde||noSalle)&&
@@ -2130,7 +2134,7 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
 }
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
-function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null,okKey="adminOk"}){
+function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null,okKey="adminOk",notes={},setNotes=null,canNotes=false}){
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
   const [difFor,setDifFor]=useState(null);
@@ -2186,7 +2190,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Assignés</div>
           {curOcc.map(({med,acte,acteId,e},i)=>(
             <div key={i}>
-            <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
+            <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
               <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
               {acte&&<span style={{padding:"2px 6px",borderRadius:4,background:acte.bg,color:acte.color,fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>}
@@ -2197,6 +2201,12 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
               {row.hasSalleChoice&&acte&&acte.hasSalle&&okAct(acte)&&<button onClick={()=>setSelMedId(med.id)}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
               {okAct(actes.find(a2=>a2.id===acteId))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+              {(()=>{/* v10.53 : note liée à CE médecin (jamais à la ligne IDE) */
+                if(med.id===IDE_MED.id)return null;
+                const _nk=nk(med.id,y2,m2,d,sl);
+                const _cn=!!setNotes&&(!selfOnly||med.id===selfOnly)&&(canNotes||okAct(acte));
+                if(!_cn&&!notes[_nk])return null;
+                return <input value={notes[_nk]||""} readOnly={!_cn} onChange={_cn?(e=>{const v=e.target.value;setNotes(p=>({...p,[_nk]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
             </div>
             {canDif&&<div style={{margin:"-2px 0 7px 6px",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
               {(e&&e.dif)
@@ -2389,7 +2399,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
 }
 
 /* ════ PICK MED SITE MODAL (CHL/CHB) ════ */
-function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null,darkMode=false,okKey="adminOk"}){
+function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null,darkMode=false,okKey="adminOk",notes={},setNotes=null,canNotes=false}){
   const {salle,siteActes,d,sl,y:y2,m:m2}=mData;
   const [step,setStep]=useState("med"); // med | acte | salle
   const [selMedId,setSelMedId]=useState(null);
@@ -2439,7 +2449,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
         <div style={{marginBottom:12}}>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Occupants</div>
           {curOcc.map(({med,acte},i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
+            <div key={i} style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
               <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
               <span style={{flex:1,color:"var(--txt)",fontSize:12}}>{med.prenom} {med.nom}</span>
               <span style={{fontSize:10,color:acte.color,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>
@@ -2450,6 +2460,11 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               {isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
               {(!adminOnly||acte[okKey]===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+              {(()=>{/* v10.53 : note liée à CE médecin, mêmes règles que la coche du rôle */
+                const _nk=nk(med.id,y2,m2,d,sl);
+                const _cn=!!setNotes&&(!selfOnly||med.id===selfOnly)&&(!adminOnly||canNotes||acte[okKey]===true);
+                if(!_cn&&!notes[_nk])return null;
+                return <input value={notes[_nk]||""} readOnly={!_cn} onChange={_cn?(e=>{const v=e.target.value;setNotes(p=>({...p,[_nk]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
             </div>
           ))}
         </div>
@@ -8110,7 +8125,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="plateau"&&<ActTabView title="❤️ PT Cardio" titleColor="#e3b341"
         rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
-        getEntries={getEntries} allDays={allDays} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} notes={notes} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
@@ -9823,8 +9838,8 @@ header::-webkit-scrollbar { display: none; }
         </div>);
       })()}
 
-      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
-      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
       {modal==="editActe"&&mData&&(
