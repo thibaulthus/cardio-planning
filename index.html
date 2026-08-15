@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.57 — 16/08/2026";
+var APP_VERSION = "v10.58 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6044,7 +6044,7 @@ function DeactModal(_a) {
                 React.createElement("button", { onClick: onClose, style: { fontSize: 12, padding: "6px 13px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "Fermer")))));
 }
 
-/* ═══════════ v10.57 — INTERNES, lots 1-2 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
+/* ═══════════ v10.58 — INTERNES, lots 1-2 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
    Les internes ne vivent PAS dans la liste `medecins` : ils sont rangés par semestre dans intCfg.sems,
    pour ne jamais apparaître dans les filtres et listes des médecins. Leurs cases du planning utiliseront
    leurs identifiants ("I...") comme clés, exactement comme celles des médecins.
@@ -6209,7 +6209,7 @@ function InternesTile({ intCfg, setIntCfg }) {
             React.createElement("span", null, "en HC")),
         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "0 = pas d'alerte pour ce compteur. La jauge s'appuiera sur ces seuils dans l'onglet Internes."));
 }
-/* ── v10.57, LOT 2 revu après son test : la grille prend la MISE EN PAGE DU
+/* ── v10.58 (v10.57 revue) : LOT 2 après son test : la grille prend la MISE EN PAGE DU
    PLANNING des médecins (TableScroll, mêmes en-têtes figés, mêmes pastilles
    Badge, fonds week-end/aujourd'hui, trait des lundis), avec une barre de
    période figée en haut (‹ › mêmes périodes que les autres onglets). La modale
@@ -6516,7 +6516,7 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                 semsAff.map(l => React.createElement(Chp, { key: l, bg: "rgba(56,139,253,.12)", c: "#1d4ed8" }, l)),
                 React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "2px 0 8px" } },
-            "La colonne de garde arrive au prochain lot, puis la jauge et les statistiques.",
+            "La colonne de garde arrive au prochain lot, puis la jauge et les statistiques. Cases hachur\u00E9es : hors du semestre de l'interne \u00B7 samedi : une seule case (matin) \u00B7 dimanche et f\u00E9ri\u00E9s : vides jusqu'\u00E0 la colonne de garde.",
             canEdit ? " Cliquez une case pour poser HC, USIC, une activité 🎓, une absence, une FMC ou un repos." : ""),
         cols.length === 0
             ? React.createElement("div", { style: Object.assign({}, S.card) },
@@ -6539,13 +6539,12 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                         const slots = off ? ["JOUR"] : samJ ? ["M"] : ["M", "AM"];
                         const vac = isVac(o.y, o.m, o.d);
                         return slots.map((sl, si) => (React.createElement("tr", { key: o.y + "-" + o.m + "-" + o.d + sl, "data-day": o.y + "-" + o.m + "-" + o.d, style: Object.assign(Object.assign(Object.assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (off || samJ ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMon ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
-                            si === 0 && React.createElement("td", { rowSpan: slots.length, style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, minWidth: C0, background: off || samJ ? "var(--bg-we)" : "var(--td-fix)" }) },
+                            si === 0 && React.createElement("td", { rowSpan: slots.length, style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, minWidth: C0, background: vac ? "var(--vac-bg)" : (off || samJ ? "var(--bg-we)" : "var(--td-fix)") }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : (off || samJ) ? "#92400e" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     o.d,
                                     viewPeriod && isNewMonth && React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700, fontFamily: "sans-serif", lineHeight: 1.2 } }, MOIS[o.m]),
                                     React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)", fontWeight: 700, fontFamily: "sans-serif" } },
                                         JOURSL[t].slice(0, 3),
-                                        vac ? " 🏖" : "",
                                         fer ? " F" : ""))),
                             React.createElement("td", { style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: off || samJ ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, off ? "" : SLOTS[sl]),
                             cols.map(c => {
@@ -6559,9 +6558,6 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                                         background: inR ? "transparent" : "repeating-linear-gradient(45deg,rgba(140,150,160,.14),rgba(140,150,160,.14) 3px,transparent 3px,transparent 7px)" } }, a && React.createElement(Badge, { a: a, hideSalle: true }));
                             }))));
                     })))),
-        React.createElement("div", { style: { fontSize: 9.5, color: "var(--txt3)", marginTop: 6, display: "flex", gap: 10, flexWrap: "wrap" } },
-            React.createElement("span", null, "Cases hachur\u00E9es : hors du semestre de l'interne."),
-            React.createElement("span", null, "Samedi : une seule case (matin). Dimanche et f\u00E9ri\u00E9s : vides jusqu'\u00E0 la colonne de garde.")),
         sel && React.createElement(InternesCellModal, { med: sel.med, y: sel.y, m: sel.m, d: sel.d, slot0: sel.slot0, onClose: () => setSel(null), actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry }));
 }
 function CardioPlanning() {

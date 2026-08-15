@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.57 — 16/08/2026";
+const APP_VERSION="v10.58 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5767,7 +5767,7 @@ function DeactModal({med,perDays,perLbl,onSave,onClose,countActs=null,onClear=nu
   );
 }
 
-/* ═══════════ v10.57 — INTERNES, lots 1-2 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
+/* ═══════════ v10.58 — INTERNES, lots 1-2 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
    Les internes ne vivent PAS dans la liste `medecins` : ils sont rangés par semestre dans intCfg.sems,
    pour ne jamais apparaître dans les filtres et listes des médecins. Leurs cases du planning utiliseront
    leurs identifiants ("I...") comme clés, exactement comme celles des médecins.
@@ -5901,7 +5901,7 @@ function InternesTile({intCfg,setIntCfg}){
   </div>;
 }
 
-/* ── v10.57, LOT 2 revu après son test : la grille prend la MISE EN PAGE DU
+/* ── v10.58 (v10.57 revue) : LOT 2 après son test : la grille prend la MISE EN PAGE DU
    PLANNING des médecins (TableScroll, mêmes en-têtes figés, mêmes pastilles
    Badge, fonds week-end/aujourd'hui, trait des lundis), avec une barre de
    période figée en haut (‹ › mêmes périodes que les autres onglets). La modale
@@ -6142,7 +6142,7 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
       </div>
     </div>
-    <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 8px"}}>La colonne de garde arrive au prochain lot, puis la jauge et les statistiques.{canEdit?" Cliquez une case pour poser HC, USIC, une activité 🎓, une absence, une FMC ou un repos.":""}</div>
+    <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 8px"}}>La colonne de garde arrive au prochain lot, puis la jauge et les statistiques. Cases hachurées : hors du semestre de l'interne · samedi : une seule case (matin) · dimanche et fériés : vides jusqu'à la colonne de garde.{canEdit?" Cliquez une case pour poser HC, USIC, une activité 🎓, une absence, une FMC ou un repos.":""}</div>
     {cols.length===0
       ?<div style={{...S.card}}>
         <div style={{fontSize:12,color:"var(--txt3)"}}>Aucun interne sur la période affichée — saisissez les semestres et les fiches dans l'onglet Équipe, section « 🎓 Internes ».</div>
@@ -6171,9 +6171,9 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
             return slots.map((sl,si)=>(
               <tr key={o.y+"-"+o.m+"-"+o.d+sl} data-day={o.y+"-"+o.m+"-"+o.d} style={{height:28,borderBottom:si===slots.length-1?"1px solid var(--border)":"1px solid var(--border2)",
                 ...(off||samJ?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{}),...(si===0&&isMon?{boxShadow:"0 -2px 0 0 var(--border)"}:{})}}>
-                {si===0&&<td rowSpan={slots.length} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,minWidth:C0,background:off||samJ?"var(--bg-we)":"var(--td-fix)"}}>
+                {si===0&&<td rowSpan={slots.length} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,minWidth:C0,background:vac?"var(--vac-bg)":(off||samJ?"var(--bg-we)":"var(--td-fix)")}}>
                   <div style={{fontWeight:800,color:isT?"var(--today-c)":(off||samJ)?"#92400e":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{o.d}{viewPeriod&&isNewMonth&&<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700,fontFamily:"sans-serif",lineHeight:1.2}}>{MOIS[o.m]}</div>}
-                    <div style={{fontSize:8,color:"var(--txt3)",fontWeight:700,fontFamily:"sans-serif"}}>{JOURSL[t].slice(0,3)}{vac?" 🏖":""}{fer?" F":""}</div>
+                    <div style={{fontSize:8,color:"var(--txt3)",fontWeight:700,fontFamily:"sans-serif"}}>{JOURSL[t].slice(0,3)}{fer?" F":""}</div>
                   </div>
                 </td>}
                 <td style={{...S.tdFix,position:"sticky",left:C0,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:off||samJ?"var(--bg-we)":"var(--td-fix)",minWidth:C1,padding:"2px"}}>{off?"":SLOTS[sl]}</td>
@@ -6195,10 +6195,6 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
         </tbody>
       </table>
     </TableScroll>}
-    <div style={{fontSize:9.5,color:"var(--txt3)",marginTop:6,display:"flex",gap:10,flexWrap:"wrap"}}>
-      <span>Cases hachurées : hors du semestre de l'interne.</span>
-      <span>Samedi : une seule case (matin). Dimanche et fériés : vides jusqu'à la colonne de garde.</span>
-    </div>
     {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry}/>}
   </div>;
 }
