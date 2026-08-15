@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.53.1 — 15/08/2026";
+const APP_VERSION="v10.54 — 15/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5767,6 +5767,136 @@ function DeactModal({med,perDays,perLbl,onSave,onClose,countActs=null,onClear=nu
   );
 }
 
+/* ═══════════ v10.54 — INTERNES, lot 1 : semestres et fiches (Équipe), coches d'activité, tuile Paramètres ═══════════
+   Les internes ne vivent PAS dans la liste `medecins` : ils sont rangés par semestre dans intCfg.sems,
+   pour ne jamais apparaître dans les filtres et listes des médecins. Leurs cases du planning utiliseront
+   leurs identifiants ("I...") comme clés, exactement comme celles des médecins. */
+const INT_COLS=["#2fbf9e","#f59e0b","#ec4899","#388bfd","#8b5cf6","#76a5af","#e3b341","#3fb950","#f97316","#64748b"];
+function intISO(dt){return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");}
+function intDecal(iso,n){const p=iso.split("-").map(Number);return intISO(new Date(p[0],p[1]-1,p[2]+n));}
+function intPlusMois(iso,n){const p=iso.split("-").map(Number);return intISO(new Date(p[0],p[1]-1+n,p[2]));}
+function intSemLabel(deb){const p=deb.split("-").map(Number);const y=p[0],m=p[1];if(m>=5&&m<=10)return "Été "+y;return m>=11?("Hiver "+y+"-"+(y+1)):("Hiver "+(y-1)+"-"+y);}
+function intSemsTri(cfg){return ((cfg&&cfg.sems)||[]).slice().sort((a,b)=>(a.deb<b.deb?-1:1));}
+function intSemDuJour(cfg,iso){return intSemsTri(cfg).find(s=>s.deb<=iso&&iso<=s.fin)||null;}
+function intFmtD(iso){const p=(iso||"").split("-");return p.length===3?(p[2]+"/"+p[1]+"/"+p[0]):iso;}
+
+function InternesEquipe({intCfg,setIntCfg,isEdit}){
+  const [open,setOpen]=useState({});
+  const [formSem,setFormSem]=useState(null);
+  const [fNom,setFNom]=useState("");
+  const [fInit,setFInit]=useState("");
+  const [fCol,setFCol]=useState(INT_COLS[0]);
+  const sems=intSemsTri(intCfg);
+  const tj=intISO(new Date());
+  const setSems=(fn)=>setIntCfg(p=>({...p,sems:fn(((p&&p.sems)||[]).slice())}));
+  const majSem=(id,patch)=>setSems(l=>l.map(s=>s.id===id?{...s,...patch}:s));
+  const addSem=()=>{const last=sems[sems.length-1];const deb=last?intDecal(last.fin,1):tj;setSems(l=>l.concat([{id:"S"+Date.now(),deb:deb,fin:intDecal(intPlusMois(deb,6),-1),meds:[]}]));};
+  const setBascule=(i,val)=>{
+    if(!val)return;
+    const s=sems[i],prev=sems[i-1];
+    if(prev&&val<=prev.deb){toast("La bascule doit être après le début du semestre précédent","warn");return;}
+    if(val>=s.fin){toast("La bascule doit rester avant la fin du semestre","warn");return;}
+    setSems(l=>l.map(x=>x.id===s.id?{...x,deb:val}:(prev&&x.id===prev.id?{...x,fin:intDecal(val,-1)}:x)));
+  };
+  const ouvreForm=(s)=>{setFormSem(s.id);setFNom("");setFInit("");const pris=(s.meds||[]).map(m=>m.color);setFCol(INT_COLS.find(c=>pris.indexOf(c)<0)||INT_COLS[0]);};
+  const addInterne=(semId)=>{
+    const nom=fNom.trim(),init=fInit.trim().toUpperCase();
+    if(!nom||!init){toast("Nom et initiales requis","warn");return;}
+    const s=sems.find(x=>x.id===semId);
+    if(s&&(s.meds||[]).some(m=>m.init===init)){toast("Initiales déjà prises dans ce semestre","warn");return;}
+    setSems(l=>l.map(x=>x.id!==semId?x:{...x,meds:(x.meds||[]).concat([{id:"I"+Date.now(),nom:nom,init:init,color:fCol}])}));
+    setFNom("");setFInit("");
+  };
+  const nFinis=sems.filter(s=>s.fin<tj).length;
+  return <div style={{marginBottom:18}}>
+    <div style={{fontSize:10,fontWeight:700,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:7}}>🎓 Internes — par semestre</div>
+    {sems.length===0&&<div style={{fontSize:12,color:"var(--txt3)",marginBottom:8}}>Aucun semestre saisi. Créez le premier pour y ranger les internes ; le suivant se préparera à l'avance et prendra le relais tout seul à la date de bascule.</div>}
+    {sems.map((s,i)=>{
+      const fini=s.fin<tj,futur=s.deb>tj,cours=!fini&&!futur;
+      if(fini&&!open[s.id])return <div key={s.id} style={{...S.card,marginBottom:8,opacity:.62,cursor:"pointer"}} onClick={()=>setOpen(o=>({...o,[s.id]:true}))}>
+        <span style={{fontWeight:700,fontSize:13,color:"var(--txt)"}}>▸ {intSemLabel(s.deb)} — terminé</span>
+        <span style={{fontSize:11,color:"var(--txt3)",marginLeft:8}}>{(s.meds||[]).length} interne(s) · un clic déplie</span>
+      </div>;
+      return <div key={s.id} style={{...S.card,marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:8}}>
+          <span style={{fontWeight:800,fontSize:13,color:"var(--txt)"}}>{intSemLabel(s.deb)}</span>
+          <Chp bg={cours?"#dcfce7":futur?"#dbeafe":"#f0f2f7"} c={cours?"#15803d":futur?"#1d4ed8":"#64748b"}>{cours?"en cours":futur?"préparé":"terminé"}</Chp>
+          {fini&&<button style={{...S.icnBtn,fontSize:10}} onClick={()=>setOpen(o=>({...o,[s.id]:false}))}>replier</button>}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:8,fontSize:12,color:"var(--txt2)"}}>
+          <span>Du</span>
+          {isEdit?<input type="date" value={s.deb} onChange={e=>{const v=e.target.value;if(!v)return;if(i===0){if(v<s.fin)majSem(s.id,{deb:v});else toast("Le début doit précéder la fin","warn");}else setBascule(i,v);}} style={{...S.fi,width:135}}/>:<b>{intFmtD(s.deb)}</b>}
+          <span>au</span>
+          {isEdit&&i===sems.length-1?<input type="date" value={s.fin} onChange={e=>{const v=e.target.value;if(v&&v>s.deb)majSem(s.id,{fin:v});}} style={{...S.fi,width:135}}/>:<b>{intFmtD(s.fin)}</b>}
+          {i>0&&isEdit&&<span style={{fontSize:10,color:"var(--txt3)"}}>— changer ce début décale la fin du semestre précédent (une seule date de bascule)</span>}
+          {i<sems.length-1&&<span style={{fontSize:10,color:"var(--txt3)"}}>— la fin est la veille du semestre suivant</span>}
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+          {(s.meds||[]).map(m=><span key={m.id} style={{display:"inline-flex",alignItems:"center",gap:6,background:m.color,color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:800}}>{m.init} · {m.nom}
+            {isEdit&&<button onClick={()=>{if(confirm("Retirer "+m.nom+" de ce semestre ? Ses cases passées du planning ne sont pas touchées."))setSems(l=>l.map(x=>x.id!==s.id?x:{...x,meds:(x.meds||[]).filter(y=>y.id!==m.id)}));}} style={{border:"none",background:"transparent",color:"#fff",fontWeight:900,cursor:"pointer",padding:0,fontSize:12}}>✕</button>}
+          </span>)}
+          {(s.meds||[]).length===0&&<span style={{fontSize:11,color:"var(--txt3)"}}>aucun interne pour l'instant</span>}
+          {isEdit&&formSem!==s.id&&<button style={{...S.icnBtn,fontSize:11}} onClick={()=>ouvreForm(s)}>+ Ajouter un interne</button>}
+        </div>
+        {isEdit&&formSem===s.id&&<div style={{marginTop:9,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+          <input placeholder="Nom" value={fNom} onChange={e=>setFNom(e.target.value)} style={{...S.fi,width:150}}/>
+          <input placeholder="Init." value={fInit} onChange={e=>setFInit(e.target.value)} style={{...S.fi,width:56}}/>
+          {INT_COLS.filter(c=>(s.meds||[]).map(m=>m.color).indexOf(c)<0).concat(INT_COLS.filter(c=>(s.meds||[]).map(m=>m.color).indexOf(c)>=0)).map(c=>
+            <button key={c} onClick={()=>setFCol(c)} title={c} style={{width:20,height:20,borderRadius:"50%",background:c,border:fCol===c?"2.5px solid var(--txt)":"2.5px solid transparent",cursor:"pointer",padding:0}}/>)}
+          <button style={{...S.icnBtn,fontWeight:800,color:"#16a34a"}} onClick={()=>addInterne(s.id)}>✓ Ajouter</button>
+          <button style={{...S.icnBtn}} onClick={()=>setFormSem(null)}>annuler</button>
+        </div>}
+      </div>;
+    })}
+    {isEdit&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
+      <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}} onClick={addSem}>+ Semestre suivant</button>
+      {nFinis>0&&<button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.08)",color:"#dc2626",fontWeight:800,cursor:"pointer"}} onClick={()=>{if(confirm(nFinis+" semestre(s) terminé(s) — supprimer leurs fiches ? Les cases passées du planning ne sont pas touchées."))setSems(l=>l.filter(s=>!(s.fin<tj)));}}>🗑 Supprimer les semestres terminés</button>}
+    </div>}
+  </div>;
+}
+
+function InternesTile({intCfg,setIntCfg}){
+  const num=(v)=>Math.max(0,Math.min(9,parseInt(v||"0",10)||0));
+  const maj=(patch)=>setIntCfg(p=>({...p,...patch}));
+  const inp=(k,def)=><input type="number" min={0} max={9} value={intCfg[k]===undefined?def:intCfg[k]} onChange={e=>{const o={};o[k]=num(e.target.value);maj(o);}} style={{...S.fi,width:52,textAlign:"center"}}/>;
+  return <div style={{...S.card,marginBottom:10}}>
+    <div style={{fontWeight:700,fontSize:13,color:"var(--txt)",marginBottom:8}}>🎓 Internes</div>
+    <label style={{display:"flex",alignItems:"center",gap:9,fontSize:12.5,fontWeight:700,marginBottom:4,cursor:"pointer"}}>
+      <input type="checkbox" checked={intCfg.show===true} onChange={e=>maj({show:e.target.checked})} style={{width:15,height:15}}/>
+      Afficher l'onglet Internes
+    </label>
+    <div style={{fontSize:11,color:"var(--txt3)",margin:"0 0 10px 24px"}}>Décoché : l'onglet disparaît de la barre. Aucune donnée n'est perdue, les fiches restent dans Équipe.</div>
+    <label style={{display:"flex",alignItems:"center",gap:9,fontSize:12.5,fontWeight:700,marginBottom:10,cursor:"pointer"}}>
+      <input type="checkbox" checked={intCfg.jaugeDef!==false} onChange={e=>maj({jaugeDef:e.target.checked})} style={{width:15,height:15}}/>
+      Jauge visible par défaut dans l'onglet
+    </label>
+    <div style={{fontSize:12,color:"var(--txt2)",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:6}}>
+      <span>Semaine : alerte si moins de</span>{inp("sHC",2)}<span>en HC ou moins de</span>{inp("sUS",2)}<span>en USIC</span>
+    </div>
+    <div style={{fontSize:12,color:"var(--txt2)",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:6}}>
+      <span>Samedi matin : alerte si moins de</span>{inp("sSam",1)}<span>en HC</span>
+    </div>
+    <div style={{fontSize:11,color:"var(--txt3)"}}>0 = pas d'alerte pour ce compteur. La jauge s'appuiera sur ces seuils dans l'onglet Internes.</div>
+  </div>;
+}
+
+function InternesView({intCfg}){
+  const tj=intISO(new Date());
+  const cur=intSemDuJour(intCfg,tj);
+  const prochains=intSemsTri(intCfg).filter(s=>s.deb>tj);
+  return <div style={{...S.card}}>
+    <div style={{fontWeight:800,fontSize:14,color:"var(--txt)",marginBottom:8}}>🎓 Internes</div>
+    {cur?<div style={{marginBottom:10}}>
+      <div style={{fontSize:12,color:"var(--txt2)",marginBottom:6}}>Semestre en cours : <b>{intSemLabel(cur.deb)}</b> ({intFmtD(cur.deb)} → {intFmtD(cur.fin)}) — {(cur.meds||[]).length} interne(s)</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(cur.meds||[]).map(m=><span key={m.id} style={{background:m.color,color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:800}}>{m.init} · {m.nom}</span>)}</div>
+    </div>:<div style={{fontSize:12,color:"var(--txt3)",marginBottom:10}}>Aucun semestre ne couvre la date du jour — saisissez-le dans l'onglet Équipe, section « 🎓 Internes ».</div>}
+    {prochains.length>0&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>{"Préparé : "+prochains.map(s=>intSemLabel(s.deb)+" (dès le "+intFmtD(s.deb)+", "+((s.meds||[]).length)+" interne(s))").join(" · ")}</div>}
+    <div style={{background:"rgba(56,139,253,.10)",border:"1px solid #388bfd",borderRadius:8,padding:"9px 11px",fontSize:12,color:"var(--txt2)"}}>
+      La grille (demi-journées, colonne de garde, jauge, statistiques) arrive au prochain lot. Cet écran sert déjà à vérifier que les semestres et les fiches saisis dans Équipe sont enregistrés et synchronisés entre appareils.
+    </div>
+  </div>;
+}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -5779,6 +5909,7 @@ function CardioPlanning(){
   const [isCadre,setIsCadre]=useState(false);
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
+  const [intCfg,setIntCfg]=useState({sems:[],show:false,jaugeDef:true,sHC:2,sUS:2,sSam:1}); // v10.54 internes
   const [ptOrder,setPtOrder]=useState([]);
   const [specColors,setSpecColors]=useState({});
   const [colOrder,setColOrder]=useState({});
@@ -5857,7 +5988,7 @@ function CardioPlanning(){
     if(mq.addEventListener)mq.addEventListener("change",onChg);else if(mq.addListener)mq.addListener(onChg);
     return ()=>{if(mq.removeEventListener)mq.removeEventListener("change",onChg);else if(mq.removeListener)mq.removeListener(onChg);};
   },[]);
-  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["construire","🏗️ Construire"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
+  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["construire","🏗️ Construire"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["internes","🎓 Internes"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
   const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder_v3"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
   useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v3",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
@@ -6156,6 +6287,7 @@ function CardioPlanning(){
             if(data.adminPin!==undefined)setAdminPin(data.adminPin);
           if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
+          if(data.intCfg){try{setIntCfg(pv=>({...pv,...JSON.parse(data.intCfg)}));}catch(e){}}
           if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
           if(data.specColors){try{setSpecColors(JSON.parse(data.specColors)||{});}catch(e){}}
           if(data.vacs!==undefined){try{setVacs(JSON.parse(data.vacs)||[]);}catch(e){}}
@@ -6642,6 +6774,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({editPin});},[editPin]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({intCfg:JSON.stringify(intCfg)});},[intCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({specColors:JSON.stringify(specColors)});},[specColors]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({vacs:JSON.stringify(vacs),vacRule:vacRule?1:0});},[vacs,vacRule]);
@@ -6851,8 +6984,8 @@ function CardioPlanning(){
     :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage","construire"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
-    .filter(([tid])=>hideTabs.indexOf(tid)<0&&HIDDEN_TABS.indexOf(tid)<0);
-  useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0)setTab("planning");},[accessMode,tab,isMedEdit]);
+    .filter(([tid])=>hideTabs.indexOf(tid)<0&&HIDDEN_TABS.indexOf(tid)<0&&(tid!=="internes"||intCfg.show===true));
+  useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0||(tab==="internes"&&intCfg.show!==true))setTab("planning");},[accessMode,tab,isMedEdit,intCfg]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
   const roleOkKey=isCadre?"cadreOk":"adminOk"; // v10.50 : la coche d'activité du rôle connecté
   // Returns true if current user can edit this specific medecin's data
@@ -8209,6 +8342,7 @@ header::-webkit-scrollbar { display: none; }
                       {a.csReport&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>📥 Proposée dans l'onglet Reports</div>}
                       {a.adminOk&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>✏️ Secrétaires</div>}
                       {a.cadreOk&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>✏️ Cadres</div>}
+                      {a.interneOk&&<div style={{fontSize:9,color:"#0e9f9f",fontWeight:700}}>{"🎓 Internes"+(a.interneSelf?" (posable par eux)":"")}</div>}
                     </div>
                     {isEdit&&<div style={{display:"flex",gap:4}}>
                       <button style={{...S.icnBtn}} onClick={()=>{setMData({...a,_new:false,sallesStr:(a.salles||[]).join(","),medStr:(a.medecinsAutorise||[]).join(",")});setModal("editActe");}}>✏️</button>
@@ -8267,10 +8401,12 @@ header::-webkit-scrollbar { display: none; }
               </div>
             </div>
           ))}
+          <InternesEquipe intCfg={intCfg} setIntCfg={setIntCfg} isEdit={isEdit}/>
         </div>
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
+      {tab==="internes"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><InternesView intCfg={intCfg}/></div>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -8807,6 +8943,7 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<ExportCard per={expPer} setPer={setExpPer} source={expSrc} setSource={setExpSrc}
             backups={backupList} seuil={expSeuil} setSeuil={setExpSeuil} dernier={expLast}
             onExport={doExport} occupe={expBusy}/>}
+          <InternesTile intCfg={intCfg} setIntCfg={setIntCfg}/>
           <div style={{...S.card,marginBottom:10}}>
             {/* Vacances scolaires */}
             <div style={{...S.card,marginBottom:10}}>
@@ -9872,6 +10009,8 @@ header::-webkit-scrollbar { display: none; }
             <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.csReport} onChange={e=>setMData(p=>({...p,csReport:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>📥 Consultation à reporter (proposée dans l'onglet Reports)</label></div>
             {!(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")&&<div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.adminOk} onChange={e=>setMData(p=>({...p,adminOk:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>✏️ Modifiable par les secrétaires (rôle administratif)</label></div>}
             {!(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")&&<div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.cadreOk} onChange={e=>setMData(p=>({...p,cadreOk:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>✏️ Modifiable par les cadres (PIN cadre)</label></div>}
+            {!(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")&&<div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={!!mData.interneOk} onChange={e=>setMData(p=>({...p,interneOk:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>🎓 Accessible aux internes</label></div>}
+            {!(mData.id==="GARDE"||mData.id==="REPOS_GARDE"||mData.id==="TP")&&!!mData.interneOk&&<div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center",marginLeft:22}}><input type="checkbox" checked={!!mData.interneSelf} onChange={e=>setMData(p=>({...p,interneSelf:e.target.checked}))} style={{width:14,height:14}}/><label style={{color:"var(--txt2)",fontSize:12}}>Posable par les internes eux-mêmes (sinon : secrétaire, cadre, intermédiaire ou éditeur)</label></div>}
             <div style={{gridColumn:"1/-1"}}>
               <label style={{color:"var(--txt2)",fontSize:12,display:"block",marginBottom:3}}>↩ Colonne/ligne de reprise dans :</label>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
