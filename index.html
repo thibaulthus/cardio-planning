@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.62 — 16/08/2026";
+var APP_VERSION = "v10.63 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1334,6 +1334,7 @@ function ActTabView({ title, titleColor, rows, year, month, prevM, nextM, medeci
         wdays.forEach(({ y: wY, m: wM, d }) => {
             if (isWE(wY, wM, d))
                 return;
+            const semJd = intMedsDuJour(intCfg, wY, wM, d); /* v10.63 : internes du jour pour les IDE */
             ["M", "AM"].forEach(sl => {
                 let tot = 0, totD = 0;
                 rows.forEach(row => {
@@ -1345,6 +1346,22 @@ function ActTabView({ title, titleColor, rows, year, month, prevM, nextM, medeci
                         if (o.dif)
                             inst[k2].dif = true;
                     });
+                    /* v10.63 : un interne mobilise les IDE de son activité, même seul dans la salle */
+                    if (semJd)
+                        semJd.meds.forEach(im => {
+                            row.ids.forEach(aid => {
+                                getEntries(im.id, wY, wM, d, sl).forEach(e => {
+                                    if (!(e && e.acteId === aid && !e.cond && (row.salle ? e.salle === row.salle : true)))
+                                        return;
+                                    const acte = actes.find(a => a.id === aid);
+                                    if (!acte)
+                                        return;
+                                    const k2 = aid + "|" + (e.salle || row.salle || "");
+                                    if (!inst[k2])
+                                        inst[k2] = { n: (acte.ideN || 0), dif: false };
+                                });
+                            });
+                        });
                     let n = 0, nd = 0;
                     Object.keys(inst).forEach(k2 => { const it = inst[k2]; if (it.dif)
                         nd += it.n;
@@ -1360,7 +1377,7 @@ function ActTabView({ title, titleColor, rows, year, month, prevM, nextM, medeci
             });
         });
         return M;
-    }, [ideActive, wdays, rows, medecins, actes, getEntries]);
+    }, [ideActive, wdays, rows, medecins, actes, getEntries, intCfg]);
     const ideCell = (row, d, sl, ry, rm) => ideActive ? (ideMap[row.label + "|" + ry + "-" + rm + "-" + d + "|" + sl] || 0) : 0;
     const setIdeDefV = (dw3, sl, v) => { if (setIdeCfg)
         setIdeCfg(p => { const q = Object.assign({}, (p || {})); q.def = Object.assign({}, (q.def || {})); q.def[dw3 + "|" + sl] = v; return q; }); };
@@ -1464,7 +1481,7 @@ function ActTabView({ title, titleColor, rows, year, month, prevM, nextM, medeci
                 const meds = g.meds.filter(m => m && m.id !== IDE_MED.id);
                 const imeds = g.imeds || [];
                 const ideOnly = meds.length === 0 && g.meds.length > 0;
-                const showIde = (meds.length === 0 && g.meds.length === 0 && imeds.length > 0) ? false : (ideOnly ? (ideN > 0) : (ideActive && (ideN > 0 || g.dif)));
+                const showIde = ideOnly ? (ideN > 0) : (ideActive && (ideN > 0 || g.dif));
                 return (React.createElement("div", { key: gi, style: { display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 4, paddingTop: gi ? 4 : 0, marginTop: gi ? 1 : 0, borderTop: gi ? "1px dashed " + (conflA ? conflSep(darkMode) : "var(--border)") : "none" } },
                     (meds.length > 0 || imeds.length > 0) && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } },
                         meds.map((m, mi) => (React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim() + (notes[nk(m.id, ry, rm, d, sl)] ? " — 📝 " + notes[nk(m.id, ry, rm, d, sl)] : ""), style: { position: "relative", width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 } },
@@ -2517,12 +2534,12 @@ function PickMedActModal({ mData, setMData, medecins, actes, getEntries, isMedAv
         !selMedId && !noMedMode && roleActes.length === 0 && (React.createElement("div", { style: { fontSize: 12, color: "#b45309", background: "#fff8e6", border: "1px solid #f59e0b", borderRadius: 7, padding: "8px 10px" } }, "\u270F\uFE0F Cette activit\u00E9 n'est pas ouverte \u00E0 votre r\u00F4le \u2014 la coche se r\u00E8gle dans l'onglet Activit\u00E9s.")),
         !selMedId && !noMedMode && roleActes.length > 0 && (React.createElement(React.Fragment, null,
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Choisir un m\u00E9decin"),
-            row.salle && curOcc.some(x => !x.isInt) && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 8 } },
+            row.salle && curOcc.length > 0 && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 8 } },
                 React.createElement("span", null, "\u26A0\uFE0F"),
                 React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } },
                     row.salle,
                     " d\u00E9j\u00E0 occup\u00E9e par ",
-                    curOcc.filter(x => !x.isInt).map(x => x.med.init).join(", "),
+                    curOcc.map(x => x.med.init).join(", "),
                     " \u2014 vous pouvez quand m\u00EAme ajouter un second m\u00E9decin."))),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" } },
                 pickMeds.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", padding: "4px 2px" } }, "Tous les m\u00E9decins autoris\u00E9s sont d\u00E9j\u00E0 assign\u00E9s sur ce cr\u00E9neau."),
@@ -2532,8 +2549,10 @@ function PickMedActModal({ mData, setMData, medecins, actes, getEntries, isMedAv
                     // La ligne du médecin ne dit plus que ce qui le concerne LUI, et nomme son activité.
                     const busyLabs = uniqArr((sl === "JOUR" ? ["JOUR", "M", "AM"] : [sl, "JOUR"])
                         .flatMap(s2 => getEntries(med.id, y2, m2, d, s2) || [])
-                        .filter(e => e && e.acteId && !e._blocked && !["TOUR_HC", "TOUR_USIC"].includes(e.acteId))
-                        .map(e => { const ax = actes.find(x => x.id === e.acteId); return (ax && (ax.short || ax.label)) || e.acteId; }).filter(Boolean));
+                        .filter(e => e && e.acteId && !e._blocked)
+                        .map(e => { if (e.acteId === "TOUR_HC")
+                        return "HC"; if (e.acteId === "TOUR_USIC")
+                        return "USIC"; const ax = actes.find(x => x.id === e.acteId); return (ax && (ax.short || ax.label)) || e.acteId; }).filter(Boolean));
                     const borderCol = avail === "cond" ? COND_C : avail === "warning" ? "#f59e0b44" : "var(--border)";
                     const bgCol = avail === "cond" ? COND_BG : avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)";
                     const cIds = avail === "cond" ? condOn(getEntries, med.id, y2, m2, d, sl) : [];
@@ -2573,7 +2592,7 @@ function PickMedActModal({ mData, setMData, medecins, actes, getEntries, isMedAv
                 const labs = uniqArr(ids.map(id => { if (id === "TOUR_HC")
                     return "HC"; if (id === "TOUR_USIC")
                     return "USIC"; const ax = actes.find(x => x.id === id); return (ax && (ax.short || ax.label)) || id; }));
-                const avail = ids.some(id => ABS_IDS.indexOf(id) >= 0) ? "blocked" : (ids.length ? "warning" : "free");
+                const avail = ids.some(id => ABS_IDS.indexOf(id) >= 0 || id === "REPOS_GARDE") ? "blocked" : (ids.length ? "warning" : "free");
                 return (React.createElement("button", { key: im.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: `1px solid ${avail === "warning" ? "#f59e0b44" : "var(--border)"}`,
                         cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: () => {
                         if (avail === "blocked")
@@ -2590,7 +2609,7 @@ function PickMedActModal({ mData, setMData, medecins, actes, getEntries, isMedAv
                     React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: im.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, border: "1.5px dashed rgba(255,255,255,.95)" } }, im.init),
                     React.createElement("div", { style: { textAlign: "left", flex: 1 } },
                         React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)" } }, im.nom),
-                        React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : avail === "warning" ? "#f59e0b" : "var(--txt3)" } }, avail === "blocked" ? "Absent / FMC" : avail === "warning" ? ("⚠ Déjà : " + (labs.join(", ") || "une activité")) : "Disponible"))));
+                        React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : avail === "warning" ? "#f59e0b" : "var(--txt3)" } }, avail === "blocked" ? "Absent / FMC / repos" : avail === "warning" ? ("⚠ Déjà : " + (labs.join(", ") || "une activité")) : "Disponible"))));
             })))),
         selMedId && selMed && (() => {
             // Recompute eligible actes now that selMed is known
@@ -2621,6 +2640,18 @@ function PickMedActModal({ mData, setMData, medecins, actes, getEntries, isMedAv
                     medecins.forEach(m => {
                         getEntries(m.id, y2, m2, d, sl).forEach(e => {
                             if (e.salle && (row.sallesDisp || []).includes(e.salle)) {
+                                if (!occ[e.salle])
+                                    occ[e.salle] = [];
+                                if (!occ[e.salle].find(x => x.id === m.id))
+                                    occ[e.salle].push(m);
+                            }
+                        });
+                    });
+                    /* v10.63 : une salle tenue par un interne se signale aussi — occupation volontaire
+                       possible (supervision), mais il faut le SAVOIR avant de s'y ajouter */
+                    ((intDay && intDay.meds) || []).forEach(m => {
+                        getEntries(m.id, y2, m2, d, sl).forEach(e => {
+                            if (e && e.salle && (row.sallesDisp || []).includes(e.salle)) {
                                 if (!occ[e.salle])
                                     occ[e.salle] = [];
                                 if (!occ[e.salle].find(x => x.id === m.id))
@@ -2751,8 +2782,10 @@ function PickMedSiteModal({ mData, medecins, actes, getEntries, isMedAvailable, 
                     /* v9.74 : même formulation que la modale de PT Cardio — dire LAQUELLE. */
                     const busyLabs = uniqArr((sl === "JOUR" ? ["JOUR", "M", "AM"] : [sl, "JOUR"])
                         .flatMap(s2 => getEntries(med.id, y2, m2, d, s2) || [])
-                        .filter(e => e && e.acteId && !e._blocked && !e.cond && !["TOUR_HC", "TOUR_USIC"].includes(e.acteId))
-                        .map(e => { const ax = actes.find(x => x.id === e.acteId); return (ax && (ax.short || ax.label)) || e.acteId; }).filter(Boolean));
+                        .filter(e => e && e.acteId && !e._blocked && !e.cond)
+                        .map(e => { if (e.acteId === "TOUR_HC")
+                        return "HC"; if (e.acteId === "TOUR_USIC")
+                        return "USIC"; const ax = actes.find(x => x.id === e.acteId); return (ax && (ax.short || ax.label)) || e.acteId; }).filter(Boolean));
                     return (React.createElement("button", { key: med.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: `1px ${avail === "cond" ? "dashed " + COND_C : "solid " + (avail === "warning" ? "#f59e0b44" : "var(--border)")}`,
                             cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "cond" ? COND_BG : avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: () => { if (avail === "blocked")
                             return; setSelMedId(med.id); setStep("acte"); } },
@@ -2773,14 +2806,14 @@ function PickMedSiteModal({ mData, medecins, actes, getEntries, isMedAvailable, 
                 const labs = uniqArr(ids.map(id => { if (id === "TOUR_HC")
                     return "HC"; if (id === "TOUR_USIC")
                     return "USIC"; const ax = actes.find(x => x.id === id); return (ax && (ax.short || ax.label)) || id; }));
-                const avail = ids.some(id => ABS_IDS.indexOf(id) >= 0) ? "blocked" : (ids.length ? "warning" : "free");
+                const avail = ids.some(id => ABS_IDS.indexOf(id) >= 0 || id === "REPOS_GARDE") ? "blocked" : (ids.length ? "warning" : "free");
                 return (React.createElement("button", { key: im.id, disabled: avail === "blocked", style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: `1px solid ${avail === "warning" ? "#f59e0b44" : "var(--border)"}`,
                         cursor: avail !== "blocked" ? "pointer" : "default", background: avail === "warning" ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: avail === "blocked" ? .35 : 1 }, onClick: () => { if (avail === "blocked")
                         return; setSelMedId(im.id); setStep("acte"); } },
                     React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: im.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, border: "1.5px dashed rgba(255,255,255,.95)" } }, im.init),
                     React.createElement("div", { style: { textAlign: "left" } },
                         React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)" } }, im.nom),
-                        React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : avail === "warning" ? "#f59e0b" : "var(--txt3)" } }, avail === "blocked" ? "Absent / FMC" : avail === "warning" ? ("⚠ Déjà : " + (labs.join(", ") || "une activité")) : "Disponible"))));
+                        React.createElement("div", { style: { fontSize: 9, color: avail === "blocked" ? "#ef4444" : avail === "warning" ? "#f59e0b" : "var(--txt3)" } }, avail === "blocked" ? "Absent / FMC / repos" : avail === "warning" ? ("⚠ Déjà : " + (labs.join(", ") || "une activité")) : "Disponible"))));
             })))),
         step === "acte" && selMed && (React.createElement(React.Fragment, null,
             eligActes.length === 1 && eligActes[0].fixedSalle && (() => { addEntry(selMed.id, y2, m2, d, sl, { acteId: eligActes[0].id, salle: eligActes[0].fixedSalle }); onClose(); return null; })(),
@@ -2792,11 +2825,11 @@ function PickMedSiteModal({ mData, medecins, actes, getEntries, isMedAvailable, 
                         selMed.prenom,
                         " ",
                         selMed.nom))),
-            !selIsInt && curOcc.filter(x => !x.isInt).length > 0 && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 10 } },
+            !selIsInt && curOcc.length > 0 && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 10 } },
                 React.createElement("span", null, "\u26A0\uFE0F"),
                 React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } },
                     "Cette salle a d\u00E9j\u00E0 ",
-                    curOcc.filter(x => !x.isInt).length,
+                    curOcc.length,
                     " praticien(s) assign\u00E9(s). Confirmer quand m\u00EAme ?")),
             selCond.length > 0 && React.createElement("div", { style: { fontSize: 10, color: COND_C, fontWeight: 700, marginBottom: 8, padding: "5px 8px", borderRadius: 6, border: "1.5px dashed " + COND_C, background: COND_BG, lineHeight: 1.45 } }, condOff
                 ? "◇ Ce praticien est sur un choix ouvert, dont aucune branche n'est proposée dans cette salle. Poser une activité ici tranchera son choix et retirera ses branches."
@@ -2841,7 +2874,7 @@ function PickMedSiteModal({ mData, medecins, actes, getEntries, isMedAvailable, 
                 const salleOccs = medecins.filter(m => {
                     const es = getEntries(m.id, y2, m2, d, sl);
                     return es.some(e => e.salle === s);
-                });
+                }).concat(((intDay && intDay.meds) || []).filter(im => getEntries(im.id, y2, m2, d, sl).some(e => e && e.salle === s)));
                 const occupied = salleOccs.length > 0;
                 return (React.createElement("button", { key: s, style: Object.assign(Object.assign({}, S.actTog), { background: occupied ? "#fee2e2" : "#46bdc6", color: occupied ? "#dc2626" : "#111", fontWeight: 700, fontSize: 13, border: occupied ? "1px solid #fca5a5" : "1px solid #46bdc6" }), onClick: () => { addEntry(selMed.id, y2, m2, d, sl, { acteId: (recapId || "BIP"), salle: s }); onClose(); } },
                     React.createElement("span", null, recapId === "BIP" ? ("Salle " + s.replace("CHB-", "")) : s),
@@ -8624,7 +8657,8 @@ function CardioPlanning() {
             (e.cond ? cIds : ids).push(e.acteId); }); });
         if (ids.some(function (id) { return ["ABSENCE", "FORMATION"].includes(id); }))
             return "blocked";
-        if (ids.some(function (id) { return !["TOUR_HC", "TOUR_USIC"].includes(id); }))
+        /* v10.63 : toute double activité se signale, tour médical compris — non bloquant */
+        if (ids.length)
             return "warning";
         if (cIds.length)
             return "cond";

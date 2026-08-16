@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.62 — 16/08/2026";
+const APP_VERSION="v10.63 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1197,6 +1197,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     const M={};
     wdays.forEach(({y:wY,m:wM,d})=>{
       if(isWE(wY,wM,d))return;
+      const semJd=intMedsDuJour(intCfg,wY,wM,d); /* v10.63 : internes du jour pour les IDE */
       ["M","AM"].forEach(sl=>{
         let tot=0,totD=0;
         rows.forEach(row=>{
@@ -1205,6 +1206,17 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
             const k2=o.acte.id+"|"+(o.salle||row.salle||"");
             if(!inst[k2])inst[k2]={n:((o.n===null||o.n===undefined)?(o.acte.ideN||0):o.n),dif:false};
             if(o.dif)inst[k2].dif=true;
+          });
+          /* v10.63 : un interne mobilise les IDE de son activité, même seul dans la salle */
+          if(semJd)semJd.meds.forEach(im=>{
+            row.ids.forEach(aid=>{
+              getEntries(im.id,wY,wM,d,sl).forEach(e=>{
+                if(!(e&&e.acteId===aid&&!e.cond&&(row.salle?e.salle===row.salle:true)))return;
+                const acte=actes.find(a=>a.id===aid);if(!acte)return;
+                const k2=aid+"|"+(e.salle||row.salle||"");
+                if(!inst[k2])inst[k2]={n:(acte.ideN||0),dif:false};
+              });
+            });
           });
           let n=0,nd=0;
           Object.keys(inst).forEach(k2=>{const it=inst[k2];if(it.dif)nd+=it.n;else n+=it.n;});
@@ -1216,7 +1228,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
       });
     });
     return M;
-  },[ideActive,wdays,rows,medecins,actes,getEntries]);
+  },[ideActive,wdays,rows,medecins,actes,getEntries,intCfg]);
   const ideCell=(row,d,sl,ry,rm)=>ideActive?(ideMap[row.label+"|"+ry+"-"+rm+"-"+d+"|"+sl]||0):0;
   const setIdeDefV=(dw3,sl,v)=>{if(setIdeCfg)setIdeCfg(p=>{const q={...(p||{})};q.def={...(q.def||{})};q.def[dw3+"|"+sl]=v;return q;});};
   const setIdeOvV=(y3,m3,d3,sl,v)=>{if(setIdeCfg)setIdeCfg(p=>{const q={...(p||{})};q.ov={...(q.ov||{})};const k=sk(y3,m3,d3,sl);if(v===null)delete q.ov[k];else q.ov[k]=v;return q;});};
@@ -1306,7 +1318,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           const meds=g.meds.filter(m=>m&&m.id!==IDE_MED.id);
           const imeds=g.imeds||[];
           const ideOnly=meds.length===0&&g.meds.length>0;
-          const showIde=(meds.length===0&&g.meds.length===0&&imeds.length>0)?false:(ideOnly?(ideN>0):(ideActive&&(ideN>0||g.dif)));
+          const showIde=ideOnly?(ideN>0):(ideActive&&(ideN>0||g.dif));
           return(
           <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:4,paddingTop:gi?4:0,marginTop:gi?1:0,borderTop:gi?"1px dashed "+(conflA?conflSep(darkMode):"var(--border)"):"none"}}>
             {(meds.length>0||imeds.length>0)&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
@@ -2321,11 +2333,11 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
           {/* Salle occupancy warning for fixed-salle rows (Stim/EEP) */}
-          {row.salle&&curOcc.some(x=>!x.isInt)&&(
+          {row.salle&&curOcc.length>0&&(
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:8}}>
               <span>⚠️</span>
               <span style={{fontSize:11,color:"#f59e0b"}}>
-                {row.salle} déjà occupée par {curOcc.filter(x=>!x.isInt).map(x=>x.med.init).join(", ")} — vous pouvez quand même ajouter un second médecin.
+                {row.salle} déjà occupée par {curOcc.map(x=>x.med.init).join(", ")} — vous pouvez quand même ajouter un second médecin.
               </span>
             </div>
           )}
@@ -2337,8 +2349,8 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
               // La ligne du médecin ne dit plus que ce qui le concerne LUI, et nomme son activité.
               const busyLabs=uniqArr((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
                 .flatMap(s2=>getEntries(med.id,y2,m2,d,s2)||[])
-                .filter(e=>e&&e.acteId&&!e._blocked&&!["TOUR_HC","TOUR_USIC"].includes(e.acteId))
-                .map(e=>{const ax=actes.find(x=>x.id===e.acteId);return (ax&&(ax.short||ax.label))||e.acteId;}).filter(Boolean));
+                .filter(e=>e&&e.acteId&&!e._blocked)
+                .map(e=>{if(e.acteId==="TOUR_HC")return "HC";if(e.acteId==="TOUR_USIC")return "USIC";const ax=actes.find(x=>x.id===e.acteId);return (ax&&(ax.short||ax.label))||e.acteId;}).filter(Boolean));
               const borderCol=avail==="cond"?COND_C:avail==="warning"?"#f59e0b44":"var(--border)";
               const bgCol=avail==="cond"?COND_BG:avail==="warning"?"rgba(245,158,11,.15)":"var(--bg2)";
               const cIds=avail==="cond"?condOn(getEntries,med.id,y2,m2,d,sl):[];
@@ -2381,7 +2393,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
             {intPick.map(im=>{
               const ids=[];(sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"]).forEach(s2=>getEntries(im.id,y2,m2,d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)ids.push(e.acteId);}));
               const labs=uniqArr(ids.map(id=>{if(id==="TOUR_HC")return "HC";if(id==="TOUR_USIC")return "USIC";const ax=actes.find(x=>x.id===id);return (ax&&(ax.short||ax.label))||id;}));
-              const avail=ids.some(id=>ABS_IDS.indexOf(id)>=0)?"blocked":(ids.length?"warning":"free");
+              const avail=ids.some(id=>ABS_IDS.indexOf(id)>=0||id==="REPOS_GARDE")?"blocked":(ids.length?"warning":"free");
               return(
                 <button key={im.id} disabled={avail==="blocked"}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px solid ${avail==="warning"?"#f59e0b44":"var(--border)"}`,
@@ -2399,7 +2411,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                   <div style={{width:28,height:28,borderRadius:"50%",background:im.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,border:"1.5px dashed rgba(255,255,255,.95)"}}>{im.init}</div>
                   <div style={{textAlign:"left",flex:1}}>
                     <div style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{im.nom}</div>
-                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent / FMC":avail==="warning"?("⚠ Déjà : "+(labs.join(", ")||"une activité")):"Disponible"}</div>
+                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent / FMC / repos":avail==="warning"?("⚠ Déjà : "+(labs.join(", ")||"une activité")):"Disponible"}</div>
                   </div>
                 </button>
               );
@@ -2453,6 +2465,16 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
               medecins.forEach(m=>{
                 getEntries(m.id,y2,m2,d,sl).forEach(e=>{
                   if(e.salle&&(row.sallesDisp||[]).includes(e.salle)){
+                    if(!occ[e.salle])occ[e.salle]=[];
+                    if(!occ[e.salle].find(x=>x.id===m.id))occ[e.salle].push(m);
+                  }
+                });
+              });
+              /* v10.63 : une salle tenue par un interne se signale aussi — occupation volontaire
+                 possible (supervision), mais il faut le SAVOIR avant de s'y ajouter */
+              ((intDay&&intDay.meds)||[]).forEach(m=>{
+                getEntries(m.id,y2,m2,d,sl).forEach(e=>{
+                  if(e&&e.salle&&(row.sallesDisp||[]).includes(e.salle)){
                     if(!occ[e.salle])occ[e.salle]=[];
                     if(!occ[e.salle].find(x=>x.id===m.id))occ[e.salle].push(m);
                   }
@@ -2595,8 +2617,8 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               /* v9.74 : même formulation que la modale de PT Cardio — dire LAQUELLE. */
               const busyLabs=uniqArr((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
                 .flatMap(s2=>getEntries(med.id,y2,m2,d,s2)||[])
-                .filter(e=>e&&e.acteId&&!e._blocked&&!e.cond&&!["TOUR_HC","TOUR_USIC"].includes(e.acteId))
-                .map(e=>{const ax=actes.find(x=>x.id===e.acteId);return (ax&&(ax.short||ax.label))||e.acteId;}).filter(Boolean));
+                .filter(e=>e&&e.acteId&&!e._blocked&&!e.cond)
+                .map(e=>{if(e.acteId==="TOUR_HC")return "HC";if(e.acteId==="TOUR_USIC")return "USIC";const ax=actes.find(x=>x.id===e.acteId);return (ax&&(ax.short||ax.label))||e.acteId;}).filter(Boolean));
               return(
                 <button key={med.id} disabled={avail==="blocked"}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px ${avail==="cond"?"dashed "+COND_C:"solid "+(avail==="warning"?"#f59e0b44":"var(--border)")}`,
@@ -2620,7 +2642,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
             {intPick.map(im=>{
               const ids=[];(sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"]).forEach(s2=>getEntries(im.id,y2,m2,d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)ids.push(e.acteId);}));
               const labs=uniqArr(ids.map(id=>{if(id==="TOUR_HC")return "HC";if(id==="TOUR_USIC")return "USIC";const ax=actes.find(x=>x.id===id);return (ax&&(ax.short||ax.label))||id;}));
-              const avail=ids.some(id=>ABS_IDS.indexOf(id)>=0)?"blocked":(ids.length?"warning":"free");
+              const avail=ids.some(id=>ABS_IDS.indexOf(id)>=0||id==="REPOS_GARDE")?"blocked":(ids.length?"warning":"free");
               return(
                 <button key={im.id} disabled={avail==="blocked"}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px solid ${avail==="warning"?"#f59e0b44":"var(--border)"}`,
@@ -2629,7 +2651,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
                   <div style={{width:28,height:28,borderRadius:"50%",background:im.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,border:"1.5px dashed rgba(255,255,255,.95)"}}>{im.init}</div>
                   <div style={{textAlign:"left"}}>
                     <div style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{im.nom}</div>
-                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent / FMC":avail==="warning"?("⚠ Déjà : "+(labs.join(", ")||"une activité")):"Disponible"}</div>
+                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent / FMC / repos":avail==="warning"?("⚠ Déjà : "+(labs.join(", ")||"une activité")):"Disponible"}</div>
                   </div>
                 </button>
               );
@@ -2647,8 +2669,8 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               <span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>{selMed.prenom} {selMed.nom}</span>
             </div>
           </div>
-          {!selIsInt&&curOcc.filter(x=>!x.isInt).length>0&&<div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:10}}>
-            <span>⚠️</span><span style={{fontSize:11,color:"#f59e0b"}}>Cette salle a déjà {curOcc.filter(x=>!x.isInt).length} praticien(s) assigné(s). Confirmer quand même ?</span>
+          {!selIsInt&&curOcc.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:10}}>
+            <span>⚠️</span><span style={{fontSize:11,color:"#f59e0b"}}>Cette salle a déjà {curOcc.length} praticien(s) assigné(s). Confirmer quand même ?</span>
           </div>}
           {selCond.length>0&&<div style={{fontSize:10,color:COND_C,fontWeight:700,marginBottom:8,padding:"5px 8px",borderRadius:6,border:"1.5px dashed "+COND_C,background:COND_BG,lineHeight:1.45}}>
             {condOff
@@ -2692,7 +2714,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               const salleOccs=medecins.filter(m=>{
                 const es=getEntries(m.id,y2,m2,d,sl);
                 return es.some(e=>e.salle===s);
-              });
+              }).concat(((intDay&&intDay.meds)||[]).filter(im=>getEntries(im.id,y2,m2,d,sl).some(e=>e&&e.salle===s)));
               const occupied=salleOccs.length>0;
               return(
                 <button key={s}
@@ -7713,7 +7735,8 @@ function CardioPlanning(){
     const ids=[],cIds=[];
     check.forEach(sl=>getEntries(med.id,y2,m2,d2,sl).forEach(e=>{if((e&&e.acteId)&&!e._blocked)(e.cond?cIds:ids).push(e.acteId);}));
     if(ids.some(id=>["ABSENCE","FORMATION"].includes(id)))return "blocked";
-    if(ids.some(id=>!["TOUR_HC","TOUR_USIC"].includes(id)))return "warning";
+    /* v10.63 : toute double activité se signale, tour médical compris — non bloquant */
+    if(ids.length)return "warning";
     if(cIds.length)return "cond";
     return "free";
   },[getEntries]);
