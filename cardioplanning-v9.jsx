@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.68 — 16/08/2026";
+const APP_VERSION="v10.69 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6042,7 +6042,7 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
   </div>;
 }
 
-function InternesTile({intCfg,setIntCfg,actes=[]}){
+function InternesTile({intCfg,setIntCfg,actes=[],pins=[]}){
   const num=(v)=>Math.max(0,Math.min(9,parseInt(v||"0",10)||0));
   const maj=(patch)=>setIntCfg(p=>({...p,...patch}));
   const inp=(k,def)=><input type="number" min={0} max={9} value={intCfg[k]===undefined?def:intCfg[k]} onChange={e=>{const o={};o[k]=num(e.target.value);maj(o);}} style={{...S.fi,width:52,textAlign:"center"}}/>;
@@ -6064,6 +6064,19 @@ function InternesTile({intCfg,setIntCfg,actes=[]}){
       <span>Samedi matin : alerte si moins de</span>{inp("sSam",1)}<span>en HC</span>
     </div>
     <div style={{fontSize:11,color:"var(--txt3)"}}>0 = pas d'alerte pour ce compteur. La jauge s'appuiera sur ces seuils dans l'onglet Internes.</div>
+    <div style={{marginTop:10,paddingTop:9,borderTop:"1px solid var(--border)"}}>
+      <div style={{fontSize:12.5,fontWeight:700,color:"var(--txt)",marginBottom:3}}>🔑 Code des internes</div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:7}}>Un seul code, partagé par tous les internes. À la connexion, il ouvre l'onglet Internes et demande un prénom (pour savoir qui modifie quoi). Les onglets Planning, CHL, CHB, PT Cardio, PT Angio et Aide restent consultables, sans modification possible.</div>
+      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+        <input type="password" id="nintp" placeholder={intCfg.pin?"Code défini — nouveau code":"Définir le code"} style={{...S.fi,flex:1,minWidth:150,textAlign:"center",letterSpacing:4}}/>
+        <button style={S.btnP} onClick={()=>{const v=(document.getElementById("nintp").value||"").trim();
+          if(v.length<4){toast("Min 4 car.","warn");return;}
+          if((pins||[]).filter(Boolean).indexOf(v)>=0){toast("Ce code est déjà utilisé par un autre rôle","warn");return;}
+          setIntCfg(p=>({...p,pin:v}));document.getElementById("nintp").value="";toast("Code des internes mis à jour");}}>OK</button>
+        {intCfg.pin&&<button style={{...S.icnBtn,fontSize:11}} onClick={()=>{setIntCfg(p=>({...p,pin:""}));toast("Code des internes supprimé — l'accès est fermé");}}>Supprimer</button>}
+      </div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginTop:5}}>{intCfg.pin?("Code actuel : "+intCfg.pin):"Aucun code : les internes ne peuvent pas se connecter."}</div>
+    </div>
     {(()=>{ /* v10.68 : SEULEMENT les colonnes du tableau 📊 — la disponibilité des
        activités se règle dans l'onglet Activités (coche 🎓), pas ici. */
       const off=intCfg.statsOff||[];
@@ -6097,12 +6110,14 @@ function InternesTile({intCfg,setIntCfg,actes=[]}){
    s'affiche désormais dans la grille. */
 function intISO2(y,m0,d){return y+"-"+String(m0+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
 function intTxt(bg){try{return hexToLum(bg)>0.35?"#111":"#fff";}catch(e){return "#fff";}}
-function intActesTuiles(actes,sam){
+function intActesTuiles(actes,sam,self){
   /* v10.68 : ce que l'onglet propose se règle UNIQUEMENT par la coche 🎓 de
      l'onglet Activités — le réglage de Paramètres ne concerne que les stats. */
   const hc={id:"TOUR_HC",short:"HC",label:sam?"Samedi matin":"Tour HC",color:"#388bfd"};
   if(sam)return [hc,{id:"ABSENCE",short:"ABS",label:"Absence / Congé",color:"#e06666"},{id:"FORMATION",short:"FMC",label:"Formation",color:"#a3e635"},{id:"REPOS_GARDE",short:"RG",label:"Repos de garde",color:"#ffe599"}];
-  const perso=actes.filter(a=>a.interneOk===true&&!a.isSystem&&!a.hasSalle&&ABS_IDS.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color}));
+  /* v10.69, lot 5 : self = un interne connecte avec le PIN interne — il ne voit
+     que les activites cochees « posable par eux » (interneSelf). */
+  const perso=actes.filter(a=>a.interneOk===true&&!a.isSystem&&!a.hasSalle&&ABS_IDS.indexOf(a.id)<0&&(!self||a.interneSelf===true)).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color}));
   return [hc,{id:"TOUR_USIC",short:"USIC",label:"Tour USIC",color:"#4285f4"}].concat(perso)
     .concat([{id:"ABSENCE",short:"ABS",label:"Absence / Congé",color:"#e06666"},{id:"FORMATION",short:"FMC",label:"Formation",color:"#a3e635"},{id:"REPOS_GARDE",short:"RG",label:"Repos de garde",color:"#ffe599"}]);
 }
@@ -6118,7 +6133,7 @@ function intGardeVeille(getEntries,mid,y,m,d){
   return ["N","JOUR"].some(sl=>getEntries(mid,v[0],v[1]-1,v[2],sl).some(e=>e&&e.acteId==="GARDE"));
 }
 
-function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry,canSalle=false,salleReg=[]}){
+function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry,canSalle=false,salleReg=[],intSelf=false}){
   const [cren,setCren]=useState(slot0==="AM"?"AM":"M");
   const [per,setPer]=useState(null);
   const [pd1,setPd1]=useState(intISO2(y,m,d));
@@ -6129,7 +6144,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const iso=intISO2(y,m,d);
   const dw=dow(y,m,d);
   const sam=dw===6;
-  const tuiles=intActesTuiles(actes,sam);
+  const tuiles=intActesTuiles(actes,sam,intSelf);
   /* v10.62, lot Salles : activités à salle cochées 🎓 — posables ici par l'éditeur,
      un intermédiaire ou un cadre uniquement, jamais par les internes ni l'administratif.
      Le choix de salle est obligatoire, la salle s'affiche ensuite sur la pastille. */
@@ -6137,6 +6152,9 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const salleSite=(s)=>{const r=(salleReg||[]).find(x=>x.n===s);return r?(Array.isArray(r.s)?r.s.join("/"):r.s):"";};
   const mid=med.id;
   const dansSem=(iso2)=>iso2>=med.sDeb&&iso2<=med.sFin;
+  /* v10.69 : ce qu'un interne connecte peut retirer lui-meme. Le reste (consultations
+     posees par le service) reste VISIBLE mais sans croix. */
+  const posable=(id)=>(!intSelf)||(["TOUR_HC","TOUR_USIC","ABSENCE","FORMATION","REPOS_GARDE"].indexOf(id)>=0)||(((acteById(id)||{}).interneSelf)===true);
   const contenu=[];
   (sam?["M"]:["M","AM"]).forEach(sl=>{
     getEntries(mid,y,m,d,sl).forEach(e=>{
@@ -6259,6 +6277,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
             {c.salle&&<span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",borderRadius:4,padding:"1px 5px"}}>{c.salle}</span>}
             {reposAuto
               ?<span style={{fontSize:10,color:"var(--txt3)"}}>posé par la garde de la veille — retirez la garde pour l'enlever</span>
+              :!posable(c.acteId)?<span style={{fontSize:10,color:"var(--txt3)"}}>posé par le service</span>
               :<button onClick={()=>retire(c)} style={{width:18,height:18,borderRadius:9,border:"1px solid #fecdd3",background:"#fff1f2",color:"#dc2626",fontSize:10,fontWeight:800,cursor:"pointer",lineHeight:1,padding:0}}>×</button>}
           </div>;
         })}
@@ -6319,12 +6338,12 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
           <button onClick={()=>{setPd1(intISO2(y,m,1));setPd2(intISO2(y,m+1,0));}} style={{...S.icnBtn,fontSize:10}}>le mois</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
-          {intActesTuiles(actes,false).map(t=>
+          {intActesTuiles(actes,false,intSelf).map(t=>
             <button key={t.id} onClick={()=>setPSel(t.id)} style={{padding:"7px 10px",borderRadius:8,cursor:"pointer",textAlign:"left",background:t.color,color:intTxt(t.color),border:pSel===t.id?"2.5px solid var(--txt)":"2.5px solid transparent"}}>
               <span style={{display:"block",fontSize:10.5,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{t.short}</span>
               <span style={{display:"block",fontSize:11,fontWeight:700}}>{t.label}</span>
             </button>)}
-          <button onClick={()=>setPSel("EFF")} style={{padding:"7px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,fontSize:12,background:"var(--bg2)",color:"var(--txt2)",border:pSel==="EFF"?"2.5px solid var(--txt)":"2.5px solid var(--border)"}}>🧹 Effacer</button>
+          {!intSelf&&<button onClick={()=>setPSel("EFF")} style={{padding:"7px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,fontSize:12,background:"var(--bg2)",color:"var(--txt2)",border:pSel==="EFF"?"2.5px solid var(--txt)":"2.5px solid var(--border)"}}>🧹 Effacer</button>}
         </div>
         <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8,lineHeight:1.5}}>
           HC, USIC et les activités se posent du lundi au vendredi (matin + après-midi), en préservant repos, absences et FMC. Absence, FMC et repos couvrent chaque journée de la période. Les activités à salle ne se posent pas ici. Un repos issu d'une garde posée dans l'application n'est jamais effacé.
@@ -6539,7 +6558,7 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
   </Ov>;
 }
 
-function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],prevM,nextM,darkMode,setDarkMode}){
+function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],intSelf=false,prevM,nextM,darkMode,setDarkMode}){
   const [sel,setSel]=useState(null);
   const [gm,setGm]=useState(null);
   const [jaugeOn,setJaugeOn]=useState(intCfg.jaugeDef!==false); /* v10.65 : affichage en nominal réglé dans Paramètres */
@@ -6708,7 +6727,7 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
         </div>
       </Ov>;
     })()}
-    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} canSalle={canSalle} salleReg={salleReg}/>}
+    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} canSalle={canSalle} salleReg={salleReg} intSelf={intSelf}/>}
     {gm&&<InternesGardeModal y={gm.y} m={gm.m} d={gm.d} jours={jours} onClose={()=>setGm(null)} intCfg={intCfg} getEntries={getEntries} setEntry={setEntry}/>}
   </div>;
 }
@@ -6743,6 +6762,12 @@ function CardioPlanning(){
   const [adminName,setAdminName]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
   const [adminAsk,setAdminAsk]=useState(false);
   const [adminNameInput,setAdminNameInput]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
+  /* v10.69, lot 5 : acces INTERNE (code partage, defini dans Parametres > tuile
+     Internes). Le prenom est demande a la connexion et retenu sur l'appareil,
+     exactement comme pour les secretaires et les cadres. */
+  const [interneAsk,setInterneAsk]=useState(false);
+  const [interneName,setInterneName]=useState(()=>{try{return localStorage.getItem("cp6_interneName")||"";}catch(e){return "";}});
+  const [interneNameInput,setInterneNameInput]=useState(()=>{try{return localStorage.getItem("cp6_interneName")||"";}catch(e){return "";}});
   const [showPins,setShowPins]=useState(false);
   const [pinsAsk,setPinsAsk]=useState(false);
   const [pinsTry,setPinsTry]=useState("");
@@ -7796,19 +7821,21 @@ function CardioPlanning(){
   const isMedEdit=accessMode==="medecinEdit"&&medLvl!=="editeur"&&!netOff;
   const isInterEdit=accessMode==="medecinEdit"&&medLvl==="inter"&&!netOff;
   /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
-  const hideTabs=accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte","construire"]
+  const hideTabs=accessMode==="interneEdit"?["construire","tourmedical","garde","astreinte","reports","attache","plantype","equipe","activites","stats","partage"]
+    :accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte","construire"]
     :isMedEdit?["activites","equipe","partage"].concat(isInterEdit?[]:["construire"])
     :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage","construire"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
     .filter(([tid])=>hideTabs.indexOf(tid)<0&&HIDDEN_TABS.indexOf(tid)<0&&(tid!=="internes"||intCfg.show===true));
-  useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0||(tab==="internes"&&intCfg.show!==true))setTab("planning");},[accessMode,tab,isMedEdit,intCfg]);
+  useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0||(tab==="internes"&&intCfg.show!==true))setTab(accessMode==="interneEdit"?"internes":"planning");},[accessMode,tab,isMedEdit,intCfg]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
+  const isInterne=accessMode==="interneEdit"&&!netOff; /* v10.69 : interne connecte (hors ligne = lecture seule) */
   const roleOkKey=isCadre?"cadreOk":"adminOk"; // v10.50 : la coche d'activité du rôle connecté
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
-  useEffect(()=>{authorRef.current=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+(isCadre?" (cadre)":" (secrétaire)")):(isEdit?"Éditeur":"?"));},[accessMode,isEdit,isMedEdit,isAdminEdit,editMedId,adminName,medecins]);
+  useEffect(()=>{authorRef.current=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+(isCadre?" (cadre)":" (secrétaire)")):(isInterne?((interneName||"?")+" (interne)"):(isEdit?"Éditeur":"?")));},[accessMode,isEdit,isMedEdit,isAdminEdit,isInterne,editMedId,adminName,interneName,medecins]);
   useEffect(()=>{ // purge du journal au-delà de 1200 entrées (éditeur uniquement, garde les 1000 plus récentes)
     if(!isEdit||!window.firebaseDB)return;
     (async()=>{try{
@@ -8789,6 +8816,7 @@ function CardioPlanning(){
     const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3);
     if(medEntry){setEditMedId(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);}
     else if(adminEnabled&&(()=>{const okA=adminPin&&adminPin.length>=3&&pinInput===adminPin;const okC=cadrePin&&cadrePin.length>=3&&pinInput===cadrePin;if(okA||okC)setIsCadre(!!okC&&!okA);return okA||okC;})()){setAdminAsk(true);setPinError(false);}
+    else if(intCfg.show===true&&intCfg.pin&&intCfg.pin.length>=3&&pinInput===intCfg.pin){setInterneAsk(true);setPinError(false);}
     else setPinError(true);
   }}}
           type="password" placeholder="PIN" style={{...S.fi,width:"100%",textAlign:"center",letterSpacing:6,fontSize:16,marginBottom:8}}/>
@@ -8804,6 +8832,8 @@ function CardioPlanning(){
               setPinError(false);
             } else if(adminEnabled&&(()=>{const okA=adminPin&&adminPin.length>=3&&pinInput===adminPin;const okC=cadrePin&&cadrePin.length>=3&&pinInput===cadrePin;if(okA||okC)setIsCadre(!!okC&&!okA);return okA||okC;})()){
               setAdminAsk(true);setPinError(false);
+            } else if(intCfg.show===true&&intCfg.pin&&intCfg.pin.length>=3&&pinInput===intCfg.pin){
+              setInterneAsk(true);setPinError(false);
             } else {
               setPinError(true);
             }
@@ -8813,6 +8843,12 @@ function CardioPlanning(){
           <input value={adminNameInput} onChange={e=>setAdminNameInput(e.target.value)} placeholder="Prénom" style={{...S.fi,width:"100%",textAlign:"center",marginBottom:8}}/>
           <button style={{width:"100%",padding:"9px",borderRadius:9,border:"none",background:"#7c3aed",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:800}}
             onClick={()=>{const n=(adminNameInput||"").trim();if(!n)return;setAdminName(n);try{localStorage.setItem("cp6_adminName",n);}catch(e){}setAccessMode("adminEdit");setAdminAsk(false);}}>{"Entrer ("+(isCadre?"cadre":"secrétaire")+")"}</button>
+        </div>}
+        {interneAsk&&<div style={{marginTop:10,padding:10,borderRadius:9,border:"1.5px solid #0e9f9f",background:"rgba(14,159,159,.08)"}}>
+          <div style={{fontSize:11,color:"#0e9f9f",fontWeight:800,marginBottom:6}}>🎓 Accès interne — votre prénom :</div>
+          <input value={interneNameInput} onChange={e=>setInterneNameInput(e.target.value)} placeholder="Prénom" style={{...S.fi,width:"100%",textAlign:"center",marginBottom:8}}/>
+          <button style={{width:"100%",padding:"9px",borderRadius:9,border:"none",background:"#0e9f9f",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:800}}
+            onClick={()=>{const n=(interneNameInput||"").trim();if(!n)return;setInterneName(n);try{localStorage.setItem("cp6_interneName",n);}catch(e){}setAccessMode("interneEdit");setInterneAsk(false);setTab("internes");}}>Entrer (interne)</button>
         </div>}
         <div style={{marginTop:14,fontSize:10,color:"var(--txt3)",textAlign:"center"}}>{APP_VERSION}</div>
       </div>
@@ -8910,6 +8946,9 @@ header::-webkit-scrollbar { display: none; }
       </div>}
       {isMedEdit&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
+      </div>}
+      {isInterne&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e9f9f",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+        🎓 Accès interne — {interneName||"?"} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
       </div>}
       {isAdminEdit&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         🗝 {isCadre?"Édition cadre":"Édition secrétaire"} — {adminName||"?"} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
@@ -9225,7 +9264,7 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
-      {tab==="internes"&&<InternesView intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||isInterEdit||isAdminEdit||isCadre} canSalle={isEdit||isInterEdit||(isAdminEdit&&isCadre)} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="internes"&&<InternesView intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||isInterEdit||isAdminEdit||isCadre||isInterne} canSalle={isEdit||isInterEdit||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -9762,7 +9801,7 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<ExportCard per={expPer} setPer={setExpPer} source={expSrc} setSource={setExpSrc}
             backups={backupList} seuil={expSeuil} setSeuil={setExpSeuil} dernier={expLast}
             onExport={doExport} occupe={expBusy}/>}
-          <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes}/>
+          <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]}/>
           <div style={{...S.card,marginBottom:10}}>
             {/* Vacances scolaires */}
             <div style={{...S.card,marginBottom:10}}>
