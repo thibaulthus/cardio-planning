@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.61 — 16/08/2026";
+const APP_VERSION="v10.62 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -957,7 +957,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false}){
     </div>
   );
 }
-function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null}){
+function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -1018,12 +1018,16 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
         /* v9.57.1 : une branche non tranchée ne figure pas dans la colonne de reprise */
         return es.filter(e=>e.acteId===_rId&&!e.cond).map(e=>({med,acte:bipActe,rs:e.salle}));
       });
+      /* v10.62 : internes posés sur cette activité — affichés, jamais comptés */
+      const semJb=intMedsDuJour(intCfg,ry,rm,d);
+      const bipInt=semJb?semJb.meds.flatMap(im=>getEntries(im.id,ry,rm,d,sl).filter(e=>e&&e.acteId===_rId&&!e.cond).map(e=>({med:im,acte:bipActe,rs:e.salle,isInt:true}))):[];
+      const bipAll=bipOcc2.concat(bipInt);
       return(
         <td key={"bip"+d+sl} style={{...S.td,borderLeft:"3px solid var(--border)",cursor:isEdit?"pointer":"default",padding:2,verticalAlign:"middle",textAlign:"center"}}
           onClick={()=>isEdit&&onPickSite({salle,siteActes:[bipActe],d,sl,y:ry,m:rm})}>
-          {bipOcc2.map(({med,acte,rs},i)=>(
+          {bipAll.map(({med,acte,rs,isInt},i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
-              <div title={((med.prenom||"")+" "+(med.nom||"")).trim()} style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{med.init}</div>
+              <div title={isInt?med.nom:((med.prenom||"")+" "+(med.nom||"")).trim()} style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0,border:isInt?"1.5px dashed rgba(255,255,255,.95)":"none"}}>{med.init}</div>
               {rs?<SallePill nom={rs} acte={acte} night={darkMode}/>
                 :(bipActe.hasSalle?<span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>⚠ sans salle</span>:null)}
             </div>
@@ -1049,6 +1053,20 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
       g.meds.push(med);
     });
     const conflict=grps.length>1;
+    /* v10.62 : les internes s'affichent dans la case (rond pointillé) SANS entrer
+       dans l'occupation ni dans le conflit — supervision volontaire, sa règle. */
+    const semJ=intMedsDuJour(intCfg,ry,rm,d);
+    if(semJ)semJ.meds.forEach(im=>{
+      getEntries(im.id,ry,rm,d,sl).forEach(e=>{
+        if(!(e&&e.acteId&&!e.cond&&e.salle===salle))return;
+        const a2=salleActes.find(a=>a.id===e.acteId);
+        if(!a2)return;
+        let g=grps.find(x=>x.k===a2.id);
+        if(!g){g={k:a2.id,acte:a2,meds:[]};grps.push(g);}
+        g.imeds=(g.imeds||[]);
+        if(!g.imeds.find(x=>x.id===im.id))g.imeds.push(im);
+      });
+    });
     /* v10.53 : initiales devant chaque note — deux occupants ne se confondent plus */
     const noteTips=occ.map(({med})=>{const n=notes[nk(med.id,ry,rm,d,sl)];return n?(med.init+" : "+n):null;}).filter(Boolean).join("  |  ");
     return(
@@ -1062,6 +1080,9 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
             <div style={{display:"flex",flexDirection:"column",gap:2}}>
               {g.meds.map((m,mi)=>(
                 <div key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{m.init}</div>
+              ))}
+              {(g.imeds||[]).map((m,mi)=>(
+                <div key={"i"+mi} title={m.nom} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</div>
               ))}
             </div>
             <ActPill a={g.acte} night={darkMode} hasNote={g.meds.some(m=>!!notes[nk(m.id,ry,rm,d,sl)])}/>
@@ -1130,7 +1151,7 @@ function SiteView({printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,m
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint}){
+function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1246,6 +1267,20 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
     const noteTips=_nMeds.map(m=>{const n=notes[nk(m.id,ry,rm,d,sl)];return n?(m.init+" : "+n):null;}).filter(Boolean).join("  |  ");
     const _idsA={};_grpsA.forEach(g=>{if(g.acte&&g.acte.id)_idsA[g.acte.id]=1;});
     const conflA=Object.keys(_idsA).length>1;
+    /* v10.62 : internes de la case — rond pointillé, jamais dans le conflit */
+    const semJA=intMedsDuJour(intCfg,ry,rm,d);
+    if(semJA)semJA.meds.forEach(im=>{
+      row.ids.forEach(aid=>{
+        getEntries(im.id,ry,rm,d,sl).forEach(e=>{
+          if(!(e&&e.acteId===aid&&!e.cond&&(row.salle?e.salle===row.salle:true)))return;
+          const a2=actes.find(a=>a.id===aid)||{id:aid,short:aid,color:row.color};
+          let g=_grpsA.find(x=>x.acte&&x.acte.id===aid&&((x.salle||null)===(e.salle||null)));
+          if(!g){g={acte:a2,salle:e.salle||null,meds:[],n:null,dif:null};_grpsA.push(g);}
+          g.imeds=(g.imeds||[]);
+          if(!g.imeds.find(x=>x.id===im.id))g.imeds.push(im);
+        });
+      });
+    });
     return(
       <td key={`${row.label}-${d}-${sl}`} title={noteTips||undefined} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
         onClick={isEdit?()=>onPickAct({row,d,sl,y:ry,m:rm}):undefined}>
@@ -1269,13 +1304,17 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           /* v9.46 : un groupe porté par IDE_MED n'a pas d'occupant — pas de vignette,
              et le chiffre porte son unité puisque aucun nom ne l'éclaire. */
           const meds=g.meds.filter(m=>m&&m.id!==IDE_MED.id);
+          const imeds=g.imeds||[];
           const ideOnly=meds.length===0&&g.meds.length>0;
-          const showIde=ideOnly?(ideN>0):(ideActive&&(ideN>0||g.dif));
+          const showIde=(meds.length===0&&g.meds.length===0&&imeds.length>0)?false:(ideOnly?(ideN>0):(ideActive&&(ideN>0||g.dif)));
           return(
           <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:4,paddingTop:gi?4:0,marginTop:gi?1:0,borderTop:gi?"1px dashed "+(conflA?conflSep(darkMode):"var(--border)"):"none"}}>
-            {meds.length>0&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
+            {(meds.length>0||imeds.length>0)&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
               {meds.map((m,mi)=>(
                 <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{position:"relative",width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}{notes[nk(m.id,ry,rm,d,sl)]&&<span style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}</span>
+              ))}
+              {imeds.map((m,mi)=>(
+                <span key={"i"+mi} title={m.nom} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</span>
               ))}
             </div>}
             {(lieu||showIde||noSalle)&&
@@ -1287,7 +1326,7 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
           </div>
         );})}
         </div>
-        {occ.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
+        {occ.length===0&&_grpsA.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
       </td>
     );
   }
@@ -2143,13 +2182,18 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
 }
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
-function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null,okKey="adminOk",notes={},setNotes=null,canNotes=false}){
+function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null,okKey="adminOk",notes={},setNotes=null,canNotes=false,intCfg=null,canInt=false}){
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
   const [difFor,setDifFor]=useState(null);
   const [difH,setDifH]=useState("");
   const [difC,setDifC]=useState("");
-  const selMed=medecins.find(x=>x.id===selMedId);
+  /* v10.62, lot Salles : mêmes règles que dans PickMedSiteModal — internes posables
+     par l'éditeur, un intermédiaire ou un cadre, sur les activités cochées 🎓, sans
+     jamais compter dans l'occupation des salles ni dans les conflits. */
+  const intDay=intMedsDuJour(intCfg,y2,m2,d);
+  const selMed=medecins.find(x=>x.id===selMedId)||((intDay&&intDay.meds)||[]).find(x=>x.id===selMedId)||null;
+  const selIsInt=!!(selMed&&intDay&&intDay.meds.some(x=>x.id===selMed.id));
   const rowActes=row.ids.map(id=>actes.find(a=>a.id===id)).filter(Boolean);
   const allAuth=new Set(rowActes.flatMap(a=>a.medecinsAutorise||[]));
   const eligMeds=medecins.filter(m=>allAuth.size===0||allAuth.has(m.init)).filter(m=>!selfOnly||m.id===selfOnly);
@@ -2181,6 +2225,18 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
     });
   });
 
+  /* v10.62 : les internes posés figurent dans les Assignés (croix pour canInt) */
+  if(intDay)row.ids.forEach(aid=>{
+    intDay.meds.forEach(im=>{
+      getEntries(im.id,y2,m2,d,sl).forEach(e=>{
+        if(!(e&&e.acteId)||e.cond)return;
+        const match=row.salle?(e.acteId===aid&&e.salle===row.salle):e.acteId===aid;
+        if(match&&!curOcc.find(x=>x.med.id===im.id&&x.acteId===aid))curOcc.push({med:im,acte:actes.find(a=>a.id===aid),acteId:aid,e,isInt:true});
+      });
+    });
+  });
+  const intActes=rowActes.filter(a=>a.interneOk===true);
+  const intPick=(canInt&&intDay&&intActes.length)?intDay.meds.filter(im=>!curOcc.find(x=>x.med.id===im.id)):[];
   // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
   const pickMeds=eligMeds.filter(m=>!curOcc.find(x=>x.med.id===m.id));
 
@@ -2197,27 +2253,27 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
       {curOcc.length>0&&(
         <div style={{marginBottom:12}}>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Assignés</div>
-          {curOcc.map(({med,acte,acteId,e},i)=>(
+          {curOcc.map(({med,acte,acteId,e,isInt},i)=>(
             <div key={i}>
             <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
-              <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
-              <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
+              <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,border:isInt?"1.5px dashed rgba(255,255,255,.95)":"none"}}>{med.init}</div>
+              <span style={{flex:1,color:"var(--txt)",fontSize:12,fontWeight:700}}>{isInt?med.nom:((med.prenom||"")+" "+(med.nom||"")).trim()}</span>
               {acte&&<span style={{padding:"2px 6px",borderRadius:4,background:acte.bg,color:acte.color,fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>}
               {(()=>{const _rs=e&&e.salle;
                 if(_rs)return <span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>{_rs}</span>;
                 if(acte&&acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
                 return null;})()}
-              {row.hasSalleChoice&&acte&&acte.hasSalle&&(!selfOnly||med.id===selfOnly)&&okAct(acte)&&<button onClick={()=>setSelMedId(med.id)}
+              {row.hasSalleChoice&&acte&&acte.hasSalle&&(isInt?canInt:((!selfOnly||med.id===selfOnly)&&okAct(acte)))&&<button onClick={()=>setSelMedId(med.id)}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
-              {(!selfOnly||med.id===selfOnly)&&okAct(actes.find(a2=>a2.id===acteId))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+              {(isInt?canInt:((!selfOnly||med.id===selfOnly)&&okAct(actes.find(a2=>a2.id===acteId))))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
               {(()=>{/* v10.53 : note liée à CE médecin (jamais à la ligne IDE) */
-                if(med.id===IDE_MED.id)return null;
+                if(med.id===IDE_MED.id||isInt)return null;
                 const _nk=nk(med.id,y2,m2,d,sl);
                 const _cn=!!setNotes&&(!selfOnly||med.id===selfOnly)&&(canNotes||okAct(acte));
                 if(!_cn&&!notes[_nk])return null;
                 return <input value={notes[_nk]||""} readOnly={!_cn} onChange={_cn?(e=>{const v=e.target.value;setNotes(p=>({...p,[_nk]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
             </div>
-            {canDif&&<div style={{margin:"-2px 0 7px 6px",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+            {canDif&&!isInt&&<div style={{margin:"-2px 0 7px 6px",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
               {(e&&e.dif)
                 ?<><span style={{fontSize:10,fontWeight:800,color:"#f59e0b",border:"1px solid rgba(245,158,11,.5)",borderRadius:5,padding:"1px 5px"}}>{"🕙 départ différé"+(e.dif.c?" — "+e.dif.c:"")+(e.dif.h?" ("+e.dif.h+")":"")}</span>
                   <button onClick={()=>{if(patchAct)patchAct(med.id,y2,m2,d,sl,acteId,e.salle||null,{dif:null});}} style={{background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:10,textDecoration:"underline"}}>retirer</button></>
@@ -2265,11 +2321,11 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
           {/* Salle occupancy warning for fixed-salle rows (Stim/EEP) */}
-          {row.salle&&curOcc.length>0&&(
+          {row.salle&&curOcc.some(x=>!x.isInt)&&(
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:8}}>
               <span>⚠️</span>
               <span style={{fontSize:11,color:"#f59e0b"}}>
-                {row.salle} déjà occupée par {curOcc.map(x=>x.med.init).join(", ")} — vous pouvez quand même ajouter un second médecin.
+                {row.salle} déjà occupée par {curOcc.filter(x=>!x.isInt).map(x=>x.med.init).join(", ")} — vous pouvez quand même ajouter un second médecin.
               </span>
             </div>
           )}
@@ -2318,9 +2374,42 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
         </>
       )}
 
+      {!selMedId&&!noMedMode&&intPick.length>0&&(
+        <>
+          <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",margin:"12px 0 8px",paddingTop:10,borderTop:"1px solid var(--border)"}}>{"🎓 Internes — "+intDay.lbl}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
+            {intPick.map(im=>{
+              const ids=[];(sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"]).forEach(s2=>getEntries(im.id,y2,m2,d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)ids.push(e.acteId);}));
+              const labs=uniqArr(ids.map(id=>{if(id==="TOUR_HC")return "HC";if(id==="TOUR_USIC")return "USIC";const ax=actes.find(x=>x.id===id);return (ax&&(ax.short||ax.label))||id;}));
+              const avail=ids.some(id=>ABS_IDS.indexOf(id)>=0)?"blocked":(ids.length?"warning":"free");
+              return(
+                <button key={im.id} disabled={avail==="blocked"}
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px solid ${avail==="warning"?"#f59e0b44":"var(--border)"}`,
+                    cursor:avail!=="blocked"?"pointer":"default",background:avail==="warning"?"rgba(245,158,11,.15)":"var(--bg2)",opacity:avail==="blocked"?.35:1}}
+                  onClick={()=>{
+                    if(avail==="blocked")return;
+                    if(!row.multiActe&&!row.hasSalleChoice&&intActes.length===1){
+                      const a=intActes[0];
+                      addEntry(im.id,y2,m2,d,sl,{acteId:a.id,salle:a.fixedSalle||row.salle||null});
+                      onClose();
+                    } else {
+                      setSelMedId(im.id);
+                    }
+                  }}>
+                  <div style={{width:28,height:28,borderRadius:"50%",background:im.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,border:"1.5px dashed rgba(255,255,255,.95)"}}>{im.init}</div>
+                  <div style={{textAlign:"left",flex:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{im.nom}</div>
+                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent / FMC":avail==="warning"?("⚠ Déjà : "+(labs.join(", ")||"une activité")):"Disponible"}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
       {selMedId&&selMed&&(()=>{
         // Recompute eligible actes now that selMed is known
-        const myEligActes=rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)).filter(okAct);
+        const myEligActes=selIsInt?rowActes.filter(a=>a.interneOk===true):rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)).filter(okAct);
         const isSimple=!row.multiActe&&!row.hasSalleChoice;
         return(
           <>
@@ -2408,11 +2497,17 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
 }
 
 /* ════ PICK MED SITE MODAL (CHL/CHB) ════ */
-function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null,darkMode=false,okKey="adminOk",notes={},setNotes=null,canNotes=false}){
+function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null,darkMode=false,okKey="adminOk",notes={},setNotes=null,canNotes=false,intCfg=null,canInt=false}){
   const {salle,siteActes,d,sl,y:y2,m:m2}=mData;
   const [step,setStep]=useState("med"); // med | acte | salle
   const [selMedId,setSelMedId]=useState(null);
-  const selMed=medecins.find(x=>x.id===selMedId);
+  /* v10.62, lot Salles : internes du semestre — posables ici par l'éditeur, un
+     intermédiaire ou un cadre, sur les seules activités cochées 🎓. Un interne posé
+     avec un médecin est VOLONTAIRE (supervision) : il n'entre jamais dans le calcul
+     d'occupation des salles ni dans les conflits. */
+  const intDay=intMedsDuJour(intCfg,y2,m2,d);
+  const selMed=medecins.find(x=>x.id===selMedId)||((intDay&&intDay.meds)||[]).find(x=>x.id===selMedId)||null;
+  const selIsInt=!!(selMed&&intDay&&intDay.meds.some(x=>x.id===selMed.id));
 
   /* v9.58.1 : les colonnes « ↩ reprise activité » étaient câblées pour le seul BIP —
      occupants introuvables et activité proposée toujours BIP dès qu'on en créait une
@@ -2433,7 +2528,17 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
     });
   });
   const [selBipSalle,setSelBipSalle]=useState(null);
-  const eligActes0=(selMed?(isRecapCol?[recapActe].filter(Boolean):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init))):[]).filter(a=>!adminOnly||a[okKey]===true);
+  /* v10.62 : les internes posés apparaissent dans les Occupants (croix pour canInt) */
+  if(intDay)intDay.meds.forEach(im=>{
+    getEntries(im.id,y2,m2,d,sl).forEach(e=>{
+      if(!(e&&e.acteId)||e.cond)return;
+      const okA=isRecapCol?(e.acteId===recapId):(e.salle===salle&&siteActes.some(a=>a.id===e.acteId));
+      if(okA&&!curOcc.find(x=>x.med.id===im.id))curOcc.push({med:im,acte:(isRecapCol?(recapActe||null):siteActes.find(a=>a.id===e.acteId)),rs:e.salle,isInt:true});
+    });
+  });
+  const intActes=isRecapCol?[recapActe].filter(a=>a&&a.interneOk===true):siteActes.filter(a=>a.interneOk===true);
+  const intPick=(canInt&&intDay&&intActes.length)?intDay.meds.filter(im=>!curOcc.find(x=>x.med.id===im.id)):[];
+  const eligActes0=(selMed?(isRecapCol?[recapActe].filter(a=>a&&(!selIsInt||a.interneOk===true)):(selIsInt?siteActes.filter(a=>a.interneOk===true):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)))):[]).filter(a=>selIsInt||!adminOnly||a[okKey]===true);
   /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches.
      Si aucune n'est offerte par cette salle, on ne le bloque pas — on le prévient. */
   const selCond=selMed?condOn(getEntries,selMed.id,y2,m2,d,sl):[];
@@ -2457,19 +2562,19 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
       {curOcc.length>0&&(
         <div style={{marginBottom:12}}>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Occupants</div>
-          {curOcc.map(({med,acte},i)=>(
+          {curOcc.map(({med,acte,isInt},i)=>(
             <div key={i} style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border)",marginBottom:4}}>
-              <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
-              <span style={{flex:1,color:"var(--txt)",fontSize:12}}>{med.prenom} {med.nom}</span>
+              <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,border:isInt?"1.5px dashed rgba(255,255,255,.95)":"none"}}>{med.init}</div>
+              <span style={{flex:1,color:"var(--txt)",fontSize:12}}>{isInt?med.nom:((med.prenom||"")+" "+(med.nom||"")).trim()}</span>
               <span style={{fontSize:10,color:acte.color,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{acte.short}</span>
               {(()=>{const _r=curOcc[i]&&curOcc[i].rs;
                 if(_r)return <SallePill nom={_r} acte={curOcc[i]&&curOcc[i].acte} night={darkMode}/>;
                 if(acte.hasSalle)return <span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 5px",whiteSpace:"nowrap"}}>⚠ sans salle</span>;
                 return null;})()}
-              {isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!selfOnly||med.id===selfOnly)&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
+              {!isInt&&isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!selfOnly||med.id===selfOnly)&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
-              {(!selfOnly||med.id===selfOnly)&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
-              {(()=>{/* v10.53 : note liée à CE médecin, mêmes règles que la coche du rôle */
+              {(isInt?canInt:((!selfOnly||med.id===selfOnly)&&(!adminOnly||acte[okKey]===true)))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
+              {(()=>{if(isInt)return null;/* v10.53 : note liée à CE médecin, mêmes règles que la coche du rôle */
                 const _nk=nk(med.id,y2,m2,d,sl);
                 const _cn=!!setNotes&&(!selfOnly||med.id===selfOnly)&&(!adminOnly||canNotes||acte[okKey]===true);
                 if(!_cn&&!notes[_nk])return null;
@@ -2508,6 +2613,30 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
           </div>
         </>
       )}
+      {step==="med"&&intPick.length>0&&(
+        <>
+          <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",margin:"12px 0 8px",paddingTop:10,borderTop:"1px solid var(--border)"}}>{"🎓 Internes — "+intDay.lbl}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
+            {intPick.map(im=>{
+              const ids=[];(sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"]).forEach(s2=>getEntries(im.id,y2,m2,d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)ids.push(e.acteId);}));
+              const labs=uniqArr(ids.map(id=>{if(id==="TOUR_HC")return "HC";if(id==="TOUR_USIC")return "USIC";const ax=actes.find(x=>x.id===id);return (ax&&(ax.short||ax.label))||id;}));
+              const avail=ids.some(id=>ABS_IDS.indexOf(id)>=0)?"blocked":(ids.length?"warning":"free");
+              return(
+                <button key={im.id} disabled={avail==="blocked"}
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",borderRadius:7,border:`1px solid ${avail==="warning"?"#f59e0b44":"var(--border)"}`,
+                    cursor:avail!=="blocked"?"pointer":"default",background:avail==="warning"?"rgba(245,158,11,.15)":"var(--bg2)",opacity:avail==="blocked"?.35:1}}
+                  onClick={()=>{ if(avail==="blocked")return; setSelMedId(im.id); setStep("acte"); }}>
+                  <div style={{width:28,height:28,borderRadius:"50%",background:im.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,border:"1.5px dashed rgba(255,255,255,.95)"}}>{im.init}</div>
+                  <div style={{textAlign:"left"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{im.nom}</div>
+                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent / FMC":avail==="warning"?("⚠ Déjà : "+(labs.join(", ")||"une activité")):"Disponible"}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
       {step==="acte"&&selMed&&(
         <>
           {eligActes.length===1&&eligActes[0].fixedSalle&&(()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId:eligActes[0].id,salle:eligActes[0].fixedSalle}); onClose(); return null; })()}
@@ -2518,8 +2647,8 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               <span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>{selMed.prenom} {selMed.nom}</span>
             </div>
           </div>
-          {curOcc.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:10}}>
-            <span>⚠️</span><span style={{fontSize:11,color:"#f59e0b"}}>Cette salle a déjà {curOcc.length} praticien(s) assigné(s). Confirmer quand même ?</span>
+          {!selIsInt&&curOcc.filter(x=>!x.isInt).length>0&&<div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:10}}>
+            <span>⚠️</span><span style={{fontSize:11,color:"#f59e0b"}}>Cette salle a déjà {curOcc.filter(x=>!x.isInt).length} praticien(s) assigné(s). Confirmer quand même ?</span>
           </div>}
           {selCond.length>0&&<div style={{fontSize:10,color:COND_C,fontWeight:700,marginBottom:8,padding:"5px 8px",borderRadius:6,border:"1.5px dashed "+COND_C,background:COND_BG,lineHeight:1.45}}>
             {condOff
@@ -5941,23 +6070,29 @@ function intGardeVeille(getEntries,mid,y,m,d){
   return ["N","JOUR"].some(sl=>getEntries(mid,v[0],v[1]-1,v[2],sl).some(e=>e&&e.acteId==="GARDE"));
 }
 
-function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry}){
+function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry,canSalle=false,salleReg=[]}){
   const [cren,setCren]=useState(slot0==="AM"?"AM":"M");
   const [per,setPer]=useState(null);
   const [pd1,setPd1]=useState(intISO2(y,m,d));
   const [pd2,setPd2]=useState(intISO2(y,m+1,0));
   const [pSel,setPSel]=useState(null);
-  const [semQ,setSemQ]=useState(null);   /* lundi : HC/USIC en attente du choix semaine / créneau */
+  const [semQ,setSemQ]=useState(null);   /* lundi : {id,salle} en attente du choix semaine / créneau */
+  const [salleQ,setSalleQ]=useState(null); /* v10.62 : activité à salle en attente du choix de salle */
   const iso=intISO2(y,m,d);
   const dw=dow(y,m,d);
   const sam=dw===6;
   const tuiles=intActesTuiles(actes,sam);
+  /* v10.62, lot Salles : activités à salle cochées 🎓 — posables ici par l'éditeur,
+     un intermédiaire ou un cadre uniquement, jamais par les internes ni l'administratif.
+     Le choix de salle est obligatoire, la salle s'affiche ensuite sur la pastille. */
+  const tuilesSalle=(canSalle&&!sam)?actes.filter(a=>a.interneOk===true&&!a.isSystem&&a.hasSalle&&ABS_IDS.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color,salles:a.salles||[],fixedSalle:a.fixedSalle||null})):[];
+  const salleSite=(s)=>{const r=(salleReg||[]).find(x=>x.n===s);return r?(Array.isArray(r.s)?r.s.join("/"):r.s):"";};
   const mid=med.id;
   const dansSem=(iso2)=>iso2>=med.sDeb&&iso2<=med.sFin;
   const contenu=[];
   (sam?["M"]:["M","AM"]).forEach(sl=>{
     getEntries(mid,y,m,d,sl).forEach(e=>{
-      if(e&&e.acteId&&!e._blocked&&!e._fullDay)contenu.push({sl:sl,acteId:e.acteId});
+      if(e&&e.acteId&&!e._blocked&&!e._fullDay)contenu.push({sl:sl,acteId:e.acteId,salle:e.salle||null});
     });
   });
   getEntries(mid,y,m,d,"JOUR").forEach(e=>{if(e&&e.acteId)contenu.push({sl:"JOUR",acteId:e.acteId});});
@@ -5966,10 +6101,11 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const crenLbl=sam?"Samedi matin":(cren==="M"?"Matin":cren==="AM"?"Après-midi":"Journée");
   const cycleCren=()=>{if(sam)return;setCren(c=>c==="M"?"AM":c==="AM"?"J":"M");};
   const slotsDuCren=()=>cren==="J"?["M","AM"]:[cren];
-  const poseCren=(acteId)=>{
-    if(sam){setEntry(mid,y,m,d,"M",{acteId:acteId});toast("Posé — samedi matin");onClose();return;}
-    if(cren==="J"){setEntry(mid,y,m,d,"M",{acteId:acteId});setEntry(mid,y,m,d,"AM",{acteId:acteId});}
-    else setEntry(mid,y,m,d,cren,{acteId:acteId});
+  const poseCren=(acteId,salle)=>{
+    const ent=()=>salle?{acteId:acteId,salle:salle}:{acteId:acteId};
+    if(sam){setEntry(mid,y,m,d,"M",ent());toast("Posé — samedi matin");onClose();return;}
+    if(cren==="J"){setEntry(mid,y,m,d,"M",ent());setEntry(mid,y,m,d,"AM",ent());}
+    else setEntry(mid,y,m,d,cren,ent());
     toast("Posé");onClose();
   };
   const poseJour=(acteId)=>{
@@ -5978,7 +6114,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
     setEntry(mid,y,m,d,"JOUR",{acteId:acteId});
     toast((acteById(acteId)||{label:acteId}).label+" — journée");onClose();
   };
-  const remplirSemaine=(acteId)=>{
+  const remplirSemaine=(acteId,salle)=>{
     const abs=acteId==="ABSENCE"||acteId==="FORMATION";
     let poses=0,sautes=0;
     for(let i=0;i<5;i++){
@@ -5991,27 +6127,38 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
       }
       ["M","AM"].forEach(sl=>{
         if(intSlotProtege(getEntries,mid,p[0],p[1]-1,p[2],sl)){sautes++;return;}
-        setEntry(mid,p[0],p[1]-1,p[2],sl,{acteId:acteId});poses++;
+        setEntry(mid,p[0],p[1]-1,p[2],sl,salle?{acteId:acteId,salle:salle}:{acteId:acteId});poses++;
       });
     }
     toast(abs?(poses+" journée(s) posée(s)"+(sautes?", "+sautes+" hors semestre":""))
              :(poses+" demi-journée(s) posée(s)"+(sautes?", "+sautes+" préservée(s) (repos, absence, FMC ou hors semestre)":"")));
     onClose();
   };
-  const poseSimple=(acteId)=>{
+  const poseSimple=(acteId,salle)=>{
     if((acteId==="ABSENCE"||acteId==="FORMATION")&&!sam&&cren==="J"){poseJour(acteId);return;}
-    poseCren(acteId);
+    poseCren(acteId,salle);
   };
   const clic=(acteId)=>{
     /* v10.60 : le lundi, TOUTE activité propose de remplir la semaine — sauf le repos de garde */
     if(acteId==="REPOS_GARDE"){poseJour(acteId);return;}
     if(acteId==="ABSENCE"||acteId==="FORMATION"){
-      if(dw===1&&!sam){setSemQ(acteId);return;}
+      if(dw===1&&!sam){setSemQ({id:acteId,salle:null});return;}
       poseSimple(acteId);return;
     }
     if(intJourBloque(getEntries,mid,y,m,d)){toast("La journée porte une absence, une FMC ou un repos — retirez-les d'abord (croix ci-dessus)","warn");return;}
-    if(dw===1&&!sam){setSemQ(acteId);return;}
+    if(dw===1&&!sam){setSemQ({id:acteId,salle:null});return;}
     poseCren(acteId);
+  };
+  const clicSalle=(t)=>{
+    if(intJourBloque(getEntries,mid,y,m,d)){toast("La journée porte une absence, une FMC ou un repos — retirez-les d'abord (croix ci-dessus)","warn");return;}
+    if(t.fixedSalle){if(dw===1&&!sam){setSemQ({id:t.id,salle:t.fixedSalle});return;}poseCren(t.id,t.fixedSalle);return;}
+    if(!(t.salles||[]).length){toast("Cette activité n'a pas de salle définie — réglez-la dans l'onglet Activités","warn");return;}
+    setSalleQ(t);
+  };
+  const choisitSalle=(s)=>{
+    const t=salleQ;setSalleQ(null);
+    if(dw===1&&!sam){setSemQ({id:t.id,salle:s});return;}
+    poseCren(t.id,s);
   };
   const appliquePeriode=()=>{
     if(!pSel){toast("Choisissez une tuile à appliquer","warn");return;}
@@ -6061,6 +6208,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
           return <div key={i} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4,fontSize:12}}>
             <span style={{background:a.color,color:intTxt(a.color),borderRadius:4,padding:"2px 8px",fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{a.short}</span>
             <span style={{fontSize:10,color:"var(--txt3)"}}>{c.sl==="JOUR"?"journée":c.sl==="M"?"matin":"après-midi"}</span>
+            {c.salle&&<span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",borderRadius:4,padding:"1px 5px"}}>{c.salle}</span>}
             {reposAuto
               ?<span style={{fontSize:10,color:"var(--txt3)"}}>posé par la garde de la veille — retirez la garde pour l'enlever</span>
               :<button onClick={()=>retire(c)} style={{width:18,height:18,borderRadius:9,border:"1px solid #fecdd3",background:"#fff1f2",color:"#dc2626",fontSize:10,fontWeight:800,cursor:"pointer",lineHeight:1,padding:0}}>×</button>}
@@ -6068,19 +6216,19 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
         })}
       </div>}
       {semQ&&<div style={{border:"1.5px solid #388bfd",background:"rgba(56,139,253,.07)",borderRadius:9,padding:"10px 12px",marginBottom:10}}>
-        <div style={{fontSize:12.5,fontWeight:800,color:"var(--txt)",marginBottom:3}}>{"Lundi + "+((acteById(semQ)||{}).short||semQ)+" : remplir toute la semaine ?"}</div>
-        <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>{(semQ==="ABSENCE"||semQ==="FORMATION")
+        <div style={{fontSize:12.5,fontWeight:800,color:"var(--txt)",marginBottom:3}}>{"Lundi + "+((acteById(semQ.id)||{}).short||semQ.id)+(semQ.salle?" ("+semQ.salle+")":"")+" : remplir toute la semaine ?"}</div>
+        <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>{(semQ.id==="ABSENCE"||semQ.id==="FORMATION")
           ?"Journées entières du lundi au vendredi — remplace ce qui s\u2019y trouve, repos de garde compris. Les jours hors semestre sont sautés."
           :"Du lundi au vendredi, matin et après-midi. Les repos de garde, absences et FMC déjà posés sont préservés."}</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <button onClick={()=>remplirSemaine(semQ)} style={{fontSize:12,padding:"7px 13px",borderRadius:7,border:"none",background:"#1d4ed8",color:"#fff",fontWeight:800,cursor:"pointer"}}>📅 Toute la semaine</button>
-          <button onClick={()=>{const a=semQ;setSemQ(null);poseSimple(a);}} style={btnO}>{"Seulement "+crenLbl.toLowerCase()}</button>
+          <button onClick={()=>remplirSemaine(semQ.id,semQ.salle)} style={{fontSize:12,padding:"7px 13px",borderRadius:7,border:"none",background:"#1d4ed8",color:"#fff",fontWeight:800,cursor:"pointer"}}>📅 Toute la semaine</button>
+          <button onClick={()=>{const a=semQ;setSemQ(null);poseSimple(a.id,a.salle);}} style={btnO}>{"Seulement "+crenLbl.toLowerCase()}</button>
           <button onClick={()=>setSemQ(null)} style={{...S.icnBtn,fontSize:11}}>annuler</button>
         </div>
       </div>}
       {per===null&&!semQ&&<div>
         <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:5}}>Ajouter</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:10}}>
+        {!salleQ&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:10}}>
           {tuiles.map(t=>{
             const j=t.id==="REPOS_GARDE";
             return <button key={t.id} onClick={()=>clic(t.id)} style={{padding:"9px 11px",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:t.color,color:intTxt(t.color)}}>
@@ -6088,9 +6236,33 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
               <span style={{display:"block",fontSize:11.5,fontWeight:700}}>{t.label}{j?" · journée":""}</span>
             </button>;
           })}
-        </div>
+        </div>}
+        {tuilesSalle.length>0&&!salleQ&&<div style={{marginBottom:10}}>
+          <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:5}}>Avec salle</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+            {tuilesSalle.map(t=>
+              <button key={t.id} onClick={()=>clicSalle(t)} style={{padding:"9px 11px",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:t.color,color:intTxt(t.color)}}>
+                <span style={{display:"block",fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{t.short}</span>
+                <span style={{display:"block",fontSize:11.5,fontWeight:700}}>{t.label} · salle…</span>
+              </button>)}
+          </div>
+        </div>}
+        {salleQ&&<div style={{border:"1.5px solid #1d4ed8",background:"rgba(29,78,216,.06)",borderRadius:9,padding:"10px 12px",marginBottom:10}}>
+          <div style={{fontSize:12.5,fontWeight:800,color:"var(--txt)",marginBottom:6}}>{(salleQ.short||salleQ.id)+" — choisir la salle"}</div>
+          {(()=>{
+            const grpsS=[];
+            (salleQ.salles||[]).forEach(s=>{const st=salleSite(s)||"Autres";let g=grpsS.find(x=>x.st===st);if(!g){g={st:st,l:[]};grpsS.push(g);}g.l.push(s);});
+            return grpsS.map(g=><div key={g.st} style={{marginBottom:6}}>
+              {grpsS.length>1&&<div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",marginBottom:3}}>{g.st==="ANGIO"?"PT Angio":g.st}</div>}
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {g.l.map(s=><button key={s} onClick={()=>choisitSalle(s)} style={{padding:"5px 10px",borderRadius:5,border:"1px solid var(--border)",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:"var(--bg2)",color:"var(--txt)"}}>{s}</button>)}
+              </div>
+            </div>);
+          })()}
+          <button onClick={()=>setSalleQ(null)} style={{...S.icnBtn,fontSize:11}}>annuler</button>
+        </div>}
         {sam&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Samedi : une seule case — le HC se pose sur le matin.</div>}
-        <button onClick={()=>setPer(1)} style={{...btnO,width:"100%",textAlign:"center",padding:"7px"}}>📅 Modifier sur une période…</button>
+        {!salleQ&&<button onClick={()=>setPer(1)} style={{...btnO,width:"100%",textAlign:"center",padding:"7px"}}>📅 Modifier sur une période…</button>}
       </div>}
       {per!==null&&<div>
         <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:8,fontSize:12,color:"var(--txt2)"}}>
@@ -6142,6 +6314,12 @@ function intGardeDuJour(getEntries,intCfg,y,m,d){
 }
 function intAbsCeJour(getEntries,mid,y,m,d){
   return ["M","AM","JOUR"].some(sl=>getEntries(mid,y,m,d,sl).some(e=>e&&e.acteId&&ABS_IDS.indexOf(e.acteId)>=0));
+}
+/* v10.62, lot Salles : les internes du semestre couvrant un jour donné — sert aux
+   modales des 4 onglets salles et à l'affichage des occupants dans leurs grilles. */
+function intMedsDuJour(intCfg,y,m,d){
+  const s=intCfg?intSemDuJour(intCfg,intISO2(y,m,d)):null;
+  return (s&&(s.meds||[]).length)?{lbl:intSemLabel(s.deb),meds:s.meds}:null;
 }
 
 function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
@@ -6262,7 +6440,7 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
   </Ov>;
 }
 
-function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,prevM,nextM,darkMode,setDarkMode}){
+function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],prevM,nextM,darkMode,setDarkMode}){
   const [sel,setSel]=useState(null);
   const [gm,setGm]=useState(null);
   const jours=useMemo(()=>{
@@ -6369,7 +6547,7 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
                   const a=e?acteById(e.acteId):null;
                   return <td key={c.id} onClick={(canEdit&&inR)?()=>setSel({med:c,y:o.y,m:o.m,d:o.d,slot0:sl}):undefined}
                     style={{...S.td,...(we?S.tdWE:{}),...(inR?{cursor:canEdit?"pointer":"default"}:horsSem)}}>
-                    {a&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}><Badge a={a} hideSalle/></div>}
+                    {a&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}><Badge a={a} salle={e.salle} hideSalle={!e.salle}/></div>}
                   </td>;
                 })}
               </tr>
@@ -6378,7 +6556,7 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
         </tbody>
       </table>
     </TableScroll>}
-    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry}/>}
+    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} canSalle={canSalle} salleReg={salleReg}/>}
     {gm&&<InternesGardeModal y={gm.y} m={gm.m} d={gm.d} jours={jours} onClose={()=>setGm(null)} intCfg={intCfg} getEntries={getEntries} setEntry={setEntry}/>}
   </div>;
 }
@@ -8728,12 +8906,12 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medecins} getEntries={getEntries} tourMed={tourMed} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
+      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} notes={notes}
+        <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -8743,13 +8921,13 @@ header::-webkit-scrollbar { display: none; }
           const full=bip&&(bip.salles||[]).includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
-      {tab==="plateau"&&<ActTabView title="❤️ PT Cardio" titleColor="#e3b341"
+      {tab==="plateau"&&<ActTabView title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfg}
         rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notes} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -8894,7 +9072,7 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
-      {tab==="internes"&&<InternesView intCfg={intCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||isInterEdit||isAdminEdit||isCadre} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="internes"&&<InternesView intCfg={intCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||isInterEdit||isAdminEdit||isCadre} canSalle={isEdit||isInterEdit||(isAdminEdit&&isCadre)} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -10463,8 +10641,8 @@ header::-webkit-scrollbar { display: none; }
         </div>);
       })()}
 
-      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||isCadre} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
-      {modal==="pickMedSite"&&mData&&<PickMedSiteModal mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||isCadre} intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedSite"&&mData&&<PickMedSiteModal intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
       {modal==="editActe"&&mData&&(
