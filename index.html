@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.67 — 16/08/2026";
+var APP_VERSION = "v10.68 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6311,20 +6311,17 @@ function InternesTile({ intCfg, setIntCfg, actes = [] }) {
             React.createElement("span", null, "en HC")),
         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "0 = pas d'alerte pour ce compteur. La jauge s'appuiera sur ces seuils dans l'onglet Internes."),
         (() => {
-            const off = intCfg.actOff || [];
-            const masquables = intActesTuiles(actes, false, []).filter(t => t.id !== "REPOS_GARDE")
-                .concat(actes.filter(a => a.interneOk === true && !a.isSystem && a.hasSalle && ABS_IDS.indexOf(a.id) < 0).map(a => ({ id: a.id, short: a.short || a.label, label: a.label, color: a.color, salle: true })));
-            const bascule = (id) => maj({ actOff: off.indexOf(id) >= 0 ? off.filter(x => x !== id) : off.concat([id]) });
+            const off = intCfg.statsOff || [];
+            const cols = [{ id: "TOUR_HC", short: "HC", color: "#388bfd" }, { id: "TOUR_USIC", short: "USIC", color: "#4285f4" }]
+                .concat(actes.filter(a => a.interneOk === true && !a.isSystem && !a.hasSalle && ABS_IDS.indexOf(a.id) < 0).map(a => ({ id: a.id, short: a.short || a.label, color: a.color })));
+            const bascule = (id) => maj({ statsOff: off.indexOf(id) >= 0 ? off.filter(x => x !== id) : off.concat([id]) });
             return React.createElement("div", { style: { marginTop: 10, paddingTop: 9, borderTop: "1px solid var(--border)" } },
-                React.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "var(--txt)", marginBottom: 3 } }, "Activit\u00E9s propos\u00E9es dans l'onglet"),
-                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 7 } }, "D\u00E9coch\u00E9e : l'activit\u00E9 dispara\u00EEt des tuiles de la modale et des statistiques de l'onglet Internes. La garde et le repos de garde restent toujours propos\u00E9s, et les poses d\u00E9j\u00E0 faites restent visibles."),
-                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "5px 16px" } },
-                    masquables.map(t => React.createElement("label", { key: t.id, title: t.label, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: "var(--txt)", cursor: "pointer" } },
-                        React.createElement("input", { type: "checkbox", checked: off.indexOf(t.id) < 0, onChange: () => bascule(t.id), style: { width: 13, height: 13 } }),
-                        React.createElement("span", { style: { width: 9, height: 9, borderRadius: 3, background: t.color, display: "inline-block", flexShrink: 0 } }),
-                        t.short,
-                        t.salle ? React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)", fontWeight: 600 } }, " salle") : null)),
-                    masquables.length === 0 && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "Aucune activit\u00E9 coch\u00E9e \uD83C\uDF93 pour l'instant \u2014 la coche se met dans la modale de chaque activit\u00E9.")));
+                React.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "var(--txt)", marginBottom: 3 } }, "Colonnes des statistiques \uD83D\uDCCA"),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 7 } }, "D\u00E9coch\u00E9e : la colonne dispara\u00EEt du tableau de statistiques de l'onglet Internes \u2014 rien d'autre ne change. Les gardes restent toujours affich\u00E9es ; les activit\u00E9s disponibles pour les internes se r\u00E8glent dans l'onglet Activit\u00E9s (coche \uD83C\uDF93)."),
+                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "5px 16px" } }, cols.map(t => React.createElement("label", { key: t.id, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: "var(--txt)", cursor: "pointer" } },
+                    React.createElement("input", { type: "checkbox", checked: off.indexOf(t.id) < 0, onChange: () => bascule(t.id), style: { width: 13, height: 13 } }),
+                    React.createElement("span", { style: { width: 9, height: 9, borderRadius: 3, background: t.color, display: "inline-block", flexShrink: 0 } }),
+                    t.short))));
         })());
 }
 /* ── v10.58 (v10.57 revue) : LOT 2 après son test : la grille prend la MISE EN PAGE DU
@@ -6344,17 +6341,15 @@ function intTxt(bg) { try {
 catch (e) {
     return "#fff";
 } }
-function intActesTuiles(actes, sam, actOff) {
-    /* v10.67 : actOff (Paramètres, tuile Internes) masque une activité de l'onglet —
-       la garde et son repos ne se masquent jamais, sa règle. */
-    const off = actOff || [];
-    const keep = t => t.id === "REPOS_GARDE" || off.indexOf(t.id) < 0;
+function intActesTuiles(actes, sam) {
+    /* v10.68 : ce que l'onglet propose se règle UNIQUEMENT par la coche 🎓 de
+       l'onglet Activités — le réglage de Paramètres ne concerne que les stats. */
     const hc = { id: "TOUR_HC", short: "HC", label: sam ? "Samedi matin" : "Tour HC", color: "#388bfd" };
     if (sam)
-        return [hc, { id: "ABSENCE", short: "ABS", label: "Absence / Congé", color: "#e06666" }, { id: "FORMATION", short: "FMC", label: "Formation", color: "#a3e635" }, { id: "REPOS_GARDE", short: "RG", label: "Repos de garde", color: "#ffe599" }].filter(keep);
+        return [hc, { id: "ABSENCE", short: "ABS", label: "Absence / Congé", color: "#e06666" }, { id: "FORMATION", short: "FMC", label: "Formation", color: "#a3e635" }, { id: "REPOS_GARDE", short: "RG", label: "Repos de garde", color: "#ffe599" }];
     const perso = actes.filter(a => a.interneOk === true && !a.isSystem && !a.hasSalle && ABS_IDS.indexOf(a.id) < 0).map(a => ({ id: a.id, short: a.short || a.label, label: a.label, color: a.color }));
     return [hc, { id: "TOUR_USIC", short: "USIC", label: "Tour USIC", color: "#4285f4" }].concat(perso)
-        .concat([{ id: "ABSENCE", short: "ABS", label: "Absence / Congé", color: "#e06666" }, { id: "FORMATION", short: "FMC", label: "Formation", color: "#a3e635" }, { id: "REPOS_GARDE", short: "RG", label: "Repos de garde", color: "#ffe599" }]).filter(keep);
+        .concat([{ id: "ABSENCE", short: "ABS", label: "Absence / Congé", color: "#e06666" }, { id: "FORMATION", short: "FMC", label: "Formation", color: "#a3e635" }, { id: "REPOS_GARDE", short: "RG", label: "Repos de garde", color: "#ffe599" }]);
 }
 function intJourBloque(getEntries, mid, y, m, d) {
     return getEntries(mid, y, m, d, "JOUR").some(e => e && e.acteId && (ABS_IDS.indexOf(e.acteId) >= 0 || e.acteId === "REPOS_GARDE"));
@@ -6368,7 +6363,7 @@ function intGardeVeille(getEntries, mid, y, m, d) {
     const v = intDecal(intISO2(y, m, d), -1).split("-").map(Number);
     return ["N", "JOUR"].some(sl => getEntries(mid, v[0], v[1] - 1, v[2], sl).some(e => e && e.acteId === "GARDE"));
 }
-function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getEntries, setEntry, canSalle = false, salleReg = [], actOff = [] }) {
+function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getEntries, setEntry, canSalle = false, salleReg = [] }) {
     const [cren, setCren] = useState(slot0 === "AM" ? "AM" : "M");
     const [per, setPer] = useState(null);
     const [pd1, setPd1] = useState(intISO2(y, m, d));
@@ -6379,11 +6374,11 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
     const iso = intISO2(y, m, d);
     const dw = dow(y, m, d);
     const sam = dw === 6;
-    const tuiles = intActesTuiles(actes, sam, actOff);
+    const tuiles = intActesTuiles(actes, sam);
     /* v10.62, lot Salles : activités à salle cochées 🎓 — posables ici par l'éditeur,
        un intermédiaire ou un cadre uniquement, jamais par les internes ni l'administratif.
        Le choix de salle est obligatoire, la salle s'affiche ensuite sur la pastille. */
-    const tuilesSalle = (canSalle && !sam) ? actes.filter(a => a.interneOk === true && !a.isSystem && a.hasSalle && ABS_IDS.indexOf(a.id) < 0 && actOff.indexOf(a.id) < 0).map(a => ({ id: a.id, short: a.short || a.label, label: a.label, color: a.color, salles: a.salles || [], fixedSalle: a.fixedSalle || null })) : [];
+    const tuilesSalle = (canSalle && !sam) ? actes.filter(a => a.interneOk === true && !a.isSystem && a.hasSalle && ABS_IDS.indexOf(a.id) < 0).map(a => ({ id: a.id, short: a.short || a.label, label: a.label, color: a.color, salles: a.salles || [], fixedSalle: a.fixedSalle || null })) : [];
     const salleSite = (s) => { const r = (salleReg || []).find(x => x.n === s); return r ? (Array.isArray(r.s) ? r.s.join("/") : r.s) : ""; };
     const mid = med.id;
     const dansSem = (iso2) => iso2 >= med.sDeb && iso2 <= med.sFin;
@@ -6644,7 +6639,7 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                             setPd2(e.target.value); }, style: Object.assign(Object.assign({}, S.fi), { width: 135 }) }),
                     React.createElement("button", { onClick: () => { setPd1(intISO2(y, m, 1)); setPd2(intISO2(y, m + 1, 0)); }, style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 10 }) }, "le mois")),
                 React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 } },
-                    intActesTuiles(actes, false, actOff).map(t => React.createElement("button", { key: t.id, onClick: () => setPSel(t.id), style: { padding: "7px 10px", borderRadius: 8, cursor: "pointer", textAlign: "left", background: t.color, color: intTxt(t.color), border: pSel === t.id ? "2.5px solid var(--txt)" : "2.5px solid transparent" } },
+                    intActesTuiles(actes, false).map(t => React.createElement("button", { key: t.id, onClick: () => setPSel(t.id), style: { padding: "7px 10px", borderRadius: 8, cursor: "pointer", textAlign: "left", background: t.color, color: intTxt(t.color), border: pSel === t.id ? "2.5px solid var(--txt)" : "2.5px solid transparent" } },
                         React.createElement("span", { style: { display: "block", fontSize: 10.5, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" } }, t.short),
                         React.createElement("span", { style: { display: "block", fontSize: 11, fontWeight: 700 } }, t.label))),
                     React.createElement("button", { onClick: () => setPSel("EFF"), style: { padding: "7px 10px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 12, background: "var(--bg2)", color: "var(--txt2)", border: pSel === "EFF" ? "2.5px solid var(--txt)" : "2.5px solid var(--border)" } }, "\uD83E\uDDF9 Effacer")),
@@ -7016,10 +7011,10 @@ function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, s
             /* v10.65 : mêmes activités « techniques » que les tuiles de la modale de case —
                Technique apparaîtra d'elle-même quand il l'aura créée ; les activités à
                salle restent hors stats (« pas indispensables », sa règle). */
-            const actOff = intCfg.actOff || [];
+            const statsOff = intCfg.statsOff || [];
             const exActes = actes.filter(a => a.interneOk === true && !a.isSystem && !a.hasSalle && ABS_IDS.indexOf(a.id) < 0 && a.id !== "REPOS_GARDE");
-            const exVis = exActes.filter(a => actOff.indexOf(a.id) < 0);
-            const showHC = actOff.indexOf("TOUR_HC") < 0, showUS = actOff.indexOf("TOUR_USIC") < 0;
+            const exVis = exActes.filter(a => statsOff.indexOf(a.id) < 0);
+            const showHC = statsOff.indexOf("TOUR_HC") < 0, showUS = statsOff.indexOf("TOUR_USIC") < 0;
             const st = intStats(getEntries, cols, jours, exVis);
             const fmtJ = n => n === 0 ? "—" : (n / 2).toString().replace(".", ","); /* v10.67 : virgule, sa préférence */
             const CAT_L = { sem: "Sem", jeu: "Jeu", ven: "Ven", sam: "Sam", dim: "Dim" };
@@ -7029,7 +7024,7 @@ function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, s
                     React.createElement("div", { style: S.mHd },
                         React.createElement("div", { style: S.mTit2 }, "📊 Statistiques — " + titre),
                         React.createElement("button", { onClick: () => setStatsOpen(false), style: S.xBtn }, "\u00D7")),
-                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "4px 0 8px" } }, "Sur la période affichée (" + jours.length + " jours" + (showFull ? "" : ", depuis aujourd'hui") + "). Gardes : total puis par catégorie (férié = dimanche, veille de férié = vendredi, comme chez les médecins). Le reste en jours (0,5 = demi-journée). Activités affichées : Paramètres, tuile Internes."),
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "4px 0 8px" } }, "Sur la période affichée (" + jours.length + " jours" + (showFull ? "" : ", depuis aujourd'hui") + "). Gardes : total puis par catégorie (férié = dimanche, veille de férié = vendredi, comme chez les médecins). Le reste en jours (0,5 = demi-journée). Colonnes affichées : Paramètres, tuile Internes."),
                     React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
                         React.createElement("thead", null,
                             React.createElement("tr", null,
@@ -7053,7 +7048,7 @@ function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, s
                                 exVis.map(a => React.createElement("td", { key: a.id, style: num }, fmtJ(s.ex[a.id]))));
                         })))));
         })(),
-        sel && React.createElement(InternesCellModal, { med: sel.med, y: sel.y, m: sel.m, d: sel.d, slot0: sel.slot0, onClose: () => setSel(null), actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, canSalle: canSalle, salleReg: salleReg, actOff: intCfg.actOff || [] }),
+        sel && React.createElement(InternesCellModal, { med: sel.med, y: sel.y, m: sel.m, d: sel.d, slot0: sel.slot0, onClose: () => setSel(null), actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, canSalle: canSalle, salleReg: salleReg }),
         gm && React.createElement(InternesGardeModal, { y: gm.y, m: gm.m, d: gm.d, jours: jours, onClose: () => setGm(null), intCfg: intCfg, getEntries: getEntries, setEntry: setEntry }));
 }
 function CardioPlanning() {
