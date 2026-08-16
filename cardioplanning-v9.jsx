@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.69 — 16/08/2026";
+const APP_VERSION="v10.70 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2254,7 +2254,9 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
     });
   });
   const intActes=rowActes.filter(a=>a.interneOk===true);
-  const intPick=(canInt&&intDay&&intActes.length)?intDay.meds.filter(im=>!curOcc.find(x=>x.med.id===im.id)):[];
+  /* v10.70 : seuls les internes cochés « salles » (fiche de l'onglet Équipe) sont
+     proposés ici. Les occupants déjà posés restent listés plus haut, avec leur croix. */
+  const intPick=(canInt&&intDay&&intActes.length)?intDay.meds.filter(im=>im.salles===true&&!curOcc.find(x=>x.med.id===im.id)):[];
   // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
   const pickMeds=eligMeds.filter(m=>!curOcc.find(x=>x.med.id===m.id));
 
@@ -2565,7 +2567,9 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
     });
   });
   const intActes=isRecapCol?[recapActe].filter(a=>a&&a.interneOk===true):siteActes.filter(a=>a.interneOk===true);
-  const intPick=(canInt&&intDay&&intActes.length)?intDay.meds.filter(im=>!curOcc.find(x=>x.med.id===im.id)):[];
+  /* v10.70 : seuls les internes cochés « salles » (fiche de l'onglet Équipe) sont
+     proposés ici. Les occupants déjà posés restent listés plus haut, avec leur croix. */
+  const intPick=(canInt&&intDay&&intActes.length)?intDay.meds.filter(im=>im.salles===true&&!curOcc.find(x=>x.med.id===im.id)):[];
   const eligActes0=(selMed?(isRecapCol?[recapActe].filter(a=>a&&(!selIsInt||a.interneOk===true)):(selIsInt?siteActes.filter(a=>a.interneOk===true):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)))):[]).filter(a=>selIsInt||!adminOnly||a[okKey]===true);
   /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches.
      Si aucune n'est offerte par cette salle, on ne le bloque pas — on le prévient. */
@@ -5963,6 +5967,10 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
   const tj=intISO(new Date());
   const setSems=(fn)=>setIntCfg(p=>({...p,sems:fn(((p&&p.sems)||[]).slice())}));
   const majSem=(id,patch)=>setSems(l=>l.map(s=>s.id===id?{...s,...patch}:s));
+  /* v10.70 : tous les internes n'ont pas acces aux activites A SALLE (consultations).
+     Une coche par interne — l'activite continue de decider par sa coche 🎓, cette
+     coche-ci dit seulement QUI peut y etre propose. */
+  const majMed=(semId,medId,patch)=>setSems(l=>l.map(x=>x.id!==semId?x:{...x,meds:(x.meds||[]).map(m=>m.id===medId?{...m,...patch}:m)}));
   const addSem=()=>{
     const last=sems[sems.length-1];
     if(!last){const deb=intDernierePrise(tj);setSems(l=>l.concat([{id:"S"+Date.now(),deb:deb,fin:intDecal(intProchainePrise(deb),-1),meds:[]}]));return;}
@@ -6018,7 +6026,11 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
           {i<sems.length-1&&<span style={{fontSize:10,color:"var(--txt3)"}}>— la fin est la veille du semestre suivant</span>}
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-          {(s.meds||[]).map(m=><span key={m.id} title={isEdit?"Cliquer pour renommer ou changer la couleur":undefined} onClick={isEdit?(()=>ouvreEdit(s,m)):undefined} style={{display:"inline-flex",alignItems:"center",gap:6,background:m.color,color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:800,cursor:isEdit?"pointer":"default",outline:editId===m.id?"2.5px solid var(--txt)":"none"}}>{m.init} · {m.nom}
+          {(s.meds||[]).map(m=><span key={m.id} title={isEdit?"Cliquer pour renommer ou changer la couleur":undefined} onClick={isEdit?(()=>ouvreEdit(s,m)):undefined} style={{display:"inline-flex",alignItems:"center",gap:6,background:m.color,color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:800,cursor:isEdit?"pointer":"default",outline:editId===m.id?"2.5px solid var(--txt)":"none"}}>
+            {isEdit
+              ?<button onClick={e=>{e.stopPropagation();majMed(s.id,m.id,{salles:!m.salles});}} title={(m.salles?"Proposé":"Non proposé")+" dans les salles (CHL, CHB, PT Cardio, PT Angio) — cliquer pour changer"} style={{border:"none",background:"transparent",color:"#fff",cursor:"pointer",padding:0,fontSize:13,lineHeight:1,opacity:m.salles?1:.55}}>{m.salles?"☑":"☐"}</button>
+              :(m.salles?<span title="Proposé dans les salles" style={{fontSize:12,lineHeight:1}}>☑</span>:null)}
+            {m.init} · {m.nom}
             {isEdit&&<button onClick={e=>{e.stopPropagation();if(confirm("Retirer "+m.nom+" de ce semestre ? Ses cases passées du planning ne sont pas touchées."))setSems(l=>l.map(x=>x.id!==s.id?x:{...x,meds:(x.meds||[]).filter(y=>y.id!==m.id)}));}} style={{border:"none",background:"transparent",color:"#fff",fontWeight:900,cursor:"pointer",padding:0,fontSize:12}}>✕</button>}
           </span>)}
           {(s.meds||[]).length===0&&<span style={{fontSize:11,color:"var(--txt3)"}}>aucun interne pour l'instant</span>}
@@ -6038,6 +6050,7 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
       <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}} onClick={addSem}>+ Semestre suivant</button>
       {nFinis>0&&<button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.08)",color:"#dc2626",fontWeight:800,cursor:"pointer"}} onClick={()=>{if(confirm(nFinis+" semestre(s) terminé(s) — supprimer leurs fiches ? Les cases passées du planning ne sont pas touchées."))setSems(l=>l.filter(s=>!(s.fin<tj)));}}>🗑 Supprimer les semestres terminés</button>}
     </div>}
+    {isEdit&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>☑ devant un interne : il est proposé dans les modales des salles (CHL, CHB, PT Cardio, PT Angio) et les activités à salle lui sont proposées dans l'onglet Internes. Décoché : il n'apparaît pas dans ces listes — ce qui lui a déjà été posé reste en place et retirable.</div>}
     {isEdit&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>Prise de fonction proposée : le 2 mai et le 2 novembre, reportée au lundi suivant quand elle tombe un vendredi, samedi ou dimanche. Les dates restent modifiables ci-dessus.</div>}
   </div>;
 }
@@ -6148,7 +6161,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   /* v10.62, lot Salles : activités à salle cochées 🎓 — posables ici par l'éditeur,
      un intermédiaire ou un cadre uniquement, jamais par les internes ni l'administratif.
      Le choix de salle est obligatoire, la salle s'affiche ensuite sur la pastille. */
-  const tuilesSalle=(canSalle&&!sam)?actes.filter(a=>a.interneOk===true&&!a.isSystem&&a.hasSalle&&ABS_IDS.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color,salles:a.salles||[],fixedSalle:a.fixedSalle||null})):[];
+  const tuilesSalle=(canSalle&&!sam&&med.salles===true)?actes.filter(a=>a.interneOk===true&&!a.isSystem&&a.hasSalle&&ABS_IDS.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color,salles:a.salles||[],fixedSalle:a.fixedSalle||null})):[];
   const salleSite=(s)=>{const r=(salleReg||[]).find(x=>x.n===s);return r?(Array.isArray(r.s)?r.s.join("/"):r.s):"";};
   const mid=med.id;
   const dansSem=(iso2)=>iso2>=med.sDeb&&iso2<=med.sFin;
@@ -6335,6 +6348,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
         <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:8,fontSize:12,color:"var(--txt2)"}}>
           <span>Du</span><input type="date" value={pd1} onChange={e=>{if(e.target.value)setPd1(e.target.value);}} style={{...S.fi,width:135}}/>
           <span>au</span><input type="date" value={pd2} onChange={e=>{if(e.target.value)setPd2(e.target.value);}} style={{...S.fi,width:135}}/>
+          <button onClick={()=>{const l=intDecal(intISO2(y,m,d),-((dow(y,m,d)+6)%7));setPd1(l);setPd2(intDecal(l,6));}} style={{...S.icnBtn,fontSize:10}}>la semaine</button>
           <button onClick={()=>{setPd1(intISO2(y,m,1));setPd2(intISO2(y,m+1,0));}} style={{...S.icnBtn,fontSize:10}}>le mois</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>

@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.69 — 16/08/2026";
+var APP_VERSION = "v10.70 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2435,7 +2435,9 @@ function PickMedActModal({ mData, setMData, medecins, actes, getEntries, isMedAv
             });
         });
     const intActes = rowActes.filter(a => a.interneOk === true);
-    const intPick = (canInt && intDay && intActes.length) ? intDay.meds.filter(im => !curOcc.find(x => x.med.id === im.id)) : [];
+    /* v10.70 : seuls les internes cochés « salles » (fiche de l'onglet Équipe) sont
+       proposés ici. Les occupants déjà posés restent listés plus haut, avec leur croix. */
+    const intPick = (canInt && intDay && intActes.length) ? intDay.meds.filter(im => im.salles === true && !curOcc.find(x => x.med.id === im.id)) : [];
     // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
     const pickMeds = eligMeds.filter(m => !curOcc.find(x => x.med.id === m.id));
     return (React.createElement(Ov, { onClose: onClose },
@@ -2696,7 +2698,9 @@ function PickMedSiteModal({ mData, medecins, actes, getEntries, isMedAvailable, 
             });
         });
     const intActes = isRecapCol ? [recapActe].filter(a => a && a.interneOk === true) : siteActes.filter(a => a.interneOk === true);
-    const intPick = (canInt && intDay && intActes.length) ? intDay.meds.filter(im => !curOcc.find(x => x.med.id === im.id)) : [];
+    /* v10.70 : seuls les internes cochés « salles » (fiche de l'onglet Équipe) sont
+       proposés ici. Les occupants déjà posés restent listés plus haut, avec leur croix. */
+    const intPick = (canInt && intDay && intActes.length) ? intDay.meds.filter(im => im.salles === true && !curOcc.find(x => x.med.id === im.id)) : [];
     const eligActes0 = (selMed ? (isRecapCol ? [recapActe].filter(a => a && (!selIsInt || a.interneOk === true)) : (selIsInt ? siteActes.filter(a => a.interneOk === true) : siteActes.filter(a => !(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.includes(selMed.init)))) : []).filter(a => selIsInt || !adminOnly || a[okKey] === true);
     /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches.
        Si aucune n'est offerte par cette salle, on ne le bloque pas — on le prévient. */
@@ -6176,6 +6180,10 @@ function InternesEquipe({ intCfg, setIntCfg, isEdit }) {
     const tj = intISO(new Date());
     const setSems = (fn) => setIntCfg(p => (Object.assign(Object.assign({}, p), { sems: fn(((p && p.sems) || []).slice()) })));
     const majSem = (id, patch) => setSems(l => l.map(s => s.id === id ? Object.assign(Object.assign({}, s), patch) : s));
+    /* v10.70 : tous les internes n'ont pas acces aux activites A SALLE (consultations).
+       Une coche par interne — l'activite continue de decider par sa coche 🎓, cette
+       coche-ci dit seulement QUI peut y etre propose. */
+    const majMed = (semId, medId, patch) => setSems(l => l.map(x => x.id !== semId ? x : Object.assign(Object.assign({}, x), { meds: (x.meds || []).map(m => m.id === medId ? Object.assign(Object.assign({}, m), patch) : m) })));
     const addSem = () => {
         const last = sems[sems.length - 1];
         if (!last) {
@@ -6266,6 +6274,9 @@ function InternesEquipe({ intCfg, setIntCfg, isEdit }) {
                     i < sems.length - 1 && React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "\u2014 la fin est la veille du semestre suivant")),
                 React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
                     (s.meds || []).map(m => React.createElement("span", { key: m.id, title: isEdit ? "Cliquer pour renommer ou changer la couleur" : undefined, onClick: isEdit ? (() => ouvreEdit(s, m)) : undefined, style: { display: "inline-flex", alignItems: "center", gap: 6, background: m.color, color: "#fff", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 800, cursor: isEdit ? "pointer" : "default", outline: editId === m.id ? "2.5px solid var(--txt)" : "none" } },
+                        isEdit
+                            ? React.createElement("button", { onClick: e => { e.stopPropagation(); majMed(s.id, m.id, { salles: !m.salles }); }, title: (m.salles ? "Proposé" : "Non proposé") + " dans les salles (CHL, CHB, PT Cardio, PT Angio) — cliquer pour changer", style: { border: "none", background: "transparent", color: "#fff", cursor: "pointer", padding: 0, fontSize: 13, lineHeight: 1, opacity: m.salles ? 1 : .55 } }, m.salles ? "☑" : "☐")
+                            : (m.salles ? React.createElement("span", { title: "Propos\u00E9 dans les salles", style: { fontSize: 12, lineHeight: 1 } }, "\u2611") : null),
                         m.init,
                         " \u00B7 ",
                         m.nom,
@@ -6284,6 +6295,7 @@ function InternesEquipe({ intCfg, setIntCfg, isEdit }) {
             React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer" }, onClick: addSem }, "+ Semestre suivant"),
             nFinis > 0 && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #dc2626", background: "rgba(220,38,38,.08)", color: "#dc2626", fontWeight: 800, cursor: "pointer" }, onClick: () => { if (confirm(nFinis + " semestre(s) terminé(s) — supprimer leurs fiches ? Les cases passées du planning ne sont pas touchées."))
                     setSems(l => l.filter(s => !(s.fin < tj))); } }, "\uD83D\uDDD1 Supprimer les semestres termin\u00E9s")),
+        isEdit && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 6 } }, "\u2611 devant un interne : il est propos\u00E9 dans les modales des salles (CHL, CHB, PT Cardio, PT Angio) et les activit\u00E9s \u00E0 salle lui sont propos\u00E9es dans l'onglet Internes. D\u00E9coch\u00E9 : il n'appara\u00EEt pas dans ces listes \u2014 ce qui lui a d\u00E9j\u00E0 \u00E9t\u00E9 pos\u00E9 reste en place et retirable."),
         isEdit && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 6 } }, "Prise de fonction propos\u00E9e : le 2 mai et le 2 novembre, report\u00E9e au lundi suivant quand elle tombe un vendredi, samedi ou dimanche. Les dates restent modifiables ci-dessus."));
 }
 function InternesTile({ intCfg, setIntCfg, actes = [], pins = [] }) {
@@ -6401,7 +6413,7 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
     /* v10.62, lot Salles : activités à salle cochées 🎓 — posables ici par l'éditeur,
        un intermédiaire ou un cadre uniquement, jamais par les internes ni l'administratif.
        Le choix de salle est obligatoire, la salle s'affiche ensuite sur la pastille. */
-    const tuilesSalle = (canSalle && !sam) ? actes.filter(a => a.interneOk === true && !a.isSystem && a.hasSalle && ABS_IDS.indexOf(a.id) < 0).map(a => ({ id: a.id, short: a.short || a.label, label: a.label, color: a.color, salles: a.salles || [], fixedSalle: a.fixedSalle || null })) : [];
+    const tuilesSalle = (canSalle && !sam && med.salles === true) ? actes.filter(a => a.interneOk === true && !a.isSystem && a.hasSalle && ABS_IDS.indexOf(a.id) < 0).map(a => ({ id: a.id, short: a.short || a.label, label: a.label, color: a.color, salles: a.salles || [], fixedSalle: a.fixedSalle || null })) : [];
     const salleSite = (s) => { const r = (salleReg || []).find(x => x.n === s); return r ? (Array.isArray(r.s) ? r.s.join("/") : r.s) : ""; };
     const mid = med.id;
     const dansSem = (iso2) => iso2 >= med.sDeb && iso2 <= med.sFin;
@@ -6664,6 +6676,7 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                     React.createElement("span", null, "au"),
                     React.createElement("input", { type: "date", value: pd2, onChange: e => { if (e.target.value)
                             setPd2(e.target.value); }, style: Object.assign(Object.assign({}, S.fi), { width: 135 }) }),
+                    React.createElement("button", { onClick: () => { const l = intDecal(intISO2(y, m, d), -((dow(y, m, d) + 6) % 7)); setPd1(l); setPd2(intDecal(l, 6)); }, style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 10 }) }, "la semaine"),
                     React.createElement("button", { onClick: () => { setPd1(intISO2(y, m, 1)); setPd2(intISO2(y, m + 1, 0)); }, style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 10 }) }, "le mois")),
                 React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 } },
                     intActesTuiles(actes, false, intSelf).map(t => React.createElement("button", { key: t.id, onClick: () => setPSel(t.id), style: { padding: "7px 10px", borderRadius: 8, cursor: "pointer", textAlign: "left", background: t.color, color: intTxt(t.color), border: pSel === t.id ? "2.5px solid var(--txt)" : "2.5px solid transparent" } },
