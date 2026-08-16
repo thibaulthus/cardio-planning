@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.59 — 16/08/2026";
+var APP_VERSION = "v10.60 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6299,12 +6299,20 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
         onClose();
     };
     const remplirSemaine = (acteId) => {
+        const abs = acteId === "ABSENCE" || acteId === "FORMATION";
         let poses = 0, sautes = 0;
         for (let i = 0; i < 5; i++) {
             const iso3 = intDecal(iso, i);
             const p = iso3.split("-").map(Number);
             if (!dansSem(iso3)) {
                 sautes++;
+                continue;
+            }
+            if (abs) { /* journées entières, comme l'écran de période — remplace, repos compris */
+                setEntry(mid, p[0], p[1] - 1, p[2], "M", null);
+                setEntry(mid, p[0], p[1] - 1, p[2], "AM", null);
+                setEntry(mid, p[0], p[1] - 1, p[2], "JOUR", { acteId: acteId });
+                poses++;
                 continue;
             }
             ["M", "AM"].forEach(sl => {
@@ -6316,26 +6324,36 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                 poses++;
             });
         }
-        toast(poses + " demi-journée(s) posée(s)" + (sautes ? ", " + sautes + " préservée(s) (repos, absence, FMC ou hors semestre)" : ""));
+        toast(abs ? (poses + " journée(s) posée(s)" + (sautes ? ", " + sautes + " hors semestre" : ""))
+            : (poses + " demi-journée(s) posée(s)" + (sautes ? ", " + sautes + " préservée(s) (repos, absence, FMC ou hors semestre)" : "")));
         onClose();
     };
+    const poseSimple = (acteId) => {
+        if ((acteId === "ABSENCE" || acteId === "FORMATION") && !sam && cren === "J") {
+            poseJour(acteId);
+            return;
+        }
+        poseCren(acteId);
+    };
     const clic = (acteId) => {
+        /* v10.60 : le lundi, TOUTE activité propose de remplir la semaine — sauf le repos de garde */
         if (acteId === "REPOS_GARDE") {
             poseJour(acteId);
             return;
         }
         if (acteId === "ABSENCE" || acteId === "FORMATION") {
-            if (!sam && cren === "J")
-                poseJour(acteId);
-            else
-                poseCren(acteId);
+            if (dw === 1 && !sam) {
+                setSemQ(acteId);
+                return;
+            }
+            poseSimple(acteId);
             return;
         }
         if (intJourBloque(getEntries, mid, y, m, d)) {
             toast("La journée porte une absence, une FMC ou un repos — retirez-les d'abord (croix ci-dessus)", "warn");
             return;
         }
-        if (dw === 1 && !sam && (acteId === "TOUR_HC" || acteId === "TOUR_USIC")) {
+        if (dw === 1 && !sam) {
             setSemQ(acteId);
             return;
         }
@@ -6426,10 +6444,12 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                 })),
             semQ && React.createElement("div", { style: { border: "1.5px solid #388bfd", background: "rgba(56,139,253,.07)", borderRadius: 9, padding: "10px 12px", marginBottom: 10 } },
                 React.createElement("div", { style: { fontSize: 12.5, fontWeight: 800, color: "var(--txt)", marginBottom: 3 } }, "Lundi + " + ((acteById(semQ) || {}).short || semQ) + " : remplir toute la semaine ?"),
-                React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8 } }, "Du lundi au vendredi, matin et apr\u00E8s-midi. Les repos de garde, absences et FMC d\u00E9j\u00E0 pos\u00E9s sont pr\u00E9serv\u00E9s."),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8 } }, (semQ === "ABSENCE" || semQ === "FORMATION")
+                    ? "Journées entières du lundi au vendredi — remplace ce qui s\u2019y trouve, repos de garde compris. Les jours hors semestre sont sautés."
+                    : "Du lundi au vendredi, matin et après-midi. Les repos de garde, absences et FMC déjà posés sont préservés."),
                 React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
                     React.createElement("button", { onClick: () => remplirSemaine(semQ), style: { fontSize: 12, padding: "7px 13px", borderRadius: 7, border: "none", background: "#1d4ed8", color: "#fff", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCC5 Toute la semaine"),
-                    React.createElement("button", { onClick: () => { const a = semQ; setSemQ(null); poseCren(a); }, style: btnO }, "Seulement " + crenLbl.toLowerCase()),
+                    React.createElement("button", { onClick: () => { const a = semQ; setSemQ(null); poseSimple(a); }, style: btnO }, "Seulement " + crenLbl.toLowerCase()),
                     React.createElement("button", { onClick: () => setSemQ(null), style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 11 }) }, "annuler"))),
             per === null && !semQ && React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 5 } }, "Ajouter"),
@@ -6489,8 +6509,8 @@ function intGardeDuJour(getEntries, intCfg, y, m, d) {
 function intAbsCeJour(getEntries, mid, y, m, d) {
     return ["M", "AM", "JOUR"].some(sl => getEntries(mid, y, m, d, sl).some(e => e && e.acteId && ABS_IDS.indexOf(e.acteId) >= 0));
 }
-function InternesGardeModal({ y, m, d, onClose, intCfg, getEntries, setEntry }) {
-    const [exDate, setExDate] = useState(intISO2(y, m, d));
+function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEntry }) {
+    const [exOpen, setExOpen] = useState(false);
     const [extNom, setExtNom] = useState("");
     const iso = intISO2(y, m, d);
     const holder = intGardeDuJour(getEntries, intCfg, y, m, d);
@@ -6546,28 +6566,27 @@ function InternesGardeModal({ y, m, d, onClose, intCfg, getEntries, setEntry }) 
         toast("Garde extérieure posée — sans repos chez nous");
         onClose();
     };
-    const echange = () => {
-        if (!exDate || exDate === iso) {
-            toast("Choisissez un autre jour", "warn");
-            return;
-        }
-        const P = exDate.split("-").map(Number);
-        const h2 = intGardeDuJour(getEntries, intCfg, P[0], P[1] - 1, P[2]);
-        if (!holder && !h2) {
-            toast("Aucune garde à échanger sur ces deux jours", "warn");
-            return;
-        }
+    /* v10.60 : échange sur le modèle des médecins (v9.82) — la liste des gardes posées
+       de la période affichée, un clic pour échanger, plus de date à saisir. Un absent
+       n'est pas bloqué (règle interne validée) ; les repos sont recalculés par retire/pose. */
+    const swap = (o, h2) => {
         retire(y, m, d);
-        retire(P[0], P[1] - 1, P[2]);
-        if (h2)
-            pose(h2, y, m, d, true);
-        if (holder)
-            pose(holder, P[0], P[1] - 1, P[2], true);
-        toast(h2 && holder ? "Gardes échangées" : "Garde déplacée");
+        retire(o.y, o.m, o.d);
+        pose(h2, y, m, d, true);
+        pose(holder, o.y, o.m, o.d, true);
+        toast("Gardes échangées");
         onClose();
     };
-    const holder2 = (() => { if (!exDate)
-        return null; const P = exDate.split("-").map(Number); return intGardeDuJour(getEntries, intCfg, P[0], P[1] - 1, P[2]); })();
+    const autresGardes = (jours || []).map(o => {
+        if (o.y === y && o.m === m && o.d === d)
+            return null;
+        const h2 = intGardeDuJour(getEntries, intCfg, o.y, o.m, o.d);
+        if (!h2)
+            return null;
+        if (h2.med && holder && holder.med && h2.med.id === holder.med.id)
+            return null;
+        return { o: o, h: h2 };
+    }).filter(Boolean);
     const nomH = (h) => h ? (h.ext ? (h.ext + " (extérieur)") : (h.med.init + " · " + h.med.nom)) : "personne";
     return React.createElement(Ov, { onClose: onClose },
         React.createElement("div", { style: { minWidth: 320, maxWidth: 520 }, onClick: e => e.stopPropagation() },
@@ -6600,13 +6619,28 @@ function InternesGardeModal({ y, m, d, onClose, intCfg, getEntries, setEntry }) 
             React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 10, padding: "8px 10px", borderRadius: 8, border: "1px dashed var(--border)", background: "var(--bg2)" } },
                 React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "var(--txt2)" } }, "Interne ext\u00E9rieur :"),
                 React.createElement("input", { placeholder: "Nom", value: extNom, onChange: e => setExtNom(e.target.value), style: Object.assign(Object.assign({}, S.fi), { width: 150 }) }),
-                React.createElement("button", { onClick: poseExt, style: { fontSize: 11, padding: "5px 11px", borderRadius: 6, border: "1.5px solid #64748b", background: "rgba(100,116,139,.10)", color: "var(--txt2)", fontWeight: 800, cursor: "pointer" } }, "Poser \u2014 sans repos chez nous")),
-            React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#388bfd" } }, "\u21C4 \u00C9changer avec le"),
-                React.createElement("input", { type: "date", value: exDate, onChange: e => { if (e.target.value)
-                        setExDate(e.target.value); }, style: Object.assign(Object.assign({}, S.fi), { width: 135 }) }),
-                React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "garde ce jour-là : " + nomH(holder2)),
-                React.createElement("button", { onClick: echange, style: { fontSize: 11, padding: "5px 11px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" } }, "\u21C4 \u00C9changer")),
+                React.createElement("button", { onClick: poseExt, style: { fontSize: 11, padding: "5px 11px", borderRadius: 6, border: "1.5px solid #64748b", background: "rgba(100,116,139,.10)", color: "var(--txt2)", fontWeight: 800, cursor: "pointer" } }, "Poser")),
+            holder && React.createElement("button", { onClick: () => setExOpen(v => !v), style: { width: "100%", padding: "6px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer", fontSize: 11, marginBottom: 8 } }, "\u21C4 \u00C9changer cette garde\u2026"),
+            holder && exOpen && React.createElement("div", { style: { marginBottom: 8, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.05)" } },
+                React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#388bfd", marginBottom: 6 } }, "⇄ Échanger la garde de " + (holder.ext ? holder.ext : holder.med.init) + " (" + JOURSL[dow(y, m, d)].slice(0, 3) + " " + d + " " + MOIS[m].slice(0, 4) + ") avec :"),
+                React.createElement("div", { style: { maxHeight: "38vh", overflowY: "auto" } },
+                    autresGardes.map((g, i2) => {
+                        const abs1 = g.h.med ? intAbsCeJour(getEntries, g.h.med.id, y, m, d) : false;
+                        const abs2 = holder.med ? intAbsCeJour(getEntries, holder.med.id, g.o.y, g.o.m, g.o.d) : false;
+                        return React.createElement("div", { key: i2, onClick: () => swap(g.o, g.h), style: { display: "flex", alignItems: "center", gap: 7, padding: "6px 9px", borderRadius: 7, marginBottom: 4, cursor: "pointer", border: "1px solid var(--border2)", background: "var(--bg2)" } },
+                            React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt)", width: 88, flexShrink: 0 } }, JOURSL[dow(g.o.y, g.o.m, g.o.d)].slice(0, 3) + " " + g.o.d + " " + MOIS[g.o.m].slice(0, 4)),
+                            g.h.med
+                                ? React.createElement("span", { style: { width: 26, height: 26, borderRadius: "50%", background: g.h.med.color, color: "#fff", fontSize: 10, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, g.h.med.init)
+                                : React.createElement("span", { style: { fontSize: 8, fontWeight: 800, color: "var(--txt2)", background: "var(--bg2)", border: "1px dashed var(--border)", borderRadius: 5, padding: "2px 4px", flexShrink: 0 } }, "ext"),
+                            React.createElement("span", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("span", { style: { display: "block", fontSize: 11, fontWeight: 600, color: "var(--txt)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, g.h.ext ? (g.h.ext + " (extérieur)") : g.h.med.nom),
+                                (abs1 || abs2) && React.createElement("span", { style: { display: "block", fontSize: 8, color: "#b45309", fontWeight: 700 } },
+                                    abs1 ? ((g.h.med ? g.h.med.init : "") + " absent/FMC le " + d) : "",
+                                    abs1 && abs2 ? " · " : "",
+                                    abs2 ? (holder.med.init + " absent/FMC le " + g.o.d) : "")),
+                            React.createElement("span", { style: { fontSize: 11, color: "#388bfd", fontWeight: 800 } }, "\u21C4"));
+                    }),
+                    autresGardes.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune autre garde pos\u00E9e sur la p\u00E9riode affich\u00E9e."))),
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", lineHeight: 1.5 } }, "Le repos du lendemain est pos\u00E9 automatiquement avec la garde et remplace ce qui s'y trouve ; il s'enl\u00E8ve en retirant la garde. Un interne peut \u00EAtre absent ou en FMC le jour de sa garde. Les repos des deux jours sont recalcul\u00E9s lors d'un \u00E9change.")));
 }
 function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, year, month, allDays, viewPeriod, showFull, canEdit, prevM, nextM, darkMode, setDarkMode }) {
@@ -6705,8 +6739,12 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                                 const iso = intISO2(o.y, o.m, o.d);
                                 const inR = iso >= c.sDeb && iso <= c.sFin;
                                 const horsSem = { background: "repeating-linear-gradient(45deg,rgba(140,150,160,.14),rgba(140,150,160,.14) 3px,transparent 3px,transparent 7px)" };
-                                if (off)
-                                    return React.createElement("td", { key: c.id, style: Object.assign(Object.assign(Object.assign({}, S.td), S.tdWE), (inR ? {} : horsSem)) });
+                                if (off) { /* v10.60 : le repos de garde s'affiche aussi le dimanche/férié */
+                                    const eJ = inR ? (getEntries(c.id, o.y, o.m, o.d, "JOUR").find(x => x && x.acteId) || null) : null;
+                                    const aJ = eJ ? acteById(eJ.acteId) : null;
+                                    return React.createElement("td", { key: c.id, style: Object.assign(Object.assign(Object.assign({}, S.td), S.tdWE), (inR ? {} : horsSem)) }, aJ && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } },
+                                        React.createElement(Badge, { a: aJ, hideSalle: true })));
+                                }
                                 const e = inR ? cellEntree(c, o, sl) : null;
                                 const a = e ? acteById(e.acteId) : null;
                                 return React.createElement("td", { key: c.id, onClick: (canEdit && inR) ? () => setSel({ med: c, y: o.y, m: o.m, d: o.d, slot0: sl }) : undefined, style: Object.assign(Object.assign(Object.assign({}, S.td), (we ? S.tdWE : {})), (inR ? { cursor: canEdit ? "pointer" : "default" } : horsSem)) }, a && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } },
@@ -6714,7 +6752,7 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                             }))));
                     })))),
         sel && React.createElement(InternesCellModal, { med: sel.med, y: sel.y, m: sel.m, d: sel.d, slot0: sel.slot0, onClose: () => setSel(null), actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry }),
-        gm && React.createElement(InternesGardeModal, { y: gm.y, m: gm.m, d: gm.d, onClose: () => setGm(null), intCfg: intCfg, getEntries: getEntries, setEntry: setEntry }));
+        gm && React.createElement(InternesGardeModal, { y: gm.y, m: gm.m, d: gm.d, jours: jours, onClose: () => setGm(null), intCfg: intCfg, getEntries: getEntries, setEntry: setEntry }));
 }
 function CardioPlanning() {
     var _this = this;

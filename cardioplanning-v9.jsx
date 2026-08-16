@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.59 — 16/08/2026";
+const APP_VERSION="v10.60 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5970,27 +5970,38 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
     toast((acteById(acteId)||{label:acteId}).label+" — journée");onClose();
   };
   const remplirSemaine=(acteId)=>{
+    const abs=acteId==="ABSENCE"||acteId==="FORMATION";
     let poses=0,sautes=0;
     for(let i=0;i<5;i++){
       const iso3=intDecal(iso,i);
       const p=iso3.split("-").map(Number);
       if(!dansSem(iso3)){sautes++;continue;}
+      if(abs){ /* journées entières, comme l'écran de période — remplace, repos compris */
+        setEntry(mid,p[0],p[1]-1,p[2],"M",null);setEntry(mid,p[0],p[1]-1,p[2],"AM",null);
+        setEntry(mid,p[0],p[1]-1,p[2],"JOUR",{acteId:acteId});poses++;continue;
+      }
       ["M","AM"].forEach(sl=>{
         if(intSlotProtege(getEntries,mid,p[0],p[1]-1,p[2],sl)){sautes++;return;}
         setEntry(mid,p[0],p[1]-1,p[2],sl,{acteId:acteId});poses++;
       });
     }
-    toast(poses+" demi-journée(s) posée(s)"+(sautes?", "+sautes+" préservée(s) (repos, absence, FMC ou hors semestre)":""));
+    toast(abs?(poses+" journée(s) posée(s)"+(sautes?", "+sautes+" hors semestre":""))
+             :(poses+" demi-journée(s) posée(s)"+(sautes?", "+sautes+" préservée(s) (repos, absence, FMC ou hors semestre)":"")));
     onClose();
   };
+  const poseSimple=(acteId)=>{
+    if((acteId==="ABSENCE"||acteId==="FORMATION")&&!sam&&cren==="J"){poseJour(acteId);return;}
+    poseCren(acteId);
+  };
   const clic=(acteId)=>{
+    /* v10.60 : le lundi, TOUTE activité propose de remplir la semaine — sauf le repos de garde */
     if(acteId==="REPOS_GARDE"){poseJour(acteId);return;}
     if(acteId==="ABSENCE"||acteId==="FORMATION"){
-      if(!sam&&cren==="J")poseJour(acteId);else poseCren(acteId);
-      return;
+      if(dw===1&&!sam){setSemQ(acteId);return;}
+      poseSimple(acteId);return;
     }
     if(intJourBloque(getEntries,mid,y,m,d)){toast("La journée porte une absence, une FMC ou un repos — retirez-les d'abord (croix ci-dessus)","warn");return;}
-    if(dw===1&&!sam&&(acteId==="TOUR_HC"||acteId==="TOUR_USIC")){setSemQ(acteId);return;}
+    if(dw===1&&!sam){setSemQ(acteId);return;}
     poseCren(acteId);
   };
   const appliquePeriode=()=>{
@@ -6049,10 +6060,12 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
       </div>}
       {semQ&&<div style={{border:"1.5px solid #388bfd",background:"rgba(56,139,253,.07)",borderRadius:9,padding:"10px 12px",marginBottom:10}}>
         <div style={{fontSize:12.5,fontWeight:800,color:"var(--txt)",marginBottom:3}}>{"Lundi + "+((acteById(semQ)||{}).short||semQ)+" : remplir toute la semaine ?"}</div>
-        <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>Du lundi au vendredi, matin et après-midi. Les repos de garde, absences et FMC déjà posés sont préservés.</div>
+        <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>{(semQ==="ABSENCE"||semQ==="FORMATION")
+          ?"Journées entières du lundi au vendredi — remplace ce qui s\u2019y trouve, repos de garde compris. Les jours hors semestre sont sautés."
+          :"Du lundi au vendredi, matin et après-midi. Les repos de garde, absences et FMC déjà posés sont préservés."}</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           <button onClick={()=>remplirSemaine(semQ)} style={{fontSize:12,padding:"7px 13px",borderRadius:7,border:"none",background:"#1d4ed8",color:"#fff",fontWeight:800,cursor:"pointer"}}>📅 Toute la semaine</button>
-          <button onClick={()=>{const a=semQ;setSemQ(null);poseCren(a);}} style={btnO}>{"Seulement "+crenLbl.toLowerCase()}</button>
+          <button onClick={()=>{const a=semQ;setSemQ(null);poseSimple(a);}} style={btnO}>{"Seulement "+crenLbl.toLowerCase()}</button>
           <button onClick={()=>setSemQ(null)} style={{...S.icnBtn,fontSize:11}}>annuler</button>
         </div>
       </div>}
@@ -6122,8 +6135,8 @@ function intAbsCeJour(getEntries,mid,y,m,d){
   return ["M","AM","JOUR"].some(sl=>getEntries(mid,y,m,d,sl).some(e=>e&&e.acteId&&ABS_IDS.indexOf(e.acteId)>=0));
 }
 
-function InternesGardeModal({y,m,d,onClose,intCfg,getEntries,setEntry}){
-  const [exDate,setExDate]=useState(intISO2(y,m,d));
+function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
+  const [exOpen,setExOpen]=useState(false);
   const [extNom,setExtNom]=useState("");
   const iso=intISO2(y,m,d);
   const holder=intGardeDuJour(getEntries,intCfg,y,m,d);
@@ -6158,17 +6171,22 @@ function InternesGardeModal({y,m,d,onClose,intCfg,getEntries,setEntry}){
     retire(y,m,d);pose({ext:n},y,m,d,false);
     toast("Garde extérieure posée — sans repos chez nous");onClose();
   };
-  const echange=()=>{
-    if(!exDate||exDate===iso){toast("Choisissez un autre jour","warn");return;}
-    const P=exDate.split("-").map(Number);
-    const h2=intGardeDuJour(getEntries,intCfg,P[0],P[1]-1,P[2]);
-    if(!holder&&!h2){toast("Aucune garde à échanger sur ces deux jours","warn");return;}
-    retire(y,m,d);retire(P[0],P[1]-1,P[2]);
-    if(h2)pose(h2,y,m,d,true);
-    if(holder)pose(holder,P[0],P[1]-1,P[2],true);
-    toast(h2&&holder?"Gardes échangées":"Garde déplacée");onClose();
+  /* v10.60 : échange sur le modèle des médecins (v9.82) — la liste des gardes posées
+     de la période affichée, un clic pour échanger, plus de date à saisir. Un absent
+     n'est pas bloqué (règle interne validée) ; les repos sont recalculés par retire/pose. */
+  const swap=(o,h2)=>{
+    retire(y,m,d);retire(o.y,o.m,o.d);
+    pose(h2,y,m,d,true);
+    pose(holder,o.y,o.m,o.d,true);
+    toast("Gardes échangées");onClose();
   };
-  const holder2=(()=>{if(!exDate)return null;const P=exDate.split("-").map(Number);return intGardeDuJour(getEntries,intCfg,P[0],P[1]-1,P[2]);})();
+  const autresGardes=(jours||[]).map(o=>{
+    if(o.y===y&&o.m===m&&o.d===d)return null;
+    const h2=intGardeDuJour(getEntries,intCfg,o.y,o.m,o.d);
+    if(!h2)return null;
+    if(h2.med&&holder&&holder.med&&h2.med.id===holder.med.id)return null;
+    return {o:o,h:h2};
+  }).filter(Boolean);
   const nomH=(h)=>h?(h.ext?(h.ext+" (extérieur)"):(h.med.init+" · "+h.med.nom)):"personne";
   return <Ov onClose={onClose}>
     <div style={{minWidth:320,maxWidth:520}} onClick={e=>e.stopPropagation()}>
@@ -6206,14 +6224,30 @@ function InternesGardeModal({y,m,d,onClose,intCfg,getEntries,setEntry}){
       <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:10,padding:"8px 10px",borderRadius:8,border:"1px dashed var(--border)",background:"var(--bg2)"}}>
         <span style={{fontSize:11,fontWeight:800,color:"var(--txt2)"}}>Interne extérieur :</span>
         <input placeholder="Nom" value={extNom} onChange={e=>setExtNom(e.target.value)} style={{...S.fi,width:150}}/>
-        <button onClick={poseExt} style={{fontSize:11,padding:"5px 11px",borderRadius:6,border:"1.5px solid #64748b",background:"rgba(100,116,139,.10)",color:"var(--txt2)",fontWeight:800,cursor:"pointer"}}>Poser — sans repos chez nous</button>
+        <button onClick={poseExt} style={{fontSize:11,padding:"5px 11px",borderRadius:6,border:"1.5px solid #64748b",background:"rgba(100,116,139,.10)",color:"var(--txt2)",fontWeight:800,cursor:"pointer"}}>Poser</button>
       </div>
-      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:8,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-        <span style={{fontSize:11,fontWeight:800,color:"#388bfd"}}>⇄ Échanger avec le</span>
-        <input type="date" value={exDate} onChange={e=>{if(e.target.value)setExDate(e.target.value);}} style={{...S.fi,width:135}}/>
-        <span style={{fontSize:10,color:"var(--txt3)"}}>{"garde ce jour-là : "+nomH(holder2)}</span>
-        <button onClick={echange} style={{fontSize:11,padding:"5px 11px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}}>⇄ Échanger</button>
-      </div>
+      {holder&&<button onClick={()=>setExOpen(v=>!v)} style={{width:"100%",padding:"6px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer",fontSize:11,marginBottom:8}}>⇄ Échanger cette garde…</button>}
+      {holder&&exOpen&&<div style={{marginBottom:8,padding:"8px 10px",borderRadius:8,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.05)"}}>
+        <div style={{fontSize:11,fontWeight:800,color:"#388bfd",marginBottom:6}}>{"⇄ Échanger la garde de "+(holder.ext?holder.ext:holder.med.init)+" ("+JOURSL[dow(y,m,d)].slice(0,3)+" "+d+" "+MOIS[m].slice(0,4)+") avec :"}</div>
+        <div style={{maxHeight:"38vh",overflowY:"auto"}}>
+          {autresGardes.map((g,i2)=>{
+            const abs1=g.h.med?intAbsCeJour(getEntries,g.h.med.id,y,m,d):false;
+            const abs2=holder.med?intAbsCeJour(getEntries,holder.med.id,g.o.y,g.o.m,g.o.d):false;
+            return <div key={i2} onClick={()=>swap(g.o,g.h)} style={{display:"flex",alignItems:"center",gap:7,padding:"6px 9px",borderRadius:7,marginBottom:4,cursor:"pointer",border:"1px solid var(--border2)",background:"var(--bg2)"}}>
+              <span style={{fontSize:11,fontWeight:700,color:"var(--txt)",width:88,flexShrink:0}}>{JOURSL[dow(g.o.y,g.o.m,g.o.d)].slice(0,3)+" "+g.o.d+" "+MOIS[g.o.m].slice(0,4)}</span>
+              {g.h.med
+                ?<span style={{width:26,height:26,borderRadius:"50%",background:g.h.med.color,color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{g.h.med.init}</span>
+                :<span style={{fontSize:8,fontWeight:800,color:"var(--txt2)",background:"var(--bg2)",border:"1px dashed var(--border)",borderRadius:5,padding:"2px 4px",flexShrink:0}}>ext</span>}
+              <span style={{flex:1,minWidth:0}}>
+                <span style={{display:"block",fontSize:11,fontWeight:600,color:"var(--txt)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.h.ext?(g.h.ext+" (extérieur)"):g.h.med.nom}</span>
+                {(abs1||abs2)&&<span style={{display:"block",fontSize:8,color:"#b45309",fontWeight:700}}>{abs1?((g.h.med?g.h.med.init:"")+" absent/FMC le "+d):""}{abs1&&abs2?" · ":""}{abs2?(holder.med.init+" absent/FMC le "+g.o.d):""}</span>}
+              </span>
+              <span style={{fontSize:11,color:"#388bfd",fontWeight:800}}>⇄</span>
+            </div>;
+          })}
+          {autresGardes.length===0&&<div style={{fontSize:11,color:"var(--txt3)"}}>Aucune autre garde posée sur la période affichée.</div>}
+        </div>
+      </div>}
       <div style={{fontSize:10,color:"var(--txt3)",lineHeight:1.5}}>Le repos du lendemain est posé automatiquement avec la garde et remplace ce qui s'y trouve ; il s'enlève en retirant la garde. Un interne peut être absent ou en FMC le jour de sa garde. Les repos des deux jours sont recalculés lors d'un échange.</div>
     </div>
   </Ov>;
@@ -6314,7 +6348,13 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
                   const iso=intISO2(o.y,o.m,o.d);
                   const inR=iso>=c.sDeb&&iso<=c.sFin;
                   const horsSem={background:"repeating-linear-gradient(45deg,rgba(140,150,160,.14),rgba(140,150,160,.14) 3px,transparent 3px,transparent 7px)"};
-                  if(off)return <td key={c.id} style={{...S.td,...S.tdWE,...(inR?{}:horsSem)}}/>;
+                  if(off){ /* v10.60 : le repos de garde s'affiche aussi le dimanche/férié */
+                    const eJ=inR?(getEntries(c.id,o.y,o.m,o.d,"JOUR").find(x=>x&&x.acteId)||null):null;
+                    const aJ=eJ?acteById(eJ.acteId):null;
+                    return <td key={c.id} style={{...S.td,...S.tdWE,...(inR?{}:horsSem)}}>
+                      {aJ&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}><Badge a={aJ} hideSalle/></div>}
+                    </td>;
+                  }
                   const e=inR?cellEntree(c,o,sl):null;
                   const a=e?acteById(e.acteId):null;
                   return <td key={c.id} onClick={(canEdit&&inR)?()=>setSel({med:c,y:o.y,m:o.m,d:o.d,slot0:sl}):undefined}
@@ -6329,7 +6369,7 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
       </table>
     </TableScroll>}
     {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry}/>}
-    {gm&&<InternesGardeModal y={gm.y} m={gm.m} d={gm.d} onClose={()=>setGm(null)} intCfg={intCfg} getEntries={getEntries} setEntry={setEntry}/>}
+    {gm&&<InternesGardeModal y={gm.y} m={gm.m} d={gm.d} jours={jours} onClose={()=>setGm(null)} intCfg={intCfg} getEntries={getEntries} setEntry={setEntry}/>}
   </div>;
 }
 
