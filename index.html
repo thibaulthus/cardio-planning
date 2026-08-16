@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.63 — 16/08/2026";
+var APP_VERSION = "v10.64 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -887,7 +887,8 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
                     return (React.createElement(React.Fragment, null,
                         React.createElement("input", { autoFocus: true, value: gardeSearch, onChange: e => setGardeSearch(e.target.value.toUpperCase()), onKeyDown: onEnter, placeholder: "Initiales ou nom...", style: { width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", fontSize: 14, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, letterSpacing: 2, marginBottom: 8, boxSizing: "border-box" } }),
                         filteredGM.length === 1 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 4, textAlign: "center" } }, "\u21B5 Entr\u00E9e pour confirmer"),
-                        React.createElement(GardeCandidateList, { meds: filteredGM, isAbsDay: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; return isAbsOn(mid, p2.y, p2.m, p2.d); }, isAbsNext: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; const nx = new Date(p2.y, p2.m, p2.d + 1); return isAbsOn(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, currentId: (() => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; const gm = getGardeMed2(p2.y, p2.m, p2.d); return gm ? gm.id : null; })(), onPick: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(mid, p2.y, p2.m, p2.d); setPickGardeDayFull(null); }, maxHeight: 320 })));
+                        React.createElement(GardeCandidateList, { meds: filteredGM, isAbsDay: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; return isAbsOn(mid, p2.y, p2.m, p2.d); }, isAbsNext: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; const nx = new Date(p2.y, p2.m, p2.d + 1); return isAbsOn(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, tourNext: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; const nx = new Date(p2.y, p2.m, p2.d + 1); const ny = nx.getFullYear(), nm = nx.getMonth(), nd = nx.getDate(); if (isWE(ny, nm, nd))
+                                return null; const t = ["M", "AM"].flatMap(sl => getEntries(mid, ny, nm, nd, sl) || []).find(e => e && (e.acteId === "TOUR_HC" || e.acteId === "TOUR_USIC")); return t ? (t.acteId === "TOUR_HC" ? "HC" : "USIC") : null; }, currentId: (() => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; const gm = getGardeMed2(p2.y, p2.m, p2.d); return gm ? gm.id : null; })(), onPick: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(mid, p2.y, p2.m, p2.d); setPickGardeDayFull(null); }, maxHeight: 320 })));
                 })())),
         React.createElement(TableScroll, { jours: true, fit: true },
             React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
@@ -1561,17 +1562,18 @@ function ActTabView({ title, titleColor, rows, year, month, prevM, nextM, medeci
                 « Assigner quand même » permet le cas rare (garde du soir après une
                 journée de FMC). Le geste rare coûte un clic de plus, le geste
                 fréquent est protégé de l'erreur. */
-function GardeCandidateList(_a) {
-    var meds = _a.meds, isAbsDay = _a.isAbsDay, isAbsNext = _a.isAbsNext, currentId = _a.currentId, onPick = _a.onPick, _b = _a.maxHeight, maxHeight = _b === void 0 ? 340 : _b;
-    return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, maxHeight: maxHeight, overflowY: "auto" } },
-        meds.map(function (m) {
-            var isOn = currentId != null && m.id === currentId;
-            var dayAbs = !isOn && isAbsDay(m.id);
-            var nxAbs = !dayAbs && !isOn && isAbsNext(m.id);
-            var bord = isOn ? "#16a34a" : dayAbs ? "#ef444455" : nxAbs ? "#f59e0b55" : "var(--border)";
-            var bg = isOn ? "#f0fdf4" : dayAbs ? "rgba(239,68,68,.06)" : nxAbs ? "rgba(245,158,11,.08)" : "var(--bg2)";
-            return (React.createElement("div", { key: m.id, style: { border: "1px solid ".concat(bord), background: bg, borderRadius: 8, padding: "7px 10px" } },
-                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, cursor: dayAbs ? "default" : "pointer" }, onClick: function () { if (!dayAbs)
+function GardeCandidateList({ meds, isAbsDay, isAbsNext, tourNext = null, currentId, onPick, maxHeight = 340 }) {
+    return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, maxHeight, overflowY: "auto" } },
+        meds.map(m => {
+            const isOn = currentId != null && m.id === currentId;
+            const dayAbs = !isOn && isAbsDay(m.id);
+            const nxAbs = !dayAbs && !isOn && isAbsNext(m.id);
+            /* v10.64 : tour médical HC/USIC le lendemain — le repos de garde tomberait dessus */
+            const tn = (!dayAbs && !isOn && tourNext) ? tourNext(m.id) : null;
+            const bord = isOn ? "#16a34a" : dayAbs ? "#ef444455" : (nxAbs || tn) ? "#f59e0b55" : "var(--border)";
+            const bg = isOn ? "#f0fdf4" : dayAbs ? "rgba(239,68,68,.06)" : (nxAbs || tn) ? "rgba(245,158,11,.08)" : "var(--bg2)";
+            return (React.createElement("div", { key: m.id, style: { border: `1px solid ${bord}`, background: bg, borderRadius: 8, padding: "7px 10px" } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, cursor: dayAbs ? "default" : "pointer" }, onClick: () => { if (!dayAbs)
                         onPick(m.id); } },
                     React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0, opacity: dayAbs ? .5 : 1 } }, m.init),
                     React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-start", flex: 1 } },
@@ -1581,145 +1583,138 @@ function GardeCandidateList(_a) {
                             m.nom),
                         dayAbs && React.createElement("span", { style: { fontSize: 9, color: "#ef4444", fontWeight: 700 } }, "\u26D4 Absent / FMC ce jour"),
                         nxAbs && React.createElement("span", { style: { fontSize: 9, color: "#b45309", fontWeight: 700 } }, "\u26A0 Absence/FMC demain \u2014 garde possible, sans repos"),
-                        !dayAbs && !nxAbs && !isOn && React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "Disponible")),
+                        tn && !nxAbs && React.createElement("span", { style: { fontSize: 9, color: "#b45309", fontWeight: 700 } },
+                            "\u26A0 Tour ",
+                            tn,
+                            " demain \u2014 le repos de garde tomberait dessus"),
+                        !dayAbs && !nxAbs && !tn && !isOn && React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "Disponible")),
                     isOn && React.createElement("span", { style: { color: "#16a34a", fontSize: 12, fontWeight: 700 } }, "\u2713 De garde")),
-                dayAbs && React.createElement("button", { onClick: function () { return onPick(m.id); }, style: { marginTop: 6, width: "100%", padding: "4px", borderRadius: 6, border: "1px solid #ef444488", background: "transparent", color: "#ef4444", cursor: "pointer", fontSize: 10, fontWeight: 800 } }, "Assigner quand m\u00EAme")));
+                dayAbs && React.createElement("button", { onClick: () => onPick(m.id), style: { marginTop: 6, width: "100%", padding: "4px", borderRadius: 6, border: "1px solid #ef444488", background: "transparent", color: "#ef4444", cursor: "pointer", fontSize: 10, fontWeight: 800 } }, "Assigner quand m\u00EAme")));
         }),
         meds.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", textAlign: "center", padding: "8px 0" } }, "Aucun m\u00E9decin de garde configur\u00E9.")));
 }
-function GardeView(_a) {
-    var _b = _a.noNav, noNav = _b === void 0 ? false : _b, _c = _a.onRemoveGarde, onRemoveGarde = _c === void 0 ? null : _c, _d = _a.printWk, printWk = _d === void 0 ? null : _d, _e = _a.onPrint, onPrint = _e === void 0 ? null : _e, year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, medecins = _a.medecins, getEntry = _a.getEntry, allDays = _a.allDays, isEdit = _a.isEdit, applyGarde = _a.applyGarde, isMedAvailable = _a.isMedAvailable, plan = _a.plan, setPlan = _a.setPlan, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, showFull = _a.showFull, setShowFull = _a.setShowFull, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, setViewPeriod = _a.setViewPeriod, tourMed = _a.tourMed, gardeAvoid = _a.gardeAvoid, gardeWish = _a.gardeWish, toast = _a.toast;
+function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrint = null, year, month, prevM, nextM, medecins, getEntry, allDays, isEdit, applyGarde, isMedAvailable, plan, setPlan, darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, tourMed, gardeAvoid, gardeWish, toast }) {
     /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
        l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
-    var removeGarde = function (d3, y3, m3) { if (onRemoveGarde)
+    const removeGarde = (d3, y3, m3) => { if (onRemoveGarde)
         onRemoveGarde(y3, m3, d3); };
-    var today = new Date();
+    const today = new Date();
     // Période globale pour les gardes
-    var _f = perStart(year, month), gvSy = _f.sy, gvSm = _f.sm;
-    var gvEffDays = useMemo(function () {
-        var days = perDaysList(gvSy, gvSm);
+    const { sy: gvSy, sm: gvSm } = perStart(year, month);
+    const gvEffDays = useMemo(() => {
+        const days = perDaysList(gvSy, gvSm);
         if (!showFull) {
-            var tod_5 = new Date();
-            tod_5.setHours(0, 0, 0, 0);
-            return days.filter(function (_a) {
-                var ey3 = _a.y, em3 = _a.m, d = _a.d;
-                return new Date(ey3, em3, d) >= tod_5;
-            });
+            const tod = new Date();
+            tod.setHours(0, 0, 0, 0);
+            return days.filter(({ y: ey3, m: em3, d }) => new Date(ey3, em3, d) >= tod);
         }
         return days;
     }, [gvSm, gvSy, showFull, PCFG.len]);
-    var _g = React.useState(false), gvSwapOpen = _g[0], setGvSwapOpen = _g[1];
-    var exportGardesCSV = function () {
-        var rows = [["Date", "Jour", "Garde"]];
-        var JX = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-        gvEffDays.forEach(function (_a) {
-            var gy = _a.y, gm = _a.m, gd = _a.d;
-            var gm2 = getGardeMed2(gy, gm, gd);
+    const [gvSwapOpen, setGvSwapOpen] = React.useState(false);
+    const exportGardesCSV = () => {
+        const rows = [["Date", "Jour", "Garde"]];
+        const JX = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+        gvEffDays.forEach(({ y: gy, m: gm, d: gd }) => {
+            const gm2 = getGardeMed2(gy, gm, gd);
             rows.push([gd + "/" + (gm + 1) + "/" + gy, JX[dow(gy, gm, gd)], gm2 ? (gm2.prenom + " " + gm2.nom) : ""]);
         });
-        var csv = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(";"); }).join("\n");
-        var blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
-        var a = document.createElement("a");
+        const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(";")).join("\n");
+        const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+        const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = "gardes.csv";
         a.click();
     };
-    var gvIsAbs = function (mid, y2, m2, d2) {
-        var sls = isWE(y2, m2, d2) ? ["JOUR"] : ["M", "AM"];
-        return sls.some(function (sl) {
+    const gvIsAbs = (mid, y2, m2, d2) => {
+        const sls = isWE(y2, m2, d2) ? ["JOUR"] : ["M", "AM"];
+        return sls.some(sl => {
             return cellHasAny((plan[sk(y2, m2, d2, sl)] || {})[mid], ABS_IDS)
                 || cellHasAny((plan[sk(y2, m2, d2, "JOUR")] || {})[mid], ABS_IDS);
         });
     };
-    var _h = React.useState(null), pickerDay = _h[0], setPickerDay = _h[1];
+    const [pickerDay, setPickerDay] = React.useState(null);
     /* ═══ Répartition automatique des gardes ═══ */
-    var _j = React.useState(false), gardeModal = _j[0], setGardeModal = _j[1];
-    var _k = React.useState(null), lastGReport = _k[0], setLastGReport = _k[1];
-    var _l = React.useState({}), gMax = _l[0], setGMax = _l[1]; // {medId: maxGardes} optionnel
-    var gardeMeds = medecins.filter(function (m) { return m.garde; });
-    var FACT = { less: 0.75, normal: 1, more: 1.25 };
+    const [gardeModal, setGardeModal] = React.useState(false);
+    const [lastGReport, setLastGReport] = React.useState(null);
+    const [gMax, setGMax] = React.useState({}); // {medId: maxGardes} optionnel
+    const gardeMeds = medecins.filter(m => m.garde);
+    const FACT = { less: 0.75, normal: 1, more: 1.25 };
     // Tous les jours de la période (complets, indépendants de showFull)
-    var gvAllDays = React.useMemo(function () { return perDaysList(gvSy, gvSm); }, [gvSy, gvSm, PCFG.len]);
-    var catOf = function (y2, m2, d2) {
+    const gvAllDays = React.useMemo(() => perDaysList(gvSy, gvSm), [gvSy, gvSm, PCFG.len]);
+    const catOf = (y2, m2, d2) => {
         if (isFerie(y2, m2, d2))
             return "dim";
-        var dw = dow(y2, m2, d2);
+        const dw = dow(y2, m2, d2);
         if (dw === 6)
             return "sam";
         if (dw === 0)
             return "dim";
-        var nx = new Date(y2, m2, d2 + 1);
+        const nx = new Date(y2, m2, d2 + 1);
         if (isFerie(nx.getFullYear(), nx.getMonth(), nx.getDate()))
             return "ven";
         return dw === 5 ? "ven" : dw === 4 ? "jeu" : "sem";
     };
-    var GCATS = ["sem", "jeu", "ven", "sam", "dim"];
-    var hasGardeAlready = function (y2, m2, d2) {
-        var dw = dow(y2, m2, d2);
-        var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
-        var dm = plan[sk(y2, m2, d2, slot)] || {};
-        return Object.keys(dm).some(function (mid) { return cellHasAny(dm[mid], ["GARDE"]); });
+    const GCATS = ["sem", "jeu", "ven", "sam", "dim"];
+    const hasGardeAlready = (y2, m2, d2) => {
+        const dw = dow(y2, m2, d2);
+        const slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+        const dm = plan[sk(y2, m2, d2, slot)] || {};
+        return Object.keys(dm).some(mid => cellHasAny(dm[mid], ["GARDE"]));
     };
-    var isAbsFor = function (medId, y2, m2, d2) {
-        var es = __spreadArray([], (getEntry ? [] : []), true);
-        var check = function (sl) { return cellHasAny((plan[sk(y2, m2, d2, sl)] || {})[medId], ABS_IDS); };
+    const isAbsFor = (medId, y2, m2, d2) => {
+        const es = [...(getEntry ? [] : []),];
+        const check = (sl) => cellHasAny((plan[sk(y2, m2, d2, sl)] || {})[medId], ABS_IDS);
         return check("M") || check("AM") || check("JOUR");
     };
-    var inTourWeek = function (medId, y2, m2, d2) {
-        var wk = wKey(y2, m2, d2);
-        var wm = (tourMed || {})[wk] || { HC: [], USIC: [] };
-        return __spreadArray(__spreadArray([], (wm.HC || []), true), (wm.USIC || []), true).map(String).includes(String(medId));
+    const inTourWeek = (medId, y2, m2, d2) => {
+        const wk = wKey(y2, m2, d2);
+        const wm = (tourMed || {})[wk] || { HC: [], USIC: [] };
+        return [...(wm.HC || []), ...(wm.USIC || [])].map(String).includes(String(medId));
     };
-    var runGardeAuto = function () {
-        var tod = new Date();
+    const runGardeAuto = () => {
+        const tod = new Date();
         tod.setHours(0, 0, 0, 0);
         // Jours à attribuer : période complète, futurs (>= aujourd'hui), sans garde existante
-        var days = gvAllDays.filter(function (_a) {
-            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-            return new Date(y2, m2, d2) >= tod && !hasGardeAlready(y2, m2, d2);
-        });
+        const days = gvAllDays.filter(({ y: y2, m: m2, d: d2 }) => new Date(y2, m2, d2) >= tod && !hasGardeAlready(y2, m2, d2));
         if (days.length === 0) {
             toast("Aucun jour à attribuer (gardes déjà posées ou période passée)", "info");
             return;
         }
         // Cibles pondérées par catégorie
-        var weights = {};
-        var wSum = 0;
-        gardeMeds.forEach(function (m) { weights[m.id] = FACT[m.gardeFactor || "normal"] || 1; wSum += weights[m.id]; });
-        var catCount = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 };
-        days.forEach(function (_a) {
-            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-            catCount[catOf(y2, m2, d2)]++;
-        });
-        var maxOf = function (mid) { var v = parseInt(gMax[mid]); return isNaN(v) ? Infinity : v; };
-        var target = {};
-        gardeMeds.forEach(function (m) { target[m.id] = {}; GCATS.forEach(function (c) { target[m.id][c] = catCount[c] * weights[m.id] / wSum; }); });
+        const weights = {};
+        let wSum = 0;
+        gardeMeds.forEach(m => { weights[m.id] = FACT[m.gardeFactor || "normal"] || 1; wSum += weights[m.id]; });
+        const catCount = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 };
+        days.forEach(({ y: y2, m: m2, d: d2 }) => { catCount[catOf(y2, m2, d2)]++; });
+        const maxOf = (mid) => { const v = parseInt(gMax[mid]); return isNaN(v) ? Infinity : v; };
+        const target = {};
+        gardeMeds.forEach(m => { target[m.id] = {}; GCATS.forEach(c => { target[m.id][c] = catCount[c] * weights[m.id] / wSum; }); });
         // Si un maximum est fixé sous la cible : réduire les cibles par catégorie au prorata,
         // et redistribuer le surplus sur les autres (proportionnellement à leur poids)
-        var surplus = 0, openW = 0;
-        gardeMeds.forEach(function (m) {
-            var tot = GCATS.reduce(function (s, c) { return s + target[m.id][c]; }, 0);
-            var mx = maxOf(m.id);
+        let surplus = 0, openW = 0;
+        gardeMeds.forEach(m => {
+            const tot = GCATS.reduce((s, c) => s + target[m.id][c], 0);
+            const mx = maxOf(m.id);
             if (mx < tot) {
-                var f2_1 = tot > 0 ? mx / tot : 0;
-                GCATS.forEach(function (c) { target[m.id][c] *= f2_1; });
+                const f2 = tot > 0 ? mx / tot : 0;
+                GCATS.forEach(c => { target[m.id][c] *= f2; });
                 surplus += tot - mx;
             }
             else
                 openW += weights[m.id];
         });
         if (surplus > 0 && openW > 0) {
-            gardeMeds.forEach(function (m) {
-                var tot = GCATS.reduce(function (s, c) { return s + target[m.id][c]; }, 0);
+            gardeMeds.forEach(m => {
+                const tot = GCATS.reduce((s, c) => s + target[m.id][c], 0);
                 if (maxOf(m.id) >= tot + 0.001) {
-                    var share = surplus * weights[m.id] / openW;
-                    var f3_1 = tot > 0 ? (tot + share) / tot : 1;
-                    GCATS.forEach(function (c) { target[m.id][c] *= f3_1; });
+                    const share = surplus * weights[m.id] / openW;
+                    const f3 = tot > 0 ? (tot + share) / tot : 1;
+                    GCATS.forEach(c => { target[m.id][c] *= f3; });
                 }
             });
         }
-        var canTake = function (m, y2, m2, d2) {
-            var dw = dow(y2, m2, d2);
+        const canTake = (m, y2, m2, d2) => {
+            const dw = dow(y2, m2, d2);
             if ((m.gardeDays || {})[String(dw)] === false)
                 return false;
             if (offOn(m, y2, m2, d2))
@@ -1728,23 +1723,24 @@ function GardeView(_a) {
                 return false;
             if (inTourWeek(m.id, y2, m2, d2))
                 return false;
-            var nx = new Date(y2, m2, d2 + 1);
+            const nx = new Date(y2, m2, d2 + 1);
             if (isAbsFor(m.id, nx.getFullYear(), nx.getMonth(), nx.getDate()))
                 return false; // repos de garde impossible
             if (offOn(m, nx.getFullYear(), nx.getMonth(), nx.getDate()))
                 return false; /* v10.41 : désactivé le lendemain — même raison */
+            if (inTourWeek(m.id, nx.getFullYear(), nx.getMonth(), nx.getDate()))
+                return false; /* v10.64 : veille d'une semaine de tour — le repos tomberait sur le tour */
             if (((gardeAvoid || {})[dKey(y2, m2, d2)] || {})[m.id])
                 return false;
             return true;
         };
         // Toutes les gardes existantes par médecin (pour l'écart minimal de 3 jours)
-        var exG = {}; // {medId:Set("y-m-d")}
-        gvAllDays.forEach(function (_a) {
-            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-            var dw = dow(y2, m2, d2);
-            var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
-            var dm = plan[sk(y2, m2, d2, slot)] || {};
-            Object.keys(dm).forEach(function (mid) {
+        const exG = {}; // {medId:Set("y-m-d")}
+        gvAllDays.forEach(({ y: y2, m: m2, d: d2 }) => {
+            const dw = dow(y2, m2, d2);
+            const slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+            const dm = plan[sk(y2, m2, d2, slot)] || {};
+            Object.keys(dm).forEach(mid => {
                 if (!cellHasAny(dm[mid], ["GARDE"]))
                     return;
                 if (!exG[mid])
@@ -1753,18 +1749,17 @@ function GardeView(_a) {
             });
         });
         // Gardes existantes (posées manuellement) par médecin/semaine : jeudi et week-end
-        var exJeu = {}, exWE = {};
-        gvAllDays.forEach(function (_a) {
-            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-            var dw = dow(y2, m2, d2);
+        const exJeu = {}, exWE = {};
+        gvAllDays.forEach(({ y: y2, m: m2, d: d2 }) => {
+            const dw = dow(y2, m2, d2);
             if (dw !== 4 && dw !== 6 && dw !== 0)
                 return;
-            var slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
-            var dm = plan[sk(y2, m2, d2, slot)] || {};
-            Object.keys(dm).forEach(function (mid) {
+            const slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+            const dm = plan[sk(y2, m2, d2, slot)] || {};
+            Object.keys(dm).forEach(mid => {
                 if (!cellHasAny(dm[mid], ["GARDE"]))
                     return;
-                var wk = wKey(y2, m2, d2);
+                const wk = wKey(y2, m2, d2);
                 if (dw === 4) {
                     if (!exJeu[mid])
                         exJeu[mid] = {};
@@ -1777,39 +1772,38 @@ function GardeView(_a) {
                 }
             });
         });
-        var N_TRIES_G = 40;
-        var best = null;
-        var _loop_1 = function (t) {
-            var cnt = {}, catCnt = {}, lastG = {};
-            var asJeu = {}, asWE = {};
-            var jeuOf = function (mid, wk) { return ((exJeu[mid] || {})[wk]) || ((asJeu[mid] || {})[wk]); };
-            var weOf = function (mid, wk) { return ((exWE[mid] || {})[wk]) || ((asWE[mid] || {})[wk]); };
-            var asG = {}; // {medId:Set("y-m-d")} gardes assignées cet essai
-            var gapOK = function (mid, y3, m3, d3) {
-                for (var k = -1; k <= 1; k += 2) {
-                    var dd = new Date(y3, m3, d3 + k);
-                    var key = dd.getFullYear() + "-" + dd.getMonth() + "-" + dd.getDate();
+        const N_TRIES_G = 40;
+        let best = null;
+        for (let t = 0; t < N_TRIES_G; t++) {
+            const cnt = {}, catCnt = {}, lastG = {};
+            const asJeu = {}, asWE = {};
+            const jeuOf = (mid, wk) => ((exJeu[mid] || {})[wk]) || ((asJeu[mid] || {})[wk]);
+            const weOf = (mid, wk) => ((exWE[mid] || {})[wk]) || ((asWE[mid] || {})[wk]);
+            const asG = {}; // {medId:Set("y-m-d")} gardes assignées cet essai
+            const gapOK = (mid, y3, m3, d3) => {
+                for (let k = -1; k <= 1; k += 2) {
+                    const dd = new Date(y3, m3, d3 + k);
+                    const key = dd.getFullYear() + "-" + dd.getMonth() + "-" + dd.getDate();
                     if ((exG[mid] && exG[mid].has(key)) || (asG[mid] && asG[mid].has(key)))
                         return false;
                 }
                 return true;
             };
-            var markG = function (mid, y3, m3, d3) { if (!asG[mid])
+            const markG = (mid, y3, m3, d3) => { if (!asG[mid])
                 asG[mid] = new Set(); asG[mid].add(y3 + "-" + m3 + "-" + d3); };
-            gardeMeds.forEach(function (m) { cnt[m.id] = 0; catCnt[m.id] = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 }; });
-            var assign = {}; // dateKey -> medId
-            var wishMiss = 0;
+            gardeMeds.forEach(m => { cnt[m.id] = 0; catCnt[m.id] = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 }; });
+            const assign = {}; // dateKey -> medId
+            let wishMiss = 0;
             // 1. Vœux d'abord
-            days.forEach(function (_a) {
-                var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-                var dk4 = dKey(y2, m2, d2);
-                var dwW = dow(y2, m2, d2), wkW = wKey(y2, m2, d2);
-                var jweOK = function (mid) { if (dwW === 6 || dwW === 0)
+            days.forEach(({ y: y2, m: m2, d: d2 }) => {
+                const dk4 = dKey(y2, m2, d2);
+                const dwW = dow(y2, m2, d2), wkW = wKey(y2, m2, d2);
+                const jweOK = (mid) => { if (dwW === 6 || dwW === 0)
                     return !jeuOf(mid, wkW); if (dwW === 4)
                     return !weOf(mid, wkW); return true; };
-                var wishers = gardeMeds.filter(function (m) { return ((gardeWish || {})[dk4] || {})[m.id] && canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && jweOK(m.id) && gapOK(m.id, y2, m2, d2); });
+                const wishers = gardeMeds.filter(m => ((gardeWish || {})[dk4] || {})[m.id] && canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && jweOK(m.id) && gapOK(m.id, y2, m2, d2));
                 if (wishers.length > 0) {
-                    var m = wishers[Math.floor(Math.random() * wishers.length)];
+                    const m = wishers[Math.floor(Math.random() * wishers.length)];
                     assign[dk4] = m.id;
                     cnt[m.id]++;
                     catCnt[m.id][catOf(y2, m2, d2)]++;
@@ -1830,45 +1824,41 @@ function GardeView(_a) {
                     wishMiss++;
             });
             // 2. Jours les plus contraints d'abord
-            var rest = days.filter(function (_a) {
-                var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-                return !assign[dKey(y2, m2, d2)];
-            });
-            var jweOK2 = function (mid, y3, m3, d3) { var dw3 = dow(y3, m3, d3), wk3 = wKey(y3, m3, d3); if (dw3 === 6 || dw3 === 0)
+            const rest = days.filter(({ y: y2, m: m2, d: d2 }) => !assign[dKey(y2, m2, d2)]);
+            const jweOK2 = (mid, y3, m3, d3) => { const dw3 = dow(y3, m3, d3), wk3 = wKey(y3, m3, d3); if (dw3 === 6 || dw3 === 0)
                 return !jeuOf(mid, wk3); if (dw3 === 4)
                 return !weOf(mid, wk3); return true; };
-            var nCand = function (dd) { return gardeMeds.filter(function (m) { return canTake(m, dd.y, dd.m, dd.d) && cnt[m.id] < maxOf(m.id) && jweOK2(m.id, dd.y, dd.m, dd.d) && gapOK(m.id, dd.y, dd.m, dd.d); }).length; };
-            var sorted = __spreadArray([], rest, true).sort(function (a, b) { return nCand(a) - nCand(b); });
-            var unfilled = 0;
-            var unfilledList = [];
-            sorted.forEach(function (_a) {
-                var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-                var dk4 = dKey(y2, m2, d2);
-                var c = catOf(y2, m2, d2);
-                var cands = gardeMeds.filter(function (m) { return canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && jweOK2(m.id, y2, m2, d2) && gapOK(m.id, y2, m2, d2); });
+            const nCand = (dd) => gardeMeds.filter(m => canTake(m, dd.y, dd.m, dd.d) && cnt[m.id] < maxOf(m.id) && jweOK2(m.id, dd.y, dd.m, dd.d) && gapOK(m.id, dd.y, dd.m, dd.d)).length;
+            const sorted = [...rest].sort((a, b) => nCand(a) - nCand(b));
+            let unfilled = 0;
+            const unfilledList = [];
+            sorted.forEach(({ y: y2, m: m2, d: d2 }) => {
+                const dk4 = dKey(y2, m2, d2);
+                const c = catOf(y2, m2, d2);
+                let cands = gardeMeds.filter(m => canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && jweOK2(m.id, y2, m2, d2) && gapOK(m.id, y2, m2, d2));
                 if (cands.length === 0)
-                    cands = gardeMeds.filter(function (m) { return canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && gapOK(m.id, y2, m2, d2); }); // dernier recours : accepter jeudi+WE, mais JAMAIS deux jours consécutifs
+                    cands = gardeMeds.filter(m => canTake(m, y2, m2, d2) && cnt[m.id] < maxOf(m.id) && gapOK(m.id, y2, m2, d2)); // dernier recours : accepter jeudi+WE, mais JAMAIS deux jours consécutifs
                 if (cands.length === 0) {
                     unfilled++;
                     unfilledList.push(d2 + " " + MOIS[m2].slice(0, 4));
                     return;
                 }
-                var ts2 = new Date(y2, m2, d2).getTime();
-                cands.sort(function (a, b) {
-                    var defA = (target[a.id][c] - catCnt[a.id][c]), defB = (target[b.id][c] - catCnt[b.id][c]);
+                const ts2 = new Date(y2, m2, d2).getTime();
+                cands.sort((a, b) => {
+                    const defA = (target[a.id][c] - catCnt[a.id][c]), defB = (target[b.id][c] - catCnt[b.id][c]);
                     if (Math.abs(defB - defA) > 0.01)
                         return defB - defA;
-                    var gapA = lastG[a.id] ? ts2 - lastG[a.id] : 1e12, gapB = lastG[b.id] ? ts2 - lastG[b.id] : 1e12;
+                    const gapA = lastG[a.id] ? ts2 - lastG[a.id] : 1e12, gapB = lastG[b.id] ? ts2 - lastG[b.id] : 1e12;
                     if (gapA !== gapB)
                         return gapB - gapA;
                     return Math.random() - 0.5;
                 });
-                var m = cands[0];
+                const m = cands[0];
                 assign[dk4] = m.id;
                 cnt[m.id]++;
                 catCnt[m.id][c]++;
                 lastG[m.id] = ts2;
-                var dwA = dow(y2, m2, d2), wkA = wKey(y2, m2, d2);
+                const dwA = dow(y2, m2, d2), wkA = wKey(y2, m2, d2);
                 if (dwA === 4) {
                     if (!asJeu[m.id])
                         asJeu[m.id] = {};
@@ -1882,37 +1872,31 @@ function GardeView(_a) {
                 markG(m.id, y2, m2, d2);
             });
             // Score : jours non attribués, écart aux cibles, vœux manqués, gardes rapprochées (<3j)
-            var dev = 0;
-            gardeMeds.forEach(function (m) { GCATS.forEach(function (c) { dev += Math.abs(catCnt[m.id][c] - target[m.id][c]); }); });
-            var score = unfilled * 1000 + wishMiss * 50 + dev * 10;
+            let dev = 0;
+            gardeMeds.forEach(m => { GCATS.forEach(c => { dev += Math.abs(catCnt[m.id][c] - target[m.id][c]); }); });
+            const score = unfilled * 1000 + wishMiss * 50 + dev * 10;
             if (!best || score < best.score)
-                best = { assign: assign, score: score, unfilled: unfilled, cnt: cnt, wishMiss: wishMiss, unfilledList: unfilledList };
+                best = { assign, score, unfilled, cnt, wishMiss, unfilledList };
             if (best.score === 0)
-                return "break";
-        };
-        for (var t = 0; t < N_TRIES_G; t++) {
-            var state_1 = _loop_1(t);
-            if (state_1 === "break")
                 break;
         }
         // Application en un seul setPlan (garde + repos de garde le lendemain)
-        setPlan(function (p) {
-            var next = __assign({}, p);
-            Object.keys(best.assign).forEach(function (dk4) {
-                var _a;
-                var _b = dk4.split("-").map(Number), y2 = _b[0], m2 = _b[1], d2 = _b[2];
-                var my = m2 - 1;
-                var dw = dow(y2, my, d2);
-                var gslot = (dw === 6 || dw === 0) ? "JOUR" : "N";
-                var gk = sk(y2, my, d2, gslot);
-                next[gk] = __assign(__assign({}, (next[gk] || {})), (_a = {}, _a[best.assign[dk4]] = { acteId: "GARDE", salle: null }, _a));
-                var nx = new Date(y2, my, d2 + 1);
-                var ny = nx.getFullYear(), nm = nx.getMonth(), nd = nx.getDate();
-                var rSlots = isWE(ny, nm, nd) ? ["JOUR"] : ["M", "AM"];
-                rSlots.forEach(function (sl) {
-                    var rk = sk(ny, nm, nd, sl);
-                    var dm = __assign({}, (next[rk] || {}));
-                    var ex = dm[best.assign[dk4]];
+        setPlan(p => {
+            let next = Object.assign({}, p);
+            Object.keys(best.assign).forEach(dk4 => {
+                const [y2, m2, d2] = dk4.split("-").map(Number);
+                const my = m2 - 1;
+                const dw = dow(y2, my, d2);
+                const gslot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+                const gk = sk(y2, my, d2, gslot);
+                next[gk] = Object.assign(Object.assign({}, (next[gk] || {})), { [best.assign[dk4]]: { acteId: "GARDE", salle: null } });
+                const nx = new Date(y2, my, d2 + 1);
+                const ny = nx.getFullYear(), nm = nx.getMonth(), nd = nx.getDate();
+                const rSlots = isWE(ny, nm, nd) ? ["JOUR"] : ["M", "AM"];
+                rSlots.forEach(sl => {
+                    const rk = sk(ny, nm, nd, sl);
+                    const dm = Object.assign({}, (next[rk] || {}));
+                    const ex = dm[best.assign[dk4]];
                     if (!cellHasAny(ex, EXCL_IDS))
                         dm[best.assign[dk4]] = { acteId: "REPOS_GARDE", salle: null };
                     next[rk] = dm;
@@ -1920,13 +1904,12 @@ function GardeView(_a) {
             });
             return next;
         });
-        var nA = Object.keys(best.assign).length;
+        const nA = Object.keys(best.assign).length;
         setLastGReport({
-            nA: nA,
-            total: days.length,
+            nA, total: days.length,
             unfilled: best.unfilled, unfilledList: best.unfilledList || [],
             wishMiss: best.wishMiss || 0,
-            tots: gardeMeds.map(function (m) { return ({ init: m.init, n: best.cnt[m.id] || 0 }); })
+            tots: gardeMeds.map(m => ({ init: m.init, n: best.cnt[m.id] || 0 }))
         });
         toast("Gardes attribuées: " + nA + "/" + days.length, "info");
         setGardeModal(false);
@@ -1940,33 +1923,32 @@ function GardeView(_a) {
         var rgy = gy || year, rgm = (gm !== undefined) ? gm : month;
         var we = isWE(rgy, rgm, d);
         var gMed = getGardeMed2(rgy, rgm, d);
-        return (React.createElement("td", { key: "g" + d + rgy + rgm, style: __assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return setPickerDay({ d: d, y: rgy, m: rgm }); } : undefined }, gMed ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3, margin: "1px", padding: "1px 3px", borderRadius: 4, background: "#1a0000", border: "1px solid #f8514944" } },
+        return (React.createElement("td", { key: "g" + d + rgy + rgm, style: Object.assign(Object.assign(Object.assign({}, S.td), (we ? S.tdWE : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? () => setPickerDay({ d, y: rgy, m: rgm }) : undefined }, gMed ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3, margin: "1px", padding: "1px 3px", borderRadius: 4, background: "#1a0000", border: "1px solid #f8514944" } },
             React.createElement("div", { style: { width: 24, height: 24, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800 } }, gMed.init),
             React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: gMed.color } },
                 gMed.prenom,
                 " ",
                 gMed.nom))) : null));
     }
-    var wdays = printWk ? gvEffDays.filter(function (o) { return inPrintRange(printWk, o.y, o.m, o.d); }) : gvEffDays; // keep full objects
-    var viewV = (React.createElement(TableScroll, { memId: "gardes" },
+    const wdays = printWk ? gvEffDays.filter(o => inPrintRange(printWk, o.y, o.m, o.d)) : gvEffDays; // keep full objects
+    const viewV = (React.createElement(TableScroll, { memId: "gardes" },
         React.createElement("table", { key: showFull ? "gvfull" : "gvpart", style: { borderCollapse: "collapse", tableLayout: "fixed" } },
             React.createElement("thead", null,
                 React.createElement("tr", null,
-                    React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 80 }) }, "Date"),
-                    React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: 150 }) }, "Garde"))),
-            React.createElement("tbody", null, gvEffDays.map(function (_a) {
-                var gvY = _a.y, gvM = _a.m, d = _a.d;
-                var isT = d === today.getDate() && gvM === today.getMonth() && gvY === today.getFullYear();
-                var dw2 = dow(gvY, gvM, d), we = isWE(gvY, gvM, d);
-                var gMed = getGardeMed2(gvY, gvM, d);
-                return (React.createElement("tr", { key: d + gvM + gvY, style: __assign(__assign({ height: 36, borderBottom: "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})) },
-                    React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, textAlign: "center", background: isT ? "var(--bg-td)" : we ? "var(--bg-we)" : "var(--td-fix)" }) },
+                    React.createElement("th", { style: Object.assign(Object.assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: 80 }) }, "Date"),
+                    React.createElement("th", { style: Object.assign(Object.assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: 150 }) }, "Garde"))),
+            React.createElement("tbody", null, gvEffDays.map(({ y: gvY, m: gvM, d }) => {
+                const isT = d === today.getDate() && gvM === today.getMonth() && gvY === today.getFullYear();
+                const dw2 = dow(gvY, gvM, d), we = isWE(gvY, gvM, d);
+                const gMed = getGardeMed2(gvY, gvM, d);
+                return (React.createElement("tr", { key: d + gvM + gvY, style: Object.assign(Object.assign({ height: 36, borderBottom: "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})) },
+                    React.createElement("td", { style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, textAlign: "center", background: isT ? "var(--bg-td)" : we ? "var(--bg-we)" : "var(--td-fix)" }) },
                         React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 13, fontFamily: "'JetBrains Mono',monospace" } },
                             d,
                             " ",
                             React.createElement("span", { style: { fontSize: 9, fontWeight: 600 } }, MOIS[gvM].slice(0, 4))),
                         React.createElement("div", { style: { fontSize: 9, color: we ? "#92400e" : isT ? "var(--today-c)" : "var(--txt3)", fontWeight: 600 } }, ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2])),
-                    React.createElement("td", { style: __assign(__assign({}, S.td), { padding: 4, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? function () { return setPickerDay({ d: d, y: gvY, m: gvM }); } : undefined }, gMed ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 6, background: gMed.color + "22" } },
+                    React.createElement("td", { style: Object.assign(Object.assign({}, S.td), { padding: 4, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? () => setPickerDay({ d, y: gvY, m: gvM }) : undefined }, gMed ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 6, background: gMed.color + "22" } },
                         React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: gMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, gMed.init),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--txt)" } },
                             gMed.prenom,
@@ -1983,30 +1965,29 @@ function GardeView(_a) {
                     MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy),
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
-                onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
-                React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
-                React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️"))),
+                onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
+                React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
+                React.createElement("button", { onClick: () => setShowFull(f => !f), title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: Object.assign(Object.assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${showFull ? "var(--today-c)" : "var(--border)"}` }) }, showFull ? "📅" : "🗓️"))),
         React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
-            isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" }, onClick: function () { setGMax({}); setGardeModal(true); } }, "\u2699\uFE0F R\u00E9partition auto"),
-            isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: function () {
-                    var lbl = MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy;
+            isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" }, onClick: () => { setGMax({}); setGardeModal(true); } }, "\u2699\uFE0F R\u00E9partition auto"),
+            isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" }, onClick: () => {
+                    const lbl = MOIS[gvSm] + " — " + MOIS[(gvSm + PCFG.len - 1) % 12] + " " + gvSy;
                     if (!window.confirm("Retirer TOUTES les gardes et repos de garde de la période " + lbl + " ?"))
                         return;
                     if (!window.confirm("Confirmer définitivement ? Cette action retire les gardes posées manuellement comme automatiquement."))
                         return;
-                    setPlan(function (p) {
-                        var next = __assign({}, p);
-                        gvAllDays.forEach(function (_a) {
-                            var y2 = _a.y, m2 = _a.m, d2 = _a.d;
-                            ["M", "AM", "JOUR", "N"].forEach(function (sl) {
-                                var k = sk(y2, m2, d2, sl);
+                    setPlan(p => {
+                        let next = Object.assign({}, p);
+                        gvAllDays.forEach(({ y: y2, m: m2, d: d2 }) => {
+                            ["M", "AM", "JOUR", "N"].forEach(sl => {
+                                const k = sk(y2, m2, d2, sl);
                                 if (!next[k])
                                     return;
-                                var dm = __assign({}, next[k]);
-                                var changed = false;
-                                Object.keys(dm).forEach(function (mid) {
+                                const dm = Object.assign({}, next[k]);
+                                let changed = false;
+                                Object.keys(dm).forEach(mid => {
                                     if (cellHasAny(dm[mid], ["GARDE", "REPOS_GARDE"])) {
-                                        var r = cellDrop(dm[mid], ["GARDE", "REPOS_GARDE"]);
+                                        const r = cellDrop(dm[mid], ["GARDE", "REPOS_GARDE"]);
                                         if (r)
                                             dm[mid] = r;
                                         else
@@ -2019,17 +2000,17 @@ function GardeView(_a) {
                             });
                         });
                         if (gvAllDays.length) {
-                            var last = gvAllDays[gvAllDays.length - 1];
-                            var dtN = new Date(last.y, last.m, last.d + 1);
-                            var nyN_1 = dtN.getFullYear(), nmN_1 = dtN.getMonth(), ndN_1 = dtN.getDate();
-                            ["JOUR", "M", "AM"].forEach(function (sl) {
-                                var k = sk(nyN_1, nmN_1, ndN_1, sl);
+                            const last = gvAllDays[gvAllDays.length - 1];
+                            const dtN = new Date(last.y, last.m, last.d + 1);
+                            const nyN = dtN.getFullYear(), nmN = dtN.getMonth(), ndN = dtN.getDate();
+                            ["JOUR", "M", "AM"].forEach(sl => {
+                                const k = sk(nyN, nmN, ndN, sl);
                                 if (!next[k])
                                     return;
-                                var dm = __assign({}, next[k]);
-                                var changed = false;
-                                Object.keys(dm).forEach(function (mid) { if (cellHasAny(dm[mid], ["REPOS_GARDE"])) {
-                                    var r = cellDrop(dm[mid], ["REPOS_GARDE"]);
+                                const dm = Object.assign({}, next[k]);
+                                let changed = false;
+                                Object.keys(dm).forEach(mid => { if (cellHasAny(dm[mid], ["REPOS_GARDE"])) {
+                                    const r = cellDrop(dm[mid], ["REPOS_GARDE"]);
                                     if (r)
                                         dm[mid] = r;
                                     else
@@ -2044,12 +2025,12 @@ function GardeView(_a) {
                     });
                     toast("Gardes et repos retirés sur la période", "info");
                 } }, "\uD83D\uDDD1 Retirer"),
-            React.createElement("button", { onClick: exportGardesCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export")),
-        gardeModal && (React.createElement(Ov, { onClose: function () { return setGardeModal(false); } },
-            React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 460, maxHeight: "85vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } },
+            React.createElement("button", { onClick: exportGardesCSV, style: Object.assign(Object.assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export")),
+        gardeModal && (React.createElement(Ov, { onClose: () => setGardeModal(false) },
+            React.createElement("div", { style: Object.assign(Object.assign({}, S.modal), { maxWidth: 460, maxHeight: "85vh", overflowY: "auto" }), onClick: e => e.stopPropagation() },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } },
                     React.createElement("div", { style: S.mTit2 }, "\u2699\uFE0F R\u00E9partition automatique des gardes"),
-                    React.createElement("button", { onClick: function () { return setGardeModal(false); }, style: S.xBtn }, "\u00D7")),
+                    React.createElement("button", { onClick: () => setGardeModal(false), style: S.xBtn }, "\u00D7")),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } },
                     "Attribue les jours ",
                     React.createElement("b", null, "sans garde existante"),
@@ -2060,21 +2041,18 @@ function GardeView(_a) {
                             React.createElement("th", { style: { textAlign: "left", padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "M\u00E9decin"),
                             React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Volume"),
                             React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Max (opt.)"))),
-                    React.createElement("tbody", null, gardeMeds.map(function (m) { return (React.createElement("tr", { key: m.id, style: { borderBottom: "1px solid var(--border2)" } },
+                    React.createElement("tbody", null, gardeMeds.map(m => (React.createElement("tr", { key: m.id, style: { borderBottom: "1px solid var(--border2)" } },
                         React.createElement("td", { style: { padding: "4px 6px", fontSize: 12, color: "var(--txt)", fontWeight: 600 } },
                             m.init,
                             " ",
                             React.createElement("span", { style: { color: "var(--txt3)", fontWeight: 400 } }, m.nom)),
                         React.createElement("td", { style: { padding: "4px 6px", fontSize: 11, textAlign: "center", color: { less: "#f59e0b", normal: "var(--txt2)", more: "#16a34a" }[m.gardeFactor || "normal"] } }, { less: "Moins", normal: "Moyen", more: "Plus" }[m.gardeFactor || "normal"]),
                         React.createElement("td", { style: { padding: "4px 6px", textAlign: "center" } },
-                            React.createElement("input", { type: "number", min: 0, placeholder: "\u2014", value: gMax[m.id] !== undefined ? gMax[m.id] : "", onChange: function (e) { return setGMax(function (p) {
-                                    var _a;
-                                    return (__assign(__assign({}, p), (_a = {}, _a[m.id] = e.target.value, _a)));
-                                }); }, style: { width: 52, padding: "3px 5px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, textAlign: "center" } })))); }))),
+                            React.createElement("input", { type: "number", min: 0, placeholder: "\u2014", value: gMax[m.id] !== undefined ? gMax[m.id] : "", onChange: e => setGMax(p => (Object.assign(Object.assign({}, p), { [m.id]: e.target.value }))), style: { width: 52, padding: "3px 5px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, textAlign: "center" } }))))))),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 12 } }, "Le tableau \"R\u00E9partition id\u00E9ale\" au-dessus de la liste des gardes reste votre r\u00E9f\u00E9rence : laissez Max vide pour une r\u00E9partition purement pond\u00E9r\u00E9e."),
                 React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
-                    React.createElement("button", { onClick: function () { return setGardeModal(false); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
-                    React.createElement("button", { onClick: runGardeAuto, style: __assign(__assign({}, S.btnP), { background: "#f85149", padding: "9px 18px" }) }, "\uD83C\uDF19 Lancer la r\u00E9partition"))))),
+                    React.createElement("button", { onClick: () => setGardeModal(false), style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
+                    React.createElement("button", { onClick: runGardeAuto, style: Object.assign(Object.assign({}, S.btnP), { background: "#f85149", padding: "9px 18px" }) }, "\uD83C\uDF19 Lancer la r\u00E9partition"))))),
         lastGReport && (React.createElement("div", { style: { margin: "8px 12px", padding: "9px 12px", borderRadius: 9, border: "1px solid " + (lastGReport.unfilled > 0 ? "#f59e0b" : "#16a34a"), background: lastGReport.unfilled > 0 ? "rgba(245,158,11,.08)" : "rgba(22,163,74,.08)", fontSize: 11, color: "var(--txt)", display: "flex", gap: 8, alignItems: "flex-start" } },
             React.createElement("span", { style: { fontSize: 13 } }, "\u2139\uFE0F"),
             React.createElement("div", { style: { flex: 1, lineHeight: 1.5 } },
@@ -2097,17 +2075,16 @@ function GardeView(_a) {
                     " v\u0153u(x) \u2B50 non satisfait(s) (contraintes incompatibles)."),
                 React.createElement("span", { style: { color: "var(--txt3)" } },
                     " Totaux : ",
-                    lastGReport.tots.map(function (t) { return t.init + " " + t.n; }).join(" · "),
+                    lastGReport.tots.map(t => t.init + " " + t.n).join(" · "),
                     ".")),
-            React.createElement("button", { onClick: function () { return setLastGReport(null); }, style: __assign(__assign({}, S.xBtn), { fontSize: 14 }) }, "\u00D7"))),
-        isEdit && (function () {
+            React.createElement("button", { onClick: () => setLastGReport(null), style: Object.assign(Object.assign({}, S.xBtn), { fontSize: 14 }) }, "\u00D7"))),
+        isEdit && (() => {
             // Répartition idéale: count days by type in the 4M period
-            var gMeds = medecins.filter(function (m) { return m.garde === true; });
-            var nMeds = gMeds.length || 1;
-            var nSem = 0, nJeu = 0, nVen = 0, nSam = 0, nDim = 0;
-            gvEffDays.forEach(function (_a) {
-                var cy = _a.y, cm = _a.m, cd = _a.d;
-                var c3 = catOf(cy, cm, cd);
+            const gMeds = medecins.filter(m => m.garde === true);
+            const nMeds = gMeds.length || 1;
+            let nSem = 0, nJeu = 0, nVen = 0, nSam = 0, nDim = 0;
+            gvEffDays.forEach(({ y: cy, m: cm, d: cd }) => {
+                const c3 = catOf(cy, cm, cd);
                 if (c3 === "jeu")
                     nJeu++;
                 else if (c3 === "ven")
@@ -2119,7 +2096,7 @@ function GardeView(_a) {
                 else
                     nSem++;
             });
-            var fmt2 = function (n) { var v = n / nMeds; return v % 1 === 0 ? String(v) : v.toFixed(1); };
+            const fmt2 = (n) => { const v = n / nMeds; return v % 1 === 0 ? String(v) : v.toFixed(1); };
             return (React.createElement("div", { style: { marginTop: 14, maxWidth: 560, borderRadius: 8, border: "1px solid var(--border)", padding: 12, background: "var(--bg2)" } },
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } },
                     "R\u00E9partition id\u00E9ale \u2014 ",
@@ -2174,17 +2151,16 @@ function GardeView(_a) {
                             React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Ven*"),
                             React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Sam"),
                             React.createElement("th", { style: { padding: "3px 6px", fontSize: 10, color: "var(--txt3)" } }, "Dim*"))),
-                    React.createElement("tbody", null, medecins.filter(function (m2) { return m2.garde; }).map(function (m2) {
-                        var cn = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 };
-                        gvEffDays.forEach(function (_a) {
-                            var ry = _a.y, rm = _a.m, rd = _a.d;
-                            var dwR = dow(ry, rm, rd);
-                            var slotR = (dwR === 6 || dwR === 0) ? "JOUR" : "N";
-                            var dmR = plan[sk(ry, rm, rd, slotR)] || {};
+                    React.createElement("tbody", null, medecins.filter(m2 => m2.garde).map(m2 => {
+                        const cn = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 };
+                        gvEffDays.forEach(({ y: ry, m: rm, d: rd }) => {
+                            const dwR = dow(ry, rm, rd);
+                            const slotR = (dwR === 6 || dwR === 0) ? "JOUR" : "N";
+                            const dmR = plan[sk(ry, rm, rd, slotR)] || {};
                             if (cellHasAny(dmR[m2.id], ["GARDE"]))
                                 cn[catOf(ry, rm, rd)]++;
                         });
-                        var totR = cn.sem + cn.jeu + cn.ven + cn.sam + cn.dim;
+                        const totR = cn.sem + cn.jeu + cn.ven + cn.sam + cn.dim;
                         return (React.createElement("tr", { key: m2.id, style: { borderBottom: "1px solid var(--border2)" } },
                             React.createElement("td", { style: { padding: "3px 8px", fontSize: 11, fontWeight: 700, color: "var(--txt)" } },
                                 React.createElement("span", { style: { display: "inline-flex", width: 22, height: 22, borderRadius: "50%", background: m2.color, color: "#fff", fontSize: 8, fontWeight: 800, alignItems: "center", justifyContent: "center", marginRight: 5, verticalAlign: "middle" } }, m2.init),
@@ -2199,11 +2175,11 @@ function GardeView(_a) {
                 React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 3 } }, "* Ven inclut les veilles de f\u00E9ri\u00E9s \u00B7 Dim inclut les jours f\u00E9ri\u00E9s \u00B7 p\u00E9riode affich\u00E9e")));
         })(),
         viewV,
-        pickerDay !== null && isEdit && (function () {
-            var pd = pickerDay && typeof pickerDay === "object" ? pickerDay : { d: pickerDay, y: year, m: month };
-            var dw2 = dow(pd.y, pd.m, pd.d), gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
-            var gMed = getGardeMed2(pd.y, pd.m, pd.d);
-            return (React.createElement(Ov, { onClose: function () { return setPickerDay(null); } },
+        pickerDay !== null && isEdit && (() => {
+            const pd = pickerDay && typeof pickerDay === "object" ? pickerDay : { d: pickerDay, y: year, m: month };
+            const dw2 = dow(pd.y, pd.m, pd.d), gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
+            const gMed = getGardeMed2(pd.y, pd.m, pd.d);
+            return (React.createElement(Ov, { onClose: () => setPickerDay(null) },
                 React.createElement("div", { style: S.mHd },
                     React.createElement("div", null,
                         React.createElement("div", { style: S.mTit2 },
@@ -2214,7 +2190,7 @@ function GardeView(_a) {
                             " ",
                             MOIS[pd.m]),
                         React.createElement("div", { style: { color: "var(--txt2)", fontSize: 12, marginTop: 2 } }, "Le repos post-garde est pos\u00E9 automatiquement.")),
-                    React.createElement("button", { onClick: function () { return setPickerDay(null); }, style: S.xBtn }, "\u00D7")),
+                    React.createElement("button", { onClick: () => setPickerDay(null), style: S.xBtn }, "\u00D7")),
                 gMed && (React.createElement("div", { style: { marginBottom: 12, padding: "8px 10px", background: "var(--bg-td)", borderRadius: 7, border: "1px solid var(--today-c)44" } },
                     React.createElement("div", { style: { fontSize: 10, color: "var(--today-c)", fontWeight: 700, marginBottom: 5 } }, "\u2713 Garde assign\u00E9e"),
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 8 } },
@@ -2223,29 +2199,28 @@ function GardeView(_a) {
                             gMed.prenom,
                             " ",
                             gMed.nom)),
-                    React.createElement("button", { onClick: function () { return setGvSwapOpen(function (v) { return !v; }); }, style: { width: "100%", padding: "6px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, fontSize: 12, cursor: "pointer", marginBottom: 6 } }, "\u21C4 \u00C9changer cette garde\u2026"),
-                    gvSwapOpen && (function () {
-                        var A = { y: pd.y, m: pd.m, d: pd.d, medId: gMed.id };
-                        var others = gvEffDays.map(function (_a) {
-                            var gy = _a.y, gm = _a.m, gd = _a.d;
+                    React.createElement("button", { onClick: () => setGvSwapOpen(v => !v), style: { width: "100%", padding: "6px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, fontSize: 12, cursor: "pointer", marginBottom: 6 } }, "\u21C4 \u00C9changer cette garde\u2026"),
+                    gvSwapOpen && (() => {
+                        const A = { y: pd.y, m: pd.m, d: pd.d, medId: gMed.id };
+                        const others = gvEffDays.map(({ y: gy, m: gm, d: gd }) => {
                             if (gy === pd.y && gm === pd.m && gd === pd.d)
                                 return null;
-                            var mB = getGardeMed2(gy, gm, gd);
+                            const mB = getGardeMed2(gy, gm, gd);
                             if (!mB || mB.id === gMed.id)
                                 return null;
-                            var blockA = gvIsAbs(gMed.id, gy, gm, gd);
-                            var blockB = gvIsAbs(mB.id, pd.y, pd.m, pd.d);
-                            var reason = blockA ? (gMed.init + " absent ce jour") : blockB ? (mB.init + " absent le " + pd.d) : null;
-                            return { y: gy, m: gm, d: gd, mB: mB, reason: reason };
+                            const blockA = gvIsAbs(gMed.id, gy, gm, gd);
+                            const blockB = gvIsAbs(mB.id, pd.y, pd.m, pd.d);
+                            const reason = blockA ? (gMed.init + " absent ce jour") : blockB ? (mB.init + " absent le " + pd.d) : null;
+                            return { y: gy, m: gm, d: gd, mB, reason };
                         }).filter(Boolean);
                         return (React.createElement("div", { style: { marginBottom: 8, padding: "7px 8px", borderRadius: 7, border: "1px solid #388bfd55", background: "rgba(56,139,253,.05)" } },
                             React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#388bfd", marginBottom: 5 } }, "Choisissez la garde \u00E0 \u00E9changer (repos d\u00E9plac\u00E9s automatiquement) :"),
                             React.createElement("div", { style: { maxHeight: "32vh", overflowY: "auto" } },
-                                others.map(function (o, i2) { return (React.createElement("div", { key: i2, onClick: function () {
+                                others.map((o, i2) => (React.createElement("div", { key: i2, onClick: () => {
                                         if (o.reason)
                                             return;
                                         applyGarde(o.mB.id, pd.y, pd.m, pd.d);
-                                        setTimeout(function () { return applyGarde(gMed.id, o.y, o.m, o.d); }, 40);
+                                        setTimeout(() => applyGarde(gMed.id, o.y, o.m, o.d), 40);
                                         toast(gMed.init + " ⇄ " + o.mB.init + " : gardes des " + pd.d + " " + MOIS[pd.m].slice(0, 4) + " et " + o.d + " " + MOIS[o.m].slice(0, 4) + " échangées", "info");
                                         setGvSwapOpen(false);
                                         setPickerDay(null);
@@ -2258,16 +2233,16 @@ function GardeView(_a) {
                                         MOIS[o.m].slice(0, 4)),
                                     React.createElement("span", { style: { width: 24, height: 24, borderRadius: "50%", background: o.mB.color, color: "#fff", fontSize: 9, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, o.mB.init),
                                     React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: "var(--txt)", flex: 1 } }, o.mB.nom),
-                                    o.reason ? React.createElement("span", { style: { fontSize: 8, color: "#f85149", fontWeight: 600 } }, o.reason) : React.createElement("span", { style: { fontSize: 10, color: "#388bfd", fontWeight: 800 } }, "\u21C4"))); }),
+                                    o.reason ? React.createElement("span", { style: { fontSize: 8, color: "#f85149", fontWeight: 600 } }, o.reason) : React.createElement("span", { style: { fontSize: 10, color: "#388bfd", fontWeight: 800 } }, "\u21C4")))),
                                 others.length === 0 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Aucune autre garde attribu\u00E9e sur la p\u00E9riode affich\u00E9e."))));
                     })(),
-                    React.createElement("button", { style: { width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { removeGarde(typeof pickerDay === "object" ? pickerDay.d : pickerDay, pd && pd.y, pd && pd.m); setPickerDay(null); } }, "Retirer la garde + repos"))),
+                    React.createElement("button", { style: { width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: () => { removeGarde(typeof pickerDay === "object" ? pickerDay.d : pickerDay, pd && pd.y, pd && pd.m); setPickerDay(null); } }, "Retirer la garde + repos"))),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, gMed ? "Changer :" : "Assigner :"),
-                React.createElement(GardeCandidateList, { meds: medecins.filter(function (m) { return m.garde === true; }), isAbsDay: function (mid) { return isMedAvailable(medecins.find(function (x) { return x.id === mid; }), pd.y, pd.m, pd.d, gardeSlot) === "blocked" || gvIsAbs(mid, pd.y, pd.m, pd.d); }, isAbsNext: function (mid) { var nx = new Date(pd.y, pd.m, pd.d + 1); return gvIsAbs(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, currentId: gMed ? gMed.id : null, onPick: function (mid) { applyGarde(mid, pd.y, pd.m, pd.d); setPickerDay(null); }, maxHeight: 360 })));
+                React.createElement(GardeCandidateList, { meds: medecins.filter(m => m.garde === true), isAbsDay: mid => isMedAvailable(medecins.find(x => x.id === mid), pd.y, pd.m, pd.d, gardeSlot) === "blocked" || gvIsAbs(mid, pd.y, pd.m, pd.d), isAbsNext: mid => { const nx = new Date(pd.y, pd.m, pd.d + 1); return gvIsAbs(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, tourNext: mid => { const nx = new Date(pd.y, pd.m, pd.d + 1); const ny = nx.getFullYear(), nm = nx.getMonth(), nd = nx.getDate(); if (isWE(ny, nm, nd))
+                        return null; const t = ["M", "AM"].map(sl => getEntry(mid, ny, nm, nd, sl)).find(e => e && (e.acteId === "TOUR_HC" || e.acteId === "TOUR_USIC")); return t ? (t.acteId === "TOUR_HC" ? "HC" : "USIC") : null; }, currentId: gMed ? gMed.id : null, onPick: mid => { applyGarde(mid, pd.y, pd.m, pd.d); setPickerDay(null); }, maxHeight: 360 })));
         })()));
 }
 /* ════ BIP TAB ════ */
-
 function PTOccRooms(_a) {
     var medecins = _a.medecins, planningType = _a.planningType, actes = _a.actes, acteById = _a.acteById, salleReg = _a.salleReg, darkMode = _a.darkMode, _b = _a.perDays, perDays = _b === void 0 ? [] : _b;
     /* v10.44 : la désactivation entre dans l'occupation théorique — couvert sur

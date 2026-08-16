@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.63 — 16/08/2026";
+const APP_VERSION="v10.64 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -745,6 +745,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
           meds={filteredGM}
           isAbsDay={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};return isAbsOn(mid,p2.y,p2.m,p2.d);}}
           isAbsNext={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const nx=new Date(p2.y,p2.m,p2.d+1);return isAbsOn(mid,nx.getFullYear(),nx.getMonth(),nx.getDate());}}
+          tourNext={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const nx=new Date(p2.y,p2.m,p2.d+1);const ny=nx.getFullYear(),nm=nx.getMonth(),nd=nx.getDate();if(isWE(ny,nm,nd))return null;const t=["M","AM"].flatMap(sl=>getEntries(mid,ny,nm,nd,sl)||[]).find(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));return t?(t.acteId==="TOUR_HC"?"HC":"USIC"):null;}}
           currentId={(()=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const gm=getGardeMed2(p2.y,p2.m,p2.d);return gm?gm.id:null;})()}
           onPick={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};applyGarde(mid,p2.y,p2.m,p2.d);setPickGardeDayFull(null);}}
           maxHeight={320}/>
@@ -1415,15 +1416,17 @@ function ActTabView({title,titleColor,rows,year,month,prevM,nextM,medecins,actes
                 « Assigner quand même » permet le cas rare (garde du soir après une
                 journée de FMC). Le geste rare coûte un clic de plus, le geste
                 fréquent est protégé de l'erreur. */
-function GardeCandidateList({meds,isAbsDay,isAbsNext,currentId,onPick,maxHeight=340}){
+function GardeCandidateList({meds,isAbsDay,isAbsNext,tourNext=null,currentId,onPick,maxHeight=340}){
   return(
     <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight,overflowY:"auto"}}>
       {meds.map(m=>{
         const isOn=currentId!=null&&m.id===currentId;
         const dayAbs=!isOn&&isAbsDay(m.id);
         const nxAbs=!dayAbs&&!isOn&&isAbsNext(m.id);
-        const bord=isOn?"#16a34a":dayAbs?"#ef444455":nxAbs?"#f59e0b55":"var(--border)";
-        const bg=isOn?"#f0fdf4":dayAbs?"rgba(239,68,68,.06)":nxAbs?"rgba(245,158,11,.08)":"var(--bg2)";
+        /* v10.64 : tour médical HC/USIC le lendemain — le repos de garde tomberait dessus */
+        const tn=(!dayAbs&&!isOn&&tourNext)?tourNext(m.id):null;
+        const bord=isOn?"#16a34a":dayAbs?"#ef444455":(nxAbs||tn)?"#f59e0b55":"var(--border)";
+        const bg=isOn?"#f0fdf4":dayAbs?"rgba(239,68,68,.06)":(nxAbs||tn)?"rgba(245,158,11,.08)":"var(--bg2)";
         return(
           <div key={m.id} style={{border:`1px solid ${bord}`,background:bg,borderRadius:8,padding:"7px 10px"}}>
             <div style={{display:"flex",alignItems:"center",gap:8,cursor:dayAbs?"default":"pointer"}}
@@ -1433,7 +1436,8 @@ function GardeCandidateList({meds,isAbsDay,isAbsNext,currentId,onPick,maxHeight=
                 <span style={{fontSize:12,fontWeight:600,color:dayAbs?"#ef4444":"var(--txt)"}}>{m.prenom} {m.nom}</span>
                 {dayAbs&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>⛔ Absent / FMC ce jour</span>}
                 {nxAbs&&<span style={{fontSize:9,color:"#b45309",fontWeight:700}}>⚠ Absence/FMC demain — garde possible, sans repos</span>}
-                {!dayAbs&&!nxAbs&&!isOn&&<span style={{fontSize:9,color:"var(--txt3)"}}>Disponible</span>}
+                {tn&&!nxAbs&&<span style={{fontSize:9,color:"#b45309",fontWeight:700}}>⚠ Tour {tn} demain — le repos de garde tomberait dessus</span>}
+                {!dayAbs&&!nxAbs&&!tn&&!isOn&&<span style={{fontSize:9,color:"var(--txt3)"}}>Disponible</span>}
               </div>
               {isOn&&<span style={{color:"#16a34a",fontSize:12,fontWeight:700}}>✓ De garde</span>}
             </div>
@@ -1557,6 +1561,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
       const nx=new Date(y2,m2,d2+1);
       if(isAbsFor(m.id,nx.getFullYear(),nx.getMonth(),nx.getDate()))return false; // repos de garde impossible
       if(offOn(m,nx.getFullYear(),nx.getMonth(),nx.getDate()))return false;   /* v10.41 : désactivé le lendemain — même raison */
+      if(inTourWeek(m.id,nx.getFullYear(),nx.getMonth(),nx.getDate()))return false; /* v10.64 : veille d'une semaine de tour — le repos tomberait sur le tour */
       if(((gardeAvoid||{})[dKey(y2,m2,d2)]||{})[m.id])return false;
       return true;
     };
@@ -2017,6 +2022,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
               meds={medecins.filter(m=>m.garde===true)}
               isAbsDay={mid=>isMedAvailable(medecins.find(x=>x.id===mid),pd.y,pd.m,pd.d,gardeSlot)==="blocked"||gvIsAbs(mid,pd.y,pd.m,pd.d)}
               isAbsNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);return gvIsAbs(mid,nx.getFullYear(),nx.getMonth(),nx.getDate());}}
+              tourNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);const ny=nx.getFullYear(),nm=nx.getMonth(),nd=nx.getDate();if(isWE(ny,nm,nd))return null;const t=["M","AM"].map(sl=>getEntry(mid,ny,nm,nd,sl)).find(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));return t?(t.acteId==="TOUR_HC"?"HC":"USIC"):null;}}
               currentId={gMed?gMed.id:null}
               onPick={mid=>{applyGarde(mid,pd.y,pd.m,pd.d);setPickerDay(null);}}
               maxHeight={360}/>
