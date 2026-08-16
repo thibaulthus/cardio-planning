@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.60.1 — 16/08/2026";
+const APP_VERSION="v10.61 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -619,7 +619,7 @@ function MedBtn({med,avail,onClick,extra}){
    parfait, ordinateur muet, et clic droit intact puisqu'il ne les consulte pas. */
 let _gvLpF=false,_gvLpT=null;
 
-function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
      disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
      partie → la case du jour est hachurée et verrouillée, et la personne
@@ -758,6 +758,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
             <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:C0}}>Jour</th>
             <th style={{...S.thFix,position:"sticky",top:0,left:C0,zIndex:40,minWidth:C1}}>Sl</th>
             {showGarde&&<th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#93c47d"}}>Garde</th>}
+            {intGarde&&<th title="Garde des internes (lecture seule)" style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#1d4ed8"}}>🎓 Int.</th>}
             {meds.map(m=><th key={m.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20}} title={`Dr. ${m.prenom} ${m.nom}`}>
               <div style={{...S.avT,background:m.color,margin:"0 auto"}}>{m.init}</div>
             </th>)}
@@ -788,6 +789,14 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                     <div style={{width:26,height:26,borderRadius:"50%",background:gardeMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{gardeMed.init}</div>
                   </div>}
                 </td>}
+                {si===0&&intGarde&&(()=>{ /* v10.61 lot 3b : garde des internes, lecture seule */
+                  const gi=intGarde(ey,em,d);
+                  return <td rowSpan={slots.length} title={gi?(gi.ext?(gi.ext+" (interne extérieur)"):("Interne de garde : "+gi.med.nom)):"Aucun interne de garde"}
+                    style={{...S.tdFix,borderRight:"2px solid var(--border)",minWidth:CG,padding:"2px",verticalAlign:"middle",
+                      background:gi?(we?"var(--bg-we)":"var(--garde-bg)"):"rgba(248,81,73,.16)"}}>
+                    {gi&&gi.med&&<div style={{width:26,height:26,borderRadius:"50%",background:gi.med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,margin:"0 auto"}}>{gi.med.init}</div>}
+                    {gi&&gi.ext&&<div style={{fontSize:8,fontWeight:800,color:"var(--txt2)",background:"var(--bg2)",border:"1px dashed var(--border)",borderRadius:5,padding:"2px 2px",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{gi.ext}</div>}
+                  </td>;})()}
                 {meds.map(med=>{
                   const es=getEntries(med.id,ey,em,d,sl);
                   const bl=es[0]&&es[0]._blocked;
@@ -6387,6 +6396,7 @@ function CardioPlanning(){
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
   const [intCfg,setIntCfg]=useState({sems:[],show:false,jaugeDef:true,sHC:2,sUS:2,sSam:1}); // v10.54 internes
+  const [intGardeOn,setIntGardeOn]=useState(false); // v10.61 lot 3b : colonne garde int. du Planning — session seulement, cachée en nominal
   const [ptOrder,setPtOrder]=useState([]);
   const [specColors,setSpecColors]=useState({});
   const [colOrder,setColOrder]=useState({});
@@ -8706,8 +8716,9 @@ header::-webkit-scrollbar { display: none; }
             <span style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginRight:4}}>Filtre:</span>
             <button onClick={()=>setPlanFilter([])} style={{padding:"2px 8px",borderRadius:10,border:"1px solid var(--border)",background:planFilter.length===0?"#1d4ed8":"var(--bg2)",color:planFilter.length===0?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:600}}>Tous</button>
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
+            {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>setIntGardeOn(v=>!v)} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfg,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 

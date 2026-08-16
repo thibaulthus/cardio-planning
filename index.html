@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.60.1 — 16/08/2026";
+var APP_VERSION = "v10.61 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -739,86 +739,78 @@ function MedBtn(_a) {
    implicitement, sur ordinateur onClick lisait une variable inexistante et le clic était
    interrompu sans rien afficher. */
 var _gvLpF = false, _gvLpT = null;
-function GridV(_a) {
-    var _b = _a.onRemoveGarde, onRemoveGarde = _b === void 0 ? null : _b, _c = _a.planIssues, planIssues = _c === void 0 ? {} : _c, allDays = _a.allDays, year = _a.year, month = _a.month, meds = _a.meds, getEntries = _a.getEntries, acteById = _a.acteById, onCell = _a.onCell, isEdit = _a.isEdit, _d = _a.notes, notes = _d === void 0 ? {} : _d, isVac = _a.isVac, applyGarde = _a.applyGarde, allMeds = _a.allMeds, viewPeriod = _a.viewPeriod, allDays4 = _a.allDays4, showFull = _a.showFull, _e = _a.showGarde, showGarde = _e === void 0 ? true : _e, _f = _a.gardeLocked, gardeLocked = _f === void 0 ? false : _f, _g = _a.onCellHistory, onCellHistory = _g === void 0 ? null : _g, getAstreinteForDay = _a.getAstreinteForDay, _h = _a.printWk, printWk = _h === void 0 ? null : _h;
+function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, meds, getEntries, acteById, onCell, isEdit, notes = {}, isVac, applyGarde, allMeds, viewPeriod, allDays4, showFull, showGarde = true, intGarde = null, gardeLocked = false, onCellHistory = null, getAstreinteForDay, printWk = null }) {
     /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
        disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
        partie → la case du jour est hachurée et verrouillée, et la personne
        redevient disponible le jour de son retour. Des dates, jamais une période. */
-    meds = (meds || []).filter(function (m) { return offEtat(m, allDays4 || []) !== "off"; });
-    var today = new Date();
-    var C0 = 42, C1 = 24, CG = 44;
+    meds = (meds || []).filter(m => offEtat(m, allDays4 || []) !== "off");
+    const today = new Date();
+    const C0 = 42, C1 = 24, CG = 44;
     // Find garde med for a given day (slot N)
-    var _j = useState(null), pickGardeDayFull = _j[0], setPickGardeDayFull = _j[1];
-    var pickGardeDay = pickGardeDayFull ? pickGardeDayFull.d : null;
-    var setPickGardeDay = function (v) { return setPickGardeDayFull(v ? { d: v, y: year, m: month } : null); };
-    var _k = useState(""), gardeSearch = _k[0], setGardeSearch = _k[1];
-    var gardePickMeds = (allMeds || meds).filter(function (m) { return m.garde === true && !(pickGardeDayFull && offOn(m, pickGardeDayFull.y, pickGardeDayFull.m, pickGardeDayFull.d)); });
+    const [pickGardeDayFull, setPickGardeDayFull] = useState(null);
+    const pickGardeDay = pickGardeDayFull ? pickGardeDayFull.d : null;
+    const setPickGardeDay = (v) => setPickGardeDayFull(v ? { d: v, y: year, m: month } : null);
+    const [gardeSearch, setGardeSearch] = useState("");
+    const gardePickMeds = (allMeds || meds).filter(m => m.garde === true && !(pickGardeDayFull && offOn(m, pickGardeDayFull.y, pickGardeDayFull.m, pickGardeDayFull.d)));
     // 4-month view: flatten allDays4 by month groups
-    var today2 = new Date();
-    var effectiveDays = useMemo(function () {
+    const today2 = new Date();
+    const effectiveDays = useMemo(() => {
         if (!viewPeriod) {
-            var base = allDays.map(function (d) { return ({ y: year, m: month, d: d, label: null }); });
+            const base = allDays.map(d => ({ y: year, m: month, d, label: null }));
             if (!showFull) {
-                var tod_1 = new Date();
-                tod_1.setHours(0, 0, 0, 0);
-                return base.filter(function (_a) {
-                    var ey = _a.y, em = _a.m, d = _a.d;
-                    return new Date(ey, em, d) >= tod_1;
-                });
+                const tod = new Date();
+                tod.setHours(0, 0, 0, 0);
+                return base.filter(({ y: ey, m: em, d }) => new Date(ey, em, d) >= tod);
             }
             return base;
         }
         // Mode période
-        var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
-        var days = perDaysList(sy, sm).map(function (o) { return ({ y: o.y, m: o.m, d: o.d, label: null }); });
+        const { sy, sm } = perStart(year, month);
+        const days = perDaysList(sy, sm).map(o => ({ y: o.y, m: o.m, d: o.d, label: null }));
         if (!showFull) {
-            var tod_2 = new Date();
-            tod_2.setHours(0, 0, 0, 0);
-            return days.filter(function (_a) {
-                var ey = _a.y, em = _a.m, d = _a.d;
-                return new Date(ey, em, d) >= tod_2;
-            });
+            const tod = new Date();
+            tod.setHours(0, 0, 0, 0);
+            return days.filter(({ y: ey, m: em, d }) => new Date(ey, em, d) >= tod);
         }
         return days;
     }, [viewPeriod, allDays, year, month, showFull, PCFG.len, PCFG.startM]);
-    var printDays = printWk ? effectiveDays.filter(function (o) { return inPrintRange(printWk, o.y, o.m, o.d); }) : effectiveDays;
-    var getGardeMed = function (d) { return getGardeMed2(year, month, d); };
-    var getGardeMed2 = function (y2, m2, d2) {
-        var dw2 = dow(y2, m2, d2);
-        var gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
-        for (var _i = 0, _a = (allMeds || meds); _i < _a.length; _i++) {
-            var m = _a[_i];
-            var es = getEntries(m.id, y2, m2, d2, gardeSlot);
-            if (es.some(function (e) { return e.acteId === "GARDE"; }))
+    const printDays = printWk ? effectiveDays.filter(o => inPrintRange(printWk, o.y, o.m, o.d)) : effectiveDays;
+    const getGardeMed = (d) => getGardeMed2(year, month, d);
+    const getGardeMed2 = (y2, m2, d2) => {
+        const dw2 = dow(y2, m2, d2);
+        const gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
+        for (const m of (allMeds || meds)) {
+            const es = getEntries(m.id, y2, m2, d2, gardeSlot);
+            if (es.some(e => e.acteId === "GARDE"))
                 return m;
         }
         return null;
     };
-    var _l = React.useState(false), gardeSwapOpen = _l[0], setGardeSwapOpen = _l[1];
-    var gSlotOf = function (y2, m2, d2) { var dw2 = dow(y2, m2, d2); return (dw2 === 6 || dw2 === 0) ? "JOUR" : "N"; };
-    var isAbsOn = function (mid, y2, m2, d2) {
-        var sls = isWE(y2, m2, d2) ? ["JOUR"] : ["M", "AM"];
-        return sls.some(function (sl) { return getEntries(mid, y2, m2, d2, sl).some(function (e) { return ABS_IDS.includes(e.acteId); }); });
+    const [gardeSwapOpen, setGardeSwapOpen] = React.useState(false);
+    const gSlotOf = (y2, m2, d2) => { const dw2 = dow(y2, m2, d2); return (dw2 === 6 || dw2 === 0) ? "JOUR" : "N"; };
+    const isAbsOn = (mid, y2, m2, d2) => {
+        const sls = isWE(y2, m2, d2) ? ["JOUR"] : ["M", "AM"];
+        return sls.some(sl => getEntries(mid, y2, m2, d2, sl).some(e => ABS_IDS.includes(e.acteId)));
     };
-    var runGardeSwap = function (A, B) {
+    const runGardeSwap = (A, B) => {
         // applyGarde retire la garde existante du jour + son repos, puis pose garde + repos du nouveau titulaire
         applyGarde(B.medId, A.y, A.m, A.d);
-        setTimeout(function () { return applyGarde(A.medId, B.y, B.m, B.d); }, 40);
+        setTimeout(() => applyGarde(A.medId, B.y, B.m, B.d), 40);
     };
-    var gardeActe = { id: "GARDE", label: "Garde nuit", short: "G", color: "#93c47d" };
+    const gardeActe = { id: "GARDE", label: "Garde nuit", short: "G", color: "#93c47d" };
     return (React.createElement(React.Fragment, null,
-        pickGardeDay && React.createElement(Ov, { onClose: function () { return setPickGardeDay(null); } },
+        pickGardeDay && React.createElement(Ov, { onClose: () => setPickGardeDay(null) },
             React.createElement("div", { style: { minWidth: 280 } },
                 React.createElement("div", { style: S.mHd },
                     React.createElement("div", { style: S.mTit2 },
                         "\uD83C\uDF19 Garde \u2014 ",
-                        (function () { var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var dw = dow(pgf.y, pgf.m, pgf.d); return ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw] + " " + pgf.d + " " + MOIS[pgf.m] + " " + pgf.y; })()),
-                    React.createElement("button", { onClick: function () { return setPickGardeDay(null); }, style: S.xBtn }, "\u00D7")),
+                        (() => { const pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; const dw = dow(pgf.y, pgf.m, pgf.d); return ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw] + " " + pgf.d + " " + MOIS[pgf.m] + " " + pgf.y; })()),
+                    React.createElement("button", { onClick: () => setPickGardeDay(null), style: S.xBtn }, "\u00D7")),
                 React.createElement("div", { style: { color: "var(--txt2)", fontSize: 12, marginTop: -6, marginBottom: 8 } }, "Le repos post-garde est pos\u00E9 automatiquement."),
-                (function () {
-                    var pgf2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
-                    var cgm = getGardeMed2(pgf2.y, pgf2.m, pgf2.d);
+                (() => {
+                    const pgf2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
+                    const cgm = getGardeMed2(pgf2.y, pgf2.m, pgf2.d);
                     return cgm ? (React.createElement("div", { style: { marginBottom: 12, padding: "8px 10px", background: "var(--garde-bg)", borderRadius: 7, border: "1px solid #86efac" } },
                         React.createElement("div", { style: { fontSize: 10, color: "#16a34a", fontWeight: 700, marginBottom: 5 } }, "\u2713 Garde assign\u00E9e"),
                         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 8 } },
@@ -827,28 +819,27 @@ function GridV(_a) {
                                 cgm.prenom,
                                 " ",
                                 cgm.nom)),
-                        React.createElement("button", { onClick: function () { return setGardeSwapOpen(function (v) { return !v; }); }, style: { width: "100%", padding: "6px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer", fontSize: 11, marginBottom: 6 } }, "\u21C4 \u00C9changer cette garde\u2026"),
-                        React.createElement("button", { style: { width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: function () { var pgf3 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; if (onRemoveGarde)
+                        React.createElement("button", { onClick: () => setGardeSwapOpen(v => !v), style: { width: "100%", padding: "6px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer", fontSize: 11, marginBottom: 6 } }, "\u21C4 \u00C9changer cette garde\u2026"),
+                        React.createElement("button", { style: { width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: () => { const pgf3 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; if (onRemoveGarde)
                                 onRemoveGarde(pgf3.y, pgf3.m, pgf3.d); setPickGardeDay(null); } }, "Retirer la garde + repos"))) : null;
                 })(),
-                gardeSwapOpen && (function () {
-                    var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
-                    var medA = getGardeMed2(pgf.y, pgf.m, pgf.d);
+                gardeSwapOpen && (() => {
+                    const pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
+                    const medA = getGardeMed2(pgf.y, pgf.m, pgf.d);
                     if (!medA)
                         return null;
-                    var A = { y: pgf.y, m: pgf.m, d: pgf.d, medId: medA.id };
-                    var JG = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-                    var others = effectiveDays.map(function (_a) {
-                        var gy = _a.y, gm = _a.m, gd = _a.d;
+                    const A = { y: pgf.y, m: pgf.m, d: pgf.d, medId: medA.id };
+                    const JG = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+                    const others = effectiveDays.map(({ y: gy, m: gm, d: gd }) => {
                         if (gy === pgf.y && gm === pgf.m && gd === pgf.d)
                             return null;
-                        var mB = getGardeMed2(gy, gm, gd);
+                        const mB = getGardeMed2(gy, gm, gd);
                         if (!mB || mB.id === medA.id)
                             return null;
-                        var blockA = isAbsOn(medA.id, gy, gm, gd); // A absent le jour de B
-                        var blockB = isAbsOn(mB.id, pgf.y, pgf.m, pgf.d); // B absent le jour de A
-                        var reason = blockA ? (medA.init + " absent ce jour") : blockB ? (mB.init + " absent le " + pgf.d) : null;
-                        return { y: gy, m: gm, d: gd, mB: mB, reason: reason };
+                        const blockA = isAbsOn(medA.id, gy, gm, gd); // A absent le jour de B
+                        const blockB = isAbsOn(mB.id, pgf.y, pgf.m, pgf.d); // B absent le jour de A
+                        const reason = blockA ? (medA.init + " absent ce jour") : blockB ? (mB.init + " absent le " + pgf.d) : null;
+                        return { y: gy, m: gm, d: gd, mB, reason };
                     }).filter(Boolean);
                     return (React.createElement("div", { style: { marginBottom: 10, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.05)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#388bfd", marginBottom: 6 } },
@@ -862,7 +853,7 @@ function GridV(_a) {
                             MOIS[pgf.m].slice(0, 4),
                             ") avec :"),
                         React.createElement("div", { style: { maxHeight: "38vh", overflowY: "auto" } },
-                            others.map(function (o, i2) { return (React.createElement("div", { key: i2, onClick: function () {
+                            others.map((o, i2) => (React.createElement("div", { key: i2, onClick: () => {
                                     if (o.reason)
                                         return;
                                     runGardeSwap(A, { y: o.y, m: o.m, d: o.d, medId: o.mB.id });
@@ -878,14 +869,14 @@ function GridV(_a) {
                                     MOIS[o.m].slice(0, 4)),
                                 React.createElement("span", { style: { width: 26, height: 26, borderRadius: "50%", background: o.mB.color, color: "#fff", fontSize: 10, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, o.mB.init),
                                 React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: "var(--txt)", flex: 1 } }, o.mB.nom),
-                                o.reason ? React.createElement("span", { style: { fontSize: 9, color: "#f85149", fontWeight: 600 } }, o.reason) : React.createElement("span", { style: { fontSize: 11, color: "#388bfd", fontWeight: 800 } }, "\u21C4"))); }),
+                                o.reason ? React.createElement("span", { style: { fontSize: 9, color: "#f85149", fontWeight: 600 } }, o.reason) : React.createElement("span", { style: { fontSize: 11, color: "#388bfd", fontWeight: 800 } }, "\u21C4")))),
                             others.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune autre garde attribu\u00E9e sur la p\u00E9riode affich\u00E9e.")),
-                        React.createElement("button", { onClick: function () { return setGardeSwapOpen(false); }, style: { marginTop: 6, fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer", fontWeight: 600 } }, "Annuler l'\u00E9change")));
+                        React.createElement("button", { onClick: () => setGardeSwapOpen(false), style: { marginTop: 6, fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer", fontWeight: 600 } }, "Annuler l'\u00E9change")));
                 })(),
-                (function () {
-                    var filteredGM = gardePickMeds.filter(function (m) { return !gardeSearch || m.init.toUpperCase().startsWith(gardeSearch); });
-                    var onEnter = function (e) { if (e.key === "Enter" && filteredGM.length === 1) {
-                        var pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
+                (() => {
+                    const filteredGM = gardePickMeds.filter(m => !gardeSearch || m.init.toUpperCase().startsWith(gardeSearch));
+                    const onEnter = e => { if (e.key === "Enter" && filteredGM.length === 1) {
+                        const pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
                         if (isAbsOn(filteredGM[0].id, pgf.y, pgf.m, pgf.d)) {
                             toast("Absent / FMC ce jour — utilisez « Assigner quand même »", "warn");
                             return;
@@ -894,65 +885,71 @@ function GridV(_a) {
                         setPickGardeDayFull(null);
                     } };
                     return (React.createElement(React.Fragment, null,
-                        React.createElement("input", { autoFocus: true, value: gardeSearch, onChange: function (e) { return setGardeSearch(e.target.value.toUpperCase()); }, onKeyDown: onEnter, placeholder: "Initiales ou nom...", style: { width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", fontSize: 14, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, letterSpacing: 2, marginBottom: 8, boxSizing: "border-box" } }),
+                        React.createElement("input", { autoFocus: true, value: gardeSearch, onChange: e => setGardeSearch(e.target.value.toUpperCase()), onKeyDown: onEnter, placeholder: "Initiales ou nom...", style: { width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", fontSize: 14, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, letterSpacing: 2, marginBottom: 8, boxSizing: "border-box" } }),
                         filteredGM.length === 1 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 4, textAlign: "center" } }, "\u21B5 Entr\u00E9e pour confirmer"),
-                        React.createElement(GardeCandidateList, { meds: filteredGM, isAbsDay: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; return isAbsOn(mid, p2.y, p2.m, p2.d); }, isAbsNext: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var nx = new Date(p2.y, p2.m, p2.d + 1); return isAbsOn(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, currentId: (function () { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; var gm = getGardeMed2(p2.y, p2.m, p2.d); return gm ? gm.id : null; })(), onPick: function (mid) { var p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(mid, p2.y, p2.m, p2.d); setPickGardeDayFull(null); }, maxHeight: 320 })));
+                        React.createElement(GardeCandidateList, { meds: filteredGM, isAbsDay: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; return isAbsOn(mid, p2.y, p2.m, p2.d); }, isAbsNext: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; const nx = new Date(p2.y, p2.m, p2.d + 1); return isAbsOn(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, currentId: (() => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; const gm = getGardeMed2(p2.y, p2.m, p2.d); return gm ? gm.id : null; })(), onPick: mid => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; applyGarde(mid, p2.y, p2.m, p2.d); setPickGardeDayFull(null); }, maxHeight: 320 })));
                 })())),
         React.createElement(TableScroll, { jours: true, fit: true },
             React.createElement("table", { style: { borderCollapse: "collapse", tableLayout: "fixed" } },
                 React.createElement("thead", null,
                     React.createElement("tr", null,
-                        React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: C0 }) }, "Jour"),
-                        React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, left: C0, zIndex: 40, minWidth: C1 }) }, "Sl"),
-                        showGarde && React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: CG, borderRight: "2px solid var(--border)", fontSize: 9, color: "#93c47d" }) }, "Garde"),
-                        meds.map(function (m) { return React.createElement("th", { key: m.id, style: __assign(__assign({}, S.th), { minWidth: 46, position: "sticky", top: 0, zIndex: 20 }), title: "Dr. ".concat(m.prenom, " ").concat(m.nom) },
-                            React.createElement("div", { style: __assign(__assign({}, S.avT), { background: m.color, margin: "0 auto" }) }, m.init)); }))),
-                React.createElement("tbody", null, printDays.map(function (_a, di) {
-                    var ey = _a.y, em = _a.m, d = _a.d;
-                    var prevDay = di > 0 ? printDays[di - 1] : null;
-                    var isNewMonth = viewPeriod && (!prevDay || prevDay.m !== em || prevDay.y !== ey);
-                    var we = isWE(ey, em, d), isT = d === today.getDate() && em === today.getMonth() && ey === today.getFullYear();
-                    var slots = we ? ["JOUR"] : ["M", "AM"];
-                    var isMonGV = !we && dow(ey, em, d) === 1;
-                    var gardeMed = getGardeMed2(ey, em, d);
-                    return slots.map(function (sl, si) { return (React.createElement("tr", { key: ey + "-" + em + "-" + d + sl, "data-day": ey + "-" + em + "-" + d, style: __assign(__assign(__assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMonGV ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
-                        si === 0 && React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: C0, background: isVac && isVac(ey, em, d) ? "var(--vac-bg)" : "var(--td-fix)" }), rowSpan: slots.length },
+                        React.createElement("th", { style: Object.assign(Object.assign({}, S.thFix), { position: "sticky", top: 0, left: 0, zIndex: 40, minWidth: C0 }) }, "Jour"),
+                        React.createElement("th", { style: Object.assign(Object.assign({}, S.thFix), { position: "sticky", top: 0, left: C0, zIndex: 40, minWidth: C1 }) }, "Sl"),
+                        showGarde && React.createElement("th", { style: Object.assign(Object.assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: CG, borderRight: "2px solid var(--border)", fontSize: 9, color: "#93c47d" }) }, "Garde"),
+                        intGarde && React.createElement("th", { title: "Garde des internes (lecture seule)", style: Object.assign(Object.assign({}, S.thFix), { position: "sticky", top: 0, zIndex: 20, minWidth: CG, borderRight: "2px solid var(--border)", fontSize: 9, color: "#1d4ed8" }) }, "\uD83C\uDF93 Int."),
+                        meds.map(m => React.createElement("th", { key: m.id, style: Object.assign(Object.assign({}, S.th), { minWidth: 46, position: "sticky", top: 0, zIndex: 20 }), title: `Dr. ${m.prenom} ${m.nom}` },
+                            React.createElement("div", { style: Object.assign(Object.assign({}, S.avT), { background: m.color, margin: "0 auto" }) }, m.init))))),
+                React.createElement("tbody", null, printDays.map(({ y: ey, m: em, d }, di) => {
+                    const prevDay = di > 0 ? printDays[di - 1] : null;
+                    const isNewMonth = viewPeriod && (!prevDay || prevDay.m !== em || prevDay.y !== ey);
+                    const we = isWE(ey, em, d), isT = d === today.getDate() && em === today.getMonth() && ey === today.getFullYear();
+                    const slots = we ? ["JOUR"] : ["M", "AM"];
+                    const isMonGV = !we && dow(ey, em, d) === 1;
+                    const gardeMed = getGardeMed2(ey, em, d);
+                    return slots.map((sl, si) => (React.createElement("tr", { key: ey + "-" + em + "-" + d + sl, "data-day": ey + "-" + em + "-" + d, style: Object.assign(Object.assign(Object.assign({ height: 28, borderBottom: si === slots.length - 1 ? "1px solid var(--border)" : "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})), (si === 0 && isMonGV ? { boxShadow: "0 -2px 0 0 var(--border)" } : {})) },
+                        si === 0 && React.createElement("td", { style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, verticalAlign: "middle", minWidth: C0, background: isVac && isVac(ey, em, d) ? "var(--vac-bg)" : "var(--td-fix)" }), rowSpan: slots.length },
                             React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                 d,
                                 viewPeriod && React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700, fontFamily: "sans-serif", lineHeight: 1.2 } }, MOIS[em])),
                             React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)", textTransform: "uppercase", textAlign: "center" } }, JOURSC[dow(ey, em, d)])),
-                        React.createElement("td", { style: __assign(__assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, SLOTS[sl]),
-                        si === 0 && showGarde && React.createElement("td", { rowSpan: slots.length, style: __assign(__assign({}, S.tdFix), { borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "var(--garde-bg)" : "var(--td-fix)" }), onClick: function () { if (!isEdit || gardeLocked)
-                                return; setGardeSearch(""); setPickGardeDayFull({ d: d, y: ey, m: em }); } }, gardeMed && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2 } },
+                        React.createElement("td", { style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, SLOTS[sl]),
+                        si === 0 && showGarde && React.createElement("td", { rowSpan: slots.length, style: Object.assign(Object.assign({}, S.tdFix), { borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: isEdit ? "pointer" : "default", background: we ? "var(--bg-we)" : gardeMed ? "var(--garde-bg)" : "var(--td-fix)" }), onClick: () => { if (!isEdit || gardeLocked)
+                                return; setGardeSearch(""); setPickGardeDayFull({ d, y: ey, m: em }); } }, gardeMed && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2 } },
                             React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: gardeMed.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 } }, gardeMed.init))),
-                        meds.map(function (med) {
-                            var es = getEntries(med.id, ey, em, d, sl);
-                            var bl = es[0] && es[0]._blocked;
-                            var noteT = notes[nk(med.id, ey, em, d, sl)];
-                            var issueT = planIssues[med.id + "|" + ey + "|" + em + "|" + d + "|" + sl];
-                            var offC = offOn(med, ey, em, d); /* v10.41 : indisponible ce jour-là */
-                            var astId = getAstreinteForDay ? getAstreinteForDay(ey, em, d) : null;
-                            var isAst = astId !== null && String(astId) === String(med.id);
-                            var astSh = null;
+                        si === 0 && intGarde && (() => {
+                            const gi = intGarde(ey, em, d);
+                            return React.createElement("td", { rowSpan: slots.length, title: gi ? (gi.ext ? (gi.ext + " (interne extérieur)") : ("Interne de garde : " + gi.med.nom)) : "Aucun interne de garde", style: Object.assign(Object.assign({}, S.tdFix), { borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", background: gi ? (we ? "var(--bg-we)" : "var(--garde-bg)") : "rgba(248,81,73,.16)" }) },
+                                gi && gi.med && React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: gi.med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, margin: "0 auto" } }, gi.med.init),
+                                gi && gi.ext && React.createElement("div", { style: { fontSize: 8, fontWeight: 800, color: "var(--txt2)", background: "var(--bg2)", border: "1px dashed var(--border)", borderRadius: 5, padding: "2px 2px", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, gi.ext));
+                        })(),
+                        meds.map(med => {
+                            const es = getEntries(med.id, ey, em, d, sl);
+                            const bl = es[0] && es[0]._blocked;
+                            const noteT = notes[nk(med.id, ey, em, d, sl)];
+                            const issueT = planIssues[med.id + "|" + ey + "|" + em + "|" + d + "|" + sl];
+                            const offC = offOn(med, ey, em, d); /* v10.41 : indisponible ce jour-là */
+                            const astId = getAstreinteForDay ? getAstreinteForDay(ey, em, d) : null;
+                            const isAst = astId !== null && String(astId) === String(med.id);
+                            let astSh = null;
                             if (isAst) {
-                                var pdV = new Date(ey, em, d - 1), ndV = new Date(ey, em, d + 1);
-                                var paV = getAstreinteForDay(pdV.getFullYear(), pdV.getMonth(), pdV.getDate()), naV = getAstreinteForDay(ndV.getFullYear(), ndV.getMonth(), ndV.getDate());
-                                var contPrev = paV !== null && String(paV) === String(med.id), contNext = naV !== null && String(naV) === String(med.id);
-                                var parts = ["inset 1px 0 0 var(--ast-bord)", "inset -1px 0 0 var(--ast-bord)"];
+                                const pdV = new Date(ey, em, d - 1), ndV = new Date(ey, em, d + 1);
+                                const paV = getAstreinteForDay(pdV.getFullYear(), pdV.getMonth(), pdV.getDate()), naV = getAstreinteForDay(ndV.getFullYear(), ndV.getMonth(), ndV.getDate());
+                                const contPrev = paV !== null && String(paV) === String(med.id), contNext = naV !== null && String(naV) === String(med.id);
+                                const parts = ["inset 1px 0 0 var(--ast-bord)", "inset -1px 0 0 var(--ast-bord)"];
                                 if (si === 0 && !contPrev)
                                     parts.push("inset 0 1px 0 var(--ast-bord)");
                                 if (si === slots.length - 1 && !contNext)
                                     parts.push("inset 0 -1px 0 var(--ast-bord)");
                                 astSh = parts.join(", ");
                             }
-                            return React.createElement("td", { key: med.id, title: offC ? ("Indisponible — désactivé " + medOffL(med).map(function (r) { return "du " + offFr(r.du) + " au " + offFr(r.au); }).join(", ")) : ((issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined), style: __assign(__assign(__assign(__assign(__assign(__assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), (offC ? { background: "repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)", opacity: .55, cursor: "default" } : {})), { display: "table-cell", verticalAlign: "middle", position: "relative" }), onContextMenu: onCellHistory ? function (e) { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onTouchMove: onCellHistory ? function () { return clearTimeout(_gvLpT); } : undefined, onClick: bl || offC || !isEdit ? undefined : function () { if (_gvLpF) {
+                            return React.createElement("td", { key: med.id, title: offC ? ("Indisponible — désactivé " + medOffL(med).map(r => "du " + offFr(r.du) + " au " + offFr(r.au)).join(", ")) : ((issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined), style: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), (offC ? { background: "repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)", opacity: .55, cursor: "default" } : {})), { display: "table-cell", verticalAlign: "middle", position: "relative" }), onContextMenu: onCellHistory ? e => { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? () => { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(() => { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? () => clearTimeout(_gvLpT) : undefined, onTouchMove: onCellHistory ? () => clearTimeout(_gvLpT) : undefined, onClick: bl || offC || !isEdit ? undefined : () => { if (_gvLpF) {
                                     _gvLpF = false;
                                     return;
                                 } onCell(med.id, ey, em, d, sl); } },
                                 issueT && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }),
                                 !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } },
                                     React.createElement(CondBadges, { es: es, acteById: acteById, noteT: noteT })));
-                        }))); });
+                        }))));
                 }))))));
 }
 /* ════ SITE VIEW (CHL/CHB) ════ */
@@ -977,12 +974,11 @@ function GridV(_a) {
      la même hauteur d'un onglet à l'autre ;
    — les autres onglets retrouvent simplement l'endroit où ils étaient.
    Rien ne survit au rechargement : on revient alors au jour courant, ce qui convient. */
-var SCROLL_MEM = { jour: null, pos: {} };
-
+const SCROLL_MEM = { jour: null, pos: {} };
 /* v10.49 : demi-journées off (onglet Reports) — participation des salles.
    `offOuv` vit sur la fiche de salle ; non renseigné = par défaut les salles où
    une consultation (CS_CHL / CS_CHB) peut se dérouler — son précochage. */
-var OFF_CS_IDS = ["CS_CHL", "CS_CHB"];
+const OFF_CS_IDS = ["CS_CHL", "CS_CHB"];
 function offOuvOn(entry, actes) {
     if (!entry)
         return false;
@@ -6768,7 +6764,8 @@ function CardioPlanning() {
     var _ic = useState(false), isCadre = _ic[0], setIsCadre = _ic[1];
     /* ── v9.35 : effectifs IDE ── */
     var _icf = useState({ def: {}, ov: {} }), ideCfg = _icf[0], setIdeCfg = _icf[1];
-    var _intc = useState({ sems: [], show: false, jaugeDef: true, sHC: 2, sUS: 2, sSam: 1 }), intCfg = _intc[0], setIntCfg = _intc[1]; // v10.54 internes
+    var _intc = useState({ sems: [], show: false, jaugeDef: true, sHC: 2, sUS: 2, sSam: 1 }), intCfg = _intc[0], setIntCfg = _intc[1];
+    var _igOn = useState(false), intGardeOn = _igOn[0], setIntGardeOn = _igOn[1]; // v10.61 lot 3b : session seulement // v10.54 internes
     var _pto = useState([]), ptOrder = _pto[0], setPtOrder = _pto[1];
     var _spc = useState({}), specColors = _spc[0], setSpecColors = _spc[1];
     var _colO = useState({}), colOrder = _colO[0], setColOrder = _colO[1];
@@ -9919,8 +9916,9 @@ function CardioPlanning() {
                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8, alignItems: "center" } },
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginRight: 4 } }, "Filtre:"),
                     React.createElement("button", { onClick: function () { return setPlanFilter([]); }, style: { padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border)", background: planFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: planFilter.length === 0 ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: 600 } }, "Tous"),
-                    medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); })),
-                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
+                    medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); }),
+                    intCfg.show === true && (intCfg.sems || []).length > 0 && React.createElement("button", { onClick: function () { setIntGardeOn(function (v) { return !v; }); }, title: "Afficher la colonne de garde des internes (lecture seule)", style: { padding: "2px 8px", borderRadius: 10, border: "1px solid " + (intGardeOn ? "#1d4ed8" : "var(--border)"), background: intGardeOn ? "#1d4ed8" : "var(--bg2)", color: intGardeOn ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: intGardeOn ? 700 : 400 } }, "\uD83C\uDF93 Garde int.")),
+                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, intGarde: intGardeOn ? function (y2, m2, d2) { return intGardeDuJour(getEntries, intCfg, y2, m2, d2); } : null, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, tourProps),
             tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medecins, getEntries: getEntries, tourMed: tourMed, isEdit: isEdit || isInterEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: function (per) { return openPtModal(null, "apply", per); }, onRemovePT: function (per) { return openPtModal(null, "remove", per); }, tourProps: tourProps, gardeProps: gardeProps }),
             tab === "chl" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || isMedEdit, notes: notes, onPickSite: function (_a) {
