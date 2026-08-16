@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.64 — 16/08/2026";
+const APP_VERSION="v10.65 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6349,6 +6349,47 @@ function intMedsDuJour(intCfg,y,m,d){
   const s=intCfg?intSemDuJour(intCfg,intISO2(y,m,d)):null;
   return (s&&(s.meds||[]).length)?{lbl:intSemLabel(s.deb),meds:s.meds}:null;
 }
+/* v10.65, lot 4 : jauge par demi-journée — comptes HC et USIC séparés parmi les
+   internes dont le semestre couvre le jour (variante 2 validée). Un interne dont
+   le créneau porte les deux ne compte qu'une fois, côté HC. */
+function intJauge(getEntries,cols,y,m,d,sl){
+  let hc=0,us=0;
+  const iso=intISO2(y,m,d);
+  cols.forEach(c=>{
+    if(!(iso>=c.sDeb&&iso<=c.sFin))return;
+    const es=(getEntries(c.id,y,m,d,sl)||[]).filter(e=>e&&e.acteId&&!e._blocked);
+    if(es.some(e=>e.acteId==="TOUR_HC"))hc++;
+    else if(es.some(e=>e.acteId==="TOUR_USIC"))us++;
+  });
+  return {hc:hc,us:us};
+}
+/* v10.65 : statistiques par interne sur une liste de jours — gardes posées et part
+   idéale (chaque jour vaut 1/nb d'internes couverts ce jour-là : chevauchements de
+   semestres et arrivées en cours de période se répartissent d'eux-mêmes), puis
+   demi-journées de HC, d'USIC et de chaque activité de la liste extras. */
+function intStats(getEntries,cols,jours,extras){
+  const st={};
+  cols.forEach(c=>{st[c.id]={gardes:0,ideal:0,hc:0,us:0,ex:{}};extras.forEach(a=>{st[c.id].ex[a.id]=0;});});
+  jours.forEach(o=>{
+    const iso=intISO2(o.y,o.m,o.d);
+    const dedans=cols.filter(c=>iso>=c.sDeb&&iso<=c.sFin);
+    if(!dedans.length)return;
+    dedans.forEach(c=>{st[c.id].ideal+=1/dedans.length;});
+    const t=dow(o.y,o.m,o.d),fer=isFerie(o.y,o.m,o.d);
+    const off=t===0||fer,sam=!off&&t===6;
+    const slots=off?[]:sam?["M"]:["M","AM"];
+    dedans.forEach(c=>{
+      if((getEntries(c.id,o.y,o.m,o.d,"N")||[]).some(e=>e&&e.acteId==="GARDE"))st[c.id].gardes++;
+      slots.forEach(sl=>{
+        const es=(getEntries(c.id,o.y,o.m,o.d,sl)||[]).filter(e=>e&&e.acteId&&!e._blocked);
+        if(es.some(e=>e.acteId==="TOUR_HC"))st[c.id].hc++;
+        else if(es.some(e=>e.acteId==="TOUR_USIC"))st[c.id].us++;
+        extras.forEach(a=>{if(es.some(e=>e.acteId===a.id))st[c.id].ex[a.id]++;});
+      });
+    });
+  });
+  return st;
+}
 
 function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
   const [exOpen,setExOpen]=useState(false);
@@ -6471,6 +6512,8 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
 function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],prevM,nextM,darkMode,setDarkMode}){
   const [sel,setSel]=useState(null);
   const [gm,setGm]=useState(null);
+  const [jaugeOn,setJaugeOn]=useState(intCfg.jaugeDef!==false); /* v10.65 : affichage en nominal réglé dans Paramètres */
+  const [statsOpen,setStatsOpen]=useState(false);
   const jours=useMemo(()=>{
     if(!viewPeriod)return allDays.map(d=>({y:year,m:month,d:d}));
     const ps=perStart(year,month);
@@ -6496,7 +6539,8 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
     const ps=perStart(year,month);
     return perLibelle(ps.sy,ps.sm);
   })();
-  const C0=42,C1=24,CG=44;
+  const C0=42,CG=44;
+  const C1=jaugeOn?60:24; /* v10.65 : place pour les deux compteurs côte à côte */
   const cellEntree=(c,o,sl)=>{
     const es=getEntries(c.id,o.y,o.m,o.d,sl);
     let e=es.find(x=>x&&x.acteId&&!x._blocked)||null;
@@ -6512,11 +6556,13 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
       </div>
       <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
         {semsAff.map(l=><Chp key={l} bg="rgba(56,139,253,.12)" c="#1d4ed8">{l}</Chp>)}
+        <button onClick={()=>setStatsOpen(true)} title="Statistiques" style={{...S.arr,fontSize:13,width:30}}>📊</button>
+        <button onClick={()=>setJaugeOn(v=>!v)} title="Jauge HC/USIC" style={{...S.arr,fontSize:13,width:30,color:jaugeOn?"#1d4ed8":"var(--txt2)",border:`1px solid ${jaugeOn?"#1d4ed8":"var(--border)"}`}}>🚦</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Toute la période"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
       </div>
     </div>
-    <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 8px"}}>La jauge et les statistiques arrivent au prochain lot. Case garde rouge : personne de garde ce jour. Cases hachurées : hors du semestre de l'interne · samedi : une seule case (matin).{canEdit?" Cliquez la colonne 🌙 pour la garde (repos posé automatiquement le lendemain), une case pour le reste.":""}</div>
+    <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 8px"}}>Jauge : internes en HC et en USIC sur le créneau, rouge sous le seuil (Paramètres). Case garde rouge : personne de garde ce jour. Cases hachurées : hors du semestre de l'interne · samedi : une seule case (matin).{canEdit?" Cliquez la colonne 🌙 pour la garde (repos posé automatiquement le lendemain), une case pour le reste.":""}</div>
     {cols.length===0
       ?<div style={{...S.card}}>
         <div style={{fontSize:12,color:"var(--txt3)"}}>Aucun interne sur la période affichée — saisissez les semestres et les fiches dans l'onglet Équipe, section « 🎓 Internes ».</div>
@@ -6553,7 +6599,17 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
                     <div style={{fontSize:8,color:"var(--txt3)",fontWeight:700,fontFamily:"sans-serif"}}>{JOURSL[t].slice(0,3)}{fer?" F":""}</div>
                   </div>
                 </td>}
-                <td style={{...S.tdFix,position:"sticky",left:C0,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:we?"var(--bg-we)":"var(--td-fix)",minWidth:C1,padding:"2px"}}>{off?"":SLOTS[sl]}</td>
+                <td style={{...S.tdFix,position:"sticky",left:C0,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:we?"var(--bg-we)":"var(--td-fix)",minWidth:C1,padding:"2px"}}>{off?"":(jaugeOn?(()=>{
+                  const jg=intJauge(getEntries,cols,o.y,o.m,o.d,sl);
+                  const seuilH=parseInt(samJ?intCfg.sSam:intCfg.sHC)||0;
+                  const seuilU=parseInt(intCfg.sUS)||0;
+                  const badH=seuilH>0&&jg.hc<seuilH;      /* seuil 0 = pas d'alerte, sa règle */
+                  const badU=!samJ&&seuilU>0&&jg.us<seuilU;
+                  const chip=(lbl,n,bad)=><span style={{fontSize:8,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:4,padding:"1px 3px",background:bad?"rgba(239,68,68,.18)":"var(--bg2)",color:bad?"#ef4444":"var(--txt3)",border:`1px solid ${bad?"#ef444466":"var(--border)"}`}}>{lbl}{n}</span>;
+                  return <div style={{display:"flex",alignItems:"center",gap:2,justifyContent:"center"}}>
+                    <span>{SLOTS[sl]}</span>{chip("H",jg.hc,badH)}{!samJ&&chip("U",jg.us,badU)}
+                  </div>;
+                })():SLOTS[sl])}</td>
                 {si===0&&<td rowSpan={slots.length} onClick={canEdit?()=>setGm({y:o.y,m:o.m,d:o.d}):undefined}
                   style={{...S.tdFix,borderRight:"2px solid var(--border)",minWidth:CG,padding:"2px",verticalAlign:"middle",cursor:canEdit?"pointer":"default",
                     background:gard?(we?"var(--bg-we)":"var(--garde-bg)"):"rgba(248,81,73,.16)"}}>
@@ -6584,6 +6640,37 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
         </tbody>
       </table>
     </TableScroll>}
+    {statsOpen&&(()=>{
+      /* v10.65 : mêmes activités « techniques » que les tuiles de la modale de case —
+         Technique apparaîtra d'elle-même quand il l'aura créée ; les activités à
+         salle restent hors stats (« pas indispensables », sa règle). */
+      const exActes=actes.filter(a=>a.interneOk===true&&!a.isSystem&&!a.hasSalle&&ABS_IDS.indexOf(a.id)<0&&a.id!=="REPOS_GARDE");
+      const st=intStats(getEntries,cols,jours,exActes);
+      const fmtJ=n=>n===0?"—":(n%2===0?String(n/2):(n===1?"½":String(Math.floor(n/2))+"½"));
+      const fmtI=x=>(Math.round(x*10)/10).toString().replace(".",",");
+      return <Ov onClose={()=>setStatsOpen(false)}>
+        <div style={{...S.modal,maxWidth:660,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={S.mHd}><div style={S.mTit2}>{"📊 Statistiques — "+titre}</div><button onClick={()=>setStatsOpen(false)} style={S.xBtn}>×</button></div>
+          <div style={{fontSize:10,color:"var(--txt3)",margin:"4px 0 10px"}}>{"Sur la période affichée ("+jours.length+" jours"+(showFull?"":", depuis aujourd'hui")+"). Gardes : posées / part idéale (jours du semestre répartis entre les internes présents). Le reste en jours, ½ = demi-journée."}</div>
+          <table style={{borderCollapse:"collapse",width:"100%"}}>
+            <thead><tr>
+              <th style={{...S.th,textAlign:"left",paddingLeft:8}}>Interne</th>
+              <th style={S.th}>🌙 Gardes</th><th style={S.th}>HC</th><th style={S.th}>USIC</th>
+              {exActes.map(a=><th key={a.id} style={S.th}>{a.short||a.label}</th>)}
+            </tr></thead>
+            <tbody>
+              {cols.map(c=>{const s=st[c.id];return <tr key={c.id} style={{borderBottom:"1px solid var(--border2)"}}>
+                <td style={{padding:"5px 8px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{...S.avT,background:c.color}}>{c.init}</div><span style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{c.nom}</span><span style={{fontSize:9,color:"var(--txt3)"}}>{c.sLbl}</span></div></td>
+                <td style={{textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:800,fontSize:12,color:"var(--txt)"}}>{s.gardes}<span style={{color:"var(--txt3)",fontWeight:600,fontSize:10}}>{" / "+fmtI(s.ideal)}</span></td>
+                <td style={{textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,fontSize:12,color:"var(--txt)"}}>{fmtJ(s.hc)}</td>
+                <td style={{textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,fontSize:12,color:"var(--txt)"}}>{fmtJ(s.us)}</td>
+                {exActes.map(a=><td key={a.id} style={{textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,fontSize:12,color:"var(--txt)"}}>{fmtJ(s.ex[a.id])}</td>)}
+              </tr>;})}
+            </tbody>
+          </table>
+        </div>
+      </Ov>;
+    })()}
     {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} canSalle={canSalle} salleReg={salleReg}/>}
     {gm&&<InternesGardeModal y={gm.y} m={gm.m} d={gm.d} jours={jours} onClose={()=>setGm(null)} intCfg={intCfg} getEntries={getEntries} setEntry={setEntry}/>}
   </div>;

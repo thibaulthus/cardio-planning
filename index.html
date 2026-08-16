@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.64 — 16/08/2026";
+var APP_VERSION = "v10.65 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6673,6 +6673,55 @@ function intMedsDuJour(intCfg, y, m, d) {
     const s = intCfg ? intSemDuJour(intCfg, intISO2(y, m, d)) : null;
     return (s && (s.meds || []).length) ? { lbl: intSemLabel(s.deb), meds: s.meds } : null;
 }
+/* v10.65, lot 4 : jauge par demi-journée — comptes HC et USIC séparés parmi les
+   internes dont le semestre couvre le jour (variante 2 validée). Un interne dont
+   le créneau porte les deux ne compte qu'une fois, côté HC. */
+function intJauge(getEntries, cols, y, m, d, sl) {
+    let hc = 0, us = 0;
+    const iso = intISO2(y, m, d);
+    cols.forEach(c => {
+        if (!(iso >= c.sDeb && iso <= c.sFin))
+            return;
+        const es = (getEntries(c.id, y, m, d, sl) || []).filter(e => e && e.acteId && !e._blocked);
+        if (es.some(e => e.acteId === "TOUR_HC"))
+            hc++;
+        else if (es.some(e => e.acteId === "TOUR_USIC"))
+            us++;
+    });
+    return { hc: hc, us: us };
+}
+/* v10.65 : statistiques par interne sur une liste de jours — gardes posées et part
+   idéale (chaque jour vaut 1/nb d'internes couverts ce jour-là : chevauchements de
+   semestres et arrivées en cours de période se répartissent d'eux-mêmes), puis
+   demi-journées de HC, d'USIC et de chaque activité de la liste extras. */
+function intStats(getEntries, cols, jours, extras) {
+    const st = {};
+    cols.forEach(c => { st[c.id] = { gardes: 0, ideal: 0, hc: 0, us: 0, ex: {} }; extras.forEach(a => { st[c.id].ex[a.id] = 0; }); });
+    jours.forEach(o => {
+        const iso = intISO2(o.y, o.m, o.d);
+        const dedans = cols.filter(c => iso >= c.sDeb && iso <= c.sFin);
+        if (!dedans.length)
+            return;
+        dedans.forEach(c => { st[c.id].ideal += 1 / dedans.length; });
+        const t = dow(o.y, o.m, o.d), fer = isFerie(o.y, o.m, o.d);
+        const off = t === 0 || fer, sam = !off && t === 6;
+        const slots = off ? [] : sam ? ["M"] : ["M", "AM"];
+        dedans.forEach(c => {
+            if ((getEntries(c.id, o.y, o.m, o.d, "N") || []).some(e => e && e.acteId === "GARDE"))
+                st[c.id].gardes++;
+            slots.forEach(sl => {
+                const es = (getEntries(c.id, o.y, o.m, o.d, sl) || []).filter(e => e && e.acteId && !e._blocked);
+                if (es.some(e => e.acteId === "TOUR_HC"))
+                    st[c.id].hc++;
+                else if (es.some(e => e.acteId === "TOUR_USIC"))
+                    st[c.id].us++;
+                extras.forEach(a => { if (es.some(e => e.acteId === a.id))
+                    st[c.id].ex[a.id]++; });
+            });
+        });
+    });
+    return st;
+}
 function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEntry }) {
     const [exOpen, setExOpen] = useState(false);
     const [extNom, setExtNom] = useState("");
@@ -6810,6 +6859,8 @@ function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEn
 function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, year, month, allDays, viewPeriod, showFull, setShowFull, canEdit, canSalle = false, salleReg = [], prevM, nextM, darkMode, setDarkMode }) {
     const [sel, setSel] = useState(null);
     const [gm, setGm] = useState(null);
+    const [jaugeOn, setJaugeOn] = useState(intCfg.jaugeDef !== false); /* v10.65 : affichage en nominal réglé dans Paramètres */
+    const [statsOpen, setStatsOpen] = useState(false);
     const jours = useMemo(() => {
         if (!viewPeriod)
             return allDays.map(d => ({ y: year, m: month, d: d }));
@@ -6844,7 +6895,8 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
         const ps = perStart(year, month);
         return perLibelle(ps.sy, ps.sm);
     })();
-    const C0 = 42, C1 = 24, CG = 44;
+    const C0 = 42, CG = 44;
+    const C1 = jaugeOn ? 60 : 24; /* v10.65 : place pour les deux compteurs côte à côte */
     const cellEntree = (c, o, sl) => {
         const es = getEntries(c.id, o.y, o.m, o.d, sl);
         let e = es.find(x => x && x.acteId && !x._blocked) || null;
@@ -6860,10 +6912,12 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" } },
                 semsAff.map(l => React.createElement(Chp, { key: l, bg: "rgba(56,139,253,.12)", c: "#1d4ed8" }, l)),
+                React.createElement("button", { onClick: () => setStatsOpen(true), title: "Statistiques", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDCCA"),
+                React.createElement("button", { onClick: () => setJaugeOn(v => !v), title: "Jauge HC/USIC", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30, color: jaugeOn ? "#1d4ed8" : "var(--txt2)", border: `1px solid ${jaugeOn ? "#1d4ed8" : "var(--border)"}` }) }, "\uD83D\uDEA6"),
                 React.createElement("button", { onClick: () => setShowFull(f => !f), title: showFull ? "Depuis aujourd'hui" : "Toute la période", style: Object.assign(Object.assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${showFull ? "var(--today-c)" : "var(--border)"}` }) }, showFull ? "📅" : "🗓️"),
                 React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "2px 0 8px" } },
-            "La jauge et les statistiques arrivent au prochain lot. Case garde rouge : personne de garde ce jour. Cases hachur\u00E9es : hors du semestre de l'interne \u00B7 samedi : une seule case (matin).",
+            "Jauge : internes en HC et en USIC sur le cr\u00E9neau, rouge sous le seuil (Param\u00E8tres). Case garde rouge : personne de garde ce jour. Cases hachur\u00E9es : hors du semestre de l'interne \u00B7 samedi : une seule case (matin).",
             canEdit ? " Cliquez la colonne 🌙 pour la garde (repos posé automatiquement le lendemain), une case pour le reste." : ""),
         cols.length === 0
             ? React.createElement("div", { style: Object.assign({}, S.card) },
@@ -6896,7 +6950,20 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                                     React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)", fontWeight: 700, fontFamily: "sans-serif" } },
                                         JOURSL[t].slice(0, 3),
                                         fer ? " F" : ""))),
-                            React.createElement("td", { style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, off ? "" : SLOTS[sl]),
+                            React.createElement("td", { style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: C0, zIndex: 9, fontSize: 9, color: "var(--txt3)", fontWeight: 700, textAlign: "center", background: we ? "var(--bg-we)" : "var(--td-fix)", minWidth: C1, padding: "2px" }) }, off ? "" : (jaugeOn ? (() => {
+                                const jg = intJauge(getEntries, cols, o.y, o.m, o.d, sl);
+                                const seuilH = parseInt(samJ ? intCfg.sSam : intCfg.sHC) || 0;
+                                const seuilU = parseInt(intCfg.sUS) || 0;
+                                const badH = seuilH > 0 && jg.hc < seuilH; /* seuil 0 = pas d'alerte, sa règle */
+                                const badU = !samJ && seuilU > 0 && jg.us < seuilU;
+                                const chip = (lbl, n, bad) => React.createElement("span", { style: { fontSize: 8, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", borderRadius: 4, padding: "1px 3px", background: bad ? "rgba(239,68,68,.18)" : "var(--bg2)", color: bad ? "#ef4444" : "var(--txt3)", border: `1px solid ${bad ? "#ef444466" : "var(--border)"}` } },
+                                    lbl,
+                                    n);
+                                return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 2, justifyContent: "center" } },
+                                    React.createElement("span", null, SLOTS[sl]),
+                                    chip("H", jg.hc, badH),
+                                    !samJ && chip("U", jg.us, badU));
+                            })() : SLOTS[sl])),
                             si === 0 && React.createElement("td", { rowSpan: slots.length, onClick: canEdit ? () => setGm({ y: o.y, m: o.m, d: o.d }) : undefined, style: Object.assign(Object.assign({}, S.tdFix), { borderRight: "2px solid var(--border)", minWidth: CG, padding: "2px", verticalAlign: "middle", cursor: canEdit ? "pointer" : "default", background: gard ? (we ? "var(--bg-we)" : "var(--garde-bg)") : "rgba(248,81,73,.16)" }) },
                                 gard && gard.med && React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: gard.med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, margin: "0 auto" } }, gard.med.init),
                                 gard && gard.ext && React.createElement("div", { title: gard.ext + " (interne extérieur)", style: { fontSize: 8, fontWeight: 800, color: "var(--txt2)", background: "var(--bg2)", border: "1px dashed var(--border)", borderRadius: 5, padding: "2px 2px", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, gard.ext)),
@@ -6916,6 +6983,44 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                                     React.createElement(Badge, { a: a, salle: e.salle, hideSalle: !e.salle })));
                             }))));
                     })))),
+        statsOpen && (() => {
+            /* v10.65 : mêmes activités « techniques » que les tuiles de la modale de case —
+               Technique apparaîtra d'elle-même quand il l'aura créée ; les activités à
+               salle restent hors stats (« pas indispensables », sa règle). */
+            const exActes = actes.filter(a => a.interneOk === true && !a.isSystem && !a.hasSalle && ABS_IDS.indexOf(a.id) < 0 && a.id !== "REPOS_GARDE");
+            const st = intStats(getEntries, cols, jours, exActes);
+            const fmtJ = n => n === 0 ? "—" : (n % 2 === 0 ? String(n / 2) : (n === 1 ? "½" : String(Math.floor(n / 2)) + "½"));
+            const fmtI = x => (Math.round(x * 10) / 10).toString().replace(".", ",");
+            return React.createElement(Ov, { onClose: () => setStatsOpen(false) },
+                React.createElement("div", { style: Object.assign(Object.assign({}, S.modal), { maxWidth: 660, maxHeight: "85vh", overflowY: "auto" }), onClick: e => e.stopPropagation() },
+                    React.createElement("div", { style: S.mHd },
+                        React.createElement("div", { style: S.mTit2 }, "📊 Statistiques — " + titre),
+                        React.createElement("button", { onClick: () => setStatsOpen(false), style: S.xBtn }, "\u00D7")),
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "4px 0 10px" } }, "Sur la période affichée (" + jours.length + " jours" + (showFull ? "" : ", depuis aujourd'hui") + "). Gardes : posées / part idéale (jours du semestre répartis entre les internes présents). Le reste en jours, ½ = demi-journée."),
+                    React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
+                        React.createElement("thead", null,
+                            React.createElement("tr", null,
+                                React.createElement("th", { style: Object.assign(Object.assign({}, S.th), { textAlign: "left", paddingLeft: 8 }) }, "Interne"),
+                                React.createElement("th", { style: S.th }, "\uD83C\uDF19 Gardes"),
+                                React.createElement("th", { style: S.th }, "HC"),
+                                React.createElement("th", { style: S.th }, "USIC"),
+                                exActes.map(a => React.createElement("th", { key: a.id, style: S.th }, a.short || a.label)))),
+                        React.createElement("tbody", null, cols.map(c => {
+                            const s = st[c.id];
+                            return React.createElement("tr", { key: c.id, style: { borderBottom: "1px solid var(--border2)" } },
+                                React.createElement("td", { style: { padding: "5px 8px" } },
+                                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+                                        React.createElement("div", { style: Object.assign(Object.assign({}, S.avT), { background: c.color }) }, c.init),
+                                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)" } }, c.nom),
+                                        React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, c.sLbl))),
+                                React.createElement("td", { style: { textAlign: "center", fontFamily: "'JetBrains Mono',monospace", fontWeight: 800, fontSize: 12, color: "var(--txt)" } },
+                                    s.gardes,
+                                    React.createElement("span", { style: { color: "var(--txt3)", fontWeight: 600, fontSize: 10 } }, " / " + fmtI(s.ideal))),
+                                React.createElement("td", { style: { textAlign: "center", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 12, color: "var(--txt)" } }, fmtJ(s.hc)),
+                                React.createElement("td", { style: { textAlign: "center", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 12, color: "var(--txt)" } }, fmtJ(s.us)),
+                                exActes.map(a => React.createElement("td", { key: a.id, style: { textAlign: "center", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 12, color: "var(--txt)" } }, fmtJ(s.ex[a.id]))));
+                        })))));
+        })(),
         sel && React.createElement(InternesCellModal, { med: sel.med, y: sel.y, m: sel.m, d: sel.d, slot0: sel.slot0, onClose: () => setSel(null), actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, canSalle: canSalle, salleReg: salleReg }),
         gm && React.createElement(InternesGardeModal, { y: gm.y, m: gm.m, d: gm.d, jours: jours, onClose: () => setGm(null), intCfg: intCfg, getEntries: getEntries, setEntry: setEntry }));
 }
