@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.60 — 16/08/2026";
+const APP_VERSION="v10.60.1 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6253,7 +6253,7 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
   </Ov>;
 }
 
-function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,canEdit,prevM,nextM,darkMode,setDarkMode}){
+function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,prevM,nextM,darkMode,setDarkMode}){
   const [sel,setSel]=useState(null);
   const [gm,setGm]=useState(null);
   const jours=useMemo(()=>{
@@ -6297,6 +6297,7 @@ function InternesView({intCfg,actes,acteById,getEntries,setEntry,isVac,year,mont
       </div>
       <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
         {semsAff.map(l=><Chp key={l} bg="rgba(56,139,253,.12)" c="#1d4ed8">{l}</Chp>)}
+        <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Toute la période"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
       </div>
     </div>
@@ -8882,7 +8883,7 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
-      {tab==="internes"&&<InternesView intCfg={intCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} canEdit={isEdit||isInterEdit||isAdminEdit||isCadre} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="internes"&&<InternesView intCfg={intCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||isInterEdit||isAdminEdit||isCadre} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);

@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.60 — 16/08/2026";
+var APP_VERSION = "v10.60.1 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6643,7 +6643,7 @@ function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEn
                     autresGardes.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune autre garde pos\u00E9e sur la p\u00E9riode affich\u00E9e."))),
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", lineHeight: 1.5 } }, "Le repos du lendemain est pos\u00E9 automatiquement avec la garde et remplace ce qui s'y trouve ; il s'enl\u00E8ve en retirant la garde. Un interne peut \u00EAtre absent ou en FMC le jour de sa garde. Les repos des deux jours sont recalcul\u00E9s lors d'un \u00E9change.")));
 }
-function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, year, month, allDays, viewPeriod, showFull, canEdit, prevM, nextM, darkMode, setDarkMode }) {
+function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, year, month, allDays, viewPeriod, showFull, setShowFull, canEdit, prevM, nextM, darkMode, setDarkMode }) {
     const [sel, setSel] = useState(null);
     const [gm, setGm] = useState(null);
     const jours = useMemo(() => {
@@ -6696,6 +6696,7 @@ function InternesView({ intCfg, actes, acteById, getEntries, setEntry, isVac, ye
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" } },
                 semsAff.map(l => React.createElement(Chp, { key: l, bg: "rgba(56,139,253,.12)", c: "#1d4ed8" }, l)),
+                React.createElement("button", { onClick: () => setShowFull(f => !f), title: showFull ? "Depuis aujourd'hui" : "Toute la période", style: Object.assign(Object.assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${showFull ? "var(--today-c)" : "var(--border)"}` }) }, showFull ? "📅" : "🗓️"),
                 React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "2px 0 8px" } },
             "La jauge et les statistiques arrivent au prochain lot. Case garde rouge : personne de garde ce jour. Cases hachur\u00E9es : hors du semestre de l'interne \u00B7 samedi : une seule case (matin).",
@@ -10055,7 +10056,7 @@ function CardioPlanning() {
                                 React.createElement("button", { title: "Reculer dans l'ordre", style: __assign(__assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800 }), onClick: function () { return moveMed(m.id, 1); } }, "\u25BC"))))); })))); }),
                 React.createElement(InternesEquipe, { intCfg: intCfg, setIntCfg: setIntCfg, isEdit: isEdit }))),
             tab === "reports" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(ReportsView, { salleReg: salleReg, medecins: medecins, actes: actes, getEntries: getEntries, tourMed: tourMed, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminOkKey: roleOkKey, adminReports: isAdminEdit && adminCanReports, adminName: adminName, removeEntry: removeEntry, year: year, month: month, toast: toast })),
-            tab === "internes" && React.createElement(InternesView, { intCfg: intCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, canEdit: isEdit || isInterEdit || isAdminEdit || isCadre, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
+            tab === "internes" && React.createElement(InternesView, { intCfg: intCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, setShowFull: setShowFull, canEdit: isEdit || isInterEdit || isAdminEdit || isCadre, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "aide" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(HelpView, null)),
             tab === "astreinte" && (function () {
                 var astMeds = medecins.filter(function (m) { return m.astreinte === true; });
