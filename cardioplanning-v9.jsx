@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.66 — 16/08/2026";
+const APP_VERSION="v10.67 — 16/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6042,7 +6042,7 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
   </div>;
 }
 
-function InternesTile({intCfg,setIntCfg}){
+function InternesTile({intCfg,setIntCfg,actes=[]}){
   const num=(v)=>Math.max(0,Math.min(9,parseInt(v||"0",10)||0));
   const maj=(patch)=>setIntCfg(p=>({...p,...patch}));
   const inp=(k,def)=><input type="number" min={0} max={9} value={intCfg[k]===undefined?def:intCfg[k]} onChange={e=>{const o={};o[k]=num(e.target.value);maj(o);}} style={{...S.fi,width:52,textAlign:"center"}}/>;
@@ -6064,6 +6064,24 @@ function InternesTile({intCfg,setIntCfg}){
       <span>Samedi matin : alerte si moins de</span>{inp("sSam",1)}<span>en HC</span>
     </div>
     <div style={{fontSize:11,color:"var(--txt3)"}}>0 = pas d'alerte pour ce compteur. La jauge s'appuiera sur ces seuils dans l'onglet Internes.</div>
+    {(()=>{ /* v10.67 : quelles activités l'onglet Internes propose — sa demande */
+      const off=intCfg.actOff||[];
+      const masquables=intActesTuiles(actes,false,[]).filter(t=>t.id!=="REPOS_GARDE")
+        .concat(actes.filter(a=>a.interneOk===true&&!a.isSystem&&a.hasSalle&&ABS_IDS.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color,salle:true})));
+      const bascule=(id)=>maj({actOff:off.indexOf(id)>=0?off.filter(x=>x!==id):off.concat([id])});
+      return <div style={{marginTop:10,paddingTop:9,borderTop:"1px solid var(--border)"}}>
+        <div style={{fontSize:12.5,fontWeight:700,color:"var(--txt)",marginBottom:3}}>Activités proposées dans l'onglet</div>
+        <div style={{fontSize:11,color:"var(--txt3)",marginBottom:7}}>Décochée : l'activité disparaît des tuiles de la modale et des statistiques de l'onglet Internes. La garde et le repos de garde restent toujours proposés, et les poses déjà faites restent visibles.</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"5px 16px"}}>
+          {masquables.map(t=><label key={t.id} title={t.label} style={{display:"flex",alignItems:"center",gap:5,fontSize:11.5,fontWeight:600,color:"var(--txt)",cursor:"pointer"}}>
+            <input type="checkbox" checked={off.indexOf(t.id)<0} onChange={()=>bascule(t.id)} style={{width:13,height:13}}/>
+            <span style={{width:9,height:9,borderRadius:3,background:t.color,display:"inline-block",flexShrink:0}}/>
+            {t.short}{t.salle?<span style={{fontSize:9,color:"var(--txt3)",fontWeight:600}}> salle</span>:null}
+          </label>)}
+          {masquables.length===0&&<span style={{fontSize:10,color:"var(--txt3)"}}>Aucune activité cochée 🎓 pour l'instant — la coche se met dans la modale de chaque activité.</span>}
+        </div>
+      </div>;
+    })()}
   </div>;
 }
 
@@ -6079,12 +6097,16 @@ function InternesTile({intCfg,setIntCfg}){
    s'affiche désormais dans la grille. */
 function intISO2(y,m0,d){return y+"-"+String(m0+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
 function intTxt(bg){try{return hexToLum(bg)>0.35?"#111":"#fff";}catch(e){return "#fff";}}
-function intActesTuiles(actes,sam){
+function intActesTuiles(actes,sam,actOff){
+  /* v10.67 : actOff (Paramètres, tuile Internes) masque une activité de l'onglet —
+     la garde et son repos ne se masquent jamais, sa règle. */
+  const off=actOff||[];
+  const keep=t=>t.id==="REPOS_GARDE"||off.indexOf(t.id)<0;
   const hc={id:"TOUR_HC",short:"HC",label:sam?"Samedi matin":"Tour HC",color:"#388bfd"};
-  if(sam)return [hc,{id:"ABSENCE",short:"ABS",label:"Absence / Congé",color:"#e06666"},{id:"FORMATION",short:"FMC",label:"Formation",color:"#a3e635"},{id:"REPOS_GARDE",short:"RG",label:"Repos de garde",color:"#ffe599"}];
+  if(sam)return [hc,{id:"ABSENCE",short:"ABS",label:"Absence / Congé",color:"#e06666"},{id:"FORMATION",short:"FMC",label:"Formation",color:"#a3e635"},{id:"REPOS_GARDE",short:"RG",label:"Repos de garde",color:"#ffe599"}].filter(keep);
   const perso=actes.filter(a=>a.interneOk===true&&!a.isSystem&&!a.hasSalle&&ABS_IDS.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color}));
   return [hc,{id:"TOUR_USIC",short:"USIC",label:"Tour USIC",color:"#4285f4"}].concat(perso)
-    .concat([{id:"ABSENCE",short:"ABS",label:"Absence / Congé",color:"#e06666"},{id:"FORMATION",short:"FMC",label:"Formation",color:"#a3e635"},{id:"REPOS_GARDE",short:"RG",label:"Repos de garde",color:"#ffe599"}]);
+    .concat([{id:"ABSENCE",short:"ABS",label:"Absence / Congé",color:"#e06666"},{id:"FORMATION",short:"FMC",label:"Formation",color:"#a3e635"},{id:"REPOS_GARDE",short:"RG",label:"Repos de garde",color:"#ffe599"}]).filter(keep);
 }
 function intJourBloque(getEntries,mid,y,m,d){
   return getEntries(mid,y,m,d,"JOUR").some(e=>e&&e.acteId&&(ABS_IDS.indexOf(e.acteId)>=0||e.acteId==="REPOS_GARDE"));
@@ -6098,7 +6120,7 @@ function intGardeVeille(getEntries,mid,y,m,d){
   return ["N","JOUR"].some(sl=>getEntries(mid,v[0],v[1]-1,v[2],sl).some(e=>e&&e.acteId==="GARDE"));
 }
 
-function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry,canSalle=false,salleReg=[]}){
+function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry,canSalle=false,salleReg=[],actOff=[]}){
   const [cren,setCren]=useState(slot0==="AM"?"AM":"M");
   const [per,setPer]=useState(null);
   const [pd1,setPd1]=useState(intISO2(y,m,d));
@@ -6109,11 +6131,11 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const iso=intISO2(y,m,d);
   const dw=dow(y,m,d);
   const sam=dw===6;
-  const tuiles=intActesTuiles(actes,sam);
+  const tuiles=intActesTuiles(actes,sam,actOff);
   /* v10.62, lot Salles : activités à salle cochées 🎓 — posables ici par l'éditeur,
      un intermédiaire ou un cadre uniquement, jamais par les internes ni l'administratif.
      Le choix de salle est obligatoire, la salle s'affiche ensuite sur la pastille. */
-  const tuilesSalle=(canSalle&&!sam)?actes.filter(a=>a.interneOk===true&&!a.isSystem&&a.hasSalle&&ABS_IDS.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color,salles:a.salles||[],fixedSalle:a.fixedSalle||null})):[];
+  const tuilesSalle=(canSalle&&!sam)?actes.filter(a=>a.interneOk===true&&!a.isSystem&&a.hasSalle&&ABS_IDS.indexOf(a.id)<0&&actOff.indexOf(a.id)<0).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color,salles:a.salles||[],fixedSalle:a.fixedSalle||null})):[];
   const salleSite=(s)=>{const r=(salleReg||[]).find(x=>x.n===s);return r?(Array.isArray(r.s)?r.s.join("/"):r.s):"";};
   const mid=med.id;
   const dansSem=(iso2)=>iso2>=med.sDeb&&iso2<=med.sFin;
@@ -6179,13 +6201,13 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   };
   const clicSalle=(t)=>{
     if(intJourBloque(getEntries,mid,y,m,d)){toast("La journée porte une absence, une FMC ou un repos — retirez-les d'abord (croix ci-dessus)","warn");return;}
-    if(t.fixedSalle){if(dw===1&&!sam){setSemQ({id:t.id,salle:t.fixedSalle});return;}poseCren(t.id,t.fixedSalle);return;}
+    if(t.fixedSalle){poseCren(t.id,t.fixedSalle);return;}
     if(!(t.salles||[]).length){toast("Cette activité n'a pas de salle définie — réglez-la dans l'onglet Activités","warn");return;}
     setSalleQ(t);
   };
+  /* v10.67 : les activités à salle se posent au créneau, jamais à la semaine — sa règle */
   const choisitSalle=(s)=>{
     const t=salleQ;setSalleQ(null);
-    if(dw===1&&!sam){setSemQ({id:t.id,salle:s});return;}
     poseCren(t.id,s);
   };
   const appliquePeriode=()=>{
@@ -6299,7 +6321,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
           <button onClick={()=>{setPd1(intISO2(y,m,1));setPd2(intISO2(y,m+1,0));}} style={{...S.icnBtn,fontSize:10}}>le mois</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
-          {intActesTuiles(actes,false).map(t=>
+          {intActesTuiles(actes,false,actOff).map(t=>
             <button key={t.id} onClick={()=>setPSel(t.id)} style={{padding:"7px 10px",borderRadius:8,cursor:"pointer",textAlign:"left",background:t.color,color:intTxt(t.color),border:pSel===t.id?"2.5px solid var(--txt)":"2.5px solid transparent"}}>
               <span style={{display:"block",fontSize:10.5,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{t.short}</span>
               <span style={{display:"block",fontSize:11,fontWeight:700}}>{t.label}</span>
@@ -6654,30 +6676,24 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
       /* v10.65 : mêmes activités « techniques » que les tuiles de la modale de case —
          Technique apparaîtra d'elle-même quand il l'aura créée ; les activités à
          salle restent hors stats (« pas indispensables », sa règle). */
+      const actOff=intCfg.actOff||[];
       const exActes=actes.filter(a=>a.interneOk===true&&!a.isSystem&&!a.hasSalle&&ABS_IDS.indexOf(a.id)<0&&a.id!=="REPOS_GARDE");
-      const exVis=exActes.filter(a=>!((intCfg.statsOff||[]).includes(a.id)));
+      const exVis=exActes.filter(a=>actOff.indexOf(a.id)<0);
+      const showHC=actOff.indexOf("TOUR_HC")<0,showUS=actOff.indexOf("TOUR_USIC")<0;
       const st=intStats(getEntries,cols,jours,exVis);
-      const fmtJ=n=>n===0?"—":(n%2===0?String(n/2):(n===1?"½":String(Math.floor(n/2))+"½"));
+      const fmtJ=n=>n===0?"—":(n/2).toString().replace(".",","); /* v10.67 : virgule, sa préférence */
       const CAT_L={sem:"Sem",jeu:"Jeu",ven:"Ven",sam:"Sam",dim:"Dim"};
       const num={textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,fontSize:12,color:"var(--txt)",padding:"4px 3px"};
       return <Ov onClose={()=>setStatsOpen(false)}>
         <div style={{...S.modal,maxWidth:720,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
           <div style={S.mHd}><div style={S.mTit2}>{"📊 Statistiques — "+titre}</div><button onClick={()=>setStatsOpen(false)} style={S.xBtn}>×</button></div>
-          <div style={{fontSize:10,color:"var(--txt3)",margin:"4px 0 8px"}}>{"Sur la période affichée ("+jours.length+" jours"+(showFull?"":", depuis aujourd'hui")+"). Gardes : total puis par catégorie (férié = dimanche, veille de férié = vendredi, comme chez les médecins). Le reste en jours, ½ = demi-journée."}</div>
-          {exActes.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:8,alignItems:"center"}}>
-            <span style={{fontSize:9,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase"}}>Activités :</span>
-            {exActes.map(a=>{const off=(intCfg.statsOff||[]).includes(a.id);
-              return <button key={a.id} disabled={!canEdit||!setIntCfg}
-                onClick={()=>setIntCfg&&setIntCfg(p=>{const cur=p.statsOff||[];return {...p,statsOff:off?cur.filter(x=>x!==a.id):cur.concat([a.id])};})}
-                title={off?"Cliquer pour afficher la colonne":"Cliquer pour masquer la colonne"}
-                style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,cursor:(canEdit&&setIntCfg)?"pointer":"default",border:`1px solid ${off?"var(--border)":"#1d4ed8"}`,background:off?"var(--bg2)":"rgba(56,139,253,.12)",color:off?"var(--txt3)":"#1d4ed8",textDecoration:off?"line-through":"none"}}>{a.short||a.label}</button>;})}
-          </div>}
+          <div style={{fontSize:10,color:"var(--txt3)",margin:"4px 0 8px"}}>{"Sur la période affichée ("+jours.length+" jours"+(showFull?"":", depuis aujourd'hui")+"). Gardes : total puis par catégorie (férié = dimanche, veille de férié = vendredi, comme chez les médecins). Le reste en jours (0,5 = demi-journée). Activités affichées : Paramètres, tuile Internes."}</div>
           <table style={{borderCollapse:"collapse",width:"100%"}}>
             <thead><tr>
               <th style={{...S.th,textAlign:"left",paddingLeft:8}}>Interne</th>
               <th style={{...S.th,padding:"4px 3px"}} title="Gardes posées (total)">🌙</th>
               {GCATS_INT.map(c2=><th key={c2} style={{...S.th,padding:"4px 3px",fontSize:9}}>{CAT_L[c2]}</th>)}
-              <th style={{...S.th,padding:"4px 3px"}}>HC</th><th style={{...S.th,padding:"4px 3px"}}>USIC</th>
+              {showHC&&<th style={{...S.th,padding:"4px 3px"}}>HC</th>}{showUS&&<th style={{...S.th,padding:"4px 3px"}}>USIC</th>}
               {exVis.map(a=><th key={a.id} style={{...S.th,padding:"4px 3px"}}>{a.short||a.label}</th>)}
             </tr></thead>
             <tbody>
@@ -6685,8 +6701,8 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
                 <td style={{padding:"4px 8px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{...S.avT,background:c.color,flexShrink:0}}>{c.init}</div><span style={{fontSize:12,fontWeight:700,color:"var(--txt)",maxWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</span></div></td>
                 <td style={{...num,fontWeight:800}}>{s.gardes}</td>
                 {GCATS_INT.map(c2=><td key={c2} style={{...num,color:s.cat[c2]?"var(--txt)":"var(--txt3)",fontWeight:s.cat[c2]?700:500}}>{s.cat[c2]||"·"}</td>)}
-                <td style={num}>{fmtJ(s.hc)}</td>
-                <td style={num}>{fmtJ(s.us)}</td>
+                {showHC&&<td style={num}>{fmtJ(s.hc)}</td>}
+                {showUS&&<td style={num}>{fmtJ(s.us)}</td>}
                 {exVis.map(a=><td key={a.id} style={num}>{fmtJ(s.ex[a.id])}</td>)}
               </tr>;})}
             </tbody>
@@ -6694,7 +6710,7 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
         </div>
       </Ov>;
     })()}
-    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} canSalle={canSalle} salleReg={salleReg}/>}
+    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} canSalle={canSalle} salleReg={salleReg} actOff={intCfg.actOff||[]}/>}
     {gm&&<InternesGardeModal y={gm.y} m={gm.m} d={gm.d} jours={jours} onClose={()=>setGm(null)} intCfg={intCfg} getEntries={getEntries} setEntry={setEntry}/>}
   </div>;
 }
@@ -9748,7 +9764,7 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<ExportCard per={expPer} setPer={setExpPer} source={expSrc} setSource={setExpSrc}
             backups={backupList} seuil={expSeuil} setSeuil={setExpSeuil} dernier={expLast}
             onExport={doExport} occupe={expBusy}/>}
-          <InternesTile intCfg={intCfg} setIntCfg={setIntCfg}/>
+          <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes}/>
           <div style={{...S.card,marginBottom:10}}>
             {/* Vacances scolaires */}
             <div style={{...S.card,marginBottom:10}}>
