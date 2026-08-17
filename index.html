@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.76 — 17/08/2026";
+var APP_VERSION = "v10.77 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -8584,27 +8584,30 @@ function CardioPlanning() {
     var acteById = useCallback(function (id) { return actes.find(function (a) { return a.id === id; }); }, [actes]);
     var isEdit = (accessMode === "edit" || (accessMode === "medecinEdit" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).niveau) || "basic") === "editeur" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).role) || "medecin") !== "attache")) && !netOff; /* v10.73 */ // hors ligne : lecture seule
     // ─── Undo/Redo history (edit mode) ───
-    var histRef = useRef({ stack: [], idx: -1, restoring: 0 });
+    const histRef = useRef({ stack: [], pas: [], idx: -1, restoring: 0 });
     /* v10.28 : un changement recu du SERVEUR n'est pas une action de cette personne.
        Sans ce drapeau, le travail d'un collegue entrait dans MA pile et mon retour
-       arriere le defaisait. Rabaisse apres CHAQUE rendu par l'effet sans dependances
-       declare juste apres celui de l'historique. */
-    var fromServer = useRef(false);
-    var _60 = useState(0), histVer = _60[0], setHistVer = _60[1];
-    /* v10.27 : les trois donnees de l'onglet Reports entrent dans l'historique. Avant,
-       poser un report ecrivait un commentaire (donc creait un cran) mais le report
-       lui-meme restait hors photo ; cocher « rouvert » ne creait aucun cran du tout. */
-    var histSnapshot = function () { return ({ plan: plan, tourMed: tourMed, astreinte: astreinte, notes: notes, planningType: planningType, csBlanches: csBlanches, csRep: csRep, csActsSel: csActsSel }); };
+       arriere le defaisait. Il est leve par le gestionnaire de messages Firestore et
+       rabaisse apres CHAQUE rendu (effet sans dependances, declare juste apres celui
+       de l'historique) : meme un message qui ne change rien ne le laisse pas colle. */
+    const fromServer = useRef(false);
+    const [histVer, setHistVer] = useState(0);
+    /* v10.27 : les trois donnees de l'onglet Reports entrent dans l'historique.
+       Avant, poser un report ecrivait un commentaire (donc creait un cran) mais le
+       report lui-meme restait hors photo : un retour arriere retirait le commentaire
+       et laissait le report en place — les deux donnees se contredisaient. Cocher
+       « rouvert » ou une semaine blanche ne creait, lui, aucun cran du tout. */
+    const histSnapshot = () => ({ plan, tourMed, astreinte, notes, planningType, csBlanches, csRep, csActsSel });
     /* v10.8 : sérialisation à CLÉS TRIÉES. Mon dédoublonnage de la v10.7 comparait deux
        textes bruts ; or l'écho du serveur renvoie les mêmes données dans un ORDRE DE CLÉS
        différent, donc le doublon passait quand même et le premier « retour » revenait sur
        un état identique. Avec un ordre stable, deux états de même contenu sont reconnus
        égaux — et le drapeau de restauration devient d'ailleurs superflu, l'état restauré
        étant par construction égal au cran visé. */
-    var histStr = function (o) { return JSON.stringify(o, function (k, v) { return (v && typeof v === "object" && !Array.isArray(v))
-        ? Object.keys(v).sort().reduce(function (a, x) { a[x] = v[x]; return a; }, {}) : v; }); };
-    useEffect(function () {
-        var h = histRef.current;
+    const histStr = (o) => JSON.stringify(o, (k, v) => (v && typeof v === "object" && !Array.isArray(v))
+        ? Object.keys(v).sort().reduce((a, x) => { a[x] = v[x]; return a; }, {}) : v);
+    useEffect(() => {
+        const h = histRef.current;
         /* v10.6 : pendant le chargement on ne remplit pas la pile, mais on RETIENT l'état
            courant. Sans lui, la pile ne contenait après la première pose qu'un seul cran —
            celui d'APRÈS — et le premier clic sur « retour » reculait vers ce même état :
@@ -8620,12 +8623,31 @@ function CardioPlanning() {
            se grisait. On compte désormais les cinq signaux avant de rendre la main. */
         if (h.restoring > 0) {
             h.restoring--;
+            /* v10.77 : apres un retour, le sommet vaut l'etat REEL (le mien defait, celui
+               des autres intact). Sans cela le pas suivant reprendrait leurs cases. */
+            const sr = histStr(histSnapshot());
+            if (h.idx >= 0 && h.stack.length)
+                h.stack[h.idx] = sr;
+            else
+                h.depart = sr;
             return;
         }
-        if (fromServer.current)
-            return; /* v10.28 : pas mon geste, pas mon cran */
+        /* v10.77 : un message du serveur ne cree pas de cran, mais il MET A JOUR le
+           sommet de la pile. Sans cela, la modification du collegue entrait dans ma
+           photo suivante, et mon retour arriere la supprimait (bug reproduit en 4
+           gestes le 17/08/2026). Le sommet remis a jour, le prochain cran ne contient
+           plus que MON geste. */
+        if (fromServer.current) {
+            const sv = histStr(histSnapshot());
+            if (h.idx >= 0 && h.stack.length)
+                h.stack[h.idx] = sv;
+            else
+                h.depart = sv;
+            return;
+        }
         if (h.stack.length === 0 && h.depart) {
             h.stack.push(h.depart);
+            h.pas = [null];
             h.idx = 0;
         }
         /* v10.7 : une seule pose déclenche DEUX fois cet effet — la modification, puis l'écho
@@ -8634,32 +8656,37 @@ function CardioPlanning() {
            rien ne bougeait, d'où les deux clics nécessaires. Le « avant » n'était pas touché,
            puisqu'il avançait vers un cran réellement différent. On n'empile plus un état
            identique au sommet de la pile. */
-        var snap = histStr(histSnapshot());
+        const snap = histStr(histSnapshot());
         if (h.stack[h.idx] === snap)
             return;
         // Truncate redo branch, push snapshot
+        const pas = h.idx >= 0 ? histPas(h.stack[h.idx], snap) : null; /* v10.77 : ce que CE geste a change */
         h.stack = h.stack.slice(0, h.idx + 1);
+        h.pas = (h.pas || [null]).slice(0, h.idx + 1);
         h.stack.push(snap);
-        if (h.stack.length > 50)
+        h.pas.push(pas);
+        if (h.stack.length > 50) {
             h.stack.shift();
+            h.pas.shift();
+        }
         h.idx = h.stack.length - 1;
-        setHistVer(function (v) { return v + 1; });
+        setHistVer(v => v + 1);
     }, [plan, tourMed, astreinte, notes, planningType, csBlanches, csRep, csActsSel]);
     /* Sans dependances : s'execute a chaque rendu, donc toujours APRES l'effet
        ci-dessus (les effets s'executent dans l'ordre de declaration). */
-    useEffect(function () { fromServer.current = false; });
+    useEffect(() => { fromServer.current = false; });
     /* ── v10.28 : un retour arriere applique la DIFFERENCE entre le cran quitte et
        le cran vise, jamais la photo entiere. Une case modifiee entre-temps par
        quelqu'un d'autre n'apparait dans aucun des deux crans : elle est donc laissee
        telle quelle au lieu d'etre ecrasee par un etat perime. ── */
-    var memeVal = function (a, b) { return histStr(a === undefined ? null : a) === histStr(b === undefined ? null : b); };
+    const memeVal = (a, b) => histStr(a === undefined ? null : a) === histStr(b === undefined ? null : b);
     /* un niveau de cles (notes, astreinte, tour, planning type, donnees de Reports) */
-    var deltaObj = function (av, ap, cur) {
-        var A = av || {}, B = ap || {}, out = __assign({}, (cur || {}));
-        var cles = {};
-        Object.keys(A).forEach(function (k) { return cles[k] = 1; });
-        Object.keys(B).forEach(function (k) { return cles[k] = 1; });
-        Object.keys(cles).forEach(function (k) {
+    const deltaObj = (av, ap, cur) => {
+        const A = av || {}, B = ap || {}, out = Object.assign({}, (cur || {}));
+        const cles = {};
+        Object.keys(A).forEach(k => cles[k] = 1);
+        Object.keys(B).forEach(k => cles[k] = 1);
+        Object.keys(cles).forEach(k => {
             if (memeVal(A[k], B[k]))
                 return; /* l'action n'a pas touche a cette cle */
             if (B[k] === undefined)
@@ -8671,20 +8698,20 @@ function CardioPlanning() {
     };
     /* le planning a DEUX niveaux : demi-journee, puis medecin — deux personnes
        peuvent modifier la meme demi-journee sur des lignes differentes */
-    var deltaPlan = function (av, ap, cur) {
-        var A = av || {}, B = ap || {}, out = __assign({}, (cur || {}));
-        var cles = {};
-        Object.keys(A).forEach(function (k) { return cles[k] = 1; });
-        Object.keys(B).forEach(function (k) { return cles[k] = 1; });
-        Object.keys(cles).forEach(function (k) {
-            var a2 = A[k] || {}, b2 = B[k] || {};
+    const deltaPlan = (av, ap, cur) => {
+        const A = av || {}, B = ap || {}, out = Object.assign({}, (cur || {}));
+        const cles = {};
+        Object.keys(A).forEach(k => cles[k] = 1);
+        Object.keys(B).forEach(k => cles[k] = 1);
+        Object.keys(cles).forEach(k => {
+            const a2 = A[k] || {}, b2 = B[k] || {};
             if (memeVal(a2, b2))
                 return;
-            var c2 = __assign({}, (out[k] || {}));
-            var ids = {};
-            Object.keys(a2).forEach(function (x) { return ids[x] = 1; });
-            Object.keys(b2).forEach(function (x) { return ids[x] = 1; });
-            Object.keys(ids).forEach(function (x) {
+            const c2 = Object.assign({}, (out[k] || {}));
+            const ids = {};
+            Object.keys(a2).forEach(x => ids[x] = 1);
+            Object.keys(b2).forEach(x => ids[x] = 1);
+            Object.keys(ids).forEach(x => {
                 if (cellKey(a2[x]) === cellKey(b2[x]))
                     return;
                 if (b2[x] === undefined)
@@ -8699,90 +8726,194 @@ function CardioPlanning() {
         });
         return out;
     };
+    /* ── v10.77 : un cran retient la LISTE des cases qu'il a changees. Le retour
+       arriere ne touche que celles-la : ce qu'un collegue a pose entre-temps n'est
+       jamais dans la liste, donc jamais defait. ── */
+    const delObj = (A, B) => {
+        const a = A || {}, b = B || {}, cles = {}, out = {};
+        Object.keys(a).forEach(k => cles[k] = 1);
+        Object.keys(b).forEach(k => cles[k] = 1);
+        Object.keys(cles).forEach(k => { if (!memeVal(a[k], b[k]))
+            out[k] = [a[k], b[k]]; });
+        return out;
+    };
+    const delPlan = (A, B) => {
+        const a = A || {}, b = B || {}, cles = {}, out = {};
+        Object.keys(a).forEach(k => cles[k] = 1);
+        Object.keys(b).forEach(k => cles[k] = 1);
+        Object.keys(cles).forEach(k => {
+            const a2 = a[k] || {}, b2 = b[k] || {};
+            if (memeVal(a2, b2))
+                return;
+            const ids = {}, d = {};
+            Object.keys(a2).forEach(x => ids[x] = 1);
+            Object.keys(b2).forEach(x => ids[x] = 1);
+            Object.keys(ids).forEach(x => { if (cellKey(a2[x]) !== cellKey(b2[x]))
+                d[x] = [a2[x], b2[x]]; });
+            if (Object.keys(d).length)
+                out[k] = d;
+        });
+        return out;
+    };
+    const HIST_CHAMPS = ["tourMed", "astreinte", "notes", "planningType", "csBlanches", "csRep", "csActsSel"];
+    const histPas = (snAv, snAp) => {
+        try {
+            const A = JSON.parse(snAv), B = JSON.parse(snAp);
+            const p = { plan: delPlan(A.plan, B.plan) };
+            HIST_CHAMPS.forEach(c => { p[c] = delObj(A[c], B[c]); });
+            return p;
+        }
+        catch (e) {
+            return null;
+        }
+    };
+    /* pose des seules cases du pas ; null ou undefined = case vidée */
+    const posePlan = (cur, d) => {
+        const out = Object.assign({}, (cur || {}));
+        Object.keys(d || {}).forEach(k => {
+            const c2 = Object.assign({}, (out[k] || {}));
+            Object.keys(d[k]).forEach(x => { const v = d[k][x]; if (v === undefined || v === null)
+                delete c2[x];
+            else
+                c2[x] = v; });
+            if (Object.keys(c2).length === 0)
+                delete out[k];
+            else
+                out[k] = c2;
+        });
+        return out;
+    };
+    const poseObj = (cur, d) => {
+        const out = Object.assign({}, (cur || {}));
+        Object.keys(d || {}).forEach(k => { const v = d[k]; if (v === undefined || v === null)
+            delete out[k];
+        else
+            out[k] = v; });
+        return out;
+    };
+    const nbCases = (pas) => pas ? Object.keys(pas.plan || {}).reduce((n, k) => n + Object.keys(pas.plan[k]).length, 0) : 0;
     /* compte les cases du planning que le pas va reellement changer — garde-fou.
        v10.28 : compte le PAS (cran quitte -> cran vise), plus l'ecart avec l'etat
        courant, qui incluait a tort les modifications des autres. */
-    var histDiff = function (snAv, snAp) {
+    const histDiff = (snAv, snAp) => {
         try {
-            var A_1 = (JSON.parse(snAv).plan) || {}, B_1 = (JSON.parse(snAp).plan) || {};
-            var n_2 = 0;
-            var cles_2 = {};
-            Object.keys(A_1).forEach(function (k) { return cles_2[k] = 1; });
-            Object.keys(B_1).forEach(function (k) { return cles_2[k] = 1; });
-            Object.keys(cles_2).forEach(function (k) {
-                var a2 = A_1[k] || {}, b2 = B_1[k] || {};
-                var ids = {};
-                Object.keys(a2).forEach(function (x) { return ids[x] = 1; });
-                Object.keys(b2).forEach(function (x) { return ids[x] = 1; });
-                Object.keys(ids).forEach(function (x) { if (cellKey(a2[x]) !== cellKey(b2[x]))
-                    n_2++; });
+            const A = (JSON.parse(snAv).plan) || {}, B = (JSON.parse(snAp).plan) || {};
+            let n = 0;
+            const cles = {};
+            Object.keys(A).forEach(k => cles[k] = 1);
+            Object.keys(B).forEach(k => cles[k] = 1);
+            Object.keys(cles).forEach(k => {
+                const a2 = A[k] || {}, b2 = B[k] || {};
+                const ids = {};
+                Object.keys(a2).forEach(x => ids[x] = 1);
+                Object.keys(b2).forEach(x => ids[x] = 1);
+                Object.keys(ids).forEach(x => { if (cellKey(a2[x]) !== cellKey(b2[x]))
+                    n++; });
             });
-            return n_2;
+            return n;
         }
         catch (e) {
             return 0;
         }
     };
-    var applyStep = function (snAv, snAp) {
-        var A = JSON.parse(snAv), B = JSON.parse(snAp);
+    /* v10.77 : on ne repose QUE les cases du pas, et seulement si elles valent encore
+       ce qu'elles valaient. Une case reprise entre-temps par quelqu'un d'autre est
+       laissée telle quelle — on le signale plutôt que de trancher à sa place. */
+    const applyStep = (snAv, snAp, pas, sens) => {
+        const P = pas || histPas(snAv, snAp) || { plan: {} };
+        const s = sens < 0 ? 1 : 0; /* retour : l'état attendu est l'APRÈS du geste */
+        const att = v => v[s], vis = v => v[1 - s];
+        let nc = 0;
+        const cur = { plan, tourMed, astreinte, notes, planningType, csBlanches, csRep, csActsSel };
+        const dPlan = {};
+        Object.keys(P.plan || {}).forEach(k => {
+            const c2 = (cur.plan || {})[k] || {}, d = {};
+            Object.keys(P.plan[k]).forEach(x => {
+                const v = P.plan[k][x];
+                if (cellKey(c2[x]) !== cellKey(att(v))) {
+                    nc++;
+                    return;
+                }
+                d[x] = vis(v);
+            });
+            if (Object.keys(d).length)
+                dPlan[k] = d;
+        });
+        const dCh = {};
+        HIST_CHAMPS.forEach(c => {
+            const d = {};
+            Object.keys(P[c] || {}).forEach(k => {
+                const v = P[c][k];
+                if (!memeVal((cur[c] || {})[k], att(v))) {
+                    nc++;
+                    return;
+                }
+                d[k] = vis(v);
+            });
+            dCh[c] = d;
+        });
         histRef.current.restoring = 1; /* React regroupe les huit changements en un seul rendu */
-        setPlan(function (c) { return deltaPlan(A.plan, B.plan, c); });
-        setTourMed(function (c) { return deltaObj(A.tourMed, B.tourMed, c); });
-        setAstreinte(function (c) { return deltaObj(A.astreinte, B.astreinte, c); });
-        setNotes(function (c) { return deltaObj(A.notes, B.notes, c); });
-        setPlanningType(function (c) { return deltaObj(A.planningType, B.planningType, c); });
-        setCsBlanches(function (c) { return deltaObj(A.csBlanches, B.csBlanches, c); });
-        setCsRep(function (c) { return deltaObj(A.csRep, B.csRep, c); });
-        setCsActsSel(function (c) { return deltaObj(A.csActsSel, B.csActsSel, c); });
+        setPlan(c => posePlan(c, dPlan));
+        setTourMed(c => poseObj(c, dCh.tourMed));
+        setAstreinte(c => poseObj(c, dCh.astreinte));
+        setNotes(c => poseObj(c, dCh.notes));
+        setPlanningType(c => poseObj(c, dCh.planningType));
+        setCsBlanches(c => poseObj(c, dCh.csBlanches));
+        setCsRep(c => poseObj(c, dCh.csRep));
+        setCsActsSel(c => poseObj(c, dCh.csActsSel));
+        if (nc > 0)
+            toast(nc > 1 ? (nc + " cases ont été modifiées depuis par quelqu'un d'autre — laissées telles quelles") : "Une case a été modifiée depuis par quelqu'un d'autre — laissée telle quelle", "warn");
     };
-    var canUndo = histRef.current.idx > 0;
-    var canRedo = histRef.current.idx < histRef.current.stack.length - 1;
-    var HIST_SEUIL = 5; /* au-delà, on demande confirmation : une action de masse ne se défait pas par mégarde */
-    var doUndo = function () {
-        var h = histRef.current;
+    const canUndo = histRef.current.idx > 0;
+    const canRedo = histRef.current.idx < histRef.current.stack.length - 1;
+    const HIST_SEUIL = 5; /* au-delà, on demande confirmation : une action de masse ne se défait pas par mégarde */
+    const doUndo = () => {
+        const h = histRef.current;
         if (h.idx <= 0)
             return;
-        var n = histDiff(h.stack[h.idx], h.stack[h.idx - 1]);
+        const n = nbCases(h.pas && h.pas[h.idx]) || histDiff(h.stack[h.idx], h.stack[h.idx - 1]);
         if (n > HIST_SEUIL) {
-            setHistConf({ sens: "undo", n: n });
+            setHistConf({ sens: "undo", n });
             return;
         }
-        applyStep(h.stack[h.idx], h.stack[h.idx - 1]);
+        applyStep(h.stack[h.idx], h.stack[h.idx - 1], h.pas && h.pas[h.idx], -1);
         h.idx--;
-        setHistVer(function (v) { return v + 1; });
+        setHistVer(v => v + 1);
     };
-    var _61 = useState(null), histConf = _61[0], setHistConf = _61[1];
-    var histGo = function () {
-        var h = histRef.current;
+    const [histConf, setHistConf] = useState(null);
+    const histGo = () => {
+        const h = histRef.current;
         if (histConf && histConf.sens === "undo") {
             if (h.idx > 0) {
-                applyStep(h.stack[h.idx], h.stack[h.idx - 1]);
+                applyStep(h.stack[h.idx], h.stack[h.idx - 1], h.pas && h.pas[h.idx], -1);
                 h.idx--;
-                setHistVer(function (v) { return v + 1; });
+                setHistVer(v => v + 1);
             }
         }
         else {
             if (h.idx < h.stack.length - 1) {
-                applyStep(h.stack[h.idx], h.stack[h.idx + 1]);
+                applyStep(h.stack[h.idx], h.stack[h.idx + 1], h.pas && h.pas[h.idx + 1], 1);
                 h.idx++;
-                setHistVer(function (v) { return v + 1; });
+                setHistVer(v => v + 1);
             }
         }
         setHistConf(null);
     };
-    var doRedo = function () {
-        var h = histRef.current;
+    const doRedo = () => {
+        const h = histRef.current;
         if (h.idx >= h.stack.length - 1)
             return;
-        var n = histDiff(h.stack[h.idx], h.stack[h.idx + 1]);
+        const n = nbCases(h.pas && h.pas[h.idx + 1]) || histDiff(h.stack[h.idx], h.stack[h.idx + 1]);
         if (n > HIST_SEUIL) {
-            setHistConf({ sens: "redo", n: n });
+            setHistConf({ sens: "redo", n });
             return;
         }
-        applyStep(h.stack[h.idx], h.stack[h.idx + 1]);
+        applyStep(h.stack[h.idx], h.stack[h.idx + 1], h.pas && h.pas[h.idx + 1], 1);
         h.idx++;
-        setHistVer(function (v) { return v + 1; });
-    };    var medLvl = accessMode === "medecinEdit" ? (((medecins.find(function (m) { return m.id === editMedId; }) || {}).niveau) || "basic") : null;
+        setHistVer(v => v + 1);
+    };
+    /* ── v9.11 : niveaux de droits (basic | inter | editeur) portés par la fiche médecin ── */
+    var medLvl = accessMode === "medecinEdit" ? (((medecins.find(function (m) { return m.id === editMedId; }) || {}).niveau) || "basic") : null;
     var isMedEdit = accessMode === "medecinEdit" && medLvl !== "editeur" && !netOff;
     var isInterEdit = accessMode === "medecinEdit" && medLvl === "inter" && !netOff;
     /* v10.73 : un ATTACHE n'agit que dans l'onglet Attaches. */

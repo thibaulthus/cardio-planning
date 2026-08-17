@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.76 — 17/08/2026";
+const APP_VERSION="v10.77 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -7723,7 +7723,7 @@ function CardioPlanning(){
   const acteById=useCallback(id=>actes.find(a=>a.id===id),[actes]);
   const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"&&(((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")!=="attache"))&&!netOff;  /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
   // ─── Undo/Redo history (edit mode) ───
-  const histRef=useRef({stack:[],idx:-1,restoring:0});
+  const histRef=useRef({stack:[],pas:[],idx:-1,restoring:0});
   /* v10.28 : un changement recu du SERVEUR n'est pas une action de cette personne.
      Sans ce drapeau, le travail d'un collegue entrait dans MA pile et mon retour
      arriere le defaisait. Il est leve par le gestionnaire de messages Firestore et
@@ -7757,9 +7757,23 @@ function CardioPlanning(){
        quatre suivants étaient donc enregistrés comme de NOUVELLES actions, ce qui effaçait
        aussitôt la branche de rétablissement — d'où le bouton « avant » qui s'allumait puis
        se grisait. On compte désormais les cinq signaux avant de rendre la main. */
-    if(h.restoring>0){h.restoring--;return;}
-    if(fromServer.current)return;   /* v10.28 : pas mon geste, pas mon cran */
-    if(h.stack.length===0&&h.depart){h.stack.push(h.depart);h.idx=0;}
+    if(h.restoring>0){h.restoring--;
+      /* v10.77 : apres un retour, le sommet vaut l'etat REEL (le mien defait, celui
+         des autres intact). Sans cela le pas suivant reprendrait leurs cases. */
+      const sr=histStr(histSnapshot());
+      if(h.idx>=0&&h.stack.length)h.stack[h.idx]=sr;else h.depart=sr;
+      return;}
+    /* v10.77 : un message du serveur ne cree pas de cran, mais il MET A JOUR le
+       sommet de la pile. Sans cela, la modification du collegue entrait dans ma
+       photo suivante, et mon retour arriere la supprimait (bug reproduit en 4
+       gestes le 17/08/2026). Le sommet remis a jour, le prochain cran ne contient
+       plus que MON geste. */
+    if(fromServer.current){
+      const sv=histStr(histSnapshot());
+      if(h.idx>=0&&h.stack.length)h.stack[h.idx]=sv;else h.depart=sv;
+      return;
+    }
+    if(h.stack.length===0&&h.depart){h.stack.push(h.depart);h.pas=[null];h.idx=0;}
     /* v10.7 : une seule pose déclenche DEUX fois cet effet — la modification, puis l'écho
        du serveur qui repose le même contenu dans un nouvel objet. Deux crans identiques
        étaient donc empilés, et le premier « retour » revenait sur un état identique :
@@ -7769,9 +7783,11 @@ function CardioPlanning(){
     const snap=histStr(histSnapshot());
     if(h.stack[h.idx]===snap)return;
     // Truncate redo branch, push snapshot
+    const pas=h.idx>=0?histPas(h.stack[h.idx],snap):null;   /* v10.77 : ce que CE geste a change */
     h.stack=h.stack.slice(0,h.idx+1);
-    h.stack.push(snap);
-    if(h.stack.length>50)h.stack.shift();
+    h.pas=(h.pas||[null]).slice(0,h.idx+1);
+    h.stack.push(snap);h.pas.push(pas);
+    if(h.stack.length>50){h.stack.shift();h.pas.shift();}
     h.idx=h.stack.length-1;
     setHistVer(v=>v+1);
   },[plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel]);
@@ -7811,6 +7827,52 @@ function CardioPlanning(){
     });
     return out;
   };
+  /* ── v10.77 : un cran retient la LISTE des cases qu'il a changees. Le retour
+     arriere ne touche que celles-la : ce qu'un collegue a pose entre-temps n'est
+     jamais dans la liste, donc jamais defait. ── */
+  const delObj=(A,B)=>{
+    const a=A||{},b=B||{},cles={},out={};
+    Object.keys(a).forEach(k=>cles[k]=1);Object.keys(b).forEach(k=>cles[k]=1);
+    Object.keys(cles).forEach(k=>{if(!memeVal(a[k],b[k]))out[k]=[a[k],b[k]];});
+    return out;
+  };
+  const delPlan=(A,B)=>{
+    const a=A||{},b=B||{},cles={},out={};
+    Object.keys(a).forEach(k=>cles[k]=1);Object.keys(b).forEach(k=>cles[k]=1);
+    Object.keys(cles).forEach(k=>{
+      const a2=a[k]||{},b2=b[k]||{};
+      if(memeVal(a2,b2))return;
+      const ids={},d={};Object.keys(a2).forEach(x=>ids[x]=1);Object.keys(b2).forEach(x=>ids[x]=1);
+      Object.keys(ids).forEach(x=>{if(cellKey(a2[x])!==cellKey(b2[x]))d[x]=[a2[x],b2[x]];});
+      if(Object.keys(d).length)out[k]=d;
+    });
+    return out;
+  };
+  const HIST_CHAMPS=["tourMed","astreinte","notes","planningType","csBlanches","csRep","csActsSel"];
+  const histPas=(snAv,snAp)=>{
+    try{
+      const A=JSON.parse(snAv),B=JSON.parse(snAp);
+      const p={plan:delPlan(A.plan,B.plan)};
+      HIST_CHAMPS.forEach(c=>{p[c]=delObj(A[c],B[c]);});
+      return p;
+    }catch(e){return null;}
+  };
+  /* pose des seules cases du pas ; null ou undefined = case vidée */
+  const posePlan=(cur,d)=>{
+    const out={...(cur||{})};
+    Object.keys(d||{}).forEach(k=>{
+      const c2={...(out[k]||{})};
+      Object.keys(d[k]).forEach(x=>{const v=d[k][x];if(v===undefined||v===null)delete c2[x];else c2[x]=v;});
+      if(Object.keys(c2).length===0)delete out[k];else out[k]=c2;
+    });
+    return out;
+  };
+  const poseObj=(cur,d)=>{
+    const out={...(cur||{})};
+    Object.keys(d||{}).forEach(k=>{const v=d[k];if(v===undefined||v===null)delete out[k];else out[k]=v;});
+    return out;
+  };
+  const nbCases=(pas)=>pas?Object.keys(pas.plan||{}).reduce((n,k)=>n+Object.keys(pas.plan[k]).length,0):0;
   /* compte les cases du planning que le pas va reellement changer — garde-fou.
      v10.28 : compte le PAS (cran quitte -> cran vise), plus l'ecart avec l'etat
      courant, qui incluait a tort les modifications des autres. */
@@ -7826,17 +7888,45 @@ function CardioPlanning(){
       return n;
     }catch(e){return 0;}
   };
-  const applyStep=(snAv,snAp)=>{
-    const A=JSON.parse(snAv),B=JSON.parse(snAp);
+  /* v10.77 : on ne repose QUE les cases du pas, et seulement si elles valent encore
+     ce qu'elles valaient. Une case reprise entre-temps par quelqu'un d'autre est
+     laissée telle quelle — on le signale plutôt que de trancher à sa place. */
+  const applyStep=(snAv,snAp,pas,sens)=>{
+    const P=pas||histPas(snAv,snAp)||{plan:{}};
+    const s=sens<0?1:0;                 /* retour : l'état attendu est l'APRÈS du geste */
+    const att=v=>v[s], vis=v=>v[1-s];
+    let nc=0;
+    const cur={plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel};
+    const dPlan={};
+    Object.keys(P.plan||{}).forEach(k=>{
+      const c2=(cur.plan||{})[k]||{},d={};
+      Object.keys(P.plan[k]).forEach(x=>{
+        const v=P.plan[k][x];
+        if(cellKey(c2[x])!==cellKey(att(v))){nc++;return;}
+        d[x]=vis(v);
+      });
+      if(Object.keys(d).length)dPlan[k]=d;
+    });
+    const dCh={};
+    HIST_CHAMPS.forEach(c=>{
+      const d={};
+      Object.keys(P[c]||{}).forEach(k=>{
+        const v=P[c][k];
+        if(!memeVal((cur[c]||{})[k],att(v))){nc++;return;}
+        d[k]=vis(v);
+      });
+      dCh[c]=d;
+    });
     histRef.current.restoring=1;   /* React regroupe les huit changements en un seul rendu */
-    setPlan(c=>deltaPlan(A.plan,B.plan,c));
-    setTourMed(c=>deltaObj(A.tourMed,B.tourMed,c));
-    setAstreinte(c=>deltaObj(A.astreinte,B.astreinte,c));
-    setNotes(c=>deltaObj(A.notes,B.notes,c));
-    setPlanningType(c=>deltaObj(A.planningType,B.planningType,c));
-    setCsBlanches(c=>deltaObj(A.csBlanches,B.csBlanches,c));
-    setCsRep(c=>deltaObj(A.csRep,B.csRep,c));
-    setCsActsSel(c=>deltaObj(A.csActsSel,B.csActsSel,c));
+    setPlan(c=>posePlan(c,dPlan));
+    setTourMed(c=>poseObj(c,dCh.tourMed));
+    setAstreinte(c=>poseObj(c,dCh.astreinte));
+    setNotes(c=>poseObj(c,dCh.notes));
+    setPlanningType(c=>poseObj(c,dCh.planningType));
+    setCsBlanches(c=>poseObj(c,dCh.csBlanches));
+    setCsRep(c=>poseObj(c,dCh.csRep));
+    setCsActsSel(c=>poseObj(c,dCh.csActsSel));
+    if(nc>0)toast(nc>1?(nc+" cases ont été modifiées depuis par quelqu'un d'autre — laissées telles quelles"):"Une case a été modifiée depuis par quelqu'un d'autre — laissée telle quelle","warn");
   };
   const canUndo=histRef.current.idx>0;
   const canRedo=histRef.current.idx<histRef.current.stack.length-1;
@@ -7844,23 +7934,23 @@ function CardioPlanning(){
   const doUndo=()=>{
     const h=histRef.current;
     if(h.idx<=0)return;
-    const n=histDiff(h.stack[h.idx],h.stack[h.idx-1]);
+    const n=nbCases(h.pas&&h.pas[h.idx])||histDiff(h.stack[h.idx],h.stack[h.idx-1]);
     if(n>HIST_SEUIL){setHistConf({sens:"undo",n});return;}
-    applyStep(h.stack[h.idx],h.stack[h.idx-1]);h.idx--;setHistVer(v=>v+1);
+    applyStep(h.stack[h.idx],h.stack[h.idx-1],h.pas&&h.pas[h.idx],-1);h.idx--;setHistVer(v=>v+1);
   };
   const [histConf,setHistConf]=useState(null);
   const histGo=()=>{
     const h=histRef.current;
-    if(histConf&&histConf.sens==="undo"){if(h.idx>0){applyStep(h.stack[h.idx],h.stack[h.idx-1]);h.idx--;setHistVer(v=>v+1);}}
-    else{if(h.idx<h.stack.length-1){applyStep(h.stack[h.idx],h.stack[h.idx+1]);h.idx++;setHistVer(v=>v+1);}}
+    if(histConf&&histConf.sens==="undo"){if(h.idx>0){applyStep(h.stack[h.idx],h.stack[h.idx-1],h.pas&&h.pas[h.idx],-1);h.idx--;setHistVer(v=>v+1);}}
+    else{if(h.idx<h.stack.length-1){applyStep(h.stack[h.idx],h.stack[h.idx+1],h.pas&&h.pas[h.idx+1],1);h.idx++;setHistVer(v=>v+1);}}
     setHistConf(null);
   };
   const doRedo=()=>{
     const h=histRef.current;
     if(h.idx>=h.stack.length-1)return;
-    const n=histDiff(h.stack[h.idx],h.stack[h.idx+1]);
+    const n=nbCases(h.pas&&h.pas[h.idx+1])||histDiff(h.stack[h.idx],h.stack[h.idx+1]);
     if(n>HIST_SEUIL){setHistConf({sens:"redo",n});return;}
-    applyStep(h.stack[h.idx],h.stack[h.idx+1]);h.idx++;setHistVer(v=>v+1);
+    applyStep(h.stack[h.idx],h.stack[h.idx+1],h.pas&&h.pas[h.idx+1],1);h.idx++;setHistVer(v=>v+1);
   };
   /* ── v9.11 : niveaux de droits (basic | inter | editeur) portés par la fiche médecin ── */
   const medLvl=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic"):null;
