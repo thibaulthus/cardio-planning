@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.72 — 17/08/2026";
+const APP_VERSION="v10.73 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -7692,7 +7692,7 @@ function CardioPlanning(){
   useEffect(()=>{ applyTheme(darkMode); },[darkMode]);
   const toast=(msg,type="ok")=>{ setNotif({msg,type}); setTimeout(()=>setNotif(null),3500); };
   const acteById=useCallback(id=>actes.find(a=>a.id===id),[actes]);
-  const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"))&&!netOff; // hors ligne : lecture seule
+  const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"&&(((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")!=="attache"))&&!netOff;  /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
   // ─── Undo/Redo history (edit mode) ───
   const histRef=useRef({stack:[],idx:-1,restoring:0});
   /* v10.28 : un changement recu du SERVEUR n'est pas une action de cette personne.
@@ -7837,10 +7837,15 @@ function CardioPlanning(){
   const medLvl=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic"):null;
   const isMedEdit=accessMode==="medecinEdit"&&medLvl!=="editeur"&&!netOff;
   const isInterEdit=accessMode==="medecinEdit"&&medLvl==="inter"&&!netOff;
+  /* v10.73 : un ATTACHE connecte n'agit QUE dans l'onglet Attaches — sa ligne,
+     plus les lignes d'attaches cochees dans sa fiche s'il est intermediaire. */
+  const isAttEdit=accessMode==="medecinEdit"&&!netOff&&((((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")==="attache");
+  const attPeutMod=(medId)=>{const me=medecins.find(m=>m.id===editMedId)||{};const t=medecins.find(m=>m.id===medId)||{};
+    return (((t.role)||"medecin")==="attache")&&((me.attEdit)||[]).indexOf(t.init)>=0;};
   /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
   const hideTabs=accessMode==="interneEdit"?["construire","tourmedical","garde","astreinte","reports","attache","plantype","equipe","activites","stats","partage"]
     :accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte","construire"]
-    :isMedEdit?["activites","equipe","partage"].concat(isInterEdit?[]:["construire"])
+    :isMedEdit?["activites","equipe","partage"].concat(isInterEdit&&!isAttEdit?[]:["construire"])
     :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage","construire"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
@@ -7850,7 +7855,9 @@ function CardioPlanning(){
   const isInterne=accessMode==="interneEdit"&&!netOff; /* v10.69 : interne connecte (hors ligne = lecture seule) */
   const roleOkKey=isCadre?"cadreOk":"adminOk"; // v10.50 : la coche d'activité du rôle connecté
   // Returns true if current user can edit this specific medecin's data
-  const canEdit=(medId)=>isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit;
+  const canEdit=(medId)=>isAttEdit
+    ?((isMedEdit&&editMedId===medId)||(isInterEdit&&attPeutMod(medId)))
+    :(isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit);
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
   useEffect(()=>{authorRef.current=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+(isCadre?" (cadre)":" (secrétaire)")):(isInterne?((interneName||"?")+" (interne)"):(isEdit?"Éditeur":"?")));},[accessMode,isEdit,isMedEdit,isAdminEdit,isInterne,editMedId,adminName,interneName,medecins]);
   useEffect(()=>{ // purge du journal au-delà de 1200 entrées (éditeur uniquement, garde les 1000 plus récentes)
@@ -9118,14 +9125,14 @@ header::-webkit-scrollbar { display: none; }
       {tab==="tourmedical"&&<TourTab {...tourProps}/>}
 
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
-      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medecins} getEntries={getEntries} tourMed={tourMed} isEdit={isEdit||isInterEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
+      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medecins} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
+      {tab==="chl"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} notes={notes}
+        <SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -9138,12 +9145,12 @@ header::-webkit-scrollbar { display: none; }
       {tab==="plateau"&&<ActTabView title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfg}
         rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
-        getEntries={getEntries} allDays={allDays} notes={notes} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||isMedEdit} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} notes={notes} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||isCadre} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc}
-        allDays={allDays} isEdit={isEdit||isAdminEdit||isMedEdit} notes={notes}
+        allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
       {false&&null&&<ActTabView title="🔬 PT Angio" titleColor="#c084fc"
@@ -9178,7 +9185,7 @@ header::-webkit-scrollbar { display: none; }
             <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}} onClick={()=>openPtModal(null,"remove")}>🗑 Retirer</button>
           </div>}
           <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Semaine type par médecin. Le bouton ▶ PT l'applique aux mois de la période affichée (choix des mois et du point de départ dans la fenêtre). TM exclus automatiquement. Clic sur une case pour définir.</div>
-          <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={isEdit||isInterEdit} acteById={acteById} setMData={setMData} setModal={setModal} perDays={allDays4} onMedClick={isEdit?((med)=>setDeactMed(med.id)):null}/>
+          <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={(isEdit||isInterEdit)&&!isAttEdit} acteById={acteById} setMData={setMData} setModal={setModal} perDays={allDays4} onMedClick={isEdit?((med)=>setDeactMed(med.id)):null}/>
           {deactMed&&<DeactModal med={medecins.find(m=>m.id===deactMed)} perDays={allDays4} perLbl={perLibelle(perStart(year,month).sy,perStart(year,month).sm)} onSave={(rgs)=>saveOff(deactMed,rgs)} onClose={()=>setDeactMed(null)} countActs={(du,au)=>offCount(deactMed,du,au)} onClear={(du,au)=>offClear(deactMed,du,au)}/>}
           <PTOccRooms medecins={medecins} planningType={planningType} actes={actes} acteById={acteById} salleReg={salleReg} darkMode={darkMode} perDays={allDays4}/>
         </div>
@@ -11147,7 +11154,9 @@ header::-webkit-scrollbar { display: none; }
             <div style={{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,fontSize:10,fontWeight:800,color:"#e3b341",textTransform:"uppercase",letterSpacing:.5}}>🔐 Niveau de droits (avec son PIN personnel)</div>
             <div style={{gridColumn:"1/-1"}}>
               <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                {[["basic","Basique","Sa ligne uniquement"],["inter","Intermédiaire","Tous les médecins, sans le paramétrage"],["editeur","Éditeur","Accès complet"]].map(([v,lab,desc])=>{
+                {[["basic","Basique","Sa ligne uniquement"],["inter","Intermédiaire","Tous les médecins, sans le paramétrage"],["editeur","Éditeur","Accès complet"]]
+                  .filter(([v])=>{const r=mData.role||"medecin";return r==="ide"?v==="basic":r==="attache"?v!=="editeur":true;})  /* v10.73 */
+                  .map(([v,lab,desc])=>{
                   const on=((mData.niveau)||"basic")===v;
                   return <button key={v} type="button" onClick={()=>setMData(p=>({...p,niveau:v}))} title={desc}
                     style={{fontSize:11,padding:"4px 10px",borderRadius:11,cursor:"pointer",fontWeight:800,
@@ -11156,7 +11165,26 @@ header::-webkit-scrollbar { display: none; }
                       color:on?(v==="editeur"?"#dc2626":v==="inter"?"#b45309":"var(--txt)"):"var(--txt3)"}}>{lab}</button>;
                 })}
               </div>
-              <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>{((mData.niveau)||"basic")==="editeur"?"Accès complet, y compris Paramètres, Équipe, Activités et la récupération des codes PIN.":((mData.niveau)||"basic")==="inter"?"Planning de tous les médecins, gardes et échanges, semaines de tour, planning type, attachés. Pas de Paramètres, Équipe ni Activités.":"Ne modifie que sa propre ligne (+ ses activités dans CHL, CHB et les plateaux)."}</div>
+              <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>{(mData.role||"medecin")==="attache"
+                ?(((mData.niveau)||"basic")==="inter"?"Modifie sa ligne et celles des attachés cochés ci-dessous, uniquement dans l'onglet Attachés. Les autres onglets restent en consultation."
+                  :"Ne modifie que sa propre ligne, dans l'onglet Attachés. Les autres onglets restent en consultation.")
+                :((mData.niveau)||"basic")==="editeur"?"Accès complet, y compris Paramètres, Équipe, Activités et la récupération des codes PIN.":((mData.niveau)||"basic")==="inter"?"Planning de tous les médecins, gardes et échanges, semaines de tour, planning type, attachés. Pas de Paramètres, Équipe ni Activités.":"Ne modifie que sa propre ligne (+ ses activités dans CHL, CHB et les plateaux)."}</div>
+              {/* v10.73 : sa demande — les attachés dont un attaché INTERMÉDIAIRE peut
+                  modifier le planning. Toujours limité à l'onglet Attachés. */}
+              {(mData.role||"medecin")==="attache"&&((mData.niveau)||"basic")==="inter"&&<div style={{marginTop:8,paddingTop:8,borderTop:"1px dashed var(--border)"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#e3b341",marginBottom:4}}>👔 Plannings d'attachés qu'il peut modifier</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  {medecins.filter(m2=>((m2.role||"medecin")==="attache")&&m2.init&&m2.init!==mData.init).map(m2=>{
+                    const on=((mData.attEdit)||[]).indexOf(m2.init)>=0;
+                    return <button key={m2.id} type="button" title={((m2.prenom||"")+" "+(m2.nom||"")).trim()}
+                      onClick={()=>setMData(p=>{const cur=(p.attEdit)||[];return {...p,attEdit:on?cur.filter(x=>x!==m2.init):cur.concat([m2.init])};})}
+                      style={{fontSize:11,padding:"3px 9px",borderRadius:11,cursor:"pointer",fontWeight:800,
+                        border:on?"1.5px solid #e3b341":"1px solid var(--border)",
+                        background:on?"rgba(227,179,65,.15)":"var(--bg2)",color:on?"#b45309":"var(--txt3)"}}>{m2.init}</button>;
+                  })}
+                </div>
+                <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>Sa propre ligne est toujours modifiable. Ni les IDE ni les internes ne figurent dans cette liste.</div>
+              </div>}
             </div>
             {(mData.role||"medecin")!=="ide"&&<div style={{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,fontSize:10,fontWeight:800,color:"#388bfd",textTransform:"uppercase",letterSpacing:.5}}>🎯 Activités autorisées</div>}
             {(mData.role||"medecin")!=="ide"&&<div style={{gridColumn:"1/-1"}}>
