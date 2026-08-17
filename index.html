@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.73 — 17/08/2026";
+var APP_VERSION = "v10.74 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1104,7 +1104,7 @@ function TableScroll(_a) {
        reprend ce sujet, au lieu des dix cadres identiques d'avant. */
     return (React.createElement("div", { ref: ref, onScroll: onScroll, style: __assign({ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - " + mh + "px)", borderRadius: 8, border: "1px solid var(--border)" }, (style || {})) }, children));
 }
-function SiteView({ printWk = null, onPrint = null, site, year, month, prevM, nextM, actes, medecins, getEntries, salleOcc, allDays, isEdit, onPickSite, notes = {}, salleReg = [], darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, colOrder = null, onOrder = null, intCfg = null }) {
+function SiteView({ issMap = {}, printWk = null, onPrint = null, site, year, month, prevM, nextM, actes, medecins, getEntries, salleOcc, allDays, isEdit, onPickSite, notes = {}, salleReg = [], darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, colOrder = null, onOrder = null, intCfg = null }) {
     const today = new Date();
     const ANGIO_SALLES_ALL = ["Angio-1", "Angio-2", "Angio-3"];
     const EXCL_SALLES = site === "CHL" ? [S_STIM, S_EEP, S_EE_CHB, ...ANGIO_SALLES_ALL] : site === "ANGIO" ? [] : [S_STIM, S_EEP, S_EE_CHL, ...ANGIO_SALLES_ALL];
@@ -1231,7 +1231,13 @@ function SiteView({ printWk = null, onPrint = null, site, year, month, prevM, ne
             React.createElement("div", { style: { display: "flex", flexDirection: "column" } }, grps.map((g, gi) => (React.createElement("div", { key: gi, style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, padding: "2px 0",
                     borderTop: gi ? "1px dashed " + (conflict ? conflSep(darkMode) : "var(--border)") : "none" } },
                 React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } },
-                    g.meds.map((m, mi) => (React.createElement("div", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim(), style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }, m.init))),
+                    g.meds.map((m, mi) => {
+                        /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
+                        const iss = issMap[m.id + "|" + ry + "|" + rm + "|" + d + "|" + sl];
+                        return React.createElement("div", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim() + (iss ? " — " + iss : ""), style: { position: "relative", width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } },
+                            m.init,
+                            iss && React.createElement("span", { style: { position: "absolute", top: -2, left: -2, width: 8, height: 8, borderRadius: "50%", background: "#f85149", border: "1.5px solid var(--bg2)" } }));
+                    }),
                     (g.imeds || []).map((m, mi) => (React.createElement("div", { key: "i" + mi, title: m.nom, style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0, border: "1.5px dashed rgba(255,255,255,.95)" } }, m.init)))),
                 React.createElement(ActPill, { a: g.acte, night: darkMode, hasNote: g.meds.some(m => !!notes[nk(m.id, ry, rm, d, sl)]) })))))));
     }
@@ -1280,8 +1286,9 @@ function SiteView({ printWk = null, onPrint = null, site, year, month, prevM, ne
                         allSalles.map(salle => renderCell(salle, d, sl, wY, wM)))));
                 }))))));
 }
-/* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({ title, titleColor, rows, year, month, prevM, nextM, medecins, actes, getEntries, notes = {}, allDays, isEdit, onPickAct, darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, ideFeature, ideOn, setIdeOn, ideCfg, setIdeCfg, canIde, orderCtl, onOrder, printWk, onPrint, intCfg = null }) {
+/* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */ 
+
+function ActTabView({ issMap = {}, title, titleColor, rows, year, month, prevM, nextM, medecins, actes, getEntries, notes = {}, allDays, isEdit, onPickAct, darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, ideFeature, ideOn, setIdeOn, ideCfg, setIdeCfg, canIde, orderCtl, onOrder, printWk, onPrint, intCfg = null }) {
     const today = new Date();
     const atvEffDays2 = useMemo(() => {
         const p = perStart(year, month);
@@ -1485,9 +1492,14 @@ function ActTabView({ title, titleColor, rows, year, month, prevM, nextM, medeci
                 const showIde = ideOnly ? (ideN > 0) : (ideActive && (ideN > 0 || g.dif));
                 return (React.createElement("div", { key: gi, style: { display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 4, paddingTop: gi ? 4 : 0, marginTop: gi ? 1 : 0, borderTop: gi ? "1px dashed " + (conflA ? conflSep(darkMode) : "var(--border)") : "none" } },
                     (meds.length > 0 || imeds.length > 0) && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } },
-                        meds.map((m, mi) => (React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim() + (notes[nk(m.id, ry, rm, d, sl)] ? " — 📝 " + notes[nk(m.id, ry, rm, d, sl)] : ""), style: { position: "relative", width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 } },
-                            m.init,
-                            notes[nk(m.id, ry, rm, d, sl)] && React.createElement("span", { style: { position: "absolute", top: -1, right: -1, width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" } })))),
+                        meds.map((m, mi) => {
+                            /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
+                            const iss = issMap[m.id + "|" + ry + "|" + rm + "|" + d + "|" + sl];
+                            return React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim() + (iss ? " — " + iss : "") + (notes[nk(m.id, ry, rm, d, sl)] ? " — 📝 " + notes[nk(m.id, ry, rm, d, sl)] : ""), style: { position: "relative", width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 } },
+                                m.init,
+                                notes[nk(m.id, ry, rm, d, sl)] && React.createElement("span", { style: { position: "absolute", top: -1, right: -1, width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" } }),
+                                iss && React.createElement("span", { style: { position: "absolute", top: -2, left: -2, width: 8, height: 8, borderRadius: "50%", background: "#f85149", border: "1.5px solid var(--bg2)" } }));
+                        }),
                         imeds.map((m, mi) => (React.createElement("span", { key: "i" + mi, title: m.nom, style: { width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0, border: "1.5px dashed rgba(255,255,255,.95)" } }, m.init)))),
                     (lieu || showIde || noSalle) &&
                         React.createElement("span", { title: g.dif ? ("Départ différé" + (dc ? " — " + dc : "")) : undefined, style: Object.assign(Object.assign({}, pillCols((g.acte && g.acte.color) || "#888888", darkMode)), { display: "inline-flex", alignItems: "stretch", height: 22, borderRadius: 4, overflow: "hidden", fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 800, whiteSpace: "nowrap", cursor: g.dif ? "help" : "inherit" }) },
@@ -1561,7 +1573,8 @@ function ActTabView({ title, titleColor, rows, year, month, prevM, nextM, medeci
      • rouge  : absent ou en FMC LE JOUR MÊME — non cliquable, mais un bouton
                 « Assigner quand même » permet le cas rare (garde du soir après une
                 journée de FMC). Le geste rare coûte un clic de plus, le geste
-                fréquent est protégé de l'erreur. */
+                fréquent est protégé de l'erreur. */ 
+
 function GardeCandidateList({ meds, isAbsDay, isAbsNext, tourNext = null, currentId, onPick, maxHeight = 340 }) {
     return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, maxHeight, overflowY: "auto" } },
         meds.map(m => {
@@ -9936,6 +9949,8 @@ function CardioPlanning() {
     var medAttacheAll = useMemo(function () { return __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true); }, [medecins]);
     var planIssues = useMemo(function () { return issuesFor(medPlan); }, [issuesFor, medecins]);
     var attIssues = useMemo(function () { return issuesFor(medAttacheAll); }, [issuesFor, medAttacheAll]);
+    /* v10.74 : une seule carte d'alertes pour les 4 onglets salles. */
+    var issAllMap = useMemo(function () { return __assign(__assign({}, planIssues.map), attIssues.map); }, [planIssues, attIssues]);
     var goIssue = function (it) { setMData({ medId: it.med.id, y: it.y, m: it.m, d: it.d, slot: it.sl }); setModal("cell"); };
     /* v10.37 : repli des encarts de Paramètres. `psetItems` est LU dans la page
        après chaque affichage — c'est ce qui rend le mécanisme insensible à l'ajout
@@ -10305,25 +10320,25 @@ function CardioPlanning() {
                 React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, intGarde: intGardeOn ? function (y2, m2, d2) { return intGardeDuJour(getEntries, intCfg, y2, m2, d2); } : null, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notes, isVac: isVac, applyGarde: applyGarde, allMeds: medecins, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay }))),
             tab === "tourmedical" && React.createElement(TourTab, tourProps),
             tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medecins, getEntries: getEntries, tourMed: tourMed, isEdit: (isEdit || isInterEdit) && !isAttEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: function (per) { return openPtModal(null, "apply", per); }, onRemovePT: function (per) { return openPtModal(null, "remove", per); }, tourProps: tourProps, gardeProps: gardeProps }),
-            tab === "chl" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", intCfg: intCfg, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notes, onPickSite: function (_a) {
+            tab === "chl" && React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", intCfg: intCfg, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
             tab === "chb" && React.createElement("div", null,
-                React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHB"] || null, onOrder: function (cols) { setColModal({ site: "CHB", cols: cols }); setModal("colOrder"); }, site: "CHB", intCfg: intCfg, darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, notes: notes, onPickSite: function (_a) {
+                React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHB"] || null, onOrder: function (cols) { setColModal({ site: "CHB", cols: cols }); setModal("colOrder"); }, site: "CHB", intCfg: intCfg, darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
                     var full = bip && (bip.salles || []).includes(salle) ? __spreadArray(__spreadArray([], siteActes.filter(function (a) { return a.id !== "BIP"; }), true), [bip], false) : siteActes;
                     setMData({ salle: salle, siteActes: full, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod })),
-            tab === "plateau" && React.createElement(ActTabView, { intCfg: intCfg, title: "\u2764\uFE0F PT Cardio", titleColor: "#e3b341", rows: ptRows, orderCtl: isEdit, onOrder: function () { return setModal("ptOrder"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, notes: notes, ideFeature: true, ideOn: ideOn, setIdeOn: setIdeOn, ideCfg: ideCfg, setIdeCfg: setIdeCfg, canIde: isEdit || isCadre, printWk: printWk, onPrint: function () { return setModal("print"); }, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
+            tab === "plateau" && React.createElement(ActTabView, { issMap: issAllMap, intCfg: intCfg, title: "\u2764\uFE0F PT Cardio", titleColor: "#e3b341", rows: ptRows, orderCtl: isEdit, onOrder: function () { return setModal("ptOrder"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medecins, actes: actes, getEntries: getEntries, allDays: allDays, notes: notes, ideFeature: true, ideOn: ideOn, setIdeOn: setIdeOn, ideCfg: ideCfg, setIdeCfg: setIdeCfg, canIde: isEdit || isCadre, printWk: printWk, onPrint: function () { return setModal("print"); }, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "angio" && React.createElement(SiteView, { printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["ANGIO"] || null, onOrder: function (cols) { setColModal({ site: "ANGIO", cols: cols }); setModal("colOrder"); }, site: "ANGIO", intCfg: intCfg, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notes, onPickSite: function (_a) {
+            tab === "angio" && React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["ANGIO"] || null, onOrder: function (cols) { setColModal({ site: "ANGIO", cols: cols }); setModal("colOrder"); }, site: "ANGIO", intCfg: intCfg, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medecins, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notes, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
