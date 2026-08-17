@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.74 — 17/08/2026";
+const APP_VERSION="v10.75 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -3034,7 +3034,10 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
   const [dt,setDt]=useState(initDate||"");
   const [slDeb,setSlDeb]=useState("M");
   const [slFin,setSlFin]=useState("AM");
-  const [moisEntier,setMoisEntier]=useState(false);
+  /* v10.75 : trois facons de designer la periode. « La semaine » porte sur la semaine
+     du jour clique, du lundi au dimanche (sa demande : clic le jeudi 20 -> 17 au 23). */
+  const [mode,setMode]=useState("dates");            // dates | semaine | mois
+  const moisEntier=mode==="mois", semEntier=mode==="semaine";
   /* v9.96 : « mois entier » ne se limite plus au mois affiché — on choisit parmi les
      mois de la période, ce qui évite de naviguer avant d'effacer. */
   const moisList=(mois&&mois.length)?mois:[{y:year,m:month}];
@@ -3054,8 +3057,12 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
   const med=medecins.find(m=>m.id===medId);
 
   const moisDeb=fmt(new Date(mDeb.y,mDeb.m,1)), moisFin=finReelle;
-  const rDf=moisEntier?moisDeb:df, rDt=moisEntier?moisFin:dt;
-  const rDeb=moisEntier?"M":slDeb, rFin=moisEntier?"AM":slFin;
+  /* la semaine du jour clique : lundi -> dimanche, traverse mois et annees */
+  const semBase=(()=>{const s=initDate||df||fmt(new Date());const p2=s.split("-").map(Number);return new Date(p2[0],(p2[1]||1)-1,p2[2]||1);})();
+  const semDeb=new Date(semBase.getFullYear(),semBase.getMonth(),semBase.getDate()-((semBase.getDay()+6)%7));
+  const semFin=new Date(semDeb.getFullYear(),semDeb.getMonth(),semDeb.getDate()+6);
+  const rDf=moisEntier?moisDeb:semEntier?fmt(semDeb):df, rDt=moisEntier?moisFin:semEntier?fmt(semFin):dt;
+  const rDeb=(moisEntier||semEntier)?"M":slDeb, rFin=(moisEntier||semEntier)?"AM":slFin;
   const nbJours=(()=>{ if(!rDf||!rDt)return 0;
     const a=new Date(rDf),b=new Date(rDt); if(b<a)return 0;
     return Math.round((b-a)/86400000)+1; })();
@@ -3066,7 +3073,9 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
     : (cible==="abs"?"Retirer les absences et FMC"
        :cible==="tout"?(degre==="absolu"?"Tout retirer, gardes et tour compris":"Tout retirer sauf gardes et tour")
        :"Effacer les activités");
-  const libPeriode=!ok?"—":(moisEntier
+  const libPeriode=!ok?"—":semEntier
+    ? `semaine du ${semDeb.getDate()} ${MOIS[semDeb.getMonth()].toLowerCase()} au ${semFin.getDate()} ${MOIS[semFin.getMonth()].toLowerCase()} ${semFin.getFullYear()} · 7 jours`
+    :(moisEntier
     ? (moisSel.length===1
         ? `${MOIS[mDeb.m]} ${mDeb.y}${iFin===moisList.length-1&&finPer?" (jusqu'à la fin de la période)":" entier"} · ${nbJours} jours`
         : `${MOIS[mDeb.m]} → ${MOIS[mFin.m]} ${mFin.y}${iFin===moisList.length-1&&finPer?" (jusqu'à la fin de la période)":""} · ${nbJours} jours`)
@@ -3176,7 +3185,14 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
         </div>}
       </div>}
 
-      {!moisEntier?<>
+      <label style={{...S.fl,marginTop:10,display:"block"}}>Quelle période</label>
+      <div style={{display:"flex",gap:5}}>
+        <button style={segBtn(mode==="dates")} onClick={()=>setMode("dates")}>Deux dates</button>
+        <button style={segBtn(mode==="semaine")} onClick={()=>setMode("semaine")}>🗓 La semaine</button>
+        <button style={segBtn(mode==="mois")} onClick={()=>setMode("mois")}>📆 Le mois</button>
+      </div>
+
+      {mode==="dates"?<>
         <label style={{...S.fl,marginTop:10,display:"block"}}>Début</label>
         <input type="date" value={df} onChange={e=>{setDf(e.target.value);if(!dt||e.target.value>dt)setDt(e.target.value);}} style={{...S.fi,width:"100%"}}/>
         <div style={{display:"flex",gap:4,marginTop:5}}>
@@ -3188,6 +3204,15 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
         <div style={{display:"flex",gap:4,marginTop:5}}>
           <button style={miniBtn(slFin==="M")} onClick={()=>setSlFin("M")}>Matin</button>
           <button style={miniBtn(slFin==="AM")} onClick={()=>setSlFin("AM")}>Après-midi</button>
+        </div>
+      </>:semEntier?<>
+        <div style={{marginTop:9,padding:"9px 11px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",textAlign:"center"}}>
+          <div style={{fontSize:12.5,fontWeight:800,color:"var(--txt)"}}>
+            Semaine du {JOURSL[1].toLowerCase()} {semDeb.getDate()} au {JOURSL[0].toLowerCase()} {semFin.getDate()} {MOIS[semFin.getMonth()].toLowerCase()}
+          </div>
+          <div style={{fontSize:10.5,fontWeight:600,color:"var(--txt3)",marginTop:2}}>
+            7 jours — contient le {JOURSL[semBase.getDay()].toLowerCase()} {semBase.getDate()}
+          </div>
         </div>
       </>:<>
         <label style={{...S.fl,marginTop:10,display:"block"}}>Quels mois (plusieurs possibles)</label>
@@ -3201,10 +3226,6 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
             </button>))}
         </div>
       </>}
-      <button onClick={()=>setMoisEntier(v=>!v)}
-        style={{marginTop:6,background:"none",border:"none",padding:0,color:"#1d4ed8",fontSize:11,textDecoration:"underline",cursor:"pointer",fontFamily:"inherit"}}>
-        {moisEntier?"↩ ou choisir deux dates":"📆 ou choisir le mois entier"}
-      </button>
 
       {action==="retirer"&&cible==="activites"&&
         <label style={{display:"flex",gap:7,alignItems:"center",fontSize:11.5,color:"var(--txt)",marginTop:9,
@@ -10541,6 +10562,61 @@ header::-webkit-scrollbar { display: none; }
                 </div>
               </div>
             )}
+
+            {/* v10.75 : une absence qui court sur plusieurs jours se retire d'un geste —
+                jusqu'a la fin, ou en entier si on a clique au milieu. Le reperage lit M,
+                AM ET JOUR (lecon v9.65.1) et enjambe week-ends et feries (sa regle). */}
+            {canEditThisMed&&(()=>{
+              const absE=entries.find(e=>e&&!e.cond&&(e.acteId==="ABSENCE"||e.acteId==="FORMATION"));
+              if(!absE)return null;
+              const aid=absE.acteId;
+              const aSlot=(yy,mm,dd,sl)=>getEntries(medId,yy,mm,dd,sl).some(x=>x&&!x.cond&&x.acteId===aid);
+              const aJour=(yy,mm,dd)=>["JOUR","M","AM"].some(sl=>aSlot(yy,mm,dd,sl));
+              const bal=(sens)=>{let cur=new Date(y2,m2,d2),last=new Date(y2,m2,d2);
+                for(let i=0;i<400;i++){
+                  cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+sens);
+                  const yy=cur.getFullYear(),mm=cur.getMonth(),dd=cur.getDate();
+                  if(aJour(yy,mm,dd)){last=new Date(yy,mm,dd);continue;}
+                  if(isWE(yy,mm,dd))continue;   /* week-end ou ferie sans absence : on enjambe */
+                  break;}
+                return last;};
+              const dDeb=bal(-1),dFin=bal(1);
+              const nJours=Math.round((dFin.getTime()-dDeb.getTime())/86400000)+1;
+              if(nJours<=1)return null;
+              const iso=t=>`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
+              const court=t=>`${String(t.getDate()).padStart(2,"0")}/${String(t.getMonth()+1).padStart(2,"0")}`;
+              const sD=aSlot(dDeb.getFullYear(),dDeb.getMonth(),dDeb.getDate(),"M")?"M":"AM";
+              const sF=aSlot(dFin.getFullYear(),dFin.getMonth(),dFin.getDate(),"AM")?"AM":"M";
+              const slotC=(we||slot==="JOUR"||slot==="N")?"M":slot;
+              const jClic=new Date(y2,m2,d2);
+              const lab=aid==="FORMATION"?"FMC":"absence";
+              const finApres=dFin.getTime()>jClic.getTime()||(slotC==="M"&&sF==="AM");
+              const go=mData._absGo;
+              const cible=go==="fin"?{df:iso(jClic),sd:slotC,dt:iso(dFin),sf:sF,txt:`du ${court(jClic)} au ${court(dFin)}`}
+                        :go==="tout"?{df:iso(dDeb),sd:sD,dt:iso(dFin),sf:sF,txt:`du ${court(dDeb)} au ${court(dFin)}`}:null;
+              const bt={background:"#fee2e2",border:"1px solid #fca5a5",color:"#dc2626",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:800,padding:"5px 9px",whiteSpace:"nowrap"};
+              return(
+                <div style={{marginBottom:10,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+                  <div style={{fontSize:11.5,fontWeight:800,color:"var(--txt)",lineHeight:1.45}}>
+                    📅 Cette {lab} court du {court(dDeb)} au {court(dFin)}
+                    <span style={{display:"block",fontSize:10,fontWeight:600,color:"var(--txt3)",marginTop:1}}>{nJours} jours{dDeb.getTime()<jClic.getTime()&&dFin.getTime()>jClic.getTime()?" — vous avez cliqué au milieu":""}</span>
+                  </div>
+                  {!cible?
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
+                      {finApres&&<button style={bt} onClick={()=>setMData(p=>({...p,_absGo:"fin"}))}>⏭ Jusqu'à la fin — {court(jClic)} au {court(dFin)}</button>}
+                      <button style={bt} onClick={()=>setMData(p=>({...p,_absGo:"tout"}))}>⏮⏭ Toute l'{lab==="FMC"?"a FMC":"absence"} — {court(dDeb)} au {court(dFin)}</button>
+                    </div>
+                  :
+                    <div style={{marginTop:7}}>
+                      <div style={{fontSize:11,fontWeight:700,color:"#991b1b",marginBottom:5}}>Retirer l'{lab==="FMC"?"a FMC":"absence"} de {med&&med.init} {cible.txt} ?</div>
+                      <div style={{display:"flex",gap:5}}>
+                        <button style={{...bt,background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--txt2)"}} onClick={()=>setMData(p=>({...p,_absGo:null}))}>Annuler</button>
+                        <button style={{...bt,background:"#dc2626",border:"1px solid #dc2626",color:"#fff"}}
+                          onClick={()=>{removeAbsence(perSlots({medId,dateFrom:cible.df,dateTo:cible.dt,slotDebut:cible.sd,slotFin:cible.sf,slots:["M","AM"]}));setModal(null);}}>Oui, retirer</button>
+                      </div>
+                    </div>}
+                </div>);
+            })()}
 
             {hasOther&&canEditThisMed&&(
               <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,background:"rgba(245,158,11,.15)",border:"1px solid #f59e0b44",marginBottom:10}}>

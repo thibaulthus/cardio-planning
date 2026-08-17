@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.74 — 17/08/2026";
+var APP_VERSION = "v10.75 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -3159,99 +3159,107 @@ function VacCollerModal(_a) {
                 React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { flex: 1, width: "auto" }), onClick: function () { return setProp(null); } }, "\u2190 Retour"),
                 React.createElement("button", { disabled: !prop.length, style: __assign(__assign({}, S.btnP), { flex: 1, opacity: prop.length ? 1 : .5 }), onClick: function () { return onValider(prop); } }, "Enregistrer")))));
 }
-function PeriodModal(_a) {
-    var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, year = _a.year, month = _a.month, _b = _a.mois, mois = _b === void 0 ? [] : _b, _c = _a.finPer, finPer = _c === void 0 ? null : _c, _d = _a.allowActs, allowActs = _d === void 0 ? true : _d, compter = _a.compter, onPose = _a.onPose, onRetraitAbs = _a.onRetraitAbs, onEffacer = _a.onEffacer, onClose = _a.onClose;
-    var fmt = function (d) { return "".concat(d.getFullYear(), "-").concat(String(d.getMonth() + 1).padStart(2, "0"), "-").concat(String(d.getDate()).padStart(2, "0")); };
-    var _e = useState("poser"), action = _e[0], setAction = _e[1]; // poser | retirer
-    var _f = useState("abs"), cible = _f[0], setCible = _f[1]; // abs | activites | tout   (si retirer)
-    var _g = useState("garde"), degre = _g[0], setDegre = _g[1]; // garde = gardes/repos/tour conservés · absolu = tout part
-    var _h = useState("ABSENCE"), absType = _h[0], setAbsType = _h[1]; // ABSENCE | FORMATION
-    var _j = useState(initMedId || null), medId = _j[0], setMedId = _j[1];
-    var _k = useState(initDate || ""), df = _k[0], setDf = _k[1];
-    var _l = useState(initDate || ""), dt = _l[0], setDt = _l[1];
-    var _m = useState("M"), slDeb = _m[0], setSlDeb = _m[1];
-    var _o = useState("AM"), slFin = _o[0], setSlFin = _o[1];
-    var _q = useState(false), moisEntier = _q[0], setMoisEntier = _q[1];
+function PeriodModal({ medecins, initMedId, initDate, year, month, mois = [], finPer = null, allowActs = true, compter, onPose, onRetraitAbs, onEffacer, onClose }) {
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const [action, setAction] = useState("poser"); // poser | retirer
+    const [cible, setCible] = useState("abs"); // abs | activites | tout   (si retirer)
+    const [degre, setDegre] = useState("garde"); // garde = gardes/repos/tour conservés · absolu = tout part
+    const [absType, setAbsType] = useState("ABSENCE"); // ABSENCE | FORMATION
+    const [medId, setMedId] = useState(initMedId || null);
+    const [df, setDf] = useState(initDate || "");
+    const [dt, setDt] = useState(initDate || "");
+    const [slDeb, setSlDeb] = useState("M");
+    const [slFin, setSlFin] = useState("AM");
+    /* v10.75 : trois facons de designer la periode. « La semaine » porte sur la semaine
+       du jour clique, du lundi au dimanche (sa demande : clic le jeudi 20 -> 17 au 23). */
+    const [mode, setMode] = useState("dates"); // dates | semaine | mois
+    const moisEntier = mode === "mois", semEntier = mode === "semaine";
     /* v9.96 : « mois entier » ne se limite plus au mois affiché — on choisit parmi les
        mois de la période, ce qui évite de naviguer avant d'effacer. */
-    var moisList = (mois && mois.length) ? mois : [{ y: year, m: month }];
+    const moisList = (mois && mois.length) ? mois : [{ y: year, m: month }];
     /* v9.97 : plusieurs mois à la fois — on peut déjà couvrir plusieurs mois avec deux
        dates, autant pouvoir le faire par mois. */
-    var _s = useState(function () { var i = moisList.findIndex(function (x) { return x.y === year && x.m === month; }); return [i < 0 ? 0 : i]; }), moisSel = _s[0], setMoisSel = _s[1];
-    var togMois = function (i) { return setMoisSel(function (p) { return p.includes(i) ? (p.length > 1 ? p.filter(function (x) { return x !== i; }) : p) : p.concat([i]).sort(function (a, b) { return a - b; }); }); };
-    var iDeb = moisSel.length ? Math.min.apply(Math, moisSel) : 0, iFin = moisSel.length ? Math.max.apply(Math, moisSel) : 0;
-    var mDeb = moisList[iDeb] || { y: year, m: month }, mFin = moisList[iFin] || { y: year, m: month };
+    const [moisSel, setMoisSel] = useState(() => { const i = moisList.findIndex(x => x.y === year && x.m === month); return [i < 0 ? 0 : i]; });
+    const togMois = (i) => setMoisSel(p => p.includes(i) ? (p.length > 1 ? p.filter(x => x !== i) : p) : p.concat([i]).sort((a, b) => a - b));
+    const iDeb = moisSel.length ? Math.min(...moisSel) : 0, iFin = moisSel.length ? Math.max(...moisSel) : 0;
+    const mDeb = moisList[iDeb] || { y: year, m: month }, mFin = moisList[iFin] || { y: year, m: month };
     /* La période ne s'arrête pas au dernier jour du mois : elle court jusqu'au dimanche qui
        clôt la dernière semaine, et rattache le lundi suivant s'il est férié. Choisir le
        DERNIER mois de la période doit donc effacer jusqu'à cette fin réelle — sinon un
        1er ou 2 novembre appartenant à la période resterait en place. */
-    var finReelle = (iFin === moisList.length - 1 && finPer) ? finPer : fmt(new Date(mFin.y, mFin.m + 1, 0));
-    var _t = useState(true), keepAbs = _t[0], setKeepAbs = _t[1];
-    var _u = useState(null), confirm = _u[0], setConfirm = _u[1];
-    var med = medecins.find(function (m) { return m.id === medId; });
-    var moisDeb = fmt(new Date(mDeb.y, mDeb.m, 1)), moisFin = finReelle;
-    var rDf = moisEntier ? moisDeb : df, rDt = moisEntier ? moisFin : dt;
-    var rDeb = moisEntier ? "M" : slDeb, rFin = moisEntier ? "AM" : slFin;
-    var nbJours = (function () {
+    const finReelle = (iFin === moisList.length - 1 && finPer) ? finPer : fmt(new Date(mFin.y, mFin.m + 1, 0));
+    const [keepAbs, setKeepAbs] = useState(true);
+    const [confirm, setConfirm] = useState(null);
+    const med = medecins.find(m => m.id === medId);
+    const moisDeb = fmt(new Date(mDeb.y, mDeb.m, 1)), moisFin = finReelle;
+    /* la semaine du jour clique : lundi -> dimanche, traverse mois et annees */
+    const semBase = (() => { const s = initDate || df || fmt(new Date()); const p2 = s.split("-").map(Number); return new Date(p2[0], (p2[1] || 1) - 1, p2[2] || 1); })();
+    const semDeb = new Date(semBase.getFullYear(), semBase.getMonth(), semBase.getDate() - ((semBase.getDay() + 6) % 7));
+    const semFin = new Date(semDeb.getFullYear(), semDeb.getMonth(), semDeb.getDate() + 6);
+    const rDf = moisEntier ? moisDeb : semEntier ? fmt(semDeb) : df, rDt = moisEntier ? moisFin : semEntier ? fmt(semFin) : dt;
+    const rDeb = (moisEntier || semEntier) ? "M" : slDeb, rFin = (moisEntier || semEntier) ? "AM" : slFin;
+    const nbJours = (() => {
         if (!rDf || !rDt)
             return 0;
-        var a = new Date(rDf), b = new Date(rDt);
+        const a = new Date(rDf), b = new Date(rDt);
         if (b < a)
             return 0;
         return Math.round((b - a) / 86400000) + 1;
     })();
-    var ok = medId && rDf && rDt && nbJours > 0;
-    var libAction = action === "poser"
+    const ok = medId && rDf && rDt && nbJours > 0;
+    const libAction = action === "poser"
         ? (absType === "FORMATION" ? "Poser une formation" : "Poser une absence")
         : (cible === "abs" ? "Retirer les absences et FMC"
             : cible === "tout" ? (degre === "absolu" ? "Tout retirer, gardes et tour compris" : "Tout retirer sauf gardes et tour")
                 : "Effacer les activités");
-    var libPeriode = !ok ? "—" : (moisEntier
-        ? (moisSel.length === 1
-            ? "".concat(MOIS[mDeb.m], " ").concat(mDeb.y).concat(iFin === moisList.length - 1 && finPer ? " (jusqu'à la fin de la période)" : " entier", " \u00B7 ").concat(nbJours, " jours")
-            : "".concat(MOIS[mDeb.m], " \u2192 ").concat(MOIS[mFin.m], " ").concat(mFin.y).concat(iFin === moisList.length - 1 && finPer ? " (jusqu'à la fin de la période)" : "", " \u00B7 ").concat(nbJours, " jours"))
-        : "du ".concat(rDf, " ").concat(rDeb === "M" ? "matin" : "après-midi", " au ").concat(rDt, " ").concat(rFin === "M" ? "matin" : "après-midi", " \u00B7 ").concat(nbJours, " jour").concat(nbJours > 1 ? "s" : ""));
+    const libPeriode = !ok ? "—" : semEntier
+        ? `semaine du ${semDeb.getDate()} ${MOIS[semDeb.getMonth()].toLowerCase()} au ${semFin.getDate()} ${MOIS[semFin.getMonth()].toLowerCase()} ${semFin.getFullYear()} · 7 jours`
+        : (moisEntier
+            ? (moisSel.length === 1
+                ? `${MOIS[mDeb.m]} ${mDeb.y}${iFin === moisList.length - 1 && finPer ? " (jusqu'à la fin de la période)" : " entier"} · ${nbJours} jours`
+                : `${MOIS[mDeb.m]} → ${MOIS[mFin.m]} ${mFin.y}${iFin === moisList.length - 1 && finPer ? " (jusqu'à la fin de la période)" : ""} · ${nbJours} jours`)
+            : `du ${rDf} ${rDeb === "M" ? "matin" : "après-midi"} au ${rDt} ${rFin === "M" ? "matin" : "après-midi"} · ${nbJours} jour${nbJours > 1 ? "s" : ""}`);
     /* les demi-journées d'extrémité : un jour au milieu de la période est toujours entier */
-    var lancer = function () {
+    const lancer = () => {
         if (!ok)
             return;
-        var p = { medId: medId, dateFrom: rDf, dateTo: rDt, slotDebut: rDeb, slotFin: rFin, slots: ["M", "AM"] };
+        const p = { medId, dateFrom: rDf, dateTo: rDt, slotDebut: rDeb, slotFin: rFin, slots: ["M", "AM"] };
         if (action === "poser") {
-            onPose(__assign(__assign({}, p), { absType: absType }));
+            onPose(Object.assign(Object.assign({}, p), { absType }));
             return;
         }
         if (cible === "abs") {
-            onRetraitAbs(__assign(__assign({}, p), { absType: absType }));
+            onRetraitAbs(Object.assign(Object.assign({}, p), { absType }));
             return;
         }
         if (cible === "tout") {
-            onEffacer(__assign(__assign({}, p), { keepAbs: false, keepGardes: degre !== "absolu" }));
+            onEffacer(Object.assign(Object.assign({}, p), { keepAbs: false, keepGardes: degre !== "absolu" }));
             return;
         }
-        onEffacer(__assign(__assign({}, p), { keepAbs: keepAbs, keepGardes: true }));
+        onEffacer(Object.assign(Object.assign({}, p), { keepAbs, keepGardes: true }));
     };
-    var segBtn = function (on, rouge) { return ({ flex: 1, padding: "7px 5px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 12,
+    const segBtn = (on, rouge) => ({ flex: 1, padding: "7px 5px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 12,
         border: "1.5px solid " + (on ? (rouge ? "#dc2626" : "#1d4ed8") : "var(--border)"),
-        background: on ? (rouge ? "#fee2e2" : "#eff6ff") : "var(--bg2)", color: on ? (rouge ? "#991b1b" : "#1e40af") : "var(--txt2)" }); };
-    var miniBtn = function (on) { return ({ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontWeight: 800, fontSize: 11,
-        border: "1.5px solid " + (on ? "#1d4ed8" : "var(--border)"), background: on ? "#eff6ff" : "var(--bg2)", color: on ? "#1e40af" : "var(--txt3)" }); };
+        background: on ? (rouge ? "#fee2e2" : "#eff6ff") : "var(--bg2)", color: on ? (rouge ? "#991b1b" : "#1e40af") : "var(--txt2)" });
+    const miniBtn = on => ({ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontWeight: 800, fontSize: 11,
+        border: "1.5px solid " + (on ? "#1d4ed8" : "var(--border)"), background: on ? "#eff6ff" : "var(--bg2)", color: on ? "#1e40af" : "var(--txt3)" });
     /* v9.94 : la confirmation annonce le nombre RÉEL d'activités qui vont disparaître.
        « tout le reste sur la période » ne permettait pas de juger : effacer 3 activités et
        en effacer 120 ne se décident pas de la même façon. */
     /* v10.11 : le décompte ne se faisait que pour « Les activités » — avec « Tout » il
        restait à zéro alors que le retrait, lui, fonctionnait. On compte désormais aussi
        pour « Tout », en lui passant les mêmes règles que celles qui seront appliquées. */
-    var rEff = (compter && (confirm === "activites" || confirm === "tout"))
-        ? compter({ medId: medId, dateFrom: rDf, dateTo: rDt,
+    const rEff = (compter && (confirm === "activites" || confirm === "tout"))
+        ? compter({ medId, dateFrom: rDf, dateTo: rDt,
             keepAbs: confirm === "tout" ? false : keepAbs,
             keepGardes: confirm === "tout" ? (degre !== "absolu") : true,
             slotDebut: rDeb, slotFin: rFin })
         : { n: 0, det: [] };
-    var nEff = rEff.n;
+    const nEff = rEff.n;
     if (confirm)
         return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
             React.createElement("div", { style: S.mHd },
-                React.createElement("div", { style: __assign(__assign({}, S.mTit2), { color: "#991b1b" }) }, "\u26A0 Confirmer")),
+                React.createElement("div", { style: Object.assign(Object.assign({}, S.mTit2), { color: "#991b1b" }) }, "\u26A0 Confirmer")),
             React.createElement("div", { style: { fontSize: 12.5, lineHeight: 1.6, color: "var(--txt)" } },
                 "Vous allez ",
                 React.createElement("b", null, libAction.toLowerCase()),
@@ -3268,14 +3276,14 @@ function PeriodModal(_a) {
                     React.createElement("div", { style: { color: "#991b1b", fontWeight: 700 } },
                         "\u2717 Effac\u00E9 : ",
                         nEff === 0 ? "aucune activité — rien à retirer" : nEff + " activité" + (nEff > 1 ? "s" : "") + " posée" + (nEff > 1 ? "s" : "")),
-                    nEff > 0 && React.createElement("div", { style: { marginTop: 5, display: "flex", flexWrap: "wrap", gap: 4 } }, rEff.det.map(function (x) { return (React.createElement("span", { key: x.lab, style: { fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 11,
+                    nEff > 0 && React.createElement("div", { style: { marginTop: 5, display: "flex", flexWrap: "wrap", gap: 4 } }, rEff.det.map(x => (React.createElement("span", { key: x.lab, style: { fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 11,
                             background: "rgba(220,38,38,.10)", border: "1px solid #fca5a5", color: "#991b1b" } },
                         x.n,
                         " \u00D7 ",
-                        x.lab)); })))),
+                        x.lab)))))),
             React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 13 } },
-                React.createElement("button", { style: segBtn(false), onClick: function () { return setConfirm(null); } }, "Annuler"),
-                React.createElement("button", { style: segBtn(true, true), onClick: function () { setConfirm(null); lancer(); } },
+                React.createElement("button", { style: segBtn(false), onClick: () => setConfirm(null) }, "Annuler"),
+                React.createElement("button", { style: segBtn(true, true), onClick: () => { setConfirm(null); lancer(); } },
                     "Oui, ",
                     action === "poser" ? "poser" : "retirer"))));
     return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
@@ -3286,61 +3294,79 @@ function PeriodModal(_a) {
             React.createElement("button", { onClick: onClose, style: S.xBtn }, "\u00D7")),
         !initMedId && React.createElement("div", { style: { marginBottom: 10 } },
             React.createElement("label", { style: S.fl }, "M\u00E9decin"),
-            React.createElement("select", { value: medId || "", onChange: function (e) { return setMedId(parseInt(e.target.value)); }, style: __assign(__assign({}, S.fi), { width: "100%" }) },
+            React.createElement("select", { value: medId || "", onChange: e => setMedId(parseInt(e.target.value)), style: Object.assign(Object.assign({}, S.fi), { width: "100%" }) },
                 React.createElement("option", { value: "" }, "\u2014 Choisir \u2014"),
-                medecins.filter(function (m) { return m.role === "medecin" || m.role === "attache"; }).map(function (m) { return (React.createElement("option", { key: m.id, value: m.id },
+                medecins.filter(m => m.role === "medecin" || m.role === "attache").map(m => (React.createElement("option", { key: m.id, value: m.id },
                     m.prenom,
                     " ",
-                    m.nom)); }))),
+                    m.nom))))),
         React.createElement("label", { style: S.fl }, "Action"),
         React.createElement("div", { style: { display: "flex", gap: 5 } },
-            React.createElement("button", { style: segBtn(action === "poser"), onClick: function () { return setAction("poser"); } }, "\uFF0B Poser"),
-            React.createElement("button", { style: segBtn(action === "retirer", true), onClick: function () { return setAction("retirer"); } }, "\uFF0D Retirer")),
+            React.createElement("button", { style: segBtn(action === "poser"), onClick: () => setAction("poser") }, "\uFF0B Poser"),
+            React.createElement("button", { style: segBtn(action === "retirer", true), onClick: () => setAction("retirer") }, "\uFF0D Retirer")),
         action === "poser" && React.createElement(React.Fragment, null,
-            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Quoi"),
+            React.createElement("label", { style: Object.assign(Object.assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Quoi"),
             React.createElement("div", { style: { display: "flex", gap: 5 } },
-                React.createElement("button", { style: segBtn(absType === "ABSENCE"), onClick: function () { return setAbsType("ABSENCE"); } }, "\uD83D\uDEAB Absence"),
-                React.createElement("button", { style: segBtn(absType === "FORMATION"), onClick: function () { return setAbsType("FORMATION"); } }, "\uD83C\uDF93 Formation"))),
+                React.createElement("button", { style: segBtn(absType === "ABSENCE"), onClick: () => setAbsType("ABSENCE") }, "\uD83D\uDEAB Absence"),
+                React.createElement("button", { style: segBtn(absType === "FORMATION"), onClick: () => setAbsType("FORMATION") }, "\uD83C\uDF93 Formation"))),
         action === "retirer" && React.createElement("div", { style: { marginTop: 10, padding: 9, borderRadius: 8, border: "1.5px dashed #f59e0b", background: "rgba(245,158,11,.07)" } },
             React.createElement("div", { style: { fontSize: 9.5, fontWeight: 800, color: "#b45309", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 } }, "Retirer quoi ?"),
             React.createElement("div", { style: { display: "flex", gap: 5 } },
-                React.createElement("button", { style: segBtn(cible === "abs", true), onClick: function () { return setCible("abs"); } }, "Absence / FMC"),
-                allowActs && React.createElement("button", { style: segBtn(cible === "activites", true), onClick: function () { return setCible("activites"); } }, "Les activit\u00E9s"),
-                allowActs && React.createElement("button", { style: segBtn(cible === "tout", true), onClick: function () { return setCible("tout"); } }, "Tout")),
+                React.createElement("button", { style: segBtn(cible === "abs", true), onClick: () => setCible("abs") }, "Absence / FMC"),
+                allowActs && React.createElement("button", { style: segBtn(cible === "activites", true), onClick: () => setCible("activites") }, "Les activit\u00E9s"),
+                allowActs && React.createElement("button", { style: segBtn(cible === "tout", true), onClick: () => setCible("tout") }, "Tout")),
             cible === "tout" && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginTop: 8 } }, [["garde", "Tout sauf gardes et tour", "absences, FMC et activités"],
-                ["absolu", "Absolument tout", "+ gardes, repos et semaines de tour"]].map(function (_a) {
-                var v = _a[0], t = _a[1], d = _a[2];
-                return (React.createElement("button", { key: v, onClick: function () { return setDegre(v); }, style: { textAlign: "left", padding: "7px 10px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 12,
-                        border: "1.5px solid " + (degre === v ? "#dc2626" : "var(--border)"),
-                        background: degre === v ? "#fee2e2" : "var(--bg2)", color: degre === v ? "#991b1b" : "var(--txt2)" } },
-                    t,
-                    React.createElement("span", { style: { display: "block", fontSize: 10, fontWeight: 600, opacity: .85, marginTop: 2 } }, d)));
-            }))),
-        !moisEntier ? React.createElement(React.Fragment, null,
-            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "D\u00E9but"),
-            React.createElement("input", { type: "date", value: df, onChange: function (e) { setDf(e.target.value); if (!dt || e.target.value > dt)
-                    setDt(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }),
+                ["absolu", "Absolument tout", "+ gardes, repos et semaines de tour"]].map(([v, t, d]) => (React.createElement("button", { key: v, onClick: () => setDegre(v), style: { textAlign: "left", padding: "7px 10px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 12,
+                    border: "1.5px solid " + (degre === v ? "#dc2626" : "var(--border)"),
+                    background: degre === v ? "#fee2e2" : "var(--bg2)", color: degre === v ? "#991b1b" : "var(--txt2)" } },
+                t,
+                React.createElement("span", { style: { display: "block", fontSize: 10, fontWeight: 600, opacity: .85, marginTop: 2 } }, d)))))),
+        React.createElement("label", { style: Object.assign(Object.assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Quelle p\u00E9riode"),
+        React.createElement("div", { style: { display: "flex", gap: 5 } },
+            React.createElement("button", { style: segBtn(mode === "dates"), onClick: () => setMode("dates") }, "Deux dates"),
+            React.createElement("button", { style: segBtn(mode === "semaine"), onClick: () => setMode("semaine") }, "\uD83D\uDDD3 La semaine"),
+            React.createElement("button", { style: segBtn(mode === "mois"), onClick: () => setMode("mois") }, "\uD83D\uDCC6 Le mois")),
+        mode === "dates" ? React.createElement(React.Fragment, null,
+            React.createElement("label", { style: Object.assign(Object.assign({}, S.fl), { marginTop: 10, display: "block" }) }, "D\u00E9but"),
+            React.createElement("input", { type: "date", value: df, onChange: e => { setDf(e.target.value); if (!dt || e.target.value > dt)
+                    setDt(e.target.value); }, style: Object.assign(Object.assign({}, S.fi), { width: "100%" }) }),
             React.createElement("div", { style: { display: "flex", gap: 4, marginTop: 5 } },
-                React.createElement("button", { style: miniBtn(slDeb === "M"), onClick: function () { return setSlDeb("M"); } }, "Matin"),
-                React.createElement("button", { style: miniBtn(slDeb === "AM"), onClick: function () { return setSlDeb("AM"); } }, "Apr\u00E8s-midi")),
-            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Fin"),
-            React.createElement("input", { type: "date", value: dt, onChange: function (e) { return setDt(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }),
+                React.createElement("button", { style: miniBtn(slDeb === "M"), onClick: () => setSlDeb("M") }, "Matin"),
+                React.createElement("button", { style: miniBtn(slDeb === "AM"), onClick: () => setSlDeb("AM") }, "Apr\u00E8s-midi")),
+            React.createElement("label", { style: Object.assign(Object.assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Fin"),
+            React.createElement("input", { type: "date", value: dt, onChange: e => setDt(e.target.value), style: Object.assign(Object.assign({}, S.fi), { width: "100%" }) }),
             React.createElement("div", { style: { display: "flex", gap: 4, marginTop: 5 } },
-                React.createElement("button", { style: miniBtn(slFin === "M"), onClick: function () { return setSlFin("M"); } }, "Matin"),
-                React.createElement("button", { style: miniBtn(slFin === "AM"), onClick: function () { return setSlFin("AM"); } }, "Apr\u00E8s-midi"))) : React.createElement(React.Fragment, null,
-            React.createElement("label", { style: __assign(__assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Quels mois (plusieurs possibles)"),
-            React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, moisList.map(function (x, i) { return (React.createElement("button", { key: x.y + "-" + x.m, onClick: function () { return togMois(i); }, style: { flex: "1 1 auto", minWidth: 78, padding: "7px 6px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 11.5,
+                React.createElement("button", { style: miniBtn(slFin === "M"), onClick: () => setSlFin("M") }, "Matin"),
+                React.createElement("button", { style: miniBtn(slFin === "AM"), onClick: () => setSlFin("AM") }, "Apr\u00E8s-midi"))) : semEntier ? React.createElement(React.Fragment, null,
+            React.createElement("div", { style: { marginTop: 9, padding: "9px 11px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", textAlign: "center" } },
+                React.createElement("div", { style: { fontSize: 12.5, fontWeight: 800, color: "var(--txt)" } },
+                    "Semaine du ",
+                    JOURSL[1].toLowerCase(),
+                    " ",
+                    semDeb.getDate(),
+                    " au ",
+                    JOURSL[0].toLowerCase(),
+                    " ",
+                    semFin.getDate(),
+                    " ",
+                    MOIS[semFin.getMonth()].toLowerCase()),
+                React.createElement("div", { style: { fontSize: 10.5, fontWeight: 600, color: "var(--txt3)", marginTop: 2 } },
+                    "7 jours \u2014 contient le ",
+                    JOURSL[semBase.getDay()].toLowerCase(),
+                    " ",
+                    semBase.getDate()))) : React.createElement(React.Fragment, null,
+            React.createElement("label", { style: Object.assign(Object.assign({}, S.fl), { marginTop: 10, display: "block" }) }, "Quels mois (plusieurs possibles)"),
+            React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, moisList.map((x, i) => (React.createElement("button", { key: x.y + "-" + x.m, onClick: () => togMois(i), style: { flex: "1 1 auto", minWidth: 78, padding: "7px 6px", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 11.5,
                     border: "1.5px solid " + (moisSel.includes(i) ? "#1d4ed8" : "var(--border)"),
                     background: moisSel.includes(i) ? "#eff6ff" : "var(--bg2)", color: moisSel.includes(i) ? "#1e40af" : "var(--txt2)" } },
                 moisSel.includes(i) ? "✓ " : "",
                 MOIS[x.m].slice(0, 4),
                 " ",
-                String(x.y).slice(2))); }))),
-        React.createElement("button", { onClick: function () { return setMoisEntier(function (v) { return !v; }); }, style: { marginTop: 6, background: "none", border: "none", padding: 0, color: "#1d4ed8", fontSize: 11, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" } }, moisEntier ? "↩ ou choisir deux dates" : "📆 ou choisir le mois entier"),
+                String(x.y).slice(2)))))),
         action === "retirer" && cible === "activites" &&
             React.createElement("label", { style: { display: "flex", gap: 7, alignItems: "center", fontSize: 11.5, color: "var(--txt)", marginTop: 9,
                     background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 7, padding: "7px 9px", cursor: "pointer" } },
-                React.createElement("input", { type: "checkbox", checked: keepAbs, onChange: function (e) { return setKeepAbs(e.target.checked); }, style: { width: 14, height: 14 } }),
+                React.createElement("input", { type: "checkbox", checked: keepAbs, onChange: e => setKeepAbs(e.target.checked), style: { width: 14, height: 14 } }),
                 "Conserver absences, FMC, gardes, repos et tour"),
         React.createElement("div", { style: { marginTop: 10, padding: "8px 10px", borderRadius: 8, fontSize: 11.5, fontWeight: 700,
                 background: action === "poser" ? "rgba(63,185,80,.12)" : "rgba(220,38,38,.10)",
@@ -3349,11 +3375,11 @@ function PeriodModal(_a) {
             libAction,
             " \u2014 ",
             libPeriode),
-        React.createElement("button", { disabled: !ok, onClick: function () { if (!ok)
+        React.createElement("button", { disabled: !ok, onClick: () => { if (!ok)
                 return; if (action === "retirer")
                 setConfirm(cible);
             else
-                lancer(); }, style: __assign(__assign({}, S.btnP), { width: "100%", marginTop: 11, opacity: ok ? 1 : .5, background: action === "poser" ? "#1d4ed8" : "#dc2626" }) }, action === "poser" ? "Poser" : "Retirer…")));
+                lancer(); }, style: Object.assign(Object.assign({}, S.btnP), { width: "100%", marginTop: 11, opacity: ok ? 1 : .5, background: action === "poser" ? "#1d4ed8" : "#dc2626" }) }, action === "poser" ? "Poser" : "Retirer…")));
 }
 function ClearPeriodModal(_a) {
     var medecins = _a.medecins, initMedId = _a.initMedId, initDate = _a.initDate, onApply = _a.onApply, onClose = _a.onClose;
@@ -11806,6 +11832,84 @@ function CardioPlanning() {
                                         removeEntry(medId, y2, m2, d2, slot, e.acteId);
                                 }, style: { background: "#fee2e2", border: "1px solid #fca5a5", cursor: "pointer", color: "#dc2626", fontSize: 11, padding: "1px 5px", borderRadius: 4, fontWeight: 900 } }, "\u00D7")));
                     })))),
+                canEditThisMed && (() => {
+                    const absE = entries.find(e => e && !e.cond && (e.acteId === "ABSENCE" || e.acteId === "FORMATION"));
+                    if (!absE)
+                        return null;
+                    const aid = absE.acteId;
+                    const aSlot = (yy, mm, dd, sl) => getEntries(medId, yy, mm, dd, sl).some(x => x && !x.cond && x.acteId === aid);
+                    const aJour = (yy, mm, dd) => ["JOUR", "M", "AM"].some(sl => aSlot(yy, mm, dd, sl));
+                    const bal = (sens) => {
+                        let cur = new Date(y2, m2, d2), last = new Date(y2, m2, d2);
+                        for (let i = 0; i < 400; i++) {
+                            cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + sens);
+                            const yy = cur.getFullYear(), mm = cur.getMonth(), dd = cur.getDate();
+                            if (aJour(yy, mm, dd)) {
+                                last = new Date(yy, mm, dd);
+                                continue;
+                            }
+                            if (isWE(yy, mm, dd))
+                                continue; /* week-end ou ferie sans absence : on enjambe */
+                            break;
+                        }
+                        return last;
+                    };
+                    const dDeb = bal(-1), dFin = bal(1);
+                    const nJours = Math.round((dFin.getTime() - dDeb.getTime()) / 86400000) + 1;
+                    if (nJours <= 1)
+                        return null;
+                    const iso = t => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+                    const court = t => `${String(t.getDate()).padStart(2, "0")}/${String(t.getMonth() + 1).padStart(2, "0")}`;
+                    const sD = aSlot(dDeb.getFullYear(), dDeb.getMonth(), dDeb.getDate(), "M") ? "M" : "AM";
+                    const sF = aSlot(dFin.getFullYear(), dFin.getMonth(), dFin.getDate(), "AM") ? "AM" : "M";
+                    const slotC = (we || slot === "JOUR" || slot === "N") ? "M" : slot;
+                    const jClic = new Date(y2, m2, d2);
+                    const lab = aid === "FORMATION" ? "FMC" : "absence";
+                    const finApres = dFin.getTime() > jClic.getTime() || (slotC === "M" && sF === "AM");
+                    const go = mData._absGo;
+                    const cible = go === "fin" ? { df: iso(jClic), sd: slotC, dt: iso(dFin), sf: sF, txt: `du ${court(jClic)} au ${court(dFin)}` }
+                        : go === "tout" ? { df: iso(dDeb), sd: sD, dt: iso(dFin), sf: sF, txt: `du ${court(dDeb)} au ${court(dFin)}` } : null;
+                    const bt = { background: "#fee2e2", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 800, padding: "5px 9px", whiteSpace: "nowrap" };
+                    return (React.createElement("div", { style: { marginBottom: 10, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 11.5, fontWeight: 800, color: "var(--txt)", lineHeight: 1.45 } },
+                            "\uD83D\uDCC5 Cette ",
+                            lab,
+                            " court du ",
+                            court(dDeb),
+                            " au ",
+                            court(dFin),
+                            React.createElement("span", { style: { display: "block", fontSize: 10, fontWeight: 600, color: "var(--txt3)", marginTop: 1 } },
+                                nJours,
+                                " jours",
+                                dDeb.getTime() < jClic.getTime() && dFin.getTime() > jClic.getTime() ? " — vous avez cliqué au milieu" : "")),
+                        !cible ?
+                            React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap", marginTop: 7 } },
+                                finApres && React.createElement("button", { style: bt, onClick: () => setMData(p => (Object.assign(Object.assign({}, p), { _absGo: "fin" }))) },
+                                    "\u23ED Jusqu'\u00E0 la fin \u2014 ",
+                                    court(jClic),
+                                    " au ",
+                                    court(dFin)),
+                                React.createElement("button", { style: bt, onClick: () => setMData(p => (Object.assign(Object.assign({}, p), { _absGo: "tout" }))) },
+                                    "\u23EE\u23ED Toute l'",
+                                    lab === "FMC" ? "a FMC" : "absence",
+                                    " \u2014 ",
+                                    court(dDeb),
+                                    " au ",
+                                    court(dFin)))
+                            :
+                                React.createElement("div", { style: { marginTop: 7 } },
+                                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#991b1b", marginBottom: 5 } },
+                                        "Retirer l'",
+                                        lab === "FMC" ? "a FMC" : "absence",
+                                        " de ",
+                                        med && med.init,
+                                        " ",
+                                        cible.txt,
+                                        " ?"),
+                                    React.createElement("div", { style: { display: "flex", gap: 5 } },
+                                        React.createElement("button", { style: Object.assign(Object.assign({}, bt), { background: "var(--bg2)", border: "1px solid var(--border)", color: "var(--txt2)" }), onClick: () => setMData(p => (Object.assign(Object.assign({}, p), { _absGo: null }))) }, "Annuler"),
+                                        React.createElement("button", { style: Object.assign(Object.assign({}, bt), { background: "#dc2626", border: "1px solid #dc2626", color: "#fff" }), onClick: () => { removeAbsence(perSlots({ medId, dateFrom: cible.df, dateTo: cible.dt, slotDebut: cible.sd, slotFin: cible.sf, slots: ["M", "AM"] })); setModal(null); } }, "Oui, retirer")))));
+                })(),
                 hasOther && canEditThisMed && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,.15)", border: "1px solid #f59e0b44", marginBottom: 10 } },
                     React.createElement("span", null, "\u26A0\uFE0F"),
                     React.createElement("span", { style: { fontSize: 11, color: "#f59e0b" } }, "Ce m\u00E9decin a d\u00E9j\u00E0 une activit\u00E9 sur ce cr\u00E9neau."))),
