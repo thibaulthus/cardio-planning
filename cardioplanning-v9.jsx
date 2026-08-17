@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.70 — 16/08/2026";
+const APP_VERSION="v10.71 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6577,31 +6577,36 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
   const [gm,setGm]=useState(null);
   const [jaugeOn,setJaugeOn]=useState(intCfg.jaugeDef!==false); /* v10.65 : affichage en nominal réglé dans Paramètres */
   const [statsOpen,setStatsOpen]=useState(false);
+  /* v10.71 : l'onglet vit au SEMESTRE (6 mois), plus sur la periode de 4 mois de
+     l'application — les internes tournent par semestre et echangent leurs gardes
+     dessus. Les fleches ne touchent donc plus le mois GLOBAL (prevM/nextM ne sont
+     plus appeles) : sortir de l'onglet ne deplace plus les autres onglets.
+     La liste des jours avance date a date entre les deux bornes du semestre —
+     aucun calcul par mois, donc pas de decalage possible (famille du bug v9.26). */
+  const sems=useMemo(()=>intSemsTri(intCfg),[intCfg]);
+  const [semIdx,setSemIdx]=useState(()=>{
+    const t=intISO(new Date());
+    const l=intSemsTri(intCfg);
+    let i=l.findIndex(s=>s.deb<=t&&t<=s.fin);      /* celui du jour */
+    if(i<0)i=l.findIndex(s=>s.deb>t);              /* sinon le prochain prepare */
+    if(i<0)i=l.length-1;                           /* sinon le dernier termine */
+    return i<0?0:i;
+  });
+  const semI=sems.length?Math.max(0,Math.min(semIdx,sems.length-1)):-1;
+  const sem=semI>=0?sems[semI]:null;
   const jours=useMemo(()=>{
-    if(!viewPeriod)return allDays.map(d=>({y:year,m:month,d:d}));
-    const ps=perStart(year,month);
-    const l=perDaysList(ps.sy,ps.sm).map(o=>({y:o.y,m:o.m,d:o.d}));
-    if(!showFull){const tod=new Date();tod.setHours(0,0,0,0);return l.filter(o=>new Date(o.y,o.m,o.d)>=tod);}
-    return l;
-  },[viewPeriod,allDays,year,month,showFull]);
-  const cols=useMemo(()=>{
-    if(jours.length===0)return [];
-    const a=intISO2(jours[0].y,jours[0].m,jours[0].d);
-    const b=intISO2(jours[jours.length-1].y,jours[jours.length-1].m,jours[jours.length-1].d);
-    const out=[];
-    intSemsTri(intCfg).forEach(s=>{
-      if(s.deb<=b&&s.fin>=a)(s.meds||[]).forEach(mm=>out.push({...mm,sDeb:s.deb,sFin:s.fin,sLbl:intSemLabel(s.deb)}));
-    });
+    if(!sem)return [];
+    const out=[];let iso=sem.deb,n=0;
+    while(iso<=sem.fin&&n<400){const p=iso.split("-").map(Number);out.push({y:p[0],m:p[1]-1,d:p[2]});iso=intDecal(iso,1);n++;}
+    if(!showFull){const tod=intISO(new Date());return out.filter(o=>intISO2(o.y,o.m,o.d)>=tod);}
     return out;
-  },[intCfg,jours]);
+  },[sem,showFull]);
+  const cols=useMemo(()=>{
+    if(!sem)return [];
+    return (sem.meds||[]).map(mm=>({...mm,sDeb:sem.deb,sFin:sem.fin,sLbl:intSemLabel(sem.deb)}));
+  },[sem]);
   const today=new Date();
-  const semsAff=[];
-  cols.forEach(c=>{if(semsAff.indexOf(c.sLbl)<0)semsAff.push(c.sLbl);});
-  const titre=(()=>{
-    if(!viewPeriod)return MOIS[month]+" "+year;
-    const ps=perStart(year,month);
-    return perLibelle(ps.sy,ps.sm);
-  })();
+  const titre=sem?intSemLabel(sem.deb):"aucun semestre";
   const C0=42,CG=44;
   const C1=jaugeOn?60:24; /* v10.65 : place pour les deux compteurs côte à côte */
   const cellEntree=(c,o,sl)=>{
@@ -6613,24 +6618,24 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
   return <div>
     <div style={{...S.bar,position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,paddingBottom:6}}>
       <div style={{display:"flex",alignItems:"center",gap:6}}>
-        <button onClick={prevM} style={S.arr}>‹</button>
+        <button onClick={()=>setSemIdx(Math.max(0,semI-1))} disabled={semI<=0} style={{...S.arr,opacity:semI<=0?.35:1}} title="Semestre precedent">‹</button>
         <h2 style={S.mTit}>{"🎓 Internes — "+titre}</h2>
-        <button onClick={nextM} style={S.arr}>›</button>
+        <button onClick={()=>setSemIdx(Math.min(sems.length-1,semI+1))} disabled={semI<0||semI>=sems.length-1} style={{...S.arr,opacity:(semI<0||semI>=sems.length-1)?.35:1}} title="Semestre suivant">›</button>
       </div>
       <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
-        {semsAff.map(l=><Chp key={l} bg="rgba(56,139,253,.12)" c="#1d4ed8">{l}</Chp>)}
+        {sem&&<Chp bg="rgba(56,139,253,.12)" c="#1d4ed8">{intFmtD(sem.deb)+" → "+intFmtD(sem.fin)}</Chp>}
         <button onClick={()=>setStatsOpen(true)} title="Statistiques" style={{...S.arr,fontSize:13,width:30}}>📊</button>
         <button onClick={()=>setJaugeOn(v=>!v)} title="Jauge HC/USIC" style={{...S.arr,fontSize:13,width:30,color:jaugeOn?"#1d4ed8":"var(--txt2)",border:`1px solid ${jaugeOn?"#1d4ed8":"var(--border)"}`}}>🚦</button>
-        <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Toute la période"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
+        <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Tout le semestre"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
       </div>
     </div>
-    <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 8px"}}>Jauge : internes en HC et en USIC sur le créneau, rouge sous le seuil (Paramètres). Case garde rouge : personne de garde ce jour. Cases hachurées : hors du semestre de l'interne · samedi : une seule case (matin).{canEdit?" Cliquez la colonne 🌙 pour la garde (repos posé automatiquement le lendemain), une case pour le reste.":""}</div>
+    <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 8px"}}>Jauge : internes en HC et en USIC sur le créneau, rouge sous le seuil (Paramètres). Case garde rouge : personne de garde ce jour. Samedi : une seule case (matin).{canEdit?" Cliquez la colonne 🌙 pour la garde (repos posé automatiquement le lendemain), une case pour le reste.":""}</div>
     {cols.length===0
       ?<div style={{...S.card}}>
-        <div style={{fontSize:12,color:"var(--txt3)"}}>Aucun interne sur la période affichée — saisissez les semestres et les fiches dans l'onglet Équipe, section « 🎓 Internes ».</div>
+        <div style={{fontSize:12,color:"var(--txt3)"}}>Aucun interne sur ce semestre — saisissez les semestres et les fiches dans l'onglet Équipe, section « 🎓 Internes ».</div>
       </div>
-      :<TableScroll jours fit>
+      :<TableScroll memId="internes" fit>
       <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
         <thead>
           <tr>
@@ -6645,7 +6650,7 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
         <tbody>
           {jours.map((o,di)=>{
             const prevDay=di>0?jours[di-1]:null;
-            const isNewMonth=viewPeriod&&(!prevDay||prevDay.m!==o.m||prevDay.y!==o.y);
+            const isNewMonth=!prevDay||prevDay.m!==o.m||prevDay.y!==o.y;
             const t=dow(o.y,o.m,o.d),fer=isFerie(o.y,o.m,o.d);
             const off=t===0||fer,samJ=!off&&t===6;
             const we=off||samJ;
@@ -6658,7 +6663,7 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
               <tr key={o.y+"-"+o.m+"-"+o.d+sl} data-day={o.y+"-"+o.m+"-"+o.d} style={{height:28,borderBottom:si===slots.length-1?"1px solid var(--border)":"1px solid var(--border2)",
                 ...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{}),...(si===0&&isMon?{boxShadow:"0 -2px 0 0 var(--border)"}:{})}}>
                 {si===0&&<td rowSpan={slots.length} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,minWidth:C0,background:vac?"var(--vac-bg)":(we?"var(--bg-we)":"var(--td-fix)")}}>
-                  <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{o.d}{viewPeriod&&isNewMonth&&<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700,fontFamily:"sans-serif",lineHeight:1.2}}>{MOIS[o.m]}</div>}
+                  <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{o.d}{isNewMonth&&<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700,fontFamily:"sans-serif",lineHeight:1.2}}>{MOIS[o.m]}</div>}
                     <div style={{fontSize:8,color:"var(--txt3)",fontWeight:700,fontFamily:"sans-serif"}}>{JOURSL[t].slice(0,3)}{fer?" F":""}</div>
                   </div>
                 </td>}
@@ -6718,7 +6723,7 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
       return <Ov onClose={()=>setStatsOpen(false)}>
         <div style={{...S.modal,maxWidth:720,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
           <div style={S.mHd}><div style={S.mTit2}>{"📊 Statistiques — "+titre}</div><button onClick={()=>setStatsOpen(false)} style={S.xBtn}>×</button></div>
-          <div style={{fontSize:10,color:"var(--txt3)",margin:"4px 0 8px"}}>{"Sur la période affichée ("+jours.length+" jours"+(showFull?"":", depuis aujourd'hui")+"). Gardes : total puis par catégorie (férié = dimanche, veille de férié = vendredi, comme chez les médecins). Le reste en jours (0,5 = demi-journée). Colonnes affichées : Paramètres, tuile Internes."}</div>
+          <div style={{fontSize:10,color:"var(--txt3)",margin:"4px 0 8px"}}>{"Sur le semestre affiché ("+jours.length+" jours"+(showFull?"":", depuis aujourd'hui")+"). Gardes : total puis par catégorie (férié = dimanche, veille de férié = vendredi, comme chez les médecins). Le reste en jours (0,5 = demi-journée). Colonnes affichées : Paramètres, tuile Internes."}</div>
           <table style={{borderCollapse:"collapse",width:"100%"}}>
             <thead><tr>
               <th style={{...S.th,textAlign:"left",paddingLeft:8}}>Interne</th>
