@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.71 — 17/08/2026";
+var APP_VERSION = "v10.71.1 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -7005,8 +7005,6 @@ function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, s
                             cols.map(c => React.createElement("th", { key: c.id, style: Object.assign(Object.assign({}, S.th), { minWidth: 52, position: "sticky", top: 0, zIndex: 20 }), title: c.nom + " — " + c.sLbl + " (" + intFmtD(c.sDeb) + " → " + intFmtD(c.sFin) + ")" },
                                 React.createElement("div", { style: Object.assign(Object.assign({}, S.avT), { background: c.color, margin: "0 auto" }) }, c.init))))),
                     React.createElement("tbody", null, jours.map((o, di) => {
-                        const prevDay = di > 0 ? jours[di - 1] : null;
-                        const isNewMonth = !prevDay || prevDay.m !== o.m || prevDay.y !== o.y;
                         const t = dow(o.y, o.m, o.d), fer = isFerie(o.y, o.m, o.d);
                         const off = t === 0 || fer, samJ = !off && t === 6;
                         const we = off || samJ;
@@ -7019,7 +7017,7 @@ function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, s
                             si === 0 && React.createElement("td", { rowSpan: slots.length, style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 10, minWidth: C0, background: vac ? "var(--vac-bg)" : (we ? "var(--bg-we)" : "var(--td-fix)") }) },
                                 React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center" } },
                                     o.d,
-                                    isNewMonth && React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700, fontFamily: "sans-serif", lineHeight: 1.2 } }, MOIS[o.m]),
+                                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", fontWeight: 700, fontFamily: "sans-serif", lineHeight: 1.2 } }, MOIS[o.m]),
                                     React.createElement("div", { style: { fontSize: 8, color: "var(--txt3)", fontWeight: 700, fontFamily: "sans-serif" } },
                                         JOURSL[t].slice(0, 3),
                                         fer ? " F" : ""))),
