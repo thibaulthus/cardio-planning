@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.71.1 — 17/08/2026";
+const APP_VERSION="v10.72 — 17/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -8831,7 +8831,10 @@ function CardioPlanning(){
         <input value={pinInput} onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){
     if(pinInput===editPin){setAccessMode("edit");setPinError(false);return;}
     const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3);
-    if(medEntry){setEditMedId(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);}
+    if(medEntry){setEditMedId(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);
+      /* v10.72 : un ATTACHE ouvre directement sur l'onglet Attaches — son planning
+         n'est pas dans l'onglet Planning, qui ne montre que les medecins. */
+      const _mA=medecins.find(m=>m.id===parseInt(medEntry[0]));if(_mA&&_mA.role==="attache")setTab("attache");}
     else if(adminEnabled&&(()=>{const okA=adminPin&&adminPin.length>=3&&pinInput===adminPin;const okC=cadrePin&&cadrePin.length>=3&&pinInput===cadrePin;if(okA||okC)setIsCadre(!!okC&&!okA);return okA||okC;})()){setAdminAsk(true);setPinError(false);}
     else if(intCfg.show===true&&intCfg.pin&&intCfg.pin.length>=3&&pinInput===intCfg.pin){setInterneAsk(true);setPinError(false);}
     else setPinError(true);
@@ -8847,6 +8850,8 @@ function CardioPlanning(){
               setEditMedId(parseInt(medEntry[0]));
               setAccessMode("medecinEdit");
               setPinError(false);
+              const _mA=medecins.find(m=>m.id===parseInt(medEntry[0]));   /* v10.72 : attache -> onglet Attaches */
+              if(_mA&&_mA.role==="attache")setTab("attache");
             } else if(adminEnabled&&(()=>{const okA=adminPin&&adminPin.length>=3&&pinInput===adminPin;const okC=cadrePin&&cadrePin.length>=3&&pinInput===cadrePin;if(okA||okC)setIsCadre(!!okC&&!okA);return okA||okC;})()){
               setAdminAsk(true);setPinError(false);
             } else if(intCfg.show===true&&intCfg.pin&&intCfg.pin.length>=3&&pinInput===intCfg.pin){
