@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.81 — 18/08/2026";
+var APP_VERSION = "v10.82 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -920,7 +920,7 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
                                     _gvLpF = false;
                                     return;
                                 } onCell(med.id, ey, em, d, sl); } },
-                                pf && pf.garde && si === 0 && React.createElement("div", { style: { position: "absolute", top: 0, left: 2, fontSize: 9, lineHeight: 1, pointerEvents: "none" } }, pf.garde === "wish" ? "⭐" : "🚫"),
+                                pf && pf.garde && si === 0 && React.createElement("div", { style: { position: "absolute", top: 1, left: 1, zIndex: 6, width: 14, height: 14, borderRadius: "50%", background: "#fff", boxShadow: "0 0 0 1px rgba(0,0,0,.28)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, lineHeight: 1, pointerEvents: "none" } }, pf.garde === "wish" ? "⭐" : "🚫"),
                                 issueT && React.createElement("div", { style: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderTop: "9px solid #f85149", borderLeft: "9px solid transparent" } }),
                                 !bl && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } },
                                     React.createElement(CondBadges, { es: es, acteById: acteById, noteT: noteT })));
@@ -12024,6 +12024,7 @@ function CardioPlanning() {
                             court(dDeb),
                             " au ",
                             court(dFin),
+                            " \u2014 voulez-vous la retirer ?",
                             React.createElement("span", { style: { display: "block", fontSize: 10, fontWeight: 600, color: "var(--txt3)", marginTop: 1 } },
                                 nJours,
                                 " jours",

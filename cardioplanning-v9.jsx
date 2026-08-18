@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.81 — 18/08/2026";
+const APP_VERSION="v10.82 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -795,7 +795,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                     onTouchEnd={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
                     onTouchMove={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
                     onClick={bl||offC||!isEdit?undefined:()=>{if(_gvLpF){_gvLpF=false;return;}onCell(med.id,ey,em,d,sl);}}>
-                    {pf&&pf.garde&&si===0&&<div style={{position:"absolute",top:0,left:2,fontSize:9,lineHeight:1,pointerEvents:"none"}}>{pf.garde==="wish"?"⭐":"🚫"}</div>}
+                    {pf&&pf.garde&&si===0&&<div style={{position:"absolute",top:1,left:1,zIndex:6,width:14,height:14,borderRadius:"50%",background:"#fff",boxShadow:"0 0 0 1px rgba(0,0,0,.28)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,lineHeight:1,pointerEvents:"none"}}>{pf.garde==="wish"?"⭐":"🚫"}</div>}
                     {issueT&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}{!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       <CondBadges es={es} acteById={acteById} noteT={noteT}/>
                     </div>}
@@ -10702,7 +10702,7 @@ header::-webkit-scrollbar { display: none; }
               return(
                 <div style={{marginBottom:10,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
                   <div style={{fontSize:11.5,fontWeight:800,color:"var(--txt)",lineHeight:1.45}}>
-                    📅 Cette {lab} court du {court(dDeb)} au {court(dFin)}
+                    📅 Cette {lab} court du {court(dDeb)} au {court(dFin)} — voulez-vous la retirer ?
                     <span style={{display:"block",fontSize:10,fontWeight:600,color:"var(--txt3)",marginTop:1}}>{nJours} jours{dDeb.getTime()<jClic.getTime()&&dFin.getTime()>jClic.getTime()?" — vous avez cliqué au milieu":""}</span>
                   </div>
                   {!cible?
