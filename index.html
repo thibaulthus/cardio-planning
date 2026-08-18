@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.78 — 18/08/2026";
+var APP_VERSION = "v10.79 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -704,41 +704,11 @@ function FF(_a) {
         React.createElement("label", { style: S.fl }, l),
         React.createElement("input", { value: v, onChange: function (e) { return c(e.target.value); }, style: __assign(__assign({}, S.fi), { width: "100%" }) }));
 }
-function MBar(_a) {
-    var year = _a.year, month = _a.month, prevM = _a.prevM, nextM = _a.nextM, extra = _a.extra, right = _a.right;
-    var _b = perStart(year, month), _sy = _b.sy, _sm = _b.sm;
-    var _em = (_sm + PCFG.len - 1) % 12;
-    var _pLabel = MOIS[_sm] + " — " + MOIS[_em] + " " + _sy;
-    return (React.createElement("div", { style: S.bar },
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-            React.createElement("button", { onClick: prevM, style: S.arr }, "\u2039"),
-            React.createElement("h2", { style: S.mTit }, extra ? React.createElement(React.Fragment, null,
-                extra,
-                " \u2014 ",
-                _pLabel) : React.createElement(React.Fragment, null, _pLabel)),
-            React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
-        right && right));
-}
-function MedBtn(_a) {
-    var med = _a.med, avail = _a.avail, onClick = _a.onClick, extra = _a.extra;
-    var blocked = avail === "blocked", warn = avail === "warning";
-    return (React.createElement("button", { disabled: blocked, onClick: onClick, style: { display: "flex", alignItems: "center", gap: 7, padding: "6px 9px", borderRadius: 7, border: "1px solid ".concat(warn ? "#f59e0b44" : "var(--border)"),
-            cursor: blocked ? "default" : "pointer", background: warn ? "rgba(245,158,11,.15)" : "var(--bg2)", opacity: blocked ? .35 : 1, width: "100%" } },
-        React.createElement("div", { style: __assign(__assign({}, S.av), { background: med.color, width: 24, height: 24 }) }, med.init),
-        React.createElement("div", { style: { textAlign: "left", flex: 1 } },
-            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt)" } },
-                med.prenom,
-                " ",
-                med.nom),
-            React.createElement("div", { style: { fontSize: 9, color: blocked ? "#ef4444" : warn ? "#f59e0b" : "var(--txt3)" } }, blocked ? "Absent/repos" : warn ? "⚠ Déjà occupé" : "Disponible")),
-        extra && extra));
-}
 /* ════ GRID H ════ */
-/* v10.12 : appui long (téléphone) contre clic (ordinateur). Ces deux variables étaient
-   utilisées sans jamais avoir été déclarées : sur téléphone onTouchStart les créait
-   implicitement, sur ordinateur onClick lisait une variable inexistante et le clic était
-   interrompu sans rien afficher. */
-var _gvLpF = false, _gvLpT = null;
+/* v10.12 : ces deux variables distinguent un APPUI LONG (téléphone) d'un clic. Sans elles,
+   `onClick` lisait une variable inexistante sur ORDINATEUR (ReferenceError) et le clic ne
+   faisait rien, alors que le téléphone fonctionnait. Ne pas supprimer. */
+let _gvLpF = false, _gvLpT = null;
 function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, meds, getEntries, acteById, onCell, isEdit, notes = {}, isVac, applyGarde, allMeds, viewPeriod, allDays4, showFull, showGarde = true, intGarde = null, gardeLocked = false, onCellHistory = null, getAstreinteForDay, printWk = null }) {
     /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
        disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
@@ -6198,7 +6168,6 @@ function DeactModal(_a) {
 const INT_COLS = ["#2fbf9e", "#f59e0b", "#ec4899", "#388bfd", "#8b5cf6", "#76a5af", "#e3b341", "#3fb950", "#f97316", "#64748b"];
 function intISO(dt) { return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0"); }
 function intDecal(iso, n) { const p = iso.split("-").map(Number); return intISO(new Date(p[0], p[1] - 1, p[2] + n)); }
-function intPlusMois(iso, n) { const p = iso.split("-").map(Number); return intISO(new Date(p[0], p[1] - 1 + n, p[2])); }
 function intSemLabel(deb) { const p = deb.split("-").map(Number); const y = p[0], m = p[1]; if (m >= 5 && m <= 10)
     return "Été " + y; return m >= 11 ? ("Hiver " + y + "-" + (y + 1)) : ("Hiver " + (y - 1) + "-" + y); }
 function intSemsTri(cfg) { return ((cfg && cfg.sems) || []).slice().sort((a, b) => (a.deb < b.deb ? -1 : 1)); }
@@ -7261,23 +7230,33 @@ function CardioPlanning() {
         else if (mq.removeListener)
             mq.removeListener(onChg); };
     }, []);
-    var DEFAULT_TABS = [["planning", "📅 Planning"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["construire", "🏗️ Construire"], ["tourmedical", "🔄 Tour"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["reports", "📥 Reports"], ["attache", "👔 Attachés"], ["internes", "🎓 Internes"], ["plantype", "📋 Type"], ["equipe", "👥 Équipe"], ["activites", "⚙️ Activités"], ["stats", "📊 Stats"], ["aide", "❓ Aide"], ["partage", "⚙️ Paramètres"]];
+    var DEFAULT_TABS = [["planning", "📅 Planning"], ["chl", "🏥 CHL"], ["chb", "🏥 CHB"], ["plateau", "❤️ PT Cardio"], ["angio", "🔬 PT Angio"], ["internes", "🎓 Internes"], ["construire", "🏗️ Construire"], ["tourmedical", "🔄 Tour"], ["garde", "🌙 Gardes"], ["astreinte", "📞 Astreinte"], ["reports", "📥 Reports"], ["attache", "👔 Attachés"], ["plantype", "📋 Type"], ["equipe", "👥 Équipe"], ["activites", "⚙️ Activités"], ["stats", "📊 Stats"], ["aide", "❓ Aide"], ["partage", "⚙️ Paramètres"]];
+    /* v10.78 : « Internes » rejoint « PT Angio ». L'ordre ENREGISTRE sur l'appareil fait foi
+       (cp6_taborder_v3), donc changer DEFAULT_TABS ne suffisait pas. Nouvelle cle v4 et, au
+       premier chargement, on DEPLACE « internes » derriere « angio » dans l'ordre deja
+       enregistre — le rangement personnel de l'appareil est conserve. */
     var _k = useState(function () { try {
-        var v = localStorage.getItem("cp6_taborder_v3");
+        var all_1 = DEFAULT_TABS.map(function (t) { return t[0]; });
+        var compl_1 = function (ids) { return __spreadArray(__spreadArray([], ids.filter(function (id) { return all_1.includes(id); }), true), all_1.filter(function (id) { return !ids.includes(id); }), true); };
+        var v = localStorage.getItem("cp6_taborder_v4");
         if (v) {
-            var saved_1 = JSON.parse(v);
-            var all_1 = DEFAULT_TABS.map(function (t) { return t[0]; });
-            var merged = __spreadArray(__spreadArray([], saved_1.filter(function (id) { return all_1.includes(id); }), true), all_1.filter(function (id) { return !saved_1.includes(id); }), true);
-            return merged;
+            return compl_1(JSON.parse(v));
         }
-        return DEFAULT_TABS.map(function (t) { return t[0]; });
+        var anc = localStorage.getItem("cp6_taborder_v3");
+        if (anc) {
+            var m = compl_1(JSON.parse(anc)).filter(function (id) { return id !== "internes"; });
+            var i = m.indexOf("angio");
+            m.splice(i >= 0 ? i + 1 : m.length, 0, "internes");
+            return m;
+        }
+        return all_1;
     }
     catch (_a) {
         return DEFAULT_TABS.map(function (t) { return t[0]; });
     } }), tabOrder = _k[0], setTabOrder = _k[1];
     var _l = useState(null), dragTab = _l[0], setDragTab = _l[1];
     useEffect(function () { try {
-        localStorage.setItem("cp6_taborder_v3", JSON.stringify(tabOrder));
+        localStorage.setItem("cp6_taborder_v4", JSON.stringify(tabOrder));
     }
     catch (_a) { } }, [tabOrder]);
     var _m = useState(null), modal = _m[0], setModal = _m[1];

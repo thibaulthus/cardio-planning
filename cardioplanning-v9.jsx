@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.78 — 18/08/2026";
+const APP_VERSION="v10.79 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -579,37 +579,6 @@ function Av({med}){return <div style={{...S.av,background:med.color}}>{med.init}
 function Chp({bg,c,children}){return <span style={{fontSize:9,background:bg,color:c,padding:"1px 4px",borderRadius:3,fontWeight:700}}>{children}</span>;}
 function Ov({children,onClose}){return <div style={S.ov} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div style={S.mb}>{children}</div></div>;}
 function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v} onChange={e=>c(e.target.value)} style={{...S.fi,width:"100%"}}/></div>;}
-function MBar({year,month,prevM,nextM,extra,right}){
-  const {sy:_sy,sm:_sm}=perStart(year,month);
-  const _em=(_sm+PCFG.len-1)%12;
-  const _pLabel=MOIS[_sm]+" — "+MOIS[_em]+" "+_sy;
-  return(
-    <div style={S.bar}>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <button onClick={prevM} style={S.arr}>‹</button>
-        <h2 style={S.mTit}>{extra?<>{extra} — {_pLabel}</>:<>{_pLabel}</>}</h2>
-        <button onClick={nextM} style={S.arr}>›</button>
-      </div>
-      {right&&right}
-    </div>
-  );
-}
-function MedBtn({med,avail,onClick,extra}){
-  const blocked=avail==="blocked", warn=avail==="warning";
-  return(
-    <button disabled={blocked} onClick={onClick}
-      style={{display:"flex",alignItems:"center",gap:7,padding:"6px 9px",borderRadius:7,border:`1px solid ${warn?"#f59e0b44":"var(--border)"}`,
-        cursor:blocked?"default":"pointer",background:warn?"rgba(245,158,11,.15)":"var(--bg2)",opacity:blocked?.35:1,width:"100%"}}>
-      <div style={{...S.av,background:med.color,width:24,height:24}}>{med.init}</div>
-      <div style={{textAlign:"left",flex:1}}>
-        <div style={{fontSize:11,fontWeight:700,color:"var(--txt)"}}>{med.prenom} {med.nom}</div>
-        <div style={{fontSize:9,color:blocked?"#ef4444":warn?"#f59e0b":"var(--txt3)"}}>{blocked?"Absent/repos":warn?"⚠ Déjà occupé":"Disponible"}</div>
-      </div>
-      {extra&&extra}
-    </button>
-  );
-}
-
 /* ════ GRID H ════ */
 /* v10.12 : ces deux variables servent à distinguer un APPUI LONG (téléphone) d'un clic.
    Elles étaient utilisées sans avoir jamais été déclarées. Sur téléphone, `onTouchStart`
@@ -5975,7 +5944,6 @@ function DeactModal({med,perDays,perLbl,onSave,onClose,countActs=null,onClear=nu
 const INT_COLS=["#2fbf9e","#f59e0b","#ec4899","#388bfd","#8b5cf6","#76a5af","#e3b341","#3fb950","#f97316","#64748b"];
 function intISO(dt){return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");}
 function intDecal(iso,n){const p=iso.split("-").map(Number);return intISO(new Date(p[0],p[1]-1,p[2]+n));}
-function intPlusMois(iso,n){const p=iso.split("-").map(Number);return intISO(new Date(p[0],p[1]-1+n,p[2]));}
 function intSemLabel(deb){const p=deb.split("-").map(Number);const y=p[0],m=p[1];if(m>=5&&m<=10)return "Été "+y;return m>=11?("Hiver "+y+"-"+(y+1)):("Hiver "+(y-1)+"-"+y);}
 function intSemsTri(cfg){return ((cfg&&cfg.sems)||[]).slice().sort((a,b)=>(a.deb<b.deb?-1:1));}
 function intSemDuJour(cfg,iso){return intSemsTri(cfg).find(s=>s.deb<=iso&&iso<=s.fin)||null;}
@@ -6876,10 +6844,24 @@ function CardioPlanning(){
     if(mq.addEventListener)mq.addEventListener("change",onChg);else if(mq.addListener)mq.addListener(onChg);
     return ()=>{if(mq.removeEventListener)mq.removeEventListener("change",onChg);else if(mq.removeListener)mq.removeListener(onChg);};
   },[]);
-  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["construire","🏗️ Construire"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["internes","🎓 Internes"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
-  const [tabOrder,setTabOrder]=useState(()=>{ try{ const v=localStorage.getItem("cp6_taborder_v3"); if(v){ const saved=JSON.parse(v); const all=DEFAULT_TABS.map(t=>t[0]); const merged=[...saved.filter(id=>all.includes(id)),...all.filter(id=>!saved.includes(id))]; return merged; } return DEFAULT_TABS.map(t=>t[0]); }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
+  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["internes","🎓 Internes"],["construire","🏗️ Construire"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
+  /* v10.78 : « Internes » rejoint « PT Angio ». L'ordre ENREGISTRE sur l'appareil fait foi
+     (cp6_taborder_v3), donc changer DEFAULT_TABS ne suffisait pas : sur un appareil deja
+     utilise, l'onglet serait reste en fin de liste. On passe donc a une nouvelle cle et,
+     au premier chargement, on DEPLACE simplement « internes » derriere « angio » dans
+     l'ordre deja enregistre — le reste du rangement personnel de l'appareil est conserve. */
+  const [tabOrder,setTabOrder]=useState(()=>{ try{
+    const all=DEFAULT_TABS.map(t=>t[0]);
+    const compl=ids=>[...ids.filter(id=>all.includes(id)),...all.filter(id=>!ids.includes(id))];
+    const v=localStorage.getItem("cp6_taborder_v4");
+    if(v) return compl(JSON.parse(v));
+    const anc=localStorage.getItem("cp6_taborder_v3");
+    if(anc){ const m=compl(JSON.parse(anc)).filter(id=>id!=="internes");
+      const i=m.indexOf("angio"); m.splice(i>=0?i+1:m.length,0,"internes"); return m; }
+    return all;
+  }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
-  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v3",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
+  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v4",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
 
   const [modal,setModal]=useState(null);
   const [mData,setMData]=useState(null);
