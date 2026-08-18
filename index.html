@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.79 — 18/08/2026";
+var APP_VERSION = "v10.80 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -960,7 +960,7 @@ function offOuvOn(entry, actes) {
 }
 /* v10.46 : les onglets dont la grille occupe l'écran en entier — leur cadre
    passe en « fit », et le bas de page n'y garde qu'une petite marge. */
-var GRID_FIT = ["planning", "chl", "chb", "plateau", "angio", "attache"];
+var GRID_FIT = ["planning", "chl", "chb", "plateau", "angio", "attache", "internes"]; /* v10.80 : « internes » manquait — onglet né en v10.54, après cette liste (v10.46). La page gardait 110 px de marge basse et la boucle de mesure les retirait au tableau. */
 /* v10.47 : Tour et Gardes vivent dans Construire (tuiles 2 et 3) — leurs
    boutons sont retirés pour tous, à sa demande. Les onglets restent dans le
    code : Construire les embarque, les supprimer le casserait. */

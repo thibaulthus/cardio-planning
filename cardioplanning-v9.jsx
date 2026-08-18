@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.79 — 18/08/2026";
+const APP_VERSION="v10.80 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -841,7 +841,7 @@ function offOuvOn(entry,actes){
 }
 /* v10.46 : les onglets dont la grille occupe l'écran en entier — leur cadre
    passe en « fit », et le bas de page n'y garde qu'une petite marge. */
-const GRID_FIT=["planning","chl","chb","plateau","angio","attache"];
+const GRID_FIT=["planning","chl","chb","plateau","angio","attache","internes"]; /* v10.80 : « internes » manquait — l'onglet est né en v10.54, APRÈS cette liste écrite en v10.46. Sa grille passait bien en « fit », mais la page gardait les 110 px de marge basse : la boucle de mesure voyait la page déborder de cette marge et rendait la hauteur correspondante. D'où un tableau qui s'arrêtait ~110 px trop haut, sur cet onglet seulement. */
 /* v10.47 : Tour et Gardes vivent dans Construire (tuiles 2 et 3) — leurs
    boutons sont retirés pour tous, à sa demande. Les onglets restent dans le
    code : Construire les embarque, les supprimer le casserait. */
