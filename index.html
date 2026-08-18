@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.77 — 17/08/2026";
+var APP_VERSION = "v10.78 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4630,7 +4630,7 @@ const HELP_SECTIONS=[
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
   HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée. En naviguant vers un mois archivé, il se recharge automatiquement en consultation. Désarchivage possible mois par mois."]}),
-  HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète toutes les 72 h, les 10 dernières conservées, avec aperçu avant restauration."]}),
+  HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}),
   HT({children:"💾 Sauvegarde sur mon ordinateur"}),
@@ -12271,6 +12271,12 @@ function CardioPlanning() {
                 React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 13 } },
                     React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { flex: 1 }), onClick: function () { return setHistConf(null); } }, "Annuler"),
                     React.createElement("button", { style: __assign(__assign({}, S.btnP), { flex: 1, background: "#b45309" }), onClick: histGo }, histConf.sens === "undo" ? "Revenir en arrière" : "Rétablir")))),
+        modal === "vacColler" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
+            React.createElement(VacCollerModal, { onClose: function () { return setModal(null); }, onValider: function (lignes) {
+                    setVacs(function (v) { return v.filter(function (x) { return !lignes.some(function (n2) { return n2.an === x.an; }); }).concat(lignes); });
+                    setModal(null);
+                    toast(lignes.length + " p\u00E9riode(s) enregistr\u00E9e(s)", "info");
+                } })),
         modal === "restaure" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(RestoreModal, { med: medecins.find(function (m) { return m.id === mData.medId; }), backups: backupList, y: mData.y, m: mData.m, d: mData.d, onDiff: function (id, df, dt) { return diffMedPeriod(id, mData.medId, df, dt); }, onGo: function (id, df, dt) { restoreMedPeriod(id, mData.medId, df, dt); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
