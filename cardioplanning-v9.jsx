@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.83 — 18/08/2026";
+const APP_VERSION="v10.85 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1714,7 +1714,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
             const dw2=dow(gvY,gvM,d),we=isWE(gvY,gvM,d);
             const gMed=getGardeMed2(gvY,gvM,d);
             return(
-              <tr key={d+gvM+gvY} style={{height:36,borderBottom:"1px solid var(--border2)",...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{})}}>
+              <tr key={gvY+"-"+gvM+"-"+d} style={{height:36,borderBottom:"1px solid var(--border2)",...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{})}}>
                 <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5,textAlign:"center",background:isT?"var(--bg-td)":we?"var(--bg-we)":"var(--td-fix)"}}>
                   <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{d} <span style={{fontSize:9,fontWeight:600}}>{MOIS[gvM].slice(0,4)}</span></div>
                   <div style={{fontSize:9,color:we?"#92400e":isT?"var(--today-c)":"var(--txt3)",fontWeight:600}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]}</div>
@@ -5542,7 +5542,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     {n:3,icon:"🌙",titre:"Gardes",
      sous:gardes.ok+" jour"+(gardes.ok>1?"s":"")+" sur "+gardes.tot+" ont une garde",
      alerte:mGar?(mGar+" jour"+(mGar>1?"s":"")+" sans garde sur la période"):null,
-     body:<BuildEmbed><GardeView key={pKey} {...gardeProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     body:<BuildEmbed><GardeView key={pKey} {...gardeProps} noNav={true} showFull={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
     {n:4,icon:"🚫",titre:"Absences de tout le monde",
      sous:nAutres+" sur "+autres.length+" renseigné"+(nAutres>1?"s":""),
      alerte:mAut?(mAut+" personne"+(mAut>1?"s":"")+" hors médecins sans réponse"):null,

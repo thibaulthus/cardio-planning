@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.83 — 18/08/2026";
+var APP_VERSION = "v10.85 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1931,7 +1931,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                 const isT = d === today.getDate() && gvM === today.getMonth() && gvY === today.getFullYear();
                 const dw2 = dow(gvY, gvM, d), we = isWE(gvY, gvM, d);
                 const gMed = getGardeMed2(gvY, gvM, d);
-                return (React.createElement("tr", { key: d + gvM + gvY, style: Object.assign(Object.assign({ height: 36, borderBottom: "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})) },
+                return (React.createElement("tr", { key: gvY + "-" + gvM + "-" + d, style: Object.assign(Object.assign({ height: 36, borderBottom: "1px solid var(--border2)" }, (we ? { background: "var(--bg-we)" } : {})), (isT ? { background: "var(--bg-td)" } : {})) },
                     React.createElement("td", { style: Object.assign(Object.assign({}, S.tdFix), { position: "sticky", left: 0, zIndex: 5, textAlign: "center", background: isT ? "var(--bg-td)" : we ? "var(--bg-we)" : "var(--td-fix)" }) },
                         React.createElement("div", { style: { fontWeight: 800, color: isT ? "var(--today-c)" : we ? "#92400e" : "var(--txt)", fontSize: 13, fontFamily: "'JetBrains Mono',monospace" } },
                             d,
@@ -5787,7 +5787,7 @@ function BuildTab(_a) {
             sous: gardes.ok + " jour" + (gardes.ok > 1 ? "s" : "") + " sur " + gardes.tot + " ont une garde",
             alerte: mGar ? (mGar + " jour" + (mGar > 1 ? "s" : "") + " sans garde sur la période") : null,
             body: React.createElement(BuildEmbed, null,
-                React.createElement(GardeView, __assign({ key: pKey }, gardeProps, { noNav: true, year: bPer.sy, month: bPer.sm }))) },
+                React.createElement(GardeView, __assign({ key: pKey }, gardeProps, { noNav: true, showFull: true, year: bPer.sy, month: bPer.sm }))) },
         { n: 4, icon: "🚫", titre: "Absences de tout le monde",
             sous: nAutres + " sur " + autres.length + " renseigné" + (nAutres > 1 ? "s" : ""),
             alerte: mAut ? (mAut + " personne" + (mAut > 1 ? "s" : "") + " hors médecins sans réponse") : null,
