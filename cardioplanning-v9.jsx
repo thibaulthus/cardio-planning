@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.80 — 18/08/2026";
+const APP_VERSION="v10.81 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -588,7 +588,7 @@ function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v}
    parfait, ordinateur muet, et clic droit intact puisqu'il ne les consulte pas. */
 let _gvLpF=false,_gvLpT=null;
 
-function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,printWk=null}){
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null}){
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
      disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
      partie → la case du jour est hachurée et verrouillée, et la personne
@@ -715,6 +715,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
           isAbsDay={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};return isAbsOn(mid,p2.y,p2.m,p2.d);}}
           isAbsNext={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const nx=new Date(p2.y,p2.m,p2.d+1);return isAbsOn(mid,nx.getFullYear(),nx.getMonth(),nx.getDate());}}
           tourNext={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const nx=new Date(p2.y,p2.m,p2.d+1);const ny=nx.getFullYear(),nm=nx.getMonth(),nd=nx.getDate();if(isWE(ny,nm,nd))return null;const t=["M","AM"].flatMap(sl=>getEntries(mid,ny,nm,nd,sl)||[]).find(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));return t?(t.acteId==="TOUR_HC"?"HC":"USIC"):null;}}
+          prefOf={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};return gardePref?gardePref(mid,p2.y,p2.m,p2.d):null;}}
           currentId={(()=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const gm=getGardeMed2(p2.y,p2.m,p2.d);return gm?gm.id:null;})()}
           onPick={mid=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};applyGarde(mid,p2.y,p2.m,p2.d);setPickGardeDayFull(null);}}
           maxHeight={320}/>
@@ -784,13 +785,17 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                     if(si===slots.length-1&&!contNext)parts.push("inset 0 -1px 0 var(--ast-bord)");
                     astSh=parts.join(", ");
                   }
+                  /* v10.81 : preferences de tour (bande lun-ven) et de garde (icone du jour) */
+                  const pf=prefFor?prefFor(med.id,ey,em,d):null;
+                  const prefBg=pf&&pf.tour?(pf.tour==="wish"?"rgba(56,139,253,.20)":"rgba(248,81,73,.18)"):null;
                   return <td key={med.id} title={offC?("Indisponible — désactivé "+medOffL(med).map(r=>"du "+offFr(r.du)+" au "+offFr(r.au)).join(", ")):((issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined)}
-                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),...(offC?{background:"repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)",opacity:.55,cursor:"default"}:{}),display:"table-cell",verticalAlign:"middle",position:"relative"}}
+                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(prefBg?{background:prefBg}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),...(offC?{background:"repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)",opacity:.55,cursor:"default"}:{}),display:"table-cell",verticalAlign:"middle",position:"relative"}}
                     onContextMenu={onCellHistory?e=>{e.preventDefault();onCellHistory(med.id,ey,em,d,sl);}:undefined}
                     onTouchStart={onCellHistory?()=>{_gvLpF=false;clearTimeout(_gvLpT);_gvLpT=setTimeout(()=>{_gvLpF=true;onCellHistory(med.id,ey,em,d,sl);},600);}:undefined}
                     onTouchEnd={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
                     onTouchMove={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
                     onClick={bl||offC||!isEdit?undefined:()=>{if(_gvLpF){_gvLpF=false;return;}onCell(med.id,ey,em,d,sl);}}>
+                    {pf&&pf.garde&&si===0&&<div style={{position:"absolute",top:0,left:2,fontSize:9,lineHeight:1,pointerEvents:"none"}}>{pf.garde==="wish"?"⭐":"🚫"}</div>}
                     {issueT&&<div style={{position:"absolute",top:0,right:0,width:0,height:0,borderTop:"9px solid #f85149",borderLeft:"9px solid transparent"}}/>}{!bl&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}>
                       <CondBadges es={es} acteById={acteById} noteT={noteT}/>
                     </div>}
@@ -1393,7 +1398,7 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
                 « Assigner quand même » permet le cas rare (garde du soir après une
                 journée de FMC). Le geste rare coûte un clic de plus, le geste
                 fréquent est protégé de l'erreur. */
-function GardeCandidateList({meds,isAbsDay,isAbsNext,tourNext=null,currentId,onPick,maxHeight=340}){
+function GardeCandidateList({meds,isAbsDay,isAbsNext,tourNext=null,prefOf=null,currentId,onPick,maxHeight=340}){
   return(
     <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight,overflowY:"auto"}}>
       {meds.map(m=>{
@@ -1402,6 +1407,8 @@ function GardeCandidateList({meds,isAbsDay,isAbsNext,tourNext=null,currentId,onP
         const nxAbs=!dayAbs&&!isOn&&isAbsNext(m.id);
         /* v10.64 : tour médical HC/USIC le lendemain — le repos de garde tomberait dessus */
         const tn=(!dayAbs&&!isOn&&tourNext)?tourNext(m.id):null;
+        /* v10.81 : preference de garde du medecin pour ce jour (informative, jamais bloquante) */
+        const gp=prefOf?prefOf(m.id):null;
         const bord=isOn?"#16a34a":dayAbs?"#ef444455":(nxAbs||tn)?"#f59e0b55":"var(--border)";
         const bg=isOn?"#f0fdf4":dayAbs?"rgba(239,68,68,.06)":(nxAbs||tn)?"rgba(245,158,11,.08)":"var(--bg2)";
         return(
@@ -1414,7 +1421,8 @@ function GardeCandidateList({meds,isAbsDay,isAbsNext,tourNext=null,currentId,onP
                 {dayAbs&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>⛔ Absent / FMC ce jour</span>}
                 {nxAbs&&<span style={{fontSize:9,color:"#b45309",fontWeight:700}}>⚠ Absence/FMC demain — garde possible, sans repos</span>}
                 {tn&&!nxAbs&&<span style={{fontSize:9,color:"#b45309",fontWeight:700}}>⚠ Tour {tn} demain — le repos de garde tomberait dessus</span>}
-                {!dayAbs&&!nxAbs&&!tn&&!isOn&&<span style={{fontSize:9,color:"var(--txt3)"}}>Disponible</span>}
+                {gp&&<span style={{fontSize:9,fontWeight:700,color:gp==="wish"?"#16a34a":"#b45309"}}>{gp==="wish"?"⭐ Souhaite cette garde":"🚫 A demandé à éviter cette garde"}</span>}
+                {!dayAbs&&!nxAbs&&!tn&&!gp&&!isOn&&<span style={{fontSize:9,color:"var(--txt3)"}}>Disponible</span>}
               </div>
               {isOn&&<span style={{color:"#16a34a",fontSize:12,fontWeight:700}}>✓ De garde</span>}
             </div>
@@ -2000,6 +2008,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
               isAbsDay={mid=>isMedAvailable(medecins.find(x=>x.id===mid),pd.y,pd.m,pd.d,gardeSlot)==="blocked"||gvIsAbs(mid,pd.y,pd.m,pd.d)}
               isAbsNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);return gvIsAbs(mid,nx.getFullYear(),nx.getMonth(),nx.getDate());}}
               tourNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);const ny=nx.getFullYear(),nm=nx.getMonth(),nd=nx.getDate();if(isWE(ny,nm,nd))return null;const t=["M","AM"].map(sl=>getEntry(mid,ny,nm,nd,sl)).find(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));return t?(t.acteId==="TOUR_HC"?"HC":"USIC"):null;}}
+              prefOf={mid=>{const dkP=dKey(pd.y,pd.m,pd.d);return ((gardeWish||{})[dkP]||{})[mid]?"wish":(((gardeAvoid||{})[dkP]||{})[mid]?"avoid":null);}}
               currentId={gMed?gMed.id:null}
               onPick={mid=>{applyGarde(mid,pd.y,pd.m,pd.d);setPickerDay(null);}}
               maxHeight={360}/>
@@ -6759,6 +6768,7 @@ function CardioPlanning(){
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
   const [intCfg,setIntCfg]=useState({sems:[],show:false,jaugeDef:true,sHC:2,sUS:2,sSam:1}); // v10.54 internes
+  const [prefOn,setPrefOn]=useState(false);   // v10.81 : coloration des preferences — session seulement
   const [intGardeOn,setIntGardeOn]=useState(false); // v10.61 lot 3b : colonne garde int. du Planning — session seulement, cachée en nominal
   const [ptOrder,setPtOrder]=useState([]);
   const [specColors,setSpecColors]=useState({});
@@ -7960,6 +7970,20 @@ function CardioPlanning(){
     ?((isMedEdit&&editMedId===medId)||(isInterEdit&&attPeutMod(medId)))
     :(isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit);
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
+  /* v10.81 : voir les preferences de tour et de garde dans le Planning.
+     Editeur et intermediaire voient tout le monde ; un medecin basique ne voit que
+     sa ligne. Ni l'administratif ni l'interne ni l'attache n'y ont acces. */
+  const canPref=(isEdit||isInterEdit||isMedEdit)&&!isAttEdit&&!isAdminEdit&&!isInterne;
+  const prefScope=(isEdit||isInterEdit)?null:(isMedEdit?editMedId:null);
+  const prefFor=(medId,y2,m2,d2)=>{
+    if(prefScope&&medId!==prefScope)return null;
+    const wkP=wKey(y2,m2,d2),dkP=dKey(y2,m2,d2),dwP=dow(y2,m2,d2);
+    const tour=(dwP>=1&&dwP<=5)?(((tourWish[wkP]||{})[medId])?"wish":(((tourAvoid[wkP]||{})[medId])?"avoid":null)):null;
+    const garde=((gardeWish[dkP]||{})[medId])?"wish":(((gardeAvoid[dkP]||{})[medId])?"avoid":null);
+    return (tour||garde)?{tour,garde}:null;
+  };
+  const gardePrefFor=(medId,y2,m2,d2)=>{const dkP=dKey(y2,m2,d2);
+    return ((gardeWish[dkP]||{})[medId])?"wish":(((gardeAvoid[dkP]||{})[medId])?"avoid":null);};
   useEffect(()=>{authorRef.current=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+(isCadre?" (cadre)":" (secrétaire)")):(isInterne?((interneName||"?")+" (interne)"):(isEdit?"Éditeur":"?")));},[accessMode,isEdit,isMedEdit,isAdminEdit,isInterne,editMedId,adminName,interneName,medecins]);
   useEffect(()=>{ // purge du journal au-delà de 1200 entrées (éditeur uniquement, garde les 1000 plus récentes)
     if(!isEdit||!window.firebaseDB)return;
@@ -9210,8 +9234,16 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>
               <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
               <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
+              {canPref&&<button onClick={()=>setPrefOn(v=>!v)} title="Afficher les préférences de tour et de garde" style={{...S.arr,fontSize:14,width:30,color:prefOn?"var(--today-c)":"var(--txt2)",border:`1px solid ${prefOn?"var(--today-c)":"var(--border)"}`}}>⭐</button>}
             </div>
           </div>
+          {prefOn&&<div style={{display:"flex",flexWrap:"wrap",gap:"4px 10px",alignItems:"center",marginBottom:8,fontSize:10,color:"var(--txt3)"}}>
+            <span style={{fontWeight:700,textTransform:"uppercase"}}>Préférences :</span>
+            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"rgba(56,139,253,.20)",border:"1px solid #388bfd"}}></span>souhaite tourner</span>
+            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"rgba(248,81,73,.18)",border:"1px solid #f85149"}}></span>préfère ne pas tourner</span>
+            <span>⭐ souhaite la garde</span>
+            <span>🚫 préfère éviter la garde</span>
+          </div>}
           {(isEdit||isMedEdit)&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
             <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
           </div>}
@@ -9221,7 +9253,7 @@ header::-webkit-scrollbar { display: none; }
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>setIntGardeOn(v=>!v)} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfg,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfg,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay}/>}
         </div>
       )}
 
@@ -10696,6 +10728,44 @@ header::-webkit-scrollbar { display: none; }
               </div>
             )}
 
+            {/* v10.81 : etat des preferences de tour et de garde, TOUJOURS visible
+                (independant du bouton de coloration du Planning) et retirable ici —
+                c'etait le seul reglage qu'on ne pouvait pas defaire simplement. */}
+            {(()=>{
+              if(!med||(!med.tourMed&&!med.garde))return null;
+              if(isAdminEdit||isInterne)return null;
+              if(!(isEdit||isInterEdit||canEditThisMed))return null;
+              const wkP=wKey(y2,m2,d2),dkP=dKey(y2,m2,d2);
+              const tP=((tourWish[wkP]||{})[medId])?"wish":(((tourAvoid[wkP]||{})[medId])?"avoid":null);
+              const gP=((gardeWish[dkP]||{})[medId])?"wish":(((gardeAvoid[dkP]||{})[medId])?"avoid":null);
+              if(!tP&&!gP)return null;
+              const delP=(setter,key)=>setter(p=>{const n={...p};const o={...(n[key]||{})};delete o[medId];if(Object.keys(o).length===0)delete n[key];else n[key]=o;return n;});
+              const wa=wkP.split("-").map(Number);
+              const dLun=new Date(wa[0],wa[1],wa[2]),dVen=new Date(wa[0],wa[1],wa[2]+4);
+              const frP=dt=>dt.getDate()+"/"+(dt.getMonth()+1);
+              const ligneP=(txt,col,onClick)=>(
+                <div onClick={canEditThisMed?onClick:undefined} title={canEditThisMed?"Cliquer pour retirer cette préférence":undefined}
+                  style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"6px 10px",borderRadius:7,fontSize:11,fontWeight:700,
+                    border:"1px solid "+col+"55",background:col+"18",color:col,cursor:canEditThisMed?"pointer":"default"}}>
+                  <span>{txt}</span>{canEditThisMed&&<span style={{fontSize:13}}>×</span>}
+                </div>);
+              return (
+                <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:10}}>
+                  {tP&&!mData._prefGo&&ligneP(tP==="wish"?"⭐ Souhaite tourner cette semaine":"🚫 Préfère ne pas tourner cette semaine",
+                    tP==="wish"?"#16a34a":"#dc2626",()=>setMData(p=>({...p,_prefGo:1})))}
+                  {tP&&mData._prefGo&&(
+                    <div style={{border:"1px solid #f59e0b",background:"rgba(245,158,11,.12)",borderRadius:7,padding:"7px 10px"}}>
+                      <div style={{fontSize:11,fontWeight:700,color:"#b45309",marginBottom:6}}>Cela retire la préférence pour TOUTE la semaine du {frP(dLun)} au {frP(dVen)}.</div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button style={{...S.qBtn}} onClick={()=>setMData(p=>({...p,_prefGo:0}))}>Annuler</button>
+                        <button style={{...S.qBtn,borderColor:"#dc2626",background:"#fef2f2",color:"#dc2626"}}
+                          onClick={()=>{delP(tP==="wish"?setTourWish:setTourAvoid,wkP);setMData(p=>({...p,_prefGo:0}));toast("Préférence de tour retirée pour la semaine","info");}}>Oui, retirer</button>
+                      </div>
+                    </div>)}
+                  {gP&&ligneP(gP==="wish"?"⭐ Souhaite être de garde ce jour":"🚫 Préfère ne pas être de garde ce jour",
+                    gP==="wish"?"#16a34a":"#dc2626",()=>{delP(gP==="wish"?setGardeWish:setGardeAvoid,dkP);toast("Préférence de garde retirée","info");})}
+                </div>);
+            })()}
             {canEditThisMed&&(
               <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
                 {/* v9.92 : un seul bouton remplace « Pose et retrait Abs », « Effacer activités » et « Effacer mois » */}
