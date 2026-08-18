@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.82 — 18/08/2026";
+var APP_VERSION = "v10.83 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5782,12 +5782,12 @@ function BuildTab(_a) {
             sous: tour.ok + " semaine" + (tour.ok > 1 ? "s" : "") + " sur " + tour.tot + " ont un tourneur",
             alerte: mTour ? (mTour + " semaine" + (mTour > 1 ? "s" : "") + " sans tour attribué") : null,
             body: React.createElement(BuildEmbed, null,
-                React.createElement(TourTab, __assign({}, tourProps, { noNav: true, year: bPer.sy, month: bPer.sm }))) },
+                React.createElement(TourTab, __assign({ key: pKey }, tourProps, { noNav: true, year: bPer.sy, month: bPer.sm }))) },
         { n: 3, icon: "🌙", titre: "Gardes",
             sous: gardes.ok + " jour" + (gardes.ok > 1 ? "s" : "") + " sur " + gardes.tot + " ont une garde",
             alerte: mGar ? (mGar + " jour" + (mGar > 1 ? "s" : "") + " sans garde sur la période") : null,
             body: React.createElement(BuildEmbed, null,
-                React.createElement(GardeView, __assign({}, gardeProps, { noNav: true, year: bPer.sy, month: bPer.sm }))) },
+                React.createElement(GardeView, __assign({ key: pKey }, gardeProps, { noNav: true, year: bPer.sy, month: bPer.sm }))) },
         { n: 4, icon: "🚫", titre: "Absences de tout le monde",
             sous: nAutres + " sur " + autres.length + " renseigné" + (nAutres > 1 ? "s" : ""),
             alerte: mAut ? (mAut + " personne" + (mAut > 1 ? "s" : "") + " hors médecins sans réponse") : null,

@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.82 — 18/08/2026";
+const APP_VERSION="v10.83 — 18/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5538,11 +5538,11 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     {n:2,icon:"🔄",titre:"Distribution du tour",
      sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
      alerte:mTour?(mTour+" semaine"+(mTour>1?"s":"")+" sans tour attribué"):null,
-     body:<BuildEmbed><TourTab {...tourProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     body:<BuildEmbed><TourTab key={pKey} {...tourProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
     {n:3,icon:"🌙",titre:"Gardes",
      sous:gardes.ok+" jour"+(gardes.ok>1?"s":"")+" sur "+gardes.tot+" ont une garde",
      alerte:mGar?(mGar+" jour"+(mGar>1?"s":"")+" sans garde sur la période"):null,
-     body:<BuildEmbed><GardeView {...gardeProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     body:<BuildEmbed><GardeView key={pKey} {...gardeProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
     {n:4,icon:"🚫",titre:"Absences de tout le monde",
      sous:nAutres+" sur "+autres.length+" renseigné"+(nAutres>1?"s":""),
      alerte:mAut?(mAut+" personne"+(mAut>1?"s":"")+" hors médecins sans réponse"):null,
