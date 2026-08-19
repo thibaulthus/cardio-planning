@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.85 — 18/08/2026";
+const APP_VERSION="v10.86 — 19/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6007,7 +6007,22 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
     setFNom("");setFInit("");
     if(s){const pris=(s.meds||[]).map(m=>m.color).concat([fCol]);setFCol(INT_COLS.find(c=>pris.indexOf(c)<0)||INT_COLS[0]);}
   };
+  /* v10.86 : un semestre PAS ENCORE COMMENCE se supprime. Sans cela, une date de
+     bascule mal saisie bloquait tout : la fin d'un semestre n'est modifiable que
+     sur le DERNIER, et son debut ne peut pas passer avant le precedent. La fin du
+     semestre precedent est recollee — sur le suivant s'il en reste un, sinon sur sa
+     fin naturelle (veille de la prochaine prise de fonction). */
+  const delSem=(i)=>{
+    const s=sems[i],prev=sems[i-1],next=sems[i+1];
+    const nM=(s.meds||[]).length;
+    if(!confirm("Supprimer le semestre "+intSemLabel(s.deb)+" ("+intFmtD(s.deb)+" → "+intFmtD(s.fin)+")"+(nM?(" et ses "+nM+" interne(s)"):"")+" ? Les cases déjà posées dans le planning ne sont pas touchées."))return;
+    const finPrev=prev?(next?intDecal(next.deb,-1):intDecal(intProchainePrise(prev.deb),-1)):null;
+    setSems(l=>l.filter(x=>x.id!==s.id).map(x=>(prev&&x.id===prev.id&&finPrev)?{...x,fin:finPrev}:x));
+  };
   const nFinis=sems.filter(s=>s.fin<tj).length;
+  /* v10.86 : au plus DEUX semestres ouverts (celui en cours et le suivant) — sa
+     regle : il ne connait les internes que 3 a 4 semaines avant leur arrivee. */
+  const nOuv=sems.filter(s=>s.fin>=tj).length;
   return <div style={{marginBottom:18}}>
     <div style={{fontSize:10,fontWeight:700,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:7}}>🎓 Internes — par semestre</div>
     {sems.length===0&&<div style={{fontSize:12,color:"var(--txt3)",marginBottom:8}}>Aucun semestre saisi. Créez le premier pour y ranger les internes ; le suivant se préparera à l'avance et prendra le relais tout seul à la date de bascule.</div>}
@@ -6022,6 +6037,8 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
           <span style={{fontWeight:800,fontSize:13,color:"var(--txt)"}}>{intSemLabel(s.deb)}</span>
           <Chp bg={cours?"#dcfce7":futur?"#dbeafe":"#f0f2f7"} c={cours?"#15803d":futur?"#1d4ed8":"#64748b"}>{cours?"en cours":futur?"préparé":"terminé"}</Chp>
           {fini&&<button style={{...S.icnBtn,fontSize:10}} onClick={()=>setOpen(o=>({...o,[s.id]:false}))}>replier</button>}
+          {futur&&isEdit&&<button title="Supprimer ce semestre — il n'a pas encore commencé" onClick={()=>delSem(i)}
+            style={{...S.icnBtn,fontSize:10,marginLeft:"auto",borderColor:"#dc2626",color:"#dc2626",fontWeight:800}}>🗑 Supprimer ce semestre</button>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:8,fontSize:12,color:"var(--txt2)"}}>
           <span>Du</span>
@@ -6053,9 +6070,12 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
       </div>;
     })}
     {isEdit&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
-      <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}} onClick={addSem}>+ Semestre suivant</button>
+      <button disabled={nOuv>=2} title={nOuv>=2?"Deux semestres sont déjà ouverts (celui en cours et le suivant) — supprimez le semestre préparé pour en créer un autre":"Créer le semestre suivant"}
+        style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:nOuv>=2?"not-allowed":"pointer",opacity:nOuv>=2?.4:1}}
+        onClick={()=>{if(nOuv>=2)return;addSem();}}>+ Semestre suivant</button>
       {nFinis>0&&<button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.08)",color:"#dc2626",fontWeight:800,cursor:"pointer"}} onClick={()=>{if(confirm(nFinis+" semestre(s) terminé(s) — supprimer leurs fiches ? Les cases passées du planning ne sont pas touchées."))setSems(l=>l.filter(s=>!(s.fin<tj)));}}>🗑 Supprimer les semestres terminés</button>}
     </div>}
+    {isEdit&&nOuv>=2&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>Deux semestres sont ouverts (celui en cours et le suivant) : c'est le maximum. Pour en préparer un autre, supprimez d'abord le semestre préparé (🗑 dans son cadre).</div>}
     {isEdit&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>☑ devant un interne : il est proposé dans les modales des salles (CHL, CHB, PT Cardio, PT Angio) et les activités à salle lui sont proposées dans l'onglet Internes. Décoché : il n'apparaît pas dans ces listes — ce qui lui a déjà été posé reste en place et retirable.</div>}
     {isEdit&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>Prise de fonction proposée : le 2 mai et le 2 novembre, reportée au lundi suivant quand elle tombe un vendredi, samedi ou dimanche. Les dates restent modifiables ci-dessus.</div>}
   </div>;
@@ -10539,6 +10559,22 @@ header::-webkit-scrollbar { display: none; }
         const entries=getEntries(medId,y2,m2,d2,slot);
         const curIds=entries.filter(e=>!e._blocked&&!e._fullDay&&!e.cond).map(e=>e.acteId);
         const hasOther=curIds.some(id=>!["TOUR_HC","TOUR_USIC"].includes(id));
+        /* v10.86 : le tour est SYNTHETISE a la semaine — la moindre entree reelle sur
+           la case le masque (expEntries). Poser une consultation le faisait donc
+           disparaitre de cette modale alors que le medecin est bien de tour. On le
+           recalcule ici pour l'afficher A COTE, en lecture seule : un tour ne se
+           retire pas d'une case, il s'echange. */
+        const tourSy=(()=>{
+          if(we||(slot!=="M"&&slot!=="AM"))return null;
+          if(curIds.includes("TOUR_HC")||curIds.includes("TOUR_USIC"))return null;
+          if(entries.some(e=>e&&(e._fullDay||e._blocked||EXCL_IDS.includes(e.acteId))))return null;
+          const dgS=((tourDerog||{})[dKey(y2,m2,d2)]||{})[medId];
+          if(dgS===true||(dgS&&dgS[slot]))return null;
+          const wmS=(tourMed||{})[wKey(y2,m2,d2)]||{};
+          if((wmS.HC||[]).includes(medId))return "TOUR_HC";
+          if((wmS.USIC||[]).includes(medId))return "TOUR_USIC";
+          return null;
+        })();
 
         const eligible=actes.filter(a=>{
           if(isNight)return a.id==="GARDE"&&canGarde;
@@ -10626,10 +10662,15 @@ header::-webkit-scrollbar { display: none; }
                       style={{background:"transparent",border:"1px solid "+COND_C,color:COND_C,borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>↩ rétablir</button>}
                   </div>);});
             })()}
-            {curIds.length>0&&(
+            {(curIds.length>0||tourSy)&&(
               <div style={{marginBottom:10}}>
                 <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>Activités</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  {tourSy&&(()=>{const aT=acteById(tourSy);if(!aT)return null;
+                    return(<div style={{display:"flex",alignItems:"center",gap:4}} title="Tour médical de la semaine — il ne se retire pas ici, il s'échange">
+                      <Badge a={aT} hideSalle={true}/>
+                      <span style={{fontSize:10,fontWeight:700,color:"var(--txt3)"}}>de tour cette semaine</span>
+                    </div>);})()}
                   {entries.filter(e=>e.acteId&&!e.cond).map((e,i)=>{
                     const a=acteById(e.acteId);if(!a)return null;
                     return(
@@ -10653,7 +10694,8 @@ header::-webkit-scrollbar { display: none; }
                               style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>Choisir la salle…</button>}
                           </>);
                         })()}
-                        {canEditThisMed&&(!isAdminEdit||a[roleOkKey]===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
+                        {/* v10.86 : un tour ne se retire pas d'une case (il s'echange) — pas de croix */}
+                        {canEditThisMed&&["TOUR_HC","TOUR_USIC"].indexOf(a.id)<0&&(!isAdminEdit||a[roleOkKey]===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
                           if(e.acteId==="GARDE"){
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);
                             const dt=new Date(y2,m2,d2+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd3=dt.getDate();
