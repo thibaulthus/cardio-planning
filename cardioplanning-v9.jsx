@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.87 — 19/08/2026";
+const APP_VERSION="v10.91 — 19/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2200,7 +2200,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
   const selIsInt=!!(selMed&&intDay&&intDay.meds.some(x=>x.id===selMed.id));
   const rowActes=row.ids.map(id=>actes.find(a=>a.id===id)).filter(Boolean);
   const allAuth=new Set(rowActes.flatMap(a=>a.medecinsAutorise||[]));
-  const eligMeds=medecins.filter(m=>allAuth.size===0||allAuth.has(m.init)).filter(m=>!selfOnly||m.id===selfOnly);
+  const eligMeds=medecins.filter(m=>allAuth.size===0||allAuth.has(authI(m))).filter(m=>!selfOnly||m.id===selfOnly);
   /* v10.50 : okAct = la coche du ROLE connecte (adminOk secretaires, cadreOk cadres).
      Le filtre existait ici (eligActesForMed) mais n'etait branche sur AUCUN chemin de
      pose — un role administratif pouvait donc poser (Stim…) sans pouvoir retirer. */
@@ -2358,7 +2358,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                   onClick={()=>{
                     if(avail==="blocked")return;
                     // If simple row (no multiActe, no salle choice) with single eligible acte → direct assign
-                    const myActes=rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(med.init)).filter(okAct);
+                    const myActes=rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(authI(med))).filter(okAct);
                     if(!row.multiActe&&!row.hasSalleChoice&&myActes.length===1){
                       const a=myActes[0];
                       const fs=a.fixedSalle||row.salle||null;
@@ -2415,7 +2415,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
       )}
       {selMedId&&selMed&&(()=>{
         // Recompute eligible actes now that selMed is known
-        const myEligActes=selIsInt?rowActes.filter(a=>a.interneOk===true):rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)).filter(okAct);
+        const myEligActes=selIsInt?rowActes.filter(a=>a.interneOk===true):rowActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(authI(selMed))).filter(okAct);
         const isSimple=!row.multiActe&&!row.hasSalleChoice;
         return(
           <>
@@ -2556,7 +2556,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
   /* v10.70 : seuls les internes cochés « salles » (fiche de l'onglet Équipe) sont
      proposés ici. Les occupants déjà posés restent listés plus haut, avec leur croix. */
   const intPick=(canInt&&intDay&&intActes.length)?intDay.meds.filter(im=>im.salles===true&&!curOcc.find(x=>x.med.id===im.id)):[];
-  const eligActes0=(selMed?(isRecapCol?[recapActe].filter(a=>a&&(!selIsInt||a.interneOk===true)):(selIsInt?siteActes.filter(a=>a.interneOk===true):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(selMed.init)))):[]).filter(a=>selIsInt||!adminOnly||a[okKey]===true);
+  const eligActes0=(selMed?(isRecapCol?[recapActe].filter(a=>a&&(!selIsInt||a.interneOk===true)):(selIsInt?siteActes.filter(a=>a.interneOk===true):siteActes.filter(a=>!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(authI(selMed))))):[]).filter(a=>selIsInt||!adminOnly||a[okKey]===true);
   /* v9.57 : un praticien en choix ouvert n'est proposable que sur SES branches.
      Si aucune n'est offerte par cette salle, on ne le bloque pas — on le prévient. */
   const selCond=selMed?condOn(getEntries,selMed.id,y2,m2,d,sl):[];
@@ -2566,7 +2566,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
   // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
   const pickMeds=medecins.filter(med=>!selfOnly||med.id===selfOnly)
     .filter(med=>!curOcc.find(x=>x.med.id===med.id))
-    .filter(med=>siteActes.some(a=>!a.medecinsAutorise||!a.medecinsAutorise.length||a.medecinsAutorise.includes(med.init)));
+    .filter(med=>siteActes.some(a=>!a.medecinsAutorise||!a.medecinsAutorise.length||a.medecinsAutorise.includes(authI(med))));
 
   return(
     <Ov onClose={onClose}>
@@ -2753,7 +2753,7 @@ function EditPTModal({mData,setMData,medecins,actes,planningType,setPlanningType
   const setPT=(aId,salle)=>{const list=brs.slice();list[addIdx?addIdx-1:0]=[aId,salle];flushBrs(list);};
   const dropBr=(i)=>{const list=brs.slice();list[i]=[null,null];flushBrs(list);};
   const afterPick=()=>setMData(p=>({...p,_ptPickSalle:null,_ptAdd:null}));
-  const eligActes=actes.filter(a=>!SYS.includes(a.id)&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes((med&&med.init))));
+  const eligActes=actes.filter(a=>!SYS.includes(a.id)&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(authI(med))));
 
   return(
     <Ov onClose={onClose}>
@@ -4542,7 +4542,7 @@ function ReportsView(p){
     setCsActsSel(prev=>{const cur=(prev[mid]&&prev[mid].length?prev[mid]:defActs).slice();
       const i=cur.indexOf(aid);if(i>=0)cur.splice(i,1);else cur.push(aid);
       return Object.assign({},prev,{[mid]:cur});});};
-  const candActs=actes.filter(a=>globalOK.indexOf(a.id)>=0&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(medSel.init)));
+  const candActs=actes.filter(a=>globalOK.indexOf(a.id)>=0&&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.includes(authI(medSel))));
   /* ── Jours habituels de consultation (planning type) ── */
   const pt=planningType[mid]||{};
   const habCS={};// {dw:{M:acteId,AM:acteId}}
@@ -4747,7 +4747,7 @@ function ReportsView(p){
     return s;
   },[p.salleReg,actes]);
   const myActesAll=actes.filter(a=>!a.isSystem&&a.id!=="TP"
-    &&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.indexOf(medSel.init)>=0)
+    &&(!(a.medecinsAutorise&&a.medecinsAutorise.length)||a.medecinsAutorise.indexOf(authI(medSel))>=0)
     &&(!p.adminReports||a[p.adminOkKey||"adminOk"]===true));
   const myActesOff=myActesAll.filter(a=>a.hasSalle&&(a.salles||[]).some(s=>offSalleSet.has(s)));   /* v10.49 : ouvrables — au moins une salle participante */
   const occSalles=(yy,mm,dd,ss)=>{const s={};medecins.forEach(mb=>getEntries(mb.id,yy,mm,dd,ss).forEach(e=>{if(e&&e.salle)s[e.salle]=true;}));return s;};
@@ -5866,7 +5866,11 @@ function setScan(el){
    déplacer. « Sur la période » n'est qu'un raccourci qui remplit les deux
    dates avec les bornes affichées. Le champ vit sur la fiche médecin : il
    voyage avec la synchro existante de l'équipe, aucun document nouveau. */
-const medOffL=(m)=>Array.isArray(m&&m.off)?m.off.filter(r=>r&&r.du&&r.au):[];
+/* v10.90 : plages saisies A LA MAIN + plages automatiques des rôles juniors
+   (semestre sans nom). La fenêtre de désactivation ne lit et n'écrit que
+   les manuelles — une plage automatique ne doit pas être « réactivable ». */
+const medOffMan=(m)=>Array.isArray(m&&m.off)?m.off.filter(r=>r&&r.du&&r.au):[];
+const medOffL=(m)=>{const a=medOffMan(m);const b=djOffRanges(m);return b.length?a.concat(b):a;};
 const offOn=(m,y2,m2,d2)=>{const k=dKey(y2,m2,d2);return medOffL(m).some(r=>r.du<=k&&k<=r.au);};
 /* état sur une liste de jours : null (actif), "part", ou "off" (tous couverts) */
 const offEtat=(m,jours)=>{
@@ -5886,7 +5890,7 @@ function DeactModal({med,perDays,perLbl,onSave,onClose,countActs=null,onClear=nu
   const [d1,setD1]=useState(du0);
   const [d2,setD2]=useState(au0);
   if(!med)return null;
-  const ranges=medOffL(med);
+  const ranges=medOffMan(med);
   const ajouter=()=>{
     const r=mode===0?{du:du0,au:au0}:{du:d1,au:d2};
     if(!r.du||!r.au||r.au<r.du)return;
@@ -5962,17 +5966,17 @@ function intPrises(iso){const y=Number(iso.slice(0,4));const l=[];[y-1,y,y+1].fo
 function intProchainePrise(iso){return intPrises(iso).find(p=>p>iso)||intDecal(iso,183);}
 function intDernierePrise(iso){const l=intPrises(iso).filter(p=>p<=iso);return l.length?l[l.length-1]:iso;}
 
-/* ═══════════ v10.87 — DOCTEURS JUNIORS, lot 1 : un nom par semestre ═══════════
+/* ═══════════ v10.91 — DOCTEURS JUNIORS : un nom par semestre ═══════════
    La fiche de l'onglet Équipe est le RÔLE (couleur, surspécialité, planning
    type, participations) ; ce sont le nom et les initiales du junior EN POSTE
    qui s'afficheront dans les onglets, semestre par semestre (lot 2).
-   Les DATES suivent exactement la règle des internes — prise de fonction le
-   2 mai et le 2 novembre, reportée au lundi suivant si elle tombe un
-   vendredi, samedi ou dimanche — mais elles sont RECALCULÉES ici au lieu
-   d'être lues dans intCfg.sems : la liste des semestres des internes se vide
-   (un semestre terminé se supprime, deux ouverts au maximum) et ne doit pas
-   emporter les juniors avec elle. Les deux mécanismes appellent intPrise /
-   intProchainePrise, donc les bascules tombent toujours le même jour. */
+   v10.88, SA CONSIGNE : les dates ne doivent PAS diverger de celles des
+   internes. Les semestres sont donc LUS dans intCfg.sems — la liste qu'il
+   règle déjà à la main dans l'onglet Équipe, bascule comprise. Le calcul
+   (2 mai / 2 novembre reporté au lundi) ne sert plus que de repli quand
+   aucun semestre n'existe encore. Une ligne junior porte l'ID du semestre ET
+   sa date de début : l'ID survit à un déplacement de bascule, la date sert
+   aux lignes écrites avant la v10.88 et au mode replié. */
 const djL=(m)=>Array.isArray(m&&m.dj)?m.dj.filter(x=>x&&x.deb):[];
 const djFin=(deb)=>intDecal(intProchainePrise(deb),-1);
 /* pourvu = un nom, un prénom ou des initiales ; vide = personne sur ces dates */
@@ -5984,50 +5988,137 @@ const djInit=(x)=>{
   return ((p?p[0]:"")+(n?n[0]:"")).toUpperCase();
 };
 const djNom=(x)=>((String((x&&x.prenom)||"")+" "+String((x&&x.nom)||"")).trim());
-/* le junior en poste à une date : null = personne, colonne masquée (lot 2) */
-function djDuJour(m,iso){
-  const l=djL(m).filter(x=>x.deb<=iso&&iso<=djFin(x.deb)&&djPourvu(x));
-  return l.length?l[l.length-1]:null;
-}
-/* semestres proposés dans la fiche : ceux déjà saisis + celui en cours + le suivant */
-function djSems(m,tj){
-  const out=[],vus={};
-  const add=(deb)=>{if(deb&&!vus[deb]){vus[deb]=1;out.push({deb:deb,fin:djFin(deb)});}};
-  djL(m).forEach(x=>add(x.deb));
-  add(intDernierePrise(tj));
-  add(intProchainePrise(tj));
-  out.sort((a,b)=>a.deb<b.deb?-1:1);
+/* une fiche de RÔLE junior : identité allégée, noms saisis par semestre */
+const djRole=(m)=>!!(m&&(m.role||"medecin")==="medecin"&&m.statut==="junior");
+/* initiales internes d'un rôle (clé des activités autorisées) — jamais saisies */
+const djAutoInit=(meds,selfId)=>{
+  const pris=(meds||[]).filter(m=>m.id!==selfId).map(m=>String(m.init||"").toUpperCase());
+  for(let i=1;i<200;i++){const c="J"+i;if(pris.indexOf(c)<0)return c;}
+  return "J"+(Date.now()%1000);
+};
+/* LA liste des semestres : celle des internes, PROLONGÉE PAR LA RÈGLE au-delà
+   du dernier enregistré jusqu'à couvrir `ref`.
+   v10.91 : sans ce prolongement, une date postérieure au dernier semestre des
+   internes n'appartenait à AUCUN semestre — donc ni nom substitué ni verrou :
+   le rôle réapparaissait avec son code (J1, J2…) sur la période nov-février.
+   Les semestres prolongés portent un identifiant "D<date>" : si le semestre
+   interne correspondant est créé plus tard avec la bascule par défaut, la date
+   de début coïncide et le nom déjà saisi est retrouvé. */
+function djSemsList(intCfg,ref){
+  const l=intSemsTri(intCfg);
+  const out=l.length?l.map(s=>({id:s.id,deb:s.deb,fin:s.fin})):[];
+  /* le repli s'ancre sur AUJOURD'HUI (pas sur `ref`) : sans quoi le début d'une
+     période à cheval sur une bascule ne serait couvert par aucun semestre. */
+  if(!out.length){const a=intDernierePrise(intISO(new Date()));out.push({id:"D"+a,deb:a,fin:djFin(a)});}
+  let n=0;
+  while(out[out.length-1].fin<ref&&n<24){
+    const d=intDecal(out[out.length-1].fin,1);
+    out.push({id:"D"+d,deb:d,fin:djFin(d)});
+    n++;
+  }
   return out;
 }
+const djTrouve=(m,s)=>djL(m).find(x=>(x.sem&&s.id&&x.sem===s.id)||x.deb===s.deb)||null;
+/* le junior en poste à une date : null = personne, colonne masquée (lot 2) */
+function djDuJour(m,iso,intCfg){
+  const s=djSemsList(intCfg,iso).find(x=>x.deb<=iso&&iso<=x.fin);
+  if(!s)return null;
+  const x=djTrouve(m,s);
+  return djPourvu(x)?x:null;
+}
+/* v10.88 : archivage — les lignes des semestres entièrement archivés partent.
+   Sa consigne : « je ne peux pas rester avec une liste qui continue ».
+   Rend la nouvelle liste, ou null s'il n'y a rien à retirer. */
+function djPurgeMed(m,intCfg,lastMk){
+  const l=djL(m);
+  if(!l.length)return null;
+  const sems=intSemsTri(intCfg);
+  const g=l.filter(x=>{
+    const s=sems.find(y=>y.id===x.sem||y.deb===x.deb);
+    return String((s?s.fin:djFin(x.deb))||"").slice(0,7)>lastMk;
+  });
+  return g.length===l.length?null:g;
+}
 
-function DJEquipe({mData,setMData,countActs,onClear,prisInit}){
+/* v10.89, SA DEMANDE : un rôle junior ne doit pas garder l'identité de son
+   ancien titulaire (elle restait affichée sur la tuile de l'onglet Équipe).
+   Le prénom est effacé et les initiales deviennent un CODE DE RÔLE (J1, J2…) ;
+   le renommage de medecinsAutorise de la v9.52 suit tout seul à
+   l'enregistrement, donc ni les activités autorisées ni le planning type
+   (indexé par identifiant) ne bougent. */
+const djCodeRole=(init,meds,selfId)=>{const t=String(init||"").trim().toUpperCase();return /^J\d+$/.test(t)?t:djAutoInit(meds,selfId);};
+/* ligne grise sous le nom du rôle, sur la tuile de l'onglet Équipe */
+function djTuileTxt(m,intCfg){
+  const iso=intISO(new Date());
+  const s=djSemsList(intCfg,iso).find(x=>x.deb<=iso&&iso<=x.fin);
+  if(!s)return "Dr Junior";
+  const x=djTrouve(m,s);
+  return intSemLabel(s.deb)+" : "+(djPourvu(x)?(djNom(x)+" ("+djInit(x)+")"):"aucun nom saisi");
+}
+
+/* ═══ v10.90, LOT 2 : identité affichée et verrouillage des semestres vides ═══
+   `medOffL` est appelé partout (grilles, tour, gardes, Construire, planning
+   type) et n'a aucun moyen de recevoir intCfg : CardioPlanning dépose donc la
+   liste des semestres ICI à chaque rendu, avant que les enfants ne s'en
+   servent. Un rôle dont le semestre n'a pas de nom devient « indisponible »
+   sur ces dates, et tout le mécanisme de la v10.40 s'applique tout seul :
+   colonne masquée, cases hachurées et non cliquables, planning type qui
+   saute, sortie du tour, des gardes et de Construire. */
+let DJ_SEMS=[];
+function djSetSems(intCfg,jusqua){DJ_SEMS=djSemsList(intCfg,jusqua||intISO(new Date()));}
+function djOffRanges(m){
+  if(!djRole(m))return [];
+  const out=[];
+  for(let i=0;i<DJ_SEMS.length;i++){const s=DJ_SEMS[i];if(!djPourvu(djTrouve(m,s)))out.push({du:s.deb,au:s.fin});}
+  return out;
+}
+/* La liste affichée : le junior en poste à la date de référence prend le nom,
+   le prénom et les initiales du rôle. Le CODE du rôle est conservé dans
+   `initAuth` — c'est lui qui indexe les activités autorisées. */
+function djSubst(meds,intCfg,refIso){
+  if(!meds||!meds.some(m=>djRole(m)))return meds;
+  return meds.map(m=>{
+    if(!djRole(m))return m;
+    const x=djDuJour(m,refIso,intCfg);
+    if(!x)return m;
+    return {...m,initAuth:m.init,init:djInit(x),nom:x.nom||m.nom,prenom:x.prenom||""};
+  });
+}
+const authI=(m)=>(m&&m.initAuth)||(m&&m.init);
+
+function DJEquipe({mData,setMData,countActs,onClear,prisInit,intCfg}){
   const tj=intISO(new Date());
-  const sems=djSems(mData,tj);
-  const trouve=(deb)=>djL(mData).find(x=>x.deb===deb)||null;
+  /* +190 jours : toujours dans le semestre SUIVANT, quel que soit le jour —
+     la fiche propose donc toujours celui en cours et le prochain, même si le
+     semestre des internes n'est pas encore créé. */
+  const sems=djSemsList(intCfg,intDecal(tj,190));
+  const propre=!intSemsTri(intCfg).length;   // repli : aucun semestre enregistré
   /* le comptage parcourt 6 mois de cases : on ne le refait que si l'état
      « pourvu / vide » d'un semestre change, pas à chaque frappe. */
-  const sig=sems.map(s=>s.deb+(djPourvu(trouve(s.deb))?"1":"0")).join(",");
+  const sig=sems.map(s=>s.deb+(djPourvu(djTrouve(mData,s))?"1":"0")).join(",");
   const cnt=useMemo(()=>{
     const o={};
-    sems.forEach(s=>{o[s.deb]=(countActs&&!djPourvu(trouve(s.deb)))?countActs(s.deb,s.fin):0;});
+    sems.forEach(s=>{o[s.deb]=(countActs&&!djPourvu(djTrouve(mData,s)))?countActs(s.deb,s.fin):0;});
     return o;
   },[sig]);
-  const maj=(deb,patch)=>setMData(p=>{
+  const maj=(s,patch)=>setMData(p=>{
     const l=djL(p).slice();
-    const i=l.findIndex(x=>x.deb===deb);
-    if(i<0)l.push({deb:deb,nom:"",prenom:"",init:"",...patch});
-    else l[i]={...l[i],...patch};
+    const i=l.findIndex(x=>(x.sem&&s.id&&x.sem===s.id)||x.deb===s.deb);
+    if(i<0)l.push({sem:s.id,deb:s.deb,nom:"",prenom:"",init:"",...patch});
+    else l[i]={...l[i],sem:s.id,deb:s.deb,...patch};
     return {...p,dj:l};
   });
-  const vider=(deb)=>setMData(p=>({...p,dj:djL(p).filter(x=>x.deb!==deb)}));
-  const chip=(txt,col)=>({fontSize:9.5,fontWeight:800,padding:"1px 6px",borderRadius:9,border:"1px solid "+col,color:col,textTransform:"uppercase",letterSpacing:.3});
+  const vider=(s)=>setMData(p=>({...p,dj:djL(p).filter(x=>!((x.sem&&s.id&&x.sem===s.id)||x.deb===s.deb))}));
+  const chip=(col)=>({fontSize:9.5,fontWeight:800,padding:"1px 6px",borderRadius:9,border:"1px solid "+col,color:col,textTransform:"uppercase",letterSpacing:.3});
   const inp={...S.fi,padding:"4px 7px",fontSize:12};
   return(
     <div style={{marginTop:10,borderTop:"1px dashed var(--border)",paddingTop:8}}>
-      <div style={{fontSize:10,fontWeight:800,color:"#8b5cf6",textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>🔁 Docteur Junior — un nom par semestre</div>
-      <div style={{fontSize:10.5,color:"var(--txt3)",marginBottom:6}}>Cette fiche est le RÔLE : couleur, surspécialité et planning type ne changent pas d'un semestre à l'autre. Ce sont le nom et les initiales saisis ci-dessous qui apparaissent dans les onglets. Mêmes dates de bascule que les internes.</div>
+      <div style={{fontSize:10,fontWeight:800,color:"#8b5cf6",textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>🔁 Docteurs Juniors du rôle, semestre par semestre</div>
+      <div style={{fontSize:10.5,color:"var(--txt3)",marginBottom:6}}>{propre
+        ?"Aucun semestre enregistré : les dates ci-dessous suivent la règle habituelle (2 mai et 2 novembre, reportés au lundi). Dès que vous créez les semestres dans le bloc Internes de cet onglet, ce sont ces dates-là qui s'appliquent ici."
+        :"Dates communes aux internes : elles se règlent dans le bloc Internes de cet onglet (bascule modifiable), jamais ici — les deux ne peuvent pas diverger."}</div>
       {sems.map(s=>{
-        const x=trouve(s.deb)||{};
+        const x=djTrouve(mData,s)||{};
         const enCours=s.deb<=tj&&tj<=s.fin;
         const passe=s.fin<tj;
         const plein=djPourvu(x);
@@ -6038,15 +6129,15 @@ function DJEquipe({mData,setMData,countActs,onClear,prisInit}){
           <div key={s.deb} style={{border:"1px solid "+(enCours?"#8b5cf6":"var(--border)"),borderRadius:8,padding:"7px 9px",marginBottom:6,background:enCours?"rgba(139,92,246,.07)":"var(--bg3)",opacity:passe?.72:1}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
               <span style={{fontWeight:800,fontSize:12.5,color:"var(--txt)"}}>{intSemLabel(s.deb)}</span>
-              <span style={chip(passe?"terminé":(enCours?"en cours":"à venir"),passe?"var(--txt3)":(enCours?"#8b5cf6":"#388bfd"))}>{passe?"terminé":(enCours?"en cours":"à venir")}</span>
+              <span style={chip(passe?"var(--txt3)":(enCours?"#8b5cf6":"#388bfd"))}>{passe?"terminé":(enCours?"en cours":"à venir")}</span>
               <span style={{fontSize:10.5,color:"var(--txt3)",flex:1}}>{intFmtD(s.deb)+" → "+intFmtD(s.fin)}</span>
-              {plein&&<button type="button" onClick={()=>vider(s.deb)} title="Effacer le nom de ce semestre"
+              {plein&&<button type="button" onClick={()=>vider(s)} title="Effacer le nom de ce semestre"
                 style={{fontSize:10.5,padding:"2px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>🗑 Effacer</button>}
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              <input placeholder="Nom" value={x.nom||""} onChange={e=>maj(s.deb,{nom:e.target.value})} style={{...inp,flex:"1 1 110px",minWidth:88}}/>
-              <input placeholder="Prénom" value={x.prenom||""} onChange={e=>maj(s.deb,{prenom:e.target.value})} style={{...inp,flex:"1 1 110px",minWidth:88}}/>
-              <input placeholder="Init." value={x.init||""} onChange={e=>maj(s.deb,{init:e.target.value.toUpperCase().slice(0,4)})} style={{...inp,width:66,flex:"0 0 66px",fontWeight:800,textAlign:"center"}}/>
+              <input placeholder="Nom" value={x.nom||""} onChange={e=>maj(s,{nom:e.target.value})} style={{...inp,flex:"1 1 110px",minWidth:88}}/>
+              <input placeholder="Prénom" value={x.prenom||""} onChange={e=>maj(s,{prenom:e.target.value})} style={{...inp,flex:"1 1 110px",minWidth:88}}/>
+              <input placeholder="Init." value={x.init||""} onChange={e=>maj(s,{init:e.target.value.toUpperCase().slice(0,4)})} style={{...inp,width:66,flex:"0 0 66px",fontWeight:800,textAlign:"center"}}/>
             </div>
             {plein&&!String(x.init||"").trim()&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"Initiales déduites du nom : "+(ini||"—")}</div>}
             {dbl&&<div style={{fontSize:10.5,color:"#b45309",fontWeight:700,marginTop:4}}>{"⚠ Les initiales "+ini+" sont déjà portées par un autre membre de l'équipe : les deux se ressembleront dans les tableaux."}</div>}
@@ -8981,8 +9072,20 @@ function CardioPlanning(){
     setMData({medId,y:y2,m:m2,d:d2,slot});setModal("cell");
   };
 
-  const medPlan=medecins.filter(m=>m.role==="medecin");
-  const medAttache=medecins.filter(m=>m.role==="attache");
+  /* ═══ v10.90 — LOT 2 des juniors ═══
+     Date de référence de l'identité affichée : AUJOURD'HUI s'il tombe dans la
+     période affichée, sinon le premier jour de cette période (sa règle du 19/08).
+     `medsAff` sert à TOUT l'affichage ; `medecins` (brut) reste la liste de
+     l'onglet Équipe, de la fiche, de l'export et de la sauvegarde Firestore. */
+  const djTodayIso=intISO(new Date());
+  const djA0=(allDays4&&allDays4.length)?dKey(allDays4[0].y,allDays4[0].m,allDays4[0].d):djTodayIso;
+  const djZ=(allDays4&&allDays4.length)?allDays4[allDays4.length-1]:null;
+  const djA1=djZ?dKey(djZ.y,djZ.m,djZ.d):djTodayIso;
+  const djRefIso=(djTodayIso>=djA0&&djTodayIso<=djA1)?djTodayIso:djA0;
+  djSetSems(intCfg,djA1);
+  const medsAff=djSubst(medecins,intCfg,djRefIso);
+  const medPlan=medsAff.filter(m=>m.role==="medecin");
+  const medAttache=medsAff.filter(m=>m.role==="attache");
   // ── Ordre d'affichage : déplace un médecin dans son groupe de rôle (ordre du tableau = ordre partout) ──
   const moveMed=(id,dir)=>{
     setMedecins(prev=>{
@@ -8998,7 +9101,7 @@ function CardioPlanning(){
   };
   const filteredMeds=medPlan.filter(m=>planFilter.length===0||planFilter.includes(m.id));
   /* v9.50 : un relevé par onglet, et le clic mène à la case */
-  const medAttacheAll=useMemo(()=>[...medAttache,...medecins.filter(m=>m.role==="ide")],[medecins]);
+  const medAttacheAll=useMemo(()=>[...medAttache,...medsAff.filter(m=>m.role==="ide")],[medsAff]);
   const planIssues=useMemo(()=>issuesFor(medPlan),[issuesFor,medecins]);
   const attIssues=useMemo(()=>issuesFor(medAttacheAll),[issuesFor,medAttacheAll]);
   /* v10.74 : une seule carte pour les 4 onglets salles — un attache en consultation
@@ -9138,8 +9241,8 @@ function CardioPlanning(){
   const _titlePeriod=MOIS[_per.sm]+" — "+MOIS[_pem]+" "+(_per.sy!==_pey?_per.sy+"/"+_pey:_pey);
   /* v10.29 : un SEUL jeu de props par ecran, utilise par l'onglet d'origine ET par la
      tuile de Construire (qui n'y change que l'annee, le mois et noNav). */
-  const tourProps={specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),darkMode,setDarkMode,planningType,setPlan,allDays,toast};
-  const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
+  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),darkMode,setDarkMode,planningType,setPlan,allDays,toast};
+  const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
       <style>{setFoldCSS()+`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -9302,7 +9405,7 @@ header::-webkit-scrollbar { display: none; }
           {/* v10.32 : rappel des demandes ouvertes. Il apparait quelle que soit la
               periode affichee — la demande porte sur la periode suivante, mais
               personne n'y va spontanement (sa remarque du 12/08). */}
-          <BuildAsk build={build} medecins={medecins} editMedId={accessMode==="medecinEdit"?editMedId:null}
+          <BuildAsk build={build} medecins={medsAff} editMedId={accessMode==="medecinEdit"?editMedId:null}
             onRepondre={(k,champ)=>setBuild(p=>{const B0=(p||{})[k]||{};const c={...(B0[champ]||{})};c[editMedId]=1;return {...(p||{}),[k]:{...B0,[champ]:c}};})}
             onGoPer={(k)=>{const a=String(k).split("_");setYM({year:+a[0],month:+a[1]});}}/>
           {/* v10.18 : alerte si la période affichée n'est pas couverte par les vacances saisies.
@@ -9374,7 +9477,7 @@ header::-webkit-scrollbar { display: none; }
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>setIntGardeOn(v=>!v)} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfg,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfg,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay}/>}
         </div>
       )}
 
@@ -9382,14 +9485,14 @@ header::-webkit-scrollbar { display: none; }
       {tab==="tourmedical"&&<TourTab {...tourProps}/>}
 
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
-      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medecins} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
+      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notes}
+      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notes}
+        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -9401,12 +9504,12 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="plateau"&&<ActTabView issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfg}
         rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
-        year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
+        year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notes} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
-        actes={actes} medecins={medecins} getEntries={getEntries} salleOcc={salleOcc}
+        actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notes}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
@@ -9416,7 +9519,7 @@ header::-webkit-scrollbar { display: none; }
           {label:"TAVI",ids:["TAVI"],color:"#fb7185",salle:null},
           {label:"FOP / FAG",ids:["FOP"],color:"#34d399",salle:null},
         ]}
-        year={year} month={month} prevM={prevM} nextM={nextM} medecins={medecins} actes={actes}
+        year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} isEdit={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
@@ -9444,7 +9547,7 @@ header::-webkit-scrollbar { display: none; }
           <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Semaine type par médecin. Le bouton ▶ PT l'applique aux mois de la période affichée (choix des mois et du point de départ dans la fenêtre). TM exclus automatiquement. Clic sur une case pour définir.</div>
           <PlanTypeGrid medecins={[...medPlan,...medAttache,...medecins.filter(m=>m.role==="ide")]} actes={actes} planningType={planningType} setPlanningType={setPlanningType} isEdit={(isEdit||isInterEdit)&&!isAttEdit} acteById={acteById} setMData={setMData} setModal={setModal} perDays={allDays4} onMedClick={isEdit?((med)=>setDeactMed(med.id)):null}/>
           {deactMed&&<DeactModal med={medecins.find(m=>m.id===deactMed)} perDays={allDays4} perLbl={perLibelle(perStart(year,month).sy,perStart(year,month).sm)} onSave={(rgs)=>saveOff(deactMed,rgs)} onClose={()=>setDeactMed(null)} countActs={(du,au)=>offCount(deactMed,du,au)} onClear={(du,au)=>offClear(deactMed,du,au)}/>}
-          <PTOccRooms medecins={medecins} planningType={planningType} actes={actes} acteById={acteById} salleReg={salleReg} darkMode={darkMode} perDays={allDays4}/>
+          <PTOccRooms medecins={medsAff} planningType={planningType} actes={actes} acteById={acteById} salleReg={salleReg} darkMode={darkMode} perDays={allDays4}/>
         </div>
       )}
 
@@ -9458,7 +9561,7 @@ header::-webkit-scrollbar { display: none; }
            {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
              <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
            </div>}
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medecins} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -9516,6 +9619,7 @@ header::-webkit-scrollbar { display: none; }
                     <div style={{width:38,height:38,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:800,flexShrink:0}}>{m.init}</div>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,color:"var(--txt)",fontSize:13}}>{m.prenom} {m.nom}</div>
+                      {djRole(m)&&<div style={{fontSize:10,color:"var(--txt3)"}}>{djTuileTxt(m,intCfg)}</div>}
                       <div style={{display:"flex",gap:3,marginTop:2,flexWrap:"wrap"}}>
                         {role==="medecin"&&(m.garde?<Chp bg="#16a34a" c="#fff">Garde</Chp>:<Chp bg="#dc2626" c="#fff">Sans garde</Chp>)}
                         {role==="medecin"&&(m.tourMed?<Chp bg="#1d4ed8" c="#fff">TM</Chp>:<Chp bg="#d97706" c="#fff">Sans TM</Chp>)}
@@ -9549,7 +9653,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medecins} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
+      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
       {tab==="internes"&&<InternesView intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
@@ -9925,7 +10029,7 @@ header::-webkit-scrollbar { display: none; }
         );
       })()}
 
-      {tab==="stats"&&(isEdit||isInterEdit)&&<StatsTab medecins={medecins} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
+      {tab==="stats"&&(isEdit||isInterEdit)&&<StatsTab medecins={medsAff} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
       {tab==="partage"&&accessMode!=="adminEdit"&&!isMedEdit&&(
         <div style={{maxWidth:500}} className={"pset "+psetFold.map(i=>"pf"+i).join(" ")} ref={psetRef} onClick={psetClick}>
           <div data-noskip="1" style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
@@ -10201,7 +10305,7 @@ header::-webkit-scrollbar { display: none; }
                   :<div>
                     <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>{monthsInPlan.length} mois archivable(s) : {monthsInPlan.join(", ")}. L'archivage copie ces cases dans Firebase (collection séparée), télécharge un export JSON, puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture).</div>
                     <button onClick={async()=>{
-                        if(!window.confirm("Archiver les "+monthsInPlan.length+" mois antérieurs à la période affichée ("+monthsInPlan.join(", ")+") ?"))return;
+                        if(!window.confirm("Archiver les "+monthsInPlan.length+" mois antérieurs à la période affichée ("+monthsInPlan.join(", ")+") ?\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
                         const okB=await makeBackup(true);
                         if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))return;
                         const byMonth={};
@@ -10218,6 +10322,13 @@ header::-webkit-scrollbar { display: none; }
                         const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="archive-cardio-"+monthsInPlan[0]+"_"+monthsInPlan[monthsInPlan.length-1]+".json";a2.click();
                         setPlan(p=>{const n2={};Object.keys(p).forEach(k=>{if(!monthsInPlan.includes(k.slice(0,7)))n2[k]=p[k];});return n2;});
                         Object.keys(byMonth).forEach(mk=>{archFetched.current[mk]=true;});
+                        /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
+                           continue ». Un semestre dont la FIN est dans les mois archivés
+                           disparaît, avec ses internes et les noms de juniors qui y sont
+                           rattachés. Le dernier mois archivé donne la borne. */
+                        const lastMk=monthsInPlan[monthsInPlan.length-1];
+                        setMedecins(l2=>l2.map(m2=>{const g=djPurgeMed(m2,intCfg,lastMk);return g?{...m2,dj:g}:m2;}));
+                        setIntCfg(p3=>({...p3,sems:(((p3&&p3.sems)||[]).filter(s3=>String(s3.fin||"").slice(0,7)>lastMk))}));
                         setArchPlan(p2=>{const add={};Object.keys(byMonth).forEach(mk=>Object.assign(add,byMonth[mk]));return {...p2,...add};});
                         toast("Archivage terminé : "+monthsInPlan.length+" mois copiés puis retirés des données actives","info");refreshArchList();
                       }} style={{fontSize:11,padding:"4px 14px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>🗄 Archiver ces mois</button>
@@ -10682,7 +10793,7 @@ header::-webkit-scrollbar { display: none; }
           if(we)return a.id==="ABSENCE"||(a.id==="GARDE"&&canGarde);
           if(SYS.includes(a.id)) return a.id==="ABSENCE";
           // Check if medecin is authorized for this activity
-          if((a.medecinsAutorise&&a.medecinsAutorise.length)>0&&!(med&&a.medecinsAutorise.includes(med.init)))return false;
+          if((a.medecinsAutorise&&a.medecinsAutorise.length)>0&&!(med&&a.medecinsAutorise.includes(authI(med))))return false;
           return true;
         }).filter(a=>!isAdminEdit||a[roleOkKey]===true||a.id==="ABSENCE"||a.id==="FORMATION"); // secrétaires/cadres : activités cochées ✏️ pour CE rôle + absences/formations
 
@@ -11088,7 +11199,7 @@ header::-webkit-scrollbar { display: none; }
 
       {modal==="clearPeriod"&&mData&&<Ov onClose={()=>setModal(null)}>
         <ClearPeriodModal
-          medecins={medecins}
+          medecins={medsAff}
           initMedId={mData.medId}
           initDate={`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`}
           onApply={({keepAbs,medId,dateFrom,dateTo,slots,absType="ABSENCE"})=>{
@@ -11150,7 +11261,7 @@ header::-webkit-scrollbar { display: none; }
       </Ov>}
       {modal==="periode"&&mData&&<Ov onClose={()=>setModal(null)}>
         <PeriodModal
-          medecins={medecins}
+          medecins={medsAff}
           initMedId={mData.medId}
           initDate={`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`}
           year={year} month={month} mois={ptPeriodMonths} finPer={(()=>{const p=perStart(year,month);const e=perEnd(p.sy,p.sm);return `${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,"0")}-${String(e.getDate()).padStart(2,"0")}`;})()} allowActs={!isAdminEdit} compter={countPeriodActs}
@@ -11164,7 +11275,7 @@ header::-webkit-scrollbar { display: none; }
             setModal(null);}}
           onClose={()=>setModal(null)}/>
       </Ov>}
-      {modal==="absence"&&<Ov onClose={()=>setModal(null)}><AbsModal medecins={medecins}
+      {modal==="absence"&&<Ov onClose={()=>setModal(null)}><AbsModal medecins={medsAff}
   initMedId={mData&&mData._absMode?mData.medId:null}
   initDate={mData&&mData._absMode?`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`:null}
   onApply={p=>{applyAbsence(p);setModal(null);}}
@@ -11234,9 +11345,9 @@ header::-webkit-scrollbar { display: none; }
         </div>);
       })()}
 
-      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||(isAdminEdit&&isCadre)} intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} setMData={setMData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
-      {modal==="pickMedSite"&&mData&&<PickMedSiteModal intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} medecins={medecins} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
-      {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medecins} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||(isAdminEdit&&isCadre)} intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} setMData={setMData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedSite"&&mData&&<PickMedSiteModal intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
+      {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medsAff} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
       {modal==="editActe"&&mData&&(
         <Ov onClose={()=>setModal(null)}>
@@ -11440,9 +11551,9 @@ header::-webkit-scrollbar { display: none; }
           <div style={S.mHd}><div style={S.mTit2}>{mData._new?"Ajouter":"Modifier"}</div><button onClick={()=>setModal(null)} style={S.xBtn}>×</button></div>
           <div style={S.fGrd}>
             <div style={{gridColumn:"1/-1",fontSize:10,fontWeight:800,color:"#388bfd",textTransform:"uppercase",letterSpacing:.5}}>👤 Identité & rôle</div>
-            <FF l="Nom" v={mData.nom} c={v=>setMData(p=>({...p,nom:v}))}/>
-            <FF l="Prénom" v={mData.prenom} c={v=>setMData(p=>({...p,prenom:v}))}/>
-            <FF l="Initiales (max 4)" v={mData.init} c={v=>setMData(p=>({...p,init:v.toUpperCase().slice(0,4)}))}/>
+            <FF l={djRole(mData)?"Rôle du Dr Junior":"Nom"} v={mData.nom} c={v=>setMData(p=>({...p,nom:v}))}/>
+            {!djRole(mData)&&<FF l="Prénom" v={mData.prenom} c={v=>setMData(p=>({...p,prenom:v}))}/>}
+            {!djRole(mData)&&<FF l="Initiales (max 4)" v={mData.init} c={v=>setMData(p=>({...p,init:v.toUpperCase().slice(0,4)}))}/>}
             <div><label style={S.fl}>Couleur</label><input type="color" value={mData.color} onChange={e=>setMData(p=>({...p,color:e.target.value}))} style={{...S.fi,padding:2,height:32,cursor:"pointer"}}/></div>
             <div style={{gridColumn:"1/-1"}}><label style={S.fl}>Rôle</label>
               <div style={{display:"flex",gap:5}}>{[["medecin","Médecin"],["attache","Attaché"],["ide","IDE"]].map(([v,l])=><button key={v} onClick={()=>setMData(p=>({...p,role:v,garde:["attache","ide"].includes(v)?false:p.garde,tourMed:["attache","ide"].includes(v)?false:p.tourMed}))} style={{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,background:(mData.role||"medecin")===v?"#1d4ed8":"var(--bg2)",color:(mData.role||"medecin")===v?"#fff":"var(--txt2)"}}>{l}</button>)}</div>
@@ -11464,9 +11575,9 @@ header::-webkit-scrollbar { display: none; }
             {(mData.role||"medecin")==="medecin"&&<div style={{gridColumn:"1/-1"}}>
               <label style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:4}}>Statut</label>
               <div style={{display:"flex",gap:4}}>
-                {[["senior","Sénior"],["junior","Junior"]].map(([v,l])=><button key={v} onClick={()=>setMData(p=>({...p,statut:v}))} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:11,background:(mData.statut||"senior")===v?"#1d4ed8":"var(--bg2)",color:(mData.statut||"senior")===v?"#fff":"var(--txt2)"}}>{l}</button>)}
+                {[["senior","Sénior"],["junior","Junior"]].map(([v,l])=><button key={v} onClick={()=>setMData(p=>(v==="junior"&&p.statut!=="junior"?{...p,statut:v,prenom:"",init:djCodeRole(p.init,medecins,p.id)}:{...p,statut:v}))} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:11,background:(mData.statut||"senior")===v?"#1d4ed8":"var(--bg2)",color:(mData.statut||"senior")===v?"#fff":"var(--txt2)"}}>{l}</button>)}
               </div>
-              {mData.statut==="junior"&&<DJEquipe mData={mData} setMData={setMData} prisInit={medecins.filter(m3=>m3.id!==mData.id).map(m3=>m3.init)} countActs={mData._new?null:((du,au)=>offCount(mData.id,du,au))} onClear={mData._new?null:((du,au)=>offClear(mData.id,du,au))}/>}
+              {djRole(mData)&&<DJEquipe mData={mData} setMData={setMData} intCfg={intCfg} prisInit={medecins.filter(m3=>m3.id!==mData.id).map(m3=>m3.init)} countActs={mData._new?null:((du,au)=>offCount(mData.id,du,au))} onClear={mData._new?null:((du,au)=>offClear(mData.id,du,au))}/>}
               {mData.tourMed&&<div style={{display:"flex",gap:10,alignItems:"center",marginTop:8,flexWrap:"wrap"}}>
                 <span style={{fontSize:13,color:"var(--txt2)"}}>2 semaines de tour consécutives :</span>
                 <label style={{display:"flex",gap:5,alignItems:"center",color:"var(--txt2)",fontSize:13,cursor:"pointer"}}><input type="checkbox" checked={!!mData.pref2HC} onChange={e=>setMData(p=>({...p,pref2HC:e.target.checked}))} style={{width:14,height:14}}/>HC</label>
@@ -11590,15 +11701,16 @@ header::-webkit-scrollbar { display: none; }
             </div>}
           </div>
           <button style={{...S.btnP,width:"100%",marginTop:10}} onClick={()=>{
-            if(!mData.nom||!mData.init)return toast("Nom et initiales requis","warn");
+            if(!mData.nom||(!mData.init&&!djRole(mData)))return toast(djRole(mData)?"Rôle du Dr Junior requis":"Nom et initiales requis","warn");
             // v9.52 : medecinsAutorise indexe les INITIALES ; un changement d'initiales
             // orphelinait donc toutes les activités du médecin. On les renomme ici.
-            const newInit=String(mData.init).trim();
+            const newInit=djRole(mData)?djCodeRole(mData.init,medecins,mData.id):String(mData.init).trim();
             const oldInit=((medecins.find(m3=>m3.id===mData.id)||{}).init)||mData._authInit||"";
             if(newInit!==oldInit&&medecins.some(m3=>m3.id!==mData.id&&m3.init===newInit))
               return toast("Initiales déjà utilisées par un autre membre","warn");
             const {_new,_authInit,...rest}=mData;
             rest.init=newInit;
+            if(djRole(rest))rest.prenom="";
             if(oldInit&&oldInit!==newInit)setActes(prev=>prev.map(act=>{
               const cur=act.medecinsAutorise;
               if(!cur||!cur.length||!cur.includes(oldInit))return act;
