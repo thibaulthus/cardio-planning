@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.86 — 19/08/2026";
+const APP_VERSION="v10.87 — 19/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5962,6 +5962,107 @@ function intPrises(iso){const y=Number(iso.slice(0,4));const l=[];[y-1,y,y+1].fo
 function intProchainePrise(iso){return intPrises(iso).find(p=>p>iso)||intDecal(iso,183);}
 function intDernierePrise(iso){const l=intPrises(iso).filter(p=>p<=iso);return l.length?l[l.length-1]:iso;}
 
+/* ═══════════ v10.87 — DOCTEURS JUNIORS, lot 1 : un nom par semestre ═══════════
+   La fiche de l'onglet Équipe est le RÔLE (couleur, surspécialité, planning
+   type, participations) ; ce sont le nom et les initiales du junior EN POSTE
+   qui s'afficheront dans les onglets, semestre par semestre (lot 2).
+   Les DATES suivent exactement la règle des internes — prise de fonction le
+   2 mai et le 2 novembre, reportée au lundi suivant si elle tombe un
+   vendredi, samedi ou dimanche — mais elles sont RECALCULÉES ici au lieu
+   d'être lues dans intCfg.sems : la liste des semestres des internes se vide
+   (un semestre terminé se supprime, deux ouverts au maximum) et ne doit pas
+   emporter les juniors avec elle. Les deux mécanismes appellent intPrise /
+   intProchainePrise, donc les bascules tombent toujours le même jour. */
+const djL=(m)=>Array.isArray(m&&m.dj)?m.dj.filter(x=>x&&x.deb):[];
+const djFin=(deb)=>intDecal(intProchainePrise(deb),-1);
+/* pourvu = un nom, un prénom ou des initiales ; vide = personne sur ces dates */
+const djPourvu=(x)=>!!(x&&(String(x.init||"").trim()||String(x.nom||"").trim()||String(x.prenom||"").trim()));
+const djInit=(x)=>{
+  const i=String((x&&x.init)||"").trim();
+  if(i)return i.toUpperCase().slice(0,4);
+  const p=String((x&&x.prenom)||"").trim(),n=String((x&&x.nom)||"").trim();
+  return ((p?p[0]:"")+(n?n[0]:"")).toUpperCase();
+};
+const djNom=(x)=>((String((x&&x.prenom)||"")+" "+String((x&&x.nom)||"")).trim());
+/* le junior en poste à une date : null = personne, colonne masquée (lot 2) */
+function djDuJour(m,iso){
+  const l=djL(m).filter(x=>x.deb<=iso&&iso<=djFin(x.deb)&&djPourvu(x));
+  return l.length?l[l.length-1]:null;
+}
+/* semestres proposés dans la fiche : ceux déjà saisis + celui en cours + le suivant */
+function djSems(m,tj){
+  const out=[],vus={};
+  const add=(deb)=>{if(deb&&!vus[deb]){vus[deb]=1;out.push({deb:deb,fin:djFin(deb)});}};
+  djL(m).forEach(x=>add(x.deb));
+  add(intDernierePrise(tj));
+  add(intProchainePrise(tj));
+  out.sort((a,b)=>a.deb<b.deb?-1:1);
+  return out;
+}
+
+function DJEquipe({mData,setMData,countActs,onClear,prisInit}){
+  const tj=intISO(new Date());
+  const sems=djSems(mData,tj);
+  const trouve=(deb)=>djL(mData).find(x=>x.deb===deb)||null;
+  /* le comptage parcourt 6 mois de cases : on ne le refait que si l'état
+     « pourvu / vide » d'un semestre change, pas à chaque frappe. */
+  const sig=sems.map(s=>s.deb+(djPourvu(trouve(s.deb))?"1":"0")).join(",");
+  const cnt=useMemo(()=>{
+    const o={};
+    sems.forEach(s=>{o[s.deb]=(countActs&&!djPourvu(trouve(s.deb)))?countActs(s.deb,s.fin):0;});
+    return o;
+  },[sig]);
+  const maj=(deb,patch)=>setMData(p=>{
+    const l=djL(p).slice();
+    const i=l.findIndex(x=>x.deb===deb);
+    if(i<0)l.push({deb:deb,nom:"",prenom:"",init:"",...patch});
+    else l[i]={...l[i],...patch};
+    return {...p,dj:l};
+  });
+  const vider=(deb)=>setMData(p=>({...p,dj:djL(p).filter(x=>x.deb!==deb)}));
+  const chip=(txt,col)=>({fontSize:9.5,fontWeight:800,padding:"1px 6px",borderRadius:9,border:"1px solid "+col,color:col,textTransform:"uppercase",letterSpacing:.3});
+  const inp={...S.fi,padding:"4px 7px",fontSize:12};
+  return(
+    <div style={{marginTop:10,borderTop:"1px dashed var(--border)",paddingTop:8}}>
+      <div style={{fontSize:10,fontWeight:800,color:"#8b5cf6",textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>🔁 Docteur Junior — un nom par semestre</div>
+      <div style={{fontSize:10.5,color:"var(--txt3)",marginBottom:6}}>Cette fiche est le RÔLE : couleur, surspécialité et planning type ne changent pas d'un semestre à l'autre. Ce sont le nom et les initiales saisis ci-dessous qui apparaissent dans les onglets. Mêmes dates de bascule que les internes.</div>
+      {sems.map(s=>{
+        const x=trouve(s.deb)||{};
+        const enCours=s.deb<=tj&&tj<=s.fin;
+        const passe=s.fin<tj;
+        const plein=djPourvu(x);
+        const ini=djInit(x);
+        const dbl=plein&&ini&&(prisInit||[]).indexOf(ini)>=0;
+        const n=cnt[s.deb]||0;
+        return(
+          <div key={s.deb} style={{border:"1px solid "+(enCours?"#8b5cf6":"var(--border)"),borderRadius:8,padding:"7px 9px",marginBottom:6,background:enCours?"rgba(139,92,246,.07)":"var(--bg3)",opacity:passe?.72:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
+              <span style={{fontWeight:800,fontSize:12.5,color:"var(--txt)"}}>{intSemLabel(s.deb)}</span>
+              <span style={chip(passe?"terminé":(enCours?"en cours":"à venir"),passe?"var(--txt3)":(enCours?"#8b5cf6":"#388bfd"))}>{passe?"terminé":(enCours?"en cours":"à venir")}</span>
+              <span style={{fontSize:10.5,color:"var(--txt3)",flex:1}}>{intFmtD(s.deb)+" → "+intFmtD(s.fin)}</span>
+              {plein&&<button type="button" onClick={()=>vider(s.deb)} title="Effacer le nom de ce semestre"
+                style={{fontSize:10.5,padding:"2px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>🗑 Effacer</button>}
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              <input placeholder="Nom" value={x.nom||""} onChange={e=>maj(s.deb,{nom:e.target.value})} style={{...inp,flex:"1 1 110px",minWidth:88}}/>
+              <input placeholder="Prénom" value={x.prenom||""} onChange={e=>maj(s.deb,{prenom:e.target.value})} style={{...inp,flex:"1 1 110px",minWidth:88}}/>
+              <input placeholder="Init." value={x.init||""} onChange={e=>maj(s.deb,{init:e.target.value.toUpperCase().slice(0,4)})} style={{...inp,width:66,flex:"0 0 66px",fontWeight:800,textAlign:"center"}}/>
+            </div>
+            {plein&&!String(x.init||"").trim()&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"Initiales déduites du nom : "+(ini||"—")}</div>}
+            {dbl&&<div style={{fontSize:10.5,color:"#b45309",fontWeight:700,marginTop:4}}>{"⚠ Les initiales "+ini+" sont déjà portées par un autre membre de l'équipe : les deux se ressembleront dans les tableaux."}</div>}
+            {!plein&&<div style={{fontSize:10.5,color:"var(--txt3)",marginTop:4}}>Aucun nom : sur ces dates la colonne sera masquée et les cases verrouillées. Saisissez le nom AVANT d'appliquer le planning type, sinon il sautera ces mois.</div>}
+            {n>0&&<div style={{border:"1px solid #ef4444",background:"rgba(239,68,68,.07)",borderRadius:8,padding:"6px 8px",marginTop:5}}>
+              <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginBottom:onClear?4:0}}>{"⚠ "+n+" activité"+(n>1?"s":"")+" déjà posée"+(n>1?"s":"")+" sur ces dates (gardes, tour et absences comprises). Sans nom, elles restent enregistrées sous les cases verrouillées."}</div>
+              {onClear&&<button type="button" onClick={()=>onClear(s.deb,s.fin)}
+                style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #ef4444",background:"rgba(239,68,68,.10)",color:"#ef4444",fontWeight:800,cursor:"pointer"}}>🧹 Retirer ces activités</button>}
+            </div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function InternesEquipe({intCfg,setIntCfg,isEdit}){
   const [open,setOpen]=useState({});
   const [formSem,setFormSem]=useState(null);
@@ -11365,6 +11466,7 @@ header::-webkit-scrollbar { display: none; }
               <div style={{display:"flex",gap:4}}>
                 {[["senior","Sénior"],["junior","Junior"]].map(([v,l])=><button key={v} onClick={()=>setMData(p=>({...p,statut:v}))} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:11,background:(mData.statut||"senior")===v?"#1d4ed8":"var(--bg2)",color:(mData.statut||"senior")===v?"#fff":"var(--txt2)"}}>{l}</button>)}
               </div>
+              {mData.statut==="junior"&&<DJEquipe mData={mData} setMData={setMData} prisInit={medecins.filter(m3=>m3.id!==mData.id).map(m3=>m3.init)} countActs={mData._new?null:((du,au)=>offCount(mData.id,du,au))} onClear={mData._new?null:((du,au)=>offClear(mData.id,du,au))}/>}
               {mData.tourMed&&<div style={{display:"flex",gap:10,alignItems:"center",marginTop:8,flexWrap:"wrap"}}>
                 <span style={{fontSize:13,color:"var(--txt2)"}}>2 semaines de tour consécutives :</span>
                 <label style={{display:"flex",gap:5,alignItems:"center",color:"var(--txt2)",fontSize:13,cursor:"pointer"}}><input type="checkbox" checked={!!mData.pref2HC} onChange={e=>setMData(p=>({...p,pref2HC:e.target.checked}))} style={{width:14,height:14}}/>HC</label>
