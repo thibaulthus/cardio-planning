@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.91 — 19/08/2026";
+const APP_VERSION="v10.92 — 19/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2187,6 +2187,9 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
 function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null,okKey="adminOk",notes={},setNotes=null,canNotes=false,intCfg=null,canInt=false}){
+  /* v10.92 : la liste proposee porte le nom du junior EN POSTE CE JOUR-LA. */
+  {const _dj=(mData&&mData.y!=null&&mData.m!=null&&mData.d!=null)?dKey(mData.y,mData.m,mData.d):null;
+   if(_dj)medecins=(medecins||[]).map(m0=>djAff(m0,_dj));}
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
   const [difFor,setDifFor]=useState(null);
@@ -2514,6 +2517,9 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
 
 /* ════ PICK MED SITE MODAL (CHL/CHB) ════ */
 function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,onClose,adminOnly=false,selfOnly=null,darkMode=false,okKey="adminOk",notes={},setNotes=null,canNotes=false,intCfg=null,canInt=false}){
+  /* v10.92 : la liste proposee porte le nom du junior EN POSTE CE JOUR-LA. */
+  {const _dj=(mData&&mData.y!=null&&mData.m!=null&&mData.d!=null)?dKey(mData.y,mData.m,mData.d):null;
+   if(_dj)medecins=(medecins||[]).map(m0=>djAff(m0,_dj));}
   const {salle,siteActes,d,sl,y:y2,m:m2}=mData;
   const [step,setStep]=useState("med"); // med | acte | salle
   const [selMedId,setSelMedId]=useState(null);
@@ -5374,7 +5380,7 @@ function BuildPersonList({gens,etat,onSet,peut,vide}){
           <span style={{width:15,height:15,borderRadius:4,flex:"0 0 15px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,
             border:"1.5px solid "+(on?"#3fb950":"var(--border)"),background:on?"#3fb950":"transparent",color:"#fff"}}>{on?"✓":""}</span>
           <span style={{width:26,height:20,borderRadius:5,background:m.color||"#888",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 26px"}}>{m.init}</span>
-          <span style={{fontSize:11,color:"var(--txt2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.prenom+" "+m.nom}</span>
+          <span style={{fontSize:11,color:"var(--txt2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m._lib||(m.prenom+" "+m.nom)}</span>
         </div>);})}
     </div>
   );
@@ -5533,7 +5539,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
          })}
        </div>
        <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Une coche par personne dès qu'elle a posé ses vacances — elle se coche aussi toute seule quand le médecin répond au rappel affiché dans son Planning. Les attachés et les IDE sont rappelés à l'étape 4.</div>
-       <BuildPersonList gens={meds} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>
+       <BuildPersonList gens={meds.map(m=>{const l=djNomsPeriode(m,bJours);return l?{...m,_lib:l}:m;})} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>
      </div>},
     {n:2,icon:"🔄",titre:"Distribution du tour",
      sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
@@ -5966,7 +5972,7 @@ function intPrises(iso){const y=Number(iso.slice(0,4));const l=[];[y-1,y,y+1].fo
 function intProchainePrise(iso){return intPrises(iso).find(p=>p>iso)||intDecal(iso,183);}
 function intDernierePrise(iso){const l=intPrises(iso).filter(p=>p<=iso);return l.length?l[l.length-1]:iso;}
 
-/* ═══════════ v10.91 — DOCTEURS JUNIORS : un nom par semestre ═══════════
+/* ═══════════ v10.92 — DOCTEURS JUNIORS : un nom par semestre ═══════════
    La fiche de l'onglet Équipe est le RÔLE (couleur, surspécialité, planning
    type, participations) ; ce sont le nom et les initiales du junior EN POSTE
    qui s'afficheront dans les onglets, semestre par semestre (lot 2).
@@ -6081,10 +6087,44 @@ function djSubst(meds,intCfg,refIso){
     if(!djRole(m))return m;
     const x=djDuJour(m,refIso,intCfg);
     if(!x)return m;
-    return {...m,initAuth:m.init,init:djInit(x),nom:x.nom||m.nom,prenom:x.prenom||""};
+    return {...m,djRole0:{init:m.init,nom:m.nom,prenom:m.prenom},initAuth:m.init,init:djInit(x),nom:x.nom||m.nom,prenom:x.prenom||""};
   });
 }
 const authI=(m)=>(m&&m.initAuth)||(m&&m.init);
+
+/* ═══ v10.92, LOT 3 : exactitude au JOUR ═══
+   Le lot 2 substitue l'identité à UNE date de référence — c'est ce qu'il faut
+   pour l'en-tête d'une colonne. Partout où une DATE existe (case, modale,
+   infobulle, impression, historique), c'est elle qui doit décider et jamais la
+   colonne : cliquer le 4 mai depuis avril montre le NOUVEAU junior, sa règle.
+   `djAff` repart toujours de l'identité du RÔLE, gardée dans `djRole0` par la
+   substitution du lot 2 — sans quoi on empilerait deux titulaires. */
+const djBase=(m)=>(m&&m.djRole0)?{...m,init:m.djRole0.init,nom:m.djRole0.nom,prenom:m.djRole0.prenom}:m;
+function djAff(m,iso){
+  if(!djRole(m)||!iso)return m;
+  const b=djBase(m);
+  const s=DJ_SEMS.find(x=>x.deb<=iso&&iso<=x.fin);
+  const x=s?djTrouve(b,s):null;
+  if(!djPourvu(x))return b;
+  return {...b,djRole0:{init:b.init,nom:b.nom,prenom:b.prenom},initAuth:b.init,init:djInit(x),nom:x.nom||b.nom,prenom:x.prenom||""};
+}
+/* Les DEUX noms quand la période affichée contient une bascule — sa demande
+   pour les congés de l'onglet Construire : il les recueille auprès des deux. */
+function djNomsPeriode(m,jours){
+  if(!djRole(m)||!jours||!jours.length)return null;
+  const b=djBase(m);
+  const a=jours[0],z=jours[jours.length-1];
+  const d1=dKey(a.y,a.m,a.d),d2=dKey(z.y,z.m,z.d);
+  const out=[];
+  DJ_SEMS.forEach(s=>{
+    if(s.fin<d1||s.deb>d2)return;
+    const x=djTrouve(b,s);
+    if(!djPourvu(x))return;
+    const n=djNom(x)||djInit(x);
+    if(n&&out.indexOf(n)<0)out.push(n);
+  });
+  return out.length>1?out.join(" puis "):null;
+}
 
 function DJEquipe({mData,setMData,countActs,onClear,prisInit,intCfg}){
   const tj=intISO(new Date());
@@ -9036,7 +9076,7 @@ function CardioPlanning(){
     const res={};
     medecins.forEach(med=>{
       getEntries(med.id,y2,m2,d2,slot).forEach(e=>{
-        if((e&&e.acteId)===acteId&&e.salle&&!e.cond){if(!res[e.salle])res[e.salle]=[];if(!res[e.salle].find(x=>x.id===med.id))res[e.salle].push(med);}
+        if((e&&e.acteId)===acteId&&e.salle&&!e.cond){if(!res[e.salle])res[e.salle]=[];if(!res[e.salle].find(x=>x.id===med.id))res[e.salle].push(djAff(med,dKey(y2,m2,d2)));}
       });
     });
     return res;
@@ -10739,7 +10779,7 @@ header::-webkit-scrollbar { display: none; }
 
       {bipModal&&bipModalUI()}
       {histModal&&(()=>{
-        const med3=medecins.find(x=>x.id===histModal.medId);
+        const med3=djAff(medecins.find(x=>x.id===histModal.medId),dKey(histModal.y,histModal.m,histModal.d));
         return(
           <Ov onClose={()=>setHistModal(null)}>
             <div style={S.mHd}>
@@ -10764,7 +10804,7 @@ header::-webkit-scrollbar { display: none; }
       })()}
       {modal==="cell"&&mData&&(()=>{
         const {medId,y:y2,m:m2,d:d2,slot}=mData;
-        const med=medecins.find(x=>x.id===medId);
+        const med=djAff(medecins.find(x=>x.id===medId),dKey(y2,m2,d2));
         const we=isWE(y2,m2,d2),isNight=slot==="N",canGarde=(med&&med.garde)===true;
         const canEditThisMed=canEdit(medId);
         const dw2=dow(y2,m2,d2);
