@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.92 — 19/08/2026";
+const APP_VERSION="v10.93 — 19/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5448,7 +5448,13 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
   const bJours=React.useMemo(()=>perDaysList(bPer.sy,bPer.sm),[bPer.sy,bPer.sm,PCFG.len]);
   /* v10.41 : un médecin désactivé sur TOUTE la période sort des listes et des
      comptes de l'onglet — une étape peut se terminer sans lui. */
-  const meds=useMemo(()=>medecins.filter(m=>(m.role||"medecin")==="medecin"&&offEtat(m,bJours)!=="off"),[medecins,bJours]);
+  /* v10.93 : la période de Construire est INDÉPENDANTE de celle qui est
+     affichée ailleurs. Les rôles juniors doivent donc porter le nom du
+     titulaire de CETTE période — sinon l'onglet propose l'ancienne équipe
+     quand on prépare le semestre suivant (son constat du 19/08). */
+  const bIso=bJours.length?dKey(bJours[0].y,bJours[0].m,bJours[0].d):null;
+  const medsB=useMemo(()=>(medecins||[]).map(m=>djAff(m,bIso)),[medecins,bIso]);
+  const meds=useMemo(()=>medsB.filter(m=>(m.role||"medecin")==="medecin"&&offEtat(m,bJours)!=="off"),[medsB,bJours]);
   /* v10.31 : la coche « absences a recueillir » de la fiche Equipe decide qui parait ici */
   const autres=useMemo(()=>medecins.filter(m=>(m.role||"medecin")!=="medecin"&&m.suiviAbs!==false),[medecins]);
 
@@ -5544,11 +5550,11 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     {n:2,icon:"🔄",titre:"Distribution du tour",
      sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
      alerte:mTour?(mTour+" semaine"+(mTour>1?"s":"")+" sans tour attribué"):null,
-     body:<BuildEmbed><TourTab key={pKey} {...tourProps} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     body:<BuildEmbed><TourTab key={pKey} {...tourProps} medecins={medsB} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
     {n:3,icon:"🌙",titre:"Gardes",
      sous:gardes.ok+" jour"+(gardes.ok>1?"s":"")+" sur "+gardes.tot+" ont une garde",
      alerte:mGar?(mGar+" jour"+(mGar>1?"s":"")+" sans garde sur la période"):null,
-     body:<BuildEmbed><GardeView key={pKey} {...gardeProps} noNav={true} showFull={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     body:<BuildEmbed><GardeView key={pKey} {...gardeProps} medecins={medsB} noNav={true} showFull={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
     {n:4,icon:"🚫",titre:"Absences de tout le monde",
      sous:nAutres+" sur "+autres.length+" renseigné"+(nAutres>1?"s":""),
      alerte:mAut?(mAut+" personne"+(mAut>1?"s":"")+" hors médecins sans réponse"):null,
@@ -5972,7 +5978,7 @@ function intPrises(iso){const y=Number(iso.slice(0,4));const l=[];[y-1,y,y+1].fo
 function intProchainePrise(iso){return intPrises(iso).find(p=>p>iso)||intDecal(iso,183);}
 function intDernierePrise(iso){const l=intPrises(iso).filter(p=>p<=iso);return l.length?l[l.length-1]:iso;}
 
-/* ═══════════ v10.92 — DOCTEURS JUNIORS : un nom par semestre ═══════════
+/* ═══════════ v10.93 — DOCTEURS JUNIORS : un nom par semestre ═══════════
    La fiche de l'onglet Équipe est le RÔLE (couleur, surspécialité, planning
    type, participations) ; ce sont le nom et les initiales du junior EN POSTE
    qui s'afficheront dans les onglets, semestre par semestre (lot 2).
@@ -6100,10 +6106,27 @@ const authI=(m)=>(m&&m.initAuth)||(m&&m.init);
    `djAff` repart toujours de l'identité du RÔLE, gardée dans `djRole0` par la
    substitution du lot 2 — sans quoi on empilerait deux titulaires. */
 const djBase=(m)=>(m&&m.djRole0)?{...m,init:m.djRole0.init,nom:m.djRole0.nom,prenom:m.djRole0.prenom}:m;
+/* v10.93 : les semestres couvrant [d1,d2], PROLONGÉS PAR LA RÈGLE au-delà du
+   registre. Le registre s'arrête au dernier jour de la période AFFICHÉE ; or
+   l'onglet Construire travaille sur une période qu'il choisit librement, qui
+   peut être plus loin. Sans ce prolongement, Construire retombait sur
+   l'identité du rôle — ou pire, sur celle de la période affichée. */
+function djSemsPour(d1,d2){
+  const out=DJ_SEMS.filter(s=>!(s.fin<d1||s.deb>d2));
+  let last=DJ_SEMS.length?DJ_SEMS[DJ_SEMS.length-1]:null;
+  let n=0;
+  while(last&&last.fin<d2&&n<24){
+    const d=intDecal(last.fin,1);
+    const c={id:"D"+d,deb:d,fin:djFin(d)};
+    if(!(c.fin<d1||c.deb>d2))out.push(c);
+    last=c;n++;
+  }
+  return out;
+}
 function djAff(m,iso){
   if(!djRole(m)||!iso)return m;
   const b=djBase(m);
-  const s=DJ_SEMS.find(x=>x.deb<=iso&&iso<=x.fin);
+  const s=djSemsPour(iso,iso)[0];
   const x=s?djTrouve(b,s):null;
   if(!djPourvu(x))return b;
   return {...b,djRole0:{init:b.init,nom:b.nom,prenom:b.prenom},initAuth:b.init,init:djInit(x),nom:x.nom||b.nom,prenom:x.prenom||""};
@@ -6116,8 +6139,7 @@ function djNomsPeriode(m,jours){
   const a=jours[0],z=jours[jours.length-1];
   const d1=dKey(a.y,a.m,a.d),d2=dKey(z.y,z.m,z.d);
   const out=[];
-  DJ_SEMS.forEach(s=>{
-    if(s.fin<d1||s.deb>d2)return;
+  djSemsPour(d1,d2).forEach(s=>{
     const x=djTrouve(b,s);
     if(!djPourvu(x))return;
     const n=djNom(x)||djInit(x);
