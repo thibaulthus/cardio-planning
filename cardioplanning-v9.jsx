@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.94 — 19/08/2026";
+const APP_VERSION="v10.95 — 20/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1477,7 +1477,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
   const [gardeModal,setGardeModal]=React.useState(false);
   const [lastGReport,setLastGReport]=React.useState(null);
   const [gMax,setGMax]=React.useState({}); // {medId: maxGardes} optionnel
-  const gardeMeds=medecins.filter(m=>m.garde);
+  const gardeMeds=djListePeriode(medecins,perDaysList(gvSy,gvSm)).filter(m=>m.garde);
   const FACT={less:0.75,normal:1,more:1.25};
   // Tous les jours de la période (complets, indépendants de showFull)
   const gvAllDays=React.useMemo(()=>perDaysList(gvSy,gvSm),[gvSy,gvSm,PCFG.len]);
@@ -3505,8 +3505,12 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     }
     return infos;
   };
-  const tourMeds=medecins.filter(m=>m.tourMed);
-  const horsTourSpecMeds=medecins.filter(m=>m.role==="medecin"&&!m.tourMed&&m.surSpec);
+  /* v10.95 : liste de la PÉRIODE de cet écran (celle de Construire quand la
+     tuile l'embarque) — les indisponibles sur toute la période en sortent et
+     un rôle junior porte les initiales de ses deux titulaires. */
+  const medsPerT=djListePeriode(medecins,perDaysList(perT.startY,perT.startM));
+  const tourMeds=medsPerT.filter(m=>m.tourMed);
+  const horsTourSpecMeds=medsPerT.filter(m=>m.role==="medecin"&&!m.tourMed&&m.surSpec);
   /* v9.84 : couleurs des surspécialités réglables. Elles étaient écrites en dur ici —
      une information dans le code que l'utilisateur ne pouvait pas atteindre. Elles
      viennent maintenant des paramètres, avec repli sur les valeurs historiques. */
@@ -4178,7 +4182,7 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
   const allTrack=[GARDE_ACTE,GARDE_SEM,GARDE_JEU,GARDE_WE,...trackActes];
 
   // Count per med per acte
-  const allStatMeds=medecins.filter(m=>m.role==="medecin");
+  const allStatMeds=djListePeriode(medecins,days).filter(m=>m.role==="medecin");
   const [medFilter,setMedFilter]=React.useState([]);
   const [sortCol,setSortCol]=React.useState(null); // {col,dir:'desc'|'asc'}
   const meds=medFilter.length>0?allStatMeds.filter(m=>medFilter.includes(m.id)):allStatMeds;
@@ -5978,7 +5982,7 @@ function intPrises(iso){const y=Number(iso.slice(0,4));const l=[];[y-1,y,y+1].fo
 function intProchainePrise(iso){return intPrises(iso).find(p=>p>iso)||intDecal(iso,183);}
 function intDernierePrise(iso){const l=intPrises(iso).filter(p=>p<=iso);return l.length?l[l.length-1]:iso;}
 
-/* ═══════════ v10.94 — DOCTEURS JUNIORS : un nom par semestre ═══════════
+/* ═══════════ v10.95 — DOCTEURS JUNIORS : un nom par semestre ═══════════
    La fiche de l'onglet Équipe est le RÔLE (couleur, surspécialité, planning
    type, participations) ; ce sont le nom et les initiales du junior EN POSTE
    qui s'afficheront dans les onglets, semestre par semestre (lot 2).
@@ -6155,6 +6159,35 @@ function djNomsPeriode(m,jours){
     if(n&&out.indexOf(n)<0)out.push(n);
   });
   return out.length>1?out.join(" puis "):null;
+}
+
+/* ═══ v10.95, SA RÈGLE : un rôle junior = UNE personne sur toute la période ═══
+   « je ne vais pas les différencier sur 2 lignes, sinon on compterait pour tout
+   le monde sur 4 mois sauf les juniors qui auraient une période sur 2 mois ».
+   Une seule ligne donc, portant les initiales des DEUX titulaires côte à côte
+   quand la période contient une bascule, et le compte de semaines de tour ou de
+   gardes de la période ENTIÈRE — l'algorithme répartit ensuite là où il y a le
+   plus besoin, sans partage arbitraire en cas de nombre impair.
+   Et ceux qui ne sont là AUCUN jour de la période sortent de la liste. */
+function djListePeriode(meds,jours){
+  if(!meds||!meds.length||!jours||!jours.length)return meds||[];
+  const a=jours[0],z=jours[jours.length-1];
+  const d1=dKey(a.y,a.m,a.d),d2=dKey(z.y,z.m,z.d);
+  const sems=djSemsPour(d1,d2);
+  return meds.filter(m=>offEtat(m,jours)!=="off").map(m=>{
+    if(!djRole(m))return m;
+    const b=djBase(m);
+    const ini=[],noms=[];
+    sems.forEach(s=>{
+      const x=djTrouve(b,s);
+      if(!djPourvu(x))return;
+      const i=djInit(x);
+      if(ini.indexOf(i)<0){ini.push(i);noms.push(djNom(x)||i);}
+    });
+    if(!ini.length)return b;
+    return {...b,djRole0:{init:b.init,nom:b.nom,prenom:b.prenom},initAuth:b.init,
+            init:ini.join("/"),nom:noms.join(" / "),prenom:"",_lib:noms.join(" puis ")};
+  });
 }
 
 function DJEquipe({mData,setMData,countActs,onClear,prisInit,intCfg}){
