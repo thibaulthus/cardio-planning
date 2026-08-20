@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.93 — 19/08/2026";
+var APP_VERSION = "v10.94 — 19/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6193,7 +6193,7 @@ function intPrise(y, m) { const d = new Date(y, m - 1, 2); const j = d.getDay();
 function intPrises(iso) { const y = Number(iso.slice(0, 4)); const l = []; [y - 1, y, y + 1].forEach(yy => { l.push(intPrise(yy, 5)); l.push(intPrise(yy, 11)); }); return l; }
 function intProchainePrise(iso) { return intPrises(iso).find(p => p > iso) || intDecal(iso, 183); }
 function intDernierePrise(iso) { const l = intPrises(iso).filter(p => p <= iso); return l.length ? l[l.length - 1] : iso; }
-/* ═══════════ v10.93 — DOCTEURS JUNIORS : un nom par semestre ═══════════
+/* ═══════════ v10.94 — DOCTEURS JUNIORS : un nom par semestre ═══════════
    La fiche de l'onglet Équipe est le RÔLE (couleur, surspécialité, planning
    type, participations) ; ce sont le nom et les initiales du junior EN POSTE
    qui s'afficheront dans les onglets, semestre par semestre (lot 2).
@@ -6301,7 +6301,15 @@ function djTuileTxt(m, intCfg) {
    colonne masquée, cases hachurées et non cliquables, planning type qui
    saute, sortie du tour, des gardes et de Construire. */
 let DJ_SEMS = [];
-function djSetSems(intCfg, jusqua) { DJ_SEMS = djSemsList(intCfg, jusqua || intISO(new Date())); }
+/* v10.94 : le registre va toujours DEUX ANS en avant. `djOffRanges` n'a aucune
+   date en argument (medOffL non plus) : il ne peut verrouiller que les semestres
+   PRÉSENTS dans le registre. Tant qu'il s'arrêtait à la période affichée, un rôle
+   sans titulaire réapparaissait dès qu'on regardait plus loin — son constat du
+   20/08 dans l'onglet Construire. */
+function djSetSems(intCfg, jusqua) {
+    const loin = intDecal(intISO(new Date()), 730);
+    DJ_SEMS = djSemsList(intCfg, (jusqua && jusqua > loin) ? jusqua : loin);
+}
 function djOffRanges(m) {
     if (!djRole(m))
         return [];
@@ -6377,9 +6385,9 @@ function djNomsPeriode(m, jours) {
     const out = [];
     djSemsPour(d1, d2).forEach(s => {
         const x = djTrouve(b, s);
-        if (!djPourvu(x))
-            return;
-        const n = djNom(x) || djInit(x);
+        /* v10.94 : un semestre sans titulaire compte aussi — sur une période à
+           cheval il doit VOIR qu'il n'y a personne pour la seconde moitié. */
+        const n = djPourvu(x) ? (djNom(x) || djInit(x)) : "non pourvu";
         if (n && out.indexOf(n) < 0)
             out.push(n);
     });
