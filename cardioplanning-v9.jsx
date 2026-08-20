@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.95 — 20/08/2026";
+const APP_VERSION="v10.96 — 20/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -10984,8 +10984,10 @@ header::-webkit-scrollbar { display: none; }
                 <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                   {tourSy&&(()=>{const aT=acteById(tourSy);if(!aT)return null;
                     return(<div style={{display:"flex",alignItems:"center",gap:4}} title="Tour médical de la semaine — il ne se retire pas ici, il s'échange">
+                      {/* v10.96 : mention textuelle retirée à sa demande du 19/08 —
+                         il voulait seulement que la tuile HC/USIC se maintienne à côté
+                         de l'activité posée, l'infobulle suffit pour le reste. */}
                       <Badge a={aT} hideSalle={true}/>
-                      <span style={{fontSize:10,fontWeight:700,color:"var(--txt3)"}}>de tour cette semaine</span>
                     </div>);})()}
                   {entries.filter(e=>e.acteId&&!e.cond).map((e,i)=>{
                     const a=acteById(e.acteId);if(!a)return null;

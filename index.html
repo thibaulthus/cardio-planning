@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.95 — 20/08/2026";
+var APP_VERSION = "v10.96 — 20/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -12294,8 +12294,7 @@ function CardioPlanning() {
                             if (!aT)
                                 return null;
                             return (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4 }, title: "Tour m\u00E9dical de la semaine \u2014 il ne se retire pas ici, il s'\u00E9change" },
-                                React.createElement(Badge, { a: aT, hideSalle: true }),
-                                React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)" } }, "de tour cette semaine")));
+                                React.createElement(Badge, { a: aT, hideSalle: true })));
                         })(),
                         entries.filter(function (e) { return e.acteId && !e.cond; }).map(function (e, i) {
                         var a = acteById(e.acteId);
