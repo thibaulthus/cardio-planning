@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.101 — 21/08/2026";
+var APP_VERSION = "v10.102 — 21/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4634,8 +4634,8 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}),
-  HT({children:"💾 Sauvegarde sur mon ordinateur"}),
-  HP({children:["Dans Paramètres, l'encart ",HE("b",null,"Sauvegarde sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui permettent de tout remettre en place. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
+  HT({children:"💻 Copie sur mon ordinateur"}),
+  HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui permettent de tout remettre en place. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
   HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). La date de dernière sauvegarde et le compteur sont propres à ",HE("b",null,"chaque ordinateur"),"."]}))},
 
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
@@ -6060,8 +6060,8 @@ function ExportCard(_a) {
     var per = _a.per, setPer = _a.setPer, source = _a.source, setSource = _a.setSource, backups = _a.backups, seuil = _a.seuil, setSeuil = _a.setSeuil, dernier = _a.dernier, onExport = _a.onExport, occupe = _a.occupe;
     var lbl = perLibelle(per.sy, per.sm);
     var dat = function (ts) { return new Date(ts).toLocaleDateString("fr-FR") + " " + new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); };
-    return (React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }), id: "set-export" },
-        React.createElement("div", { style: { fontWeight: 700, color: "#f59e0b", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde sur mon ordinateur"),
+    return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" }, id: "set-export" },
+        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "💻 Copie sur mon ordinateur"),
         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Un fichier gard\u00E9 chez vous, ind\u00E9pendant de l'application et de sa synchronisation. Le tableau sert \u00E0 rediffuser le planning ; le fichier de donn\u00E9es sert \u00E0 le remettre en place."),
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" } },
             React.createElement("button", { onClick: function () { return setPer(perPrev(per.sy, per.sm)); }, style: S.arr }, "\u2039"),
@@ -10562,7 +10562,7 @@ function CardioPlanning() {
                     _a.trys.push([1, 5, , 6]);
                     src = void 0;
                     if (!(expSrc === "now")) return [3 /*break*/, 2];
-                    src = { plan: plan, notes: notes, tourMed: tourMed, tourDerog: tourDerog, medecins: medecins, actes: actes, salleReg: salleReg };
+                    src = { plan: plan, notes: notes, tourMed: tourMed, tourDerog: tourDerog, medecins: medecins, actes: actes, salleReg: salleReg, planningType: planningType };
                     return [3 /*break*/, 4];
                 case 2: return [4 /*yield*/, window.firebaseDB.collection("backups").doc(expSrc).get()];
                 case 3:
@@ -10573,10 +10573,20 @@ function CardioPlanning() {
                     catch (e) {
                         return def;
                     } };
+                    var rdV2 = function (mp, ordRaw, leg) {
+                        if (!mp) return pj(leg, []);
+                        var vals = {}; Object.keys(mp).forEach(function (k) { var v = mp[k]; vals[k] = typeof v === "string" ? JSON.parse(v) : v; });
+                        var ord = pj(ordRaw, null);
+                        var ids = Array.isArray(ord) ? ord.map(String).filter(function (id) { return vals[id] !== undefined; }) : [];
+                        var rest = Object.keys(vals).filter(function (id) { return ids.indexOf(id) < 0; });
+                        return ids.concat(rest).map(function (id) { return vals[id]; });
+                    };
                     src = { plan: dd.planV2 || {}, notes: pj(dd.notes, {}), tourMed: pj(dd.tourMed, {}), tourDerog: pj(dd.tourDerog, {}),
-                        medecins: pj(dd.medecins, []), actes: pj(dd.actes, []), salleReg: pj(dd.salleReg, []) };
+                        medecins: rdV2(dd.medecinsV2, dd.medecinsV2Order, dd.medecins), actes: rdV2(dd.actesV2, dd.actesV2Order, dd.actes), salleReg: pj(dd.salleReg, []),
+                        planningType: (dd.planningTypeV2 !== undefined ? pj(dd.planningTypeV2, {}) : pj(dd.planningType, {})) };
                     _a.label = 4;
                 case 4:
+                    src.exportDate = new Date().toISOString(); src.version = "v7";
                     nom = "planning-" + expPer.sy + "-" + String(expPer.sm + 1).padStart(2, "0");
                     if (kind === "tableau")
                         expTelecharge(nom + ".xls", expTable(expPer, src));
@@ -10603,7 +10613,7 @@ function CardioPlanning() {
                     return [2 /*return*/];
             }
         });
-    }); }, [expSrc, expPer, plan, notes, tourMed, tourDerog, medecins, actes, salleReg]);
+    }); }, [expSrc, expPer, plan, notes, tourMed, tourDerog, medecins, actes, salleReg, planningType]);
     /* ── Login ── */
     // Show loading while Firebase connects (so medPins are available for login)
     if (accessMode === "ask" && fbStatus === "connecting" && !PLANNING_DOC)
@@ -11725,7 +11735,6 @@ function CardioPlanning() {
                         })(),
                         React.createElement("button", { onClick: function () { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
-                isEdit && React.createElement(ExportCard, { per: expPer, setPer: setExpPer, source: expSrc, setSource: setExpSrc, backups: backupList, seuil: expSeuil, setSeuil: setExpSeuil, dernier: expLast, onExport: doExport, occupe: expBusy }),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde & archivage"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois."),
@@ -11773,22 +11782,9 @@ function CardioPlanning() {
                                 React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(b.ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?"))
                                         restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
                         React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
-                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", margin: "2px 0 4px" } }, "💻 Copie sur votre ordinateur"),
-                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "« Sauvegarder » télécharge un fichier (cardio-backup-….json) dans les Téléchargements de cet appareil — gardez-le : c'est votre seule copie hors Firebase. « Importer » relit un tel fichier pour tout restaurer."),
+                    isEdit && React.createElement(ExportCard, { per: expPer, setPer: setExpPer, source: expSrc, setSource: setExpSrc, backups: backupList, seuil: expSeuil, setSeuil: setExpSeuil, dernier: expLast, onExport: doExport, occupe: expBusy }),
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 6 } }, "📂 Importer relit un fichier de données (.json) et remet tout en place."),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-                        React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#e3b341", color: "#111" }), onClick: function () {
-                                var data = { plan: plan, tourMed: tourMed, planningType: planningType, notes: notes, medecins: medecins, actes: actes, editPin: editPin, adminPin: adminPin, adminEnabled: adminEnabled, adminCanReports: adminCanReports, adminCanNotes: adminCanNotes, exportDate: new Date().toISOString(), version: "v6" };
-                                var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-                                var url = URL.createObjectURL(blob);
-                                var a = document.createElement("a");
-                                var today = new Date();
-                                var ds = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
-                                a.href = url;
-                                a.download = "cardio-backup-" + ds + ".json";
-                                a.click();
-                                URL.revokeObjectURL(url);
-                                toast("Sauvegarde téléchargée");
-                            } }, "\uD83D\uDCBE Sauvegarder"),
                         isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#7c3aed" }), onClick: function () {
                                 var input = document.createElement("input");
                                 input.type = "file";
@@ -11818,6 +11814,10 @@ function CardioPlanning() {
                                                 setMedecins(data.medecins);
                                             if (data.actes)
                                                 setActes(data.actes);
+                                            if (data.tourDerog)
+                                                setTourDerog(data.tourDerog);
+                                            if (data.salleReg)
+                                                setSalleReg(data.salleReg);
                                             toast("Sauvegarde restaurée");
                                         }
                                         catch (err) {
@@ -11827,7 +11827,7 @@ function CardioPlanning() {
                                     reader.readAsText(file);
                                 };
                                 input.click();
-                            } }, "\uD83D\uDCC2 Importer"))),
+                            } }, "\uD83D\uDCC2 Importer")),
                 isEdit && (function () {
                         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
                         var perStartDate = new Date(sy, sm, 1);
@@ -11842,7 +11842,7 @@ function CardioPlanning() {
                                         monthsInPlan.length,
                                         " mois archivable(s) : ",
                                         monthsInPlan.join(", "),
-                                        ". L'archivage copie ces cases dans Firebase — en deux exemplaires : l'archive et une copie de sécurité — télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture)."),
+                                        ". L'archivage copie ces cases dans Firebase, télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture)."),
                                     React.createElement("button", { onClick: function () { return __awaiter(_this, void 0, void 0, function () {
                                             var okB, byMonth, _i, monthsInPlan_1, mk, ref, prev, merged, e_9, blob, a2;
                                             return __generator(this, function (_a) {
@@ -11872,7 +11872,6 @@ function CardioPlanning() {
                                                     case 4:
                                                         prev = (_a.sent()).data() || {};
                                                         merged = __assign(__assign({}, (prev.plan ? JSON.parse(prev.plan) : {})), byMonth[mk]);
-                                                        window.firebaseDB.collection("archives").doc("copie-arch-" + mk).set({ plan: JSON.stringify(merged), _ts: Date.now(), _copie: 1 }).catch(function (e2) { console.log("copie archive:", e2); }); /* v10.101 : copie miroir — les archives ne sont pas reprises par la sauvegarde quotidienne */
                                                         return [4 /*yield*/, ref.set({ plan: JSON.stringify(merged), _ts: Date.now() })];
                                                     case 5:
                                                         _a.sent();
@@ -11949,7 +11948,7 @@ function CardioPlanning() {
                                                 }
                                             });
                                         }); }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 10, padding: 0, color: "#16a34a", fontWeight: 900 } }, "\u21A9"))); })))));
-                    })(),
+                    })()),
                 React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDF13 Th\u00E8me"),
                         React.createElement("div", { style: { display: "flex", gap: 6 } },
