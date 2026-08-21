@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.98 — 20/08/2026";
+const APP_VERSION="v10.100 — 21/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4357,6 +4357,9 @@ const HELP_SECTIONS=[
   HP({children:["Accès : éditeur et intermédiaires. Le bouton du ",HE("b",null,"Bip de Béthune")," vit dans la tuile 7 (il n'est plus dans l'onglet CHB)."]}),
   HT({children:"Le détail, étape par étape"}),
   HP({children:["L'ordre compte : chaque étape s'appuie sur la précédente. Tout se fait sur la ",HE("b",null,"période affichée")," (généralement 4 mois). La période s'étend jusqu'au ",HE("b",null,"dimanche qui clôt la dernière semaine"),", et rattache le lundi suivant s'il est férié (ex. 1er novembre) : la répartition se fait en semaines complètes, et la période suivante démarre le lendemain."]}),
+  HT({children:"🏖 Les vacances scolaires"}),
+  HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
+  HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
   HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
@@ -4369,13 +4372,15 @@ const HELP_SECTIONS=[
   HP({children:["Pour chaque consultation perdue (absence, semaine de tour), l'application propose la ",HE("b",null,"semaine blanche libre la plus proche"),", jamais à plus d'",HE("b",null,"un mois"),", en avant comme en arrière, dans la période affichée. Une semaine sans solution se traite à la main : « ⇄ Chercher une autre semaine blanche » ouvre le choix complet, sans plafond. La ligne d'une blanche qui reçoit dit « peut accueillir le report de … » et se met à jour toute seule si vous décidez autrement."]}),
   HT({children:"Valider, annuler — tout laisse une trace"}),
   HP({children:["« ✓ valider » écrit un ",HE("b",null,"commentaire estampillé")," dans la case du planning (« 12/08 · TH — Report du 3 août M, trois patients ») ; « annuler le report » n'efface rien : une ligne s'ajoute au commentaire. Les demi-journées blanches restées libres portent la pastille ☐ ",HE("b",null,"à rouvrir"),", qui devient « rouvert par … » une fois cochée — pour ne pas oublier de rendre le créneau aux secrétaires."]}),
+  HT({children:"Les demi-journées off"}),
+  HP({children:["Le tableau des ",HE("b",null,"off")," liste vos demi-journées habituellement libres, matin et après-midi séparément. Chaque pastille a trois états : ",HE("b",null,"vide")," = pas de off · ",HE("b",null,"verte")," = off, et au moins une salle est disponible ce créneau (cliquez pour l'ouvrir) · ",HE("b",null,"hachurée grise")," = off, mais aucune salle libre. Les salles concernées sont celles cochées « Ouvrable sur un off » dans leur fiche ; sans réglage, ce sont les salles de consultation des deux sites."]}),
   HT({children:"Le décompte des patients"}),
   HP({children:["La case patients ",HE("b",null,"vide"),", c'est toute la consultation qui part d'un bloc ; un ",HE("b",null,"nombre"),", c'est vous qui divisez. Les ",HE("b",null,"après-midis des semaines de tour")," peuvent reprendre une partie des patients — jamais le matin — et la part posée crée alors réellement la consultation dans le planning, avec choix de salle. Le reste peut partir « ↪ en liste d'attente », gérée par les secrétaires. Un badge « ⚠ report incomplet » reste affiché tant que le compte n'est pas à zéro."]}),
   HP({last:true,children:["En bas, « ",HE("b",null,"Demi-journées off par semaine")," » montre les créneaux libres hors semaines de tour : de quoi ouvrir une consultation, une fois tous les reports traités (export CSV). Les flèches ↶↷ couvrent aussi les reports, y compris pour les administratifs."]}))},
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
   HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible."]}),
   HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip. Les anciens onglets Tour et Gardes vivent ici, entiers, dans les tuiles 2 et 3."]}),
-  HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour."]}),
+  HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour. Le bouton ↔ règle l'",HE("b",null,"ordre des colonnes"),", de gauche à droite, site par site (↩ Ordre par défaut pour revenir en arrière)."]}),
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
   HTab({t:"🎓 Internes",children:["le planning des internes, par semestre de 6 mois : demi-journées, colonne de garde, jauge et statistiques. Onglet facultatif, activé dans Paramètres."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
@@ -4400,14 +4405,24 @@ const HELP_SECTIONS=[
 
  {id:"cellules",icon:"🔲",title:"Les cellules du planning",body:()=>HE("div",null,
   HP({children:["Chaque jour de semaine a deux créneaux (M matin, AM après-midi) plus la nuit N pour la garde ; le week-end une seule case JOUR. Cliquez sur une case (en mode édition) pour ouvrir la modale :"]}),
-  HP({children:["• choisir l'",HE("b",null,"activité")," (seules celles autorisées pour ce médecin apparaissent), la ",HE("b",null,"salle")," si l'activité en demande une, ajouter une ",HE("b",null,"note")," 📝 (un point sur le badge la signale, elle s'affiche au survol)."]}),
+  HP({children:["• choisir l'",HE("b",null,"activité")," (seules celles autorisées pour ce médecin apparaissent), la ",HE("b",null,"salle")," si l'activité en demande une, ajouter une ",HE("b",null,"note")," 📝."]}),
   HP({children:["• ",HE("b",null,"retirer")," : rouvrir la case et choisir Retirer."]}),
-  HP({children:["Repères visuels : cases grisées = bloquées par une semaine de tour · fond jaune pâle = week-end · fond et contour verts = semaine d'astreinte · ",HBadg({txt:"G",color:"#93c47d"})," garde · ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde."]}),
-  HP({last:true,children:["Les activités cochées « reprise » affichent le nom du médecin seul dans les onglets concernés."]}))},
+  HP({children:["Repères visuels : cases grisées = bloquées par une semaine de tour · fond jaune pâle = week-end · fond et contour verts = semaine d'astreinte · ",HBadg({txt:"G",color:"#93c47d"})," garde · ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde · cases ",HE("b",null,"hachurées")," = personne indisponible (section ⏸)."]}),
+  HP({children:["Les activités cochées « reprise » affichent le nom du médecin seul dans les onglets concernés."]}),
+  HT({children:"📝 Les notes"}),
+  HP({children:["Une note s'écrit depuis la modale de case, et aussi depuis les fenêtres des onglets ",HE("b",null,"CHL, CHB, PT Cardio et PT Angio"),", où chaque occupant a son propre champ. Elle est donc toujours ",HE("b",null,"rattachée à un médecin"),", ce qui compte quand deux personnes se succèdent dans la même salle : au survol de la case, les notes s'affichent préfixées des initiales (« ND : 4 cs · TH : 3 cs »). Un point orange sur la vignette signale qui en porte une."]}),
+  HT({children:"◇ Le choix ouvert"}),
+  HP({children:["Un ",HE("b",null,"choix ouvert")," est une activité (une, deux ou trois) posée sans être tranchée : « ce sera l'une de celles-là ». Il se crée dans le ",HE("b",null,"planning type")," (fenêtre d'une case → « ◇ Transformer en choix ouvert »), et se reconnaît dans les grilles à son ",HE("b",null,"cadre pointillé violet"),"."]}),
+  HP({children:["Tant qu'il n'est pas tranché, le médecin reste ",HE("b",null,"disponible")," pour ces activités : il n'occupe aucune salle, ne consomme aucune IDE, et reste proposé dans les fenêtres — c'est tout l'intérêt, notamment pour le bip. Un compteur violet à part, en haut du Planning, dit combien il en reste à trancher."]}),
+  HP({children:["Trancher, c'est ",HE("b",null,"poser quelque chose de ferme")," : attribuer une salle depuis un onglet de salle, ou cliquer « ✓ c'est celle-ci » dans la modale de case (pour les activités sans salle). Les autres branches disparaissent alors — mais elles sont gardées en mémoire : la modale propose ",HE("b",null,"↩ rétablir"),", et retirer l'activité rétablit le choix tout seul. Une croix par branche permet aussi d'en supprimer une, ou tout le choix."]}),
+  HT({children:"📅 Modifier sur une période"}),
+  HP({children:["Depuis la modale d'une case, ",HBtn({kind:"ghost",children:"📅 Modifier sur une période…"})," évite de cliquer case par case. On choisit des dates (ou « la semaine », « le mois entier », qui affichent les dates réelles), puis ce qu'on fait : poser ou retirer une ",HE("b",null,"absence / FMC"),", retirer ",HE("b",null,"les activités"),", ou ",HE("b",null,"tout"),"."]}),
+  HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
   HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée. En naviguant vers un mois archivé, il se recharge automatiquement en consultation. Désarchivage possible mois par mois."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
+  HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}),
   HT({children:"💾 Sauvegarde sur mon ordinateur"}),
@@ -4468,16 +4483,13 @@ const HELP_SECTIONS=[
 function HelpView(){
   const [hOpen,setHOpen]=React.useState({});
   const toggleH=(id)=>setHOpen(p=>Object.assign({},p,{[id]:!p[id]}));
-  const goH=(id)=>{setHOpen(p=>Object.assign({},p,{[id]:true}));setTimeout(()=>{const el=document.getElementById("help-"+id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},80);};
+  /* v10.100 : le rappel des tuiles en haut est retire a sa demande. Seules
+     restent les tuiles depliables ci-dessous ; le raccourci de defilement
+     n'avait plus d'appelant. */
   return HE("div",{style:{maxWidth:760}},
-    HE("div",{style:{position:"sticky",top:HDR_H,zIndex:40,background:"var(--bg)",paddingTop:6,maxHeight:"38vh",overflowY:"auto"}},
-      HE("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}},
+    HE("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}},
       HE("h2",{style:{fontSize:17,fontWeight:800,color:"var(--txt)",margin:0}},"❓ Aide"),
       HE("span",{style:{fontSize:11,color:"var(--txt3)"}},"— cliquez sur une tuile pour l'ouvrir")),
-    HE("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:6,marginBottom:14}},
-      HELP_SECTIONS.map(s=>HE("button",{key:s.id,onClick:()=>goH(s.id),
-        style:{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"left"}},
-        HE("span",null,s.icon),HE("span",{style:{lineHeight:1.25}},s.title))))),
     HELP_SECTIONS.map(s=>HE("div",{key:s.id,id:"help-"+s.id,style:{marginBottom:8,borderRadius:10,border:"1px solid var(--border)",background:"var(--card)",overflow:"hidden",scrollMarginTop:150}},
       HE("button",{onClick:()=>toggleH(s.id),
         style:{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"11px 13px",border:"none",background:"transparent",cursor:"pointer",textAlign:"left"}},
@@ -4888,7 +4900,7 @@ function ReportsView(p){
       RE("span",{style:{color:"#ef4444",marginRight:6}},"date rouge = absence"),"F = férié"),
     /* ── Rapport ── */
     /* ── v10.24 : Semaine par semaine ─────────────────────────────────────── */
-    RE("div",{style:{fontSize:10,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:6}},"Semaine par semaine — ce qu'il y a à faire"),
+    RE("div",{style:{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:6}},"Semaine par semaine — ce qu'il y a à faire"),
     (()=>{
       const items=analysis.weekItems;
       const GRPS=[
@@ -4900,14 +4912,14 @@ function ReportsView(p){
       let nPend=0;
       items.forEach(it=>{if(it.kind==="report")it.lost.forEach(L=>{if(!repTo[lostK(L)])nPend++;});});
       const shown=items.filter(it=>!hidGrp[it.grp]);
-      const badge=(txt,bgc,cl)=>RE("span",{style:{fontSize:9,padding:"1px 6px",borderRadius:5,fontWeight:800,background:bgc,color:cl}},txt);
-      const pill=(a2)=>a2&&RE("span",{style:{padding:"0 5px",borderRadius:4,fontSize:8,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a2.site==="CHB"?"#b4a7d6":"#c9daf8",color:"#111"}},a2.short);
-      const miniBtn=(txt,col,fn)=>RE("button",{onClick:fn,style:{fontSize:9,padding:"1px 7px",borderRadius:5,cursor:"pointer",fontWeight:800,border:"1px solid "+col,background:"transparent",color:col}},txt);
-      const ecBadge=(n)=>RE("span",{style:{fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:5,background:"var(--th)",color:"var(--txt2)",fontFamily:"'JetBrains Mono',monospace"}},ecLbl(n));
+      const badge=(txt,bgc,cl)=>RE("span",{style:{fontSize:10,padding:"1px 6px",borderRadius:5,fontWeight:800,background:bgc,color:cl}},txt);
+      const pill=(a2)=>a2&&RE("span",{style:{padding:"0 5px",borderRadius:4,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a2.site==="CHB"?"#b4a7d6":"#c9daf8",color:"#111"}},a2.short);
+      const miniBtn=(txt,col,fn)=>RE("button",{onClick:fn,style:{fontSize:10,padding:"1px 7px",borderRadius:5,cursor:"pointer",fontWeight:800,border:"1px solid "+col,background:"transparent",color:col}},txt);
+      const ecBadge=(n)=>RE("span",{style:{fontSize:10,fontWeight:800,padding:"1px 6px",borderRadius:5,background:"var(--th)",color:"var(--txt2)",fontFamily:"'JetBrains Mono',monospace"}},ecLbl(n));
       /* pastille « a rouvrir » — collee au libelle, jamais isolee en debut de ligne */
       const tick=(o)=>{
         const inf=doneInfo(o);
-        return RE("label",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:10,
+        return RE("label",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,
           cursor:editable?"pointer":"default",border:"1px solid "+(inf?"rgba(22,163,74,.45)":"rgba(245,158,11,.55)"),
           background:inf?"rgba(22,163,74,.09)":"rgba(245,158,11,.10)",borderRadius:11,padding:"1px 9px 1px 6px"}},
           RE("input",{type:"checkbox",checked:!!inf,disabled:!editable,onChange:()=>toggleDone(o),
@@ -4917,18 +4929,18 @@ function ReportsView(p){
       };
       /* une consultation perdue */
       /* case patients — VIDE par defaut : vide = tout part d'un bloc */
-      const patBox=(L,tot)=>RE("span",{style:{display:"inline-flex",alignItems:"center",gap:4,fontSize:9.5,fontWeight:800,
+      const patBox=(L,tot)=>RE("span",{style:{display:"inline-flex",alignItems:"center",gap:4,fontSize:10.5,fontWeight:800,
         color:tot===null?"var(--txt3)":"var(--txt2)",background:tot===null?"var(--th)":"rgba(124,58,237,.09)",
         borderRadius:9,padding:"1px 7px"}},
         "👥",
         RE("input",{value:tot===null?"":String(tot),placeholder:"—",readOnly:!editable,
           title:"Laissez vide si toute la consultation part d'un bloc ; un nombre signifie que vous la divisez",
           onChange:e=>setTot(L,e.target.value.replace(/[^0-9]/g,"")),
-          style:{width:30,textAlign:"center",fontSize:9.5,fontWeight:800,fontFamily:"inherit",color:"var(--txt)",
+          style:{width:30,textAlign:"center",fontSize:10.5,fontWeight:800,fontFamily:"inherit",color:"var(--txt)",
             border:"1px solid var(--border)",borderRadius:4,background:"var(--bg2)",padding:"0 2px"}}),
         "patients");
       const jauge=(tot,pl,att,reste)=>{const pc=tot>0?Math.round(100*(pl+att)/tot):0;
-        return RE("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:9.5,fontWeight:800}},
+        return RE("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:10.5,fontWeight:800}},
           RE("span",{style:{display:"inline-block",width:74,height:8,borderRadius:4,background:"var(--th)",
             overflow:"hidden",border:"1px solid var(--border2)",verticalAlign:"middle"}},
             RE("span",{style:{display:"block",height:"100%",width:pc+"%",background:reste>0?"#f59e0b":"#16a34a"}})),
@@ -4936,8 +4948,8 @@ function ReportsView(p){
             reste>0?(enLet(reste)+" à placer"):(enLet(pl)+" placé"+(pl>1?"s":""))));};
       const noteInp=(L)=>RE("input",{value:(repOf(L)||{}).n||"",placeholder:"note…",readOnly:!editable,
         onChange:e=>setRepNote2(L,e.target.value),
-        style:{fontSize:9,padding:"1px 5px",borderRadius:4,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",width:140}});
-      const cmtTag=()=>RE("span",{style:{fontSize:9,color:"#16a34a",background:"rgba(22,163,74,.09)",borderRadius:4,padding:"1px 6px"}},"💬 commentaire écrit dans la case");
+        style:{fontSize:10,padding:"1px 5px",borderRadius:4,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",width:140}});
+      const cmtTag=()=>RE("span",{style:{fontSize:10,color:"#16a34a",background:"rgba(22,163,74,.09)",borderRadius:4,padding:"1px 6px"}},"💬 commentaire écrit dans la case");
       const lostLine=(L,k,prop)=>{
         const a2=acteOf(L.acte),ps=partsOf(L),tot=totOf(L),att=attOf(L),reste=resteOf(L);
         const divise=tot!==null,rows=[];
@@ -4965,18 +4977,18 @@ function ReportsView(p){
             cmtTag(),
             editable&&miniBtn("annuler le report","var(--txt3)",()=>annulPart(L,i))));});
         if(divise&&reste>0)rows.push(RE("div",{key:"al",style:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",
-          fontSize:10,fontWeight:800,color:"#ef4444",background:"rgba(239,68,68,.08)",
+          fontSize:11,fontWeight:800,color:"#ef4444",background:"rgba(239,68,68,.08)",
           border:"1px solid rgba(239,68,68,.35)",borderRadius:6,padding:"4px 8px",marginTop:4}},
           "⚠ ",RE("b",null,cap1(enLet(reste))+" patient"+(reste>1?"s":"")+(reste>1?" ne sont pas replacés.":" n'est pas replacé.")),
           editable&&miniBtn("placer le reste","#7c3aed",()=>{setRepStep(null);setShowG3(false);setRepModal({L});}),
           editable&&miniBtn("↪ en liste d'attente","#b45309",()=>setAtt(L,att+reste))));
         if(att>0)rows.push(RE("div",{key:"at",style:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",
-          fontSize:10,fontWeight:800,color:"#b45309",background:"rgba(245,158,11,.10)",
+          fontSize:11,fontWeight:800,color:"#b45309",background:"rgba(245,158,11,.10)",
           border:"1px solid rgba(245,158,11,.45)",borderRadius:6,padding:"4px 8px",marginTop:4}},
           "↪ ",RE("b",null,cap1(enLet(att))+" en liste d'attente"),
           RE("span",{style:{color:"var(--txt3)",fontWeight:400}},"— replacés hors période ou ventilés par le secrétariat"),
           editable&&miniBtn("reprendre","var(--txt3)",()=>setAtt(L,0))));
-        if(divise&&ps.length===0&&reste===tot)rows.push(RE("div",{key:"ai",style:{fontSize:9.5,color:"var(--txt3)",fontStyle:"italic",paddingLeft:20}},
+        if(divise&&ps.length===0&&reste===tot)rows.push(RE("div",{key:"ai",style:{fontSize:10.5,color:"var(--txt3)",fontStyle:"italic",paddingLeft:20}},
           "Videz la case pour reporter la consultation entière d'un seul bloc."));
         return RE("div",{key:k,style:{padding:"1px 0"}},rows);
       };
@@ -4998,15 +5010,15 @@ function ReportsView(p){
             const off=!!hidGrp[G.g];
             return RE("span",{key:G.g,onClick:()=>setHidGrp(h=>Object.assign({},h,{[G.g]:!h[G.g]})),
               title:off?"Afficher ces semaines":"Masquer ces semaines",
-              style:{fontSize:10.5,fontWeight:800,padding:"3px 10px",borderRadius:11,cursor:"pointer",userSelect:"none",
+              style:{fontSize:11.5,fontWeight:800,padding:"3px 10px",borderRadius:11,cursor:"pointer",userSelect:"none",
                 border:"1px solid "+G.col,color:G.col,background:"var(--bg2)",opacity:off?.4:1,
                 textDecoration:off?"line-through":"none"}},G.lbl(n));})),
-        nPend>0&&RE("div",{style:{fontSize:10.5,color:"#b45309",background:"rgba(245,158,11,.10)",border:"1px solid rgba(245,158,11,.45)",
+        nPend>0&&RE("div",{style:{fontSize:11.5,color:"#b45309",background:"rgba(245,158,11,.10)",border:"1px solid rgba(245,158,11,.45)",
           borderRadius:7,padding:"6px 10px",marginBottom:10,lineHeight:1.5}},
           "⏳ ",RE("b",null,cap1(enLet(nPend))+" report"+(nPend>1?"s":"")+" encore à valider."),
           " Les demi-journées à rouvrir n'apparaîtront toutes qu'une fois ces reports traités — d'ici là, cette liste n'est pas définitive."),
         shown.length===0
-          ?RE("div",{style:{fontSize:11,color:"var(--txt3)",fontWeight:700,marginBottom:10}},"Tout est masqué — touchez une pastille pour réafficher.")
+          ?RE("div",{style:{fontSize:12,color:"var(--txt3)",fontWeight:700,marginBottom:10}},"Tout est masqué — touchez une pastille pour réafficher.")
           :RE("div",{style:{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden",marginBottom:12}},
             shown.map((it,i)=>{
               const f=it.days[0];
@@ -5026,7 +5038,7 @@ function ReportsView(p){
               /* v10.25 : le bouton n'applique plus rien tout seul — il OUVRE le choix. */
               const nInc=(it.lost||[]).filter(L=>incomplet(L)).length;
               return RE("div",{key:it.wk,style:{padding:"7px 10px 8px 13px",borderTop:i>0?"1px solid var(--border2)":"none",
-                fontSize:11,position:"relative",borderLeft:"3px solid "+bar,
+                fontSize:12,position:"relative",borderLeft:"3px solid "+bar,
                 background:it.kind==="rien"?"rgba(127,127,127,.045)":"transparent"}},
                 RE("div",{style:{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}},
                   RE("span",{style:{fontWeight:800,color:it.kind==="rien"?"var(--txt3)":"var(--txt)"}},"Semaine du "+f.d+" "+MOIS[f.m].slice(0,4)),
@@ -5040,31 +5052,31 @@ function ReportsView(p){
                   it.kind==="report"&&ecBadge(it.ec),
                   it.kind==="norep"&&RE("span",{style:{color:"#ef4444",fontWeight:800}},"aucune semaine blanche à moins d'un mois"),
                   it.kind==="norep"&&editable&&RE("button",{onClick:()=>setWeekModal({it}),
-                    style:{fontSize:10,padding:"3px 9px",borderRadius:6,cursor:"pointer",fontWeight:800,
+                    style:{fontSize:11,padding:"3px 9px",borderRadius:6,cursor:"pointer",fontWeight:800,
                       border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed"}},"⇄ Chercher une autre semaine blanche"),
                   it.kind==="ok"&&RE("span",{style:{fontWeight:800,color:"#16a34a"}},"✓ semaine blanche — pas de report nécessaire"),
                   it.kind==="rien"&&RE("span",{style:{fontWeight:700,color:"var(--txt3)"}},"rien à faire"),
                   it.kind==="recv"&&recvTxt.map((R,k2)=>RE("span",{key:k2,style:{fontWeight:800,color:R.c}},(k2?" · ":"")+R.t))),
-                (it.kind==="report"||it.kind==="norep")&&RE("div",{style:{fontSize:10,color:"var(--txt2)",lineHeight:1.7,marginTop:3}},
+                (it.kind==="report"||it.kind==="norep")&&RE("div",{style:{fontSize:11,color:"var(--txt2)",lineHeight:1.7,marginTop:3}},
                   it.lost.map((L,k)=>lostLine(L,k,it.dest?it.dest[k]:null))),
-                it.kind==="recv"&&RE("div",{style:{fontSize:10,color:"var(--txt2)",lineHeight:1.7,marginTop:3}},
+                it.kind==="recv"&&RE("div",{style:{fontSize:11,color:"var(--txt2)",lineHeight:1.7,marginTop:3}},
                   it.dates.map((o,k)=>recvLine(o,k))));
             })));
     })(),
-    RE("div",{style:{fontSize:10,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:3}},"Demi-journées off par semaine"),
-    RE("div",{style:{fontSize:10,color:"var(--txt3)",marginBottom:5,lineHeight:1.5}},
+    RE("div",{style:{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,marginBottom:3}},"Demi-journées off par semaine"),
+    RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:5,lineHeight:1.5}},
       "Demi-journées libres, hors semaines de tour : de quoi OUVRIR une consultation, une fois tous vos reports traités."),
     analysis.offWeeks.length===0
-      ?RE("div",{style:{fontSize:11,color:"var(--txt3)",fontWeight:700,marginBottom:10}},"Aucune demi-journée off sur la période.")
+      ?RE("div",{style:{fontSize:12,color:"var(--txt3)",fontWeight:700,marginBottom:10}},"Aucune demi-journée off sur la période.")
       :RE("div",{style:{overflowX:"auto",border:"1px solid var(--border)",borderRadius:8,marginBottom:6}},
         RE("table",{style:{borderCollapse:"collapse",width:"100%"}},
           RE("thead",null,RE("tr",null,
-            RE("th",{style:{padding:"4px 8px",fontSize:9,color:"var(--txt3)",textAlign:"left",background:"var(--th)"}},"Semaine"),
-            ["Lun","Mar","Mer","Jeu","Ven"].map(j=>RE("th",{key:j,style:{padding:"4px 6px",fontSize:9,color:"var(--txt3)",background:"var(--th)"}},j)))),
+            RE("th",{style:{padding:"4px 8px",fontSize:10,color:"var(--txt3)",textAlign:"left",background:"var(--th)"}},"Semaine"),
+            ["Lun","Mar","Mer","Jeu","Ven"].map(j=>RE("th",{key:j,style:{padding:"4px 6px",fontSize:10,color:"var(--txt3)",background:"var(--th)"}},j)))),
           RE("tbody",null,analysis.offWeeks.map(w=>{
             const f=w.days[0];
             return RE("tr",{key:w.key,style:{borderTop:"1px solid var(--border2)"}},
-              RE("td",{style:{padding:"3px 8px",fontSize:10,fontWeight:700,color:"var(--txt)",whiteSpace:"nowrap"}},f.d+" "+MOIS[f.m].slice(0,4)),
+              RE("td",{style:{padding:"3px 8px",fontSize:11,fontWeight:700,color:"var(--txt)",whiteSpace:"nowrap"}},f.d+" "+MOIS[f.m].slice(0,4)),
                     [1,2,3,4,5].map(dw=>{
                       const sls=w.slots[dw]||[];
                       const o=dayOf(w,dw);
@@ -5080,7 +5092,7 @@ function ReportsView(p){
                           return RE("span",{key:s2,
                             onClick:(ok&&editable)?()=>{setFreeStep(null);setFreeModal({y:o.y,m:o.m,d:o.d,sl:s2,slots:[s2]});}:undefined,
                             title:ok?undefined:"off, mais aucune salle libre ce créneau",
-                            style:{display:"inline-block",minWidth:22,margin:"1px 2px",padding:"1px 5px",borderRadius:5,fontSize:9,fontWeight:800,
+                            style:{display:"inline-block",minWidth:22,margin:"1px 2px",padding:"1px 5px",borderRadius:5,fontSize:10,fontWeight:800,
                               cursor:(ok&&editable)?"pointer":"default",
                               border:ok?"1.5px solid #2da44e":"1.5px dashed #b6bec7",
                               background:ok?"rgba(22,163,74,.16)":"repeating-linear-gradient(45deg,rgba(140,150,160,.18),rgba(140,150,160,.18) 3px,transparent 3px,transparent 6px)",
@@ -5088,13 +5100,13 @@ function ReportsView(p){
                         }):null);
                     }));
           })))),
-              analysis.offWeeks.length>0&&RE("div",{style:{fontSize:9.5,color:"var(--txt3)",marginBottom:10,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}},
+              analysis.offWeeks.length>0&&RE("div",{style:{fontSize:10.5,color:"var(--txt3)",marginBottom:10,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}},
                 RE("span",{style:{display:"inline-block",width:24,height:12,borderRadius:5,border:"1px solid var(--border)",background:"var(--bg2)"}}),"pas de off",
                 RE("span",null,"·"),
                 RE("span",{style:{display:"inline-block",width:24,height:12,borderRadius:5,border:"1.5px solid #2da44e",background:"rgba(22,163,74,.16)"}}),"off avec au moins une salle disponible"+(editable?" — cliquez pour ouvrir":""),
                 RE("span",null,"·"),
                 RE("span",{style:{display:"inline-block",width:24,height:12,borderRadius:5,border:"1.5px dashed #b6bec7",background:"repeating-linear-gradient(45deg,rgba(140,150,160,.18),rgba(140,150,160,.18) 3px,transparent 3px,transparent 6px)"}}),"off mais pas de salle"),
-    analysis.weekPairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"),
+    analysis.weekPairs.length>0&&RE("button",{onClick:exportCSVR,style:{fontSize:12,padding:"5px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}},"⬇ Export CSV des propositions"),
     /* ── v10.25 : modale de report a TROIS groupes ────────────────────────────
        1. semaines blanches, meme jour de semaine — reprennent tout d'un coup
        2. creneaux de tour — APRES-MIDI seulement (« on ne consulte jamais le matin
@@ -8312,6 +8324,12 @@ function CardioPlanning(){
   useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0||(tab==="internes"&&intCfg.show!==true))setTab(accessMode==="interneEdit"?"internes":"planning");},[accessMode,tab,isMedEdit,intCfg]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
   const isInterne=accessMode==="interneEdit"&&!netOff; /* v10.69 : interne connecte (hors ligne = lecture seule) */
+  /* v10.100 : le bandeau de role du bas confirme sous quel acces on est entre,
+     puis ne sert plus a rien et mange de la hauteur. Il s'efface au bout de
+     6 secondes. doFit mesure les bandeaux a CHAQUE rendu : ce changement
+     d'etat rend donc la place aux grilles tout seul. */
+  const [botOn,setBotOn]=useState(true);
+  useEffect(()=>{setBotOn(true);const t=setTimeout(()=>setBotOn(false),6000);return ()=>clearTimeout(t);},[accessMode]);
   const roleOkKey=isCadre?"cadreOk":"adminOk"; // v10.50 : la coche d'activité du rôle connecté
   // Returns true if current user can edit this specific medecin's data
   const canEdit=(medId)=>isAttEdit
@@ -9461,14 +9479,14 @@ header::-webkit-scrollbar { display: none; }
       {netOff&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
         📴 Hors ligne — dernier planning reçu · lecture seule
       </div>}
-      {isMedEdit&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
-        ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
+      {isMedEdit&&botOn&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+        ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom}
       </div>}
-      {isInterne&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e9f9f",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
-        🎓 Accès interne — {interneName||"?"} · <button onClick={()=>setAccessMode("view")} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
+      {isInterne&&botOn&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e9f9f",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+        🎓 Accès interne — {interneName||"?"}
       </div>}
-      {isAdminEdit&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
-        🗝 {isCadre?"Édition cadre":"Édition secrétaire"} — {adminName||"?"} · <button onClick={()=>{setIsCadre(false);setAccessMode("view");}} style={{background:"none",border:"1px solid rgba(255,255,255,.5)",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,padding:"1px 7px",marginLeft:8}}>Quitter</button>
+      {isAdminEdit&&botOn&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+        🗝 {isCadre?"Édition cadre":"Édition secrétaire"} — {adminName||"?"}
       </div>}
 
       {/* HEADER */}
