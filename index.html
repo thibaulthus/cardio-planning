@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.100 — 21/08/2026";
+var APP_VERSION = "v10.101 — 21/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -8238,9 +8238,9 @@ function CardioPlanning() {
                 case 1:
                     snap = _a.sent();
                     d = snap.data() || {};
-                    bPlan_1 = d.plan ? JSON.parse(d.plan) : {};
+                    bPlan_1 = d.planV2 ? d.planV2 : (d.plan ? JSON.parse(d.plan) : {}); /* v10.101 : format actuel d'abord */
                     bTour = d.tourMed ? JSON.parse(d.tourMed) : {};
-                    bMeds = d.medecins ? JSON.parse(d.medecins) : [];
+                    bMeds = d.medecinsV2 ? Object.keys(d.medecinsV2).map(function (k2) { var v2 = d.medecinsV2[k2]; return typeof v2 === "string" ? JSON.parse(v2) : v2; }) : (d.medecins ? JSON.parse(d.medecins) : []);
                     sB = statsOf(bPlan_1, bTour, bMeds);
                     sC = statsOf(plan, tourMed, medecins);
                     added_1 = 0, removed_1 = 0, changed_1 = 0;
@@ -8271,6 +8271,7 @@ function CardioPlanning() {
         });
     }); }, [plan, tourMed, medecins]);
     var _30 = useState(null), docSize = _30[0], setDocSize = _30[1];
+    var _30b = useState(null), docDet = _30b[0], setDocDet = _30b[1]; /* v10.101 : poids par champ */
     var _31 = useState([]), archivedList = _31[0], setArchivedList = _31[1];
     var refreshArchList = useCallback(function () { return __awaiter(_this, void 0, void 0, function () {
         var snap, ids_1, e_4;
@@ -8300,7 +8301,7 @@ function CardioPlanning() {
         refreshBackupList();
         refreshArchList();
         (function () { return __awaiter(_this, void 0, void 0, function () {
-            var d_1, bytes_1, e_5;
+            var d_1, bytes_1, det_1, e_5;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -8308,17 +8309,20 @@ function CardioPlanning() {
                         return [4 /*yield*/, window.firebaseDB.collection("planning").doc("main").get()];
                     case 1:
                         d_1 = (_a.sent()).data() || {};
-                        bytes_1 = 0;
+                        bytes_1 = 0; det_1 = {};
                         Object.keys(d_1).forEach(function (k) {
                             var v = d_1[k];
                             var s = typeof v === "string" ? v : JSON.stringify(v);
-                            bytes_1 += new Blob([k]).size + new Blob([s || ""]).size + 2;
+                            var b2 = new Blob([k]).size + new Blob([s || ""]).size + 2;
+                            bytes_1 += b2; det_1[k] = b2;
                         });
                         setDocSize(bytes_1);
+                        setDocDet(det_1);
                         return [3 /*break*/, 3];
                     case 2:
                         e_5 = _a.sent();
                         setDocSize(null);
+                        setDocDet(null);
                         return [3 /*break*/, 3];
                     case 3: return [2 /*return*/];
                 }
@@ -11723,8 +11727,34 @@ function CardioPlanning() {
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
                 isEdit && React.createElement(ExportCard, { per: expPer, setPer: setExpPer, source: expSrc, setSource: setExpSrc, backups: backupList, seuil: expSeuil, setSeuil: setExpSeuil, dernier: expLast, onExport: doExport, occupe: expBusy }),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde des donn\u00E9es"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "T\u00E9l\u00E9chargez une copie de toutes vos donn\u00E9es. En cas de probl\u00E8me, importez ce fichier pour tout restaurer."),
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde & archivage"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois."),
+                docSize !== null && (function () {
+                        var LIMIT = 1048576;
+                        var pct = Math.min(100, Math.round(docSize / LIMIT * 100));
+                        var col = pct < 60 ? "#16a34a" : pct < 85 ? "#f59e0b" : "#dc2626";
+                        return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 5 } },
+                                "\uD83D\uDCE6 Poids des donn\u00E9es : ",
+                                (docSize / 1024).toFixed(0),
+                                " Ko / 1024 Ko ",
+                                React.createElement("span", { style: { color: col, fontWeight: 800 } },
+                                    "(",
+                                    pct,
+                                    "%)")),
+                            React.createElement("div", { style: { height: 8, borderRadius: 4, background: "var(--border2)", overflow: "hidden" } },
+                                React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 4 } })),
+                            docDet && (function () { /* v10.101 : le détail du poids, par famille de données */
+                                var EQ = "Équipe & internes", AC = "Activités & salles", TO = "Tour médical", SO = "Souhaits ⭐🚫", AS = "Astreinte", RE = "Reports";
+                                var FAMN = {planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2: EQ,medecinsV2Order: EQ,medecins: EQ,intCfg: EQ,medPins: EQ,actesV2: AC,actesV2Order: AC,actes: AC,salleReg: AC,tourMed: TO,tourDerog: TO,tourMins: TO,tourMinsHard: TO,tourCfg: TO,tourReport: TO,tourWish: SO,tourAvoid: SO,gardeWish: SO,gardeAvoid: SO,astreinte: AS,astReport: AS,notes:"Notes",build:"Construire",csRep: RE,csBlanches: RE,csActsSel: RE,csActsGlobal: RE,journal:"Journal"};
+                                var g = {}; Object.keys(docDet).forEach(function (k) { var f = FAMN[k] || "Réglages divers"; g[f] = (g[f] || 0) + docDet[k]; });
+                                var rows = Object.keys(g).map(function (f) { return { f: f, b: g[f] }; }).sort(function (a, b) { return b.b - a.b; });
+                                return React.createElement("div", { style: { marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 } }, rows.map(function (r) { return React.createElement("span", { key: r.f, style: { fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 9, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--txt2)" } }, r.f + " " + (r.b < 1024 ? "<1" : (r.b / 1024).toFixed(r.b < 10240 ? 1 : 0)) + " Ko"); }));
+                            })(),
+                            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } },
+                                "Limite Firebase : 1 Mo par document. ",
+                                pct < 60 ? "Large marge." : pct < 85 ? "À surveiller — un archivage des anciens mois sera à prévoir." : "⚠ Proche de la limite : archivez les anciens mois rapidement.")));
+                    })(),
                     React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } }, "\uD83D\uDD50 Sauvegardes automatiques (une par jour, 45 conserv\u00E9es)"),
                         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "Restaurer \u00E9crase les donn\u00E9es actuelles par celles de la sauvegarde choisie."),
@@ -11743,6 +11773,8 @@ function CardioPlanning() {
                                 React.createElement("button", { style: { padding: "3px 10px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontSize: 10, fontWeight: 700, cursor: "pointer" }, onClick: function () { if (window.confirm("Restaurer la sauvegarde du " + new Date(b.ts).toLocaleString("fr-FR") + " ?\nLes données actuelles seront remplacées.") && window.confirm("Confirmer définitivement la restauration ?"))
                                         restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
                         React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
+                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", margin: "2px 0 4px" } }, "💻 Copie sur votre ordinateur"),
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "« Sauvegarder » télécharge un fichier (cardio-backup-….json) dans les Téléchargements de cet appareil — gardez-le : c'est votre seule copie hors Firebase. « Importer » relit un tel fichier pour tout restaurer."),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
                         React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#e3b341", color: "#111" }), onClick: function () {
                                 var data = { plan: plan, tourMed: tourMed, planningType: planningType, notes: notes, medecins: medecins, actes: actes, editPin: editPin, adminPin: adminPin, adminEnabled: adminEnabled, adminCanReports: adminCanReports, adminCanNotes: adminCanNotes, exportDate: new Date().toISOString(), version: "v6" };
@@ -11796,25 +11828,6 @@ function CardioPlanning() {
                                 };
                                 input.click();
                             } }, "\uD83D\uDCC2 Importer"))),
-                docSize !== null && (function () {
-                        var LIMIT = 1048576;
-                        var pct = Math.min(100, Math.round(docSize / LIMIT * 100));
-                        var col = pct < 60 ? "#16a34a" : pct < 85 ? "#f59e0b" : "#dc2626";
-                        return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 5 } },
-                                "\uD83D\uDCE6 Poids des donn\u00E9es : ",
-                                (docSize / 1024).toFixed(0),
-                                " Ko / 1024 Ko ",
-                                React.createElement("span", { style: { color: col, fontWeight: 800 } },
-                                    "(",
-                                    pct,
-                                    "%)")),
-                            React.createElement("div", { style: { height: 8, borderRadius: 4, background: "var(--border2)", overflow: "hidden" } },
-                                React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 4 } })),
-                            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } },
-                                "Limite Firebase : 1 Mo par document. ",
-                                pct < 60 ? "Large marge." : pct < 85 ? "À surveiller — un archivage des anciens mois sera à prévoir." : "⚠ Proche de la limite : archivez les anciens mois rapidement.")));
-                    })(),
                 isEdit && (function () {
                         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
                         var perStartDate = new Date(sy, sm, 1);
@@ -11829,7 +11842,7 @@ function CardioPlanning() {
                                         monthsInPlan.length,
                                         " mois archivable(s) : ",
                                         monthsInPlan.join(", "),
-                                        ". L'archivage copie ces cases dans Firebase (collection s\u00E9par\u00E9e), t\u00E9l\u00E9charge un export JSON, puis les retire des donn\u00E9es actives. Elles restent consultables en naviguant vers ces mois (lecture)."),
+                                        ". L'archivage copie ces cases dans Firebase — en deux exemplaires : l'archive et une copie de sécurité — télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture)."),
                                     React.createElement("button", { onClick: function () { return __awaiter(_this, void 0, void 0, function () {
                                             var okB, byMonth, _i, monthsInPlan_1, mk, ref, prev, merged, e_9, blob, a2;
                                             return __generator(this, function (_a) {
@@ -11859,6 +11872,7 @@ function CardioPlanning() {
                                                     case 4:
                                                         prev = (_a.sent()).data() || {};
                                                         merged = __assign(__assign({}, (prev.plan ? JSON.parse(prev.plan) : {})), byMonth[mk]);
+                                                        window.firebaseDB.collection("archives").doc("copie-arch-" + mk).set({ plan: JSON.stringify(merged), _ts: Date.now(), _copie: 1 }).catch(function (e2) { console.log("copie archive:", e2); }); /* v10.101 : copie miroir — les archives ne sont pas reprises par la sauvegarde quotidienne */
                                                         return [4 /*yield*/, ref.set({ plan: JSON.stringify(merged), _ts: Date.now() })];
                                                     case 5:
                                                         _a.sent();

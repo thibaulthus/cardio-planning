@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.100 — 21/08/2026";
+const APP_VERSION="v10.101 — 21/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -7634,9 +7634,12 @@ function CardioPlanning(){
     try{
       const snap=await window.firebaseDB.collection("backups").doc(id).get();
       const d=snap.data()||{};
-      const bPlan=d.plan?JSON.parse(d.plan):{};
+      /* v10.101 : l'aperçu lisait les champs d'AVANT la v9.7 (plan, medecins), purgés depuis —
+         il annonçait donc une sauvegarde vide et toutes les cases actuelles « perdues ».
+         Lecture du format actuel, avec repli sur l'ancien pour de très vieilles sauvegardes. */
+      const bPlan=d.planV2?d.planV2:(d.plan?JSON.parse(d.plan):{});
       const bTour=d.tourMed?JSON.parse(d.tourMed):{};
-      const bMeds=d.medecins?JSON.parse(d.medecins):[];
+      const bMeds=d.medecinsV2?Object.keys(d.medecinsV2).map(k2=>{const v2=d.medecinsV2[k2];return typeof v2==="string"?JSON.parse(v2):v2;}):(d.medecins?JSON.parse(d.medecins):[]);
       const sB=statsOf(bPlan,bTour,bMeds);
       const sC=statsOf(plan,tourMed,medecins);
       // diff cellule à cellule
@@ -7657,6 +7660,7 @@ function CardioPlanning(){
     }catch(e){toast("Impossible de charger l'aperçu","warn");}
   },[plan,tourMed,medecins]);
   const [docSize,setDocSize]=useState(null);
+  const [docDet,setDocDet]=useState(null);   /* v10.101 : poids par champ, pour le détail de la jauge */
   const [archivedList,setArchivedList]=useState([]);
   const refreshArchList=useCallback(async()=>{
     try{
@@ -7672,14 +7676,15 @@ function CardioPlanning(){
     (async()=>{
       try{
         const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};
-        let bytes=0;
+        let bytes=0;const det={};
         Object.keys(d).forEach(k=>{
           const v=d[k];
           const s=typeof v==="string"?v:JSON.stringify(v);
-          bytes+=new Blob([k]).size+new Blob([s||""]).size+2;
+          const b2=new Blob([k]).size+new Blob([s||""]).size+2;
+          bytes+=b2;det[k]=b2;
         });
-        setDocSize(bytes);
-      }catch(e){setDocSize(null);}
+        setDocSize(bytes);setDocDet(det);
+      }catch(e){setDocSize(null);setDocDet(null);}
     })();
   },[tab]);
   /* v10.0 : RESTAURATION CIBLÉE — un médecin, sur une période. La restauration globale
@@ -10446,74 +10451,6 @@ header::-webkit-scrollbar { display: none; }
               {vacs.length===0&&<div style={{fontSize:11.5,color:"var(--txt3)"}}>Aucune vacance saisie.</div>}
             </div>
 
-            {isEdit&&(()=>{
-              const {sy,sm}=perStart(year,month);
-              const perStartDate=new Date(sy,sm,1);
-              const monthsInPlan=Object.keys(plan).map(k=>k.slice(0,7)).filter((v,i2,a2)=>a2.indexOf(v)===i2)
-                .filter(mk=>{const y2=+mk.slice(0,4),m2=+mk.slice(5,7)-1;return new Date(y2,m2,1)<perStartDate;}).sort();
-              return(
-              <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🗄 Archivage</div>
-                {monthsInPlan.length===0
-                  ?<div style={{fontSize:10,color:"var(--txt3)"}}>Aucun mois antérieur à la période affichée dans les données actives — rien à archiver pour l'instant.</div>
-                  :<div>
-                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>{monthsInPlan.length} mois archivable(s) : {monthsInPlan.join(", ")}. L'archivage copie ces cases dans Firebase (collection séparée), télécharge un export JSON, puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture).</div>
-                    <button onClick={async()=>{
-                        if(!window.confirm("Archiver les "+monthsInPlan.length+" mois antérieurs à la période affichée ("+monthsInPlan.join(", ")+") ?\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
-                        const okB=await makeBackup(true);
-                        if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))return;
-                        const byMonth={};
-                        Object.keys(plan).forEach(k=>{const mk=k.slice(0,7);if(monthsInPlan.includes(mk)){(byMonth[mk]=byMonth[mk]||{})[k]=plan[k];}});
-                        try{
-                          for(const mk of monthsInPlan){
-                            const ref=window.firebaseDB.collection("archives").doc("arch-"+mk);
-                            const prev=(await ref.get()).data()||{};
-                            const merged={...(prev.plan?JSON.parse(prev.plan):{}),...byMonth[mk]};
-                            await ref.set({plan:JSON.stringify(merged),_ts:Date.now()});
-                          }
-                        }catch(e){toast("Échec de la copie en archive — RIEN n'a été retiré","warn");return;}
-                        const blob=new Blob([JSON.stringify(byMonth,null,1)],{type:"application/json"});
-                        const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="archive-cardio-"+monthsInPlan[0]+"_"+monthsInPlan[monthsInPlan.length-1]+".json";a2.click();
-                        setPlan(p=>{const n2={};Object.keys(p).forEach(k=>{if(!monthsInPlan.includes(k.slice(0,7)))n2[k]=p[k];});return n2;});
-                        Object.keys(byMonth).forEach(mk=>{archFetched.current[mk]=true;});
-                        /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
-                           continue ». Un semestre dont la FIN est dans les mois archivés
-                           disparaît, avec ses internes et les noms de juniors qui y sont
-                           rattachés. Le dernier mois archivé donne la borne. */
-                        const lastMk=monthsInPlan[monthsInPlan.length-1];
-                        setMedecins(l2=>l2.map(m2=>{const g=djPurgeMed(m2,intCfg,lastMk);return g?{...m2,dj:g}:m2;}));
-                        setIntCfg(p3=>({...p3,sems:(((p3&&p3.sems)||[]).filter(s3=>String(s3.fin||"").slice(0,7)>lastMk))}));
-                        setArchPlan(p2=>{const add={};Object.keys(byMonth).forEach(mk=>Object.assign(add,byMonth[mk]));return {...p2,...add};});
-                        toast("Archivage terminé : "+monthsInPlan.length+" mois copiés puis retirés des données actives","info");refreshArchList();
-                      }} style={{fontSize:11,padding:"4px 14px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>🗄 Archiver ces mois</button>
-                  </div>}
-                {archivedList.length>0&&<div style={{marginTop:8,paddingTop:7,borderTop:"1px dashed var(--border)"}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>Mois archivés ({archivedList.length}) :</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                    {archivedList.map(mk=>(
-                      <span key={mk} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,fontWeight:700,padding:"3px 7px",borderRadius:12,border:"1px solid #7c3aed",background:"rgba(124,58,237,.07)",color:"#7c3aed"}}>
-                        🗄 {mk}
-                        <button title="Désarchiver : remettre ce mois dans les données actives" onClick={async()=>{
-                            if(!window.confirm("Désarchiver "+mk+" ? Le mois sera remis dans les données actives (les cases actives existantes sont conservées en cas de doublon)."))return;
-                            try{
-                              const ref=window.firebaseDB.collection("archives").doc("arch-"+mk);
-                              const d2=(await ref.get()).data();
-                              if(!d2||!d2.plan){toast("Archive introuvable","warn");return;}
-                              const frag=JSON.parse(d2.plan);
-                              setPlan(p=>({...frag,...p}));
-                              setArchPlan(p=>{const n2={};Object.keys(p).forEach(k=>{if(k.indexOf(mk)!==0)n2[k]=p[k];});return n2;});
-                              delete archFetched.current[mk];
-                              await ref.delete();
-                              refreshArchList();
-                              toast("Mois "+mk+" désarchivé — de retour dans les données actives","info");
-                            }catch(e){toast("Échec du désarchivage","warn");}
-                          }} style={{border:"none",background:"none",cursor:"pointer",fontSize:10,padding:0,color:"#16a34a",fontWeight:900}}>↩</button>
-                      </span>
-                    ))}
-                  </div>
-                </div>}
-              </div>);
-            })()}
             <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
               <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🏥 Salles</div>
               {["CHL","CHB","ANGIO","PLATEAU"].map(site2=>{
@@ -10566,6 +10503,11 @@ header::-webkit-scrollbar { display: none; }
               </div>
               <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil (le bouton 🌓 des onglets fait pareil).</div>
             </div>
+
+            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
+              Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois.
+            </div>
             {docSize!==null&&(()=>{
               const LIMIT=1048576;
               const pct=Math.min(100,Math.round(docSize/LIMIT*100));
@@ -10576,14 +10518,18 @@ header::-webkit-scrollbar { display: none; }
                 <div style={{height:8,borderRadius:4,background:"var(--border2)",overflow:"hidden"}}>
                   <div style={{height:"100%",width:pct+"%",background:col,borderRadius:4}}/>
                 </div>
+                {docDet&&(()=>{ /* v10.101 : le détail du poids, par famille de données */
+                  const EQ="Équipe & internes",AC="Activités & salles",TO="Tour médical",SO="Souhaits ⭐🚫",AS="Astreinte",RE="Reports";
+                  const FAMN={planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2:EQ,medecinsV2Order:EQ,medecins:EQ,intCfg:EQ,medPins:EQ,actesV2:AC,actesV2Order:AC,actes:AC,salleReg:AC,tourMed:TO,tourDerog:TO,tourMins:TO,tourMinsHard:TO,tourCfg:TO,tourReport:TO,tourWish:SO,tourAvoid:SO,gardeWish:SO,gardeAvoid:SO,astreinte:AS,astReport:AS,notes:"Notes",build:"Construire",csRep:RE,csBlanches:RE,csActsSel:RE,csActsGlobal:RE,journal:"Journal"};
+                  const g={};Object.keys(docDet).forEach(k=>{const f=FAMN[k]||"Réglages divers";g[f]=(g[f]||0)+docDet[k];});
+                  const rows=Object.keys(g).map(f=>({f,b:g[f]})).sort((a,b)=>b.b-a.b);
+                  return <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
+                    {rows.map(r=><span key={r.f} style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:9,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)"}}>{r.f} {r.b<1024?"<1":(r.b/1024).toFixed(r.b<10240?1:0)} Ko</span>)}
+                  </div>;
+                })()}
                 <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Limite Firebase : 1 Mo par document. {pct<60?"Large marge.":pct<85?"À surveiller — un archivage des anciens mois sera à prévoir.":"⚠ Proche de la limite : archivez les anciens mois rapidement."}</div>
               </div>);
             })()}
-
-            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>💾 Sauvegarde des données</div>
-            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
-              Téléchargez une copie de toutes vos données. En cas de problème, importez ce fichier pour tout restaurer.
-            </div>
             <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
               <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>🕐 Sauvegardes automatiques (une par jour, 45 conservées)</div>
               <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Restaurer écrase les données actuelles par celles de la sauvegarde choisie.</div>
@@ -10613,6 +10559,8 @@ header::-webkit-scrollbar { display: none; }
               </div>
               <button style={{...S.qBtn}} onClick={()=>makeBackup(true)}>💾 Sauvegarder maintenant</button>
             </div>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",margin:"2px 0 4px"}}>💻 Copie sur votre ordinateur</div>
+            <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>« Sauvegarder » télécharge un fichier (cardio-backup-….json) dans les Téléchargements de cet appareil — gardez-le : c'est votre seule copie hors Firebase. « Importer » relit un tel fichier pour tout restaurer.</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button style={{...S.btnP,background:"#e3b341",color:"#111"}} onClick={()=>{
                 const data={plan,tourMed,planningType,notes,medecins,actes,editPin,adminPin,adminEnabled,adminCanReports,adminCanNotes,
@@ -10652,6 +10600,77 @@ header::-webkit-scrollbar { display: none; }
                 input.click();
               }}>📂 Importer</button>}
             </div>
+            {isEdit&&(()=>{
+              const {sy,sm}=perStart(year,month);
+              const perStartDate=new Date(sy,sm,1);
+              const monthsInPlan=Object.keys(plan).map(k=>k.slice(0,7)).filter((v,i2,a2)=>a2.indexOf(v)===i2)
+                .filter(mk=>{const y2=+mk.slice(0,4),m2=+mk.slice(5,7)-1;return new Date(y2,m2,1)<perStartDate;}).sort();
+              return(
+              <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🗄 Archivage</div>
+                {monthsInPlan.length===0
+                  ?<div style={{fontSize:10,color:"var(--txt3)"}}>Aucun mois antérieur à la période affichée dans les données actives — rien à archiver pour l'instant.</div>
+                  :<div>
+                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>{monthsInPlan.length} mois archivable(s) : {monthsInPlan.join(", ")}. L'archivage copie ces cases dans Firebase — en deux exemplaires : l'archive et une copie de sécurité — télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture).</div>
+                    <button onClick={async()=>{
+                        if(!window.confirm("Archiver les "+monthsInPlan.length+" mois antérieurs à la période affichée ("+monthsInPlan.join(", ")+") ?\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
+                        const okB=await makeBackup(true);
+                        if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))return;
+                        const byMonth={};
+                        Object.keys(plan).forEach(k=>{const mk=k.slice(0,7);if(monthsInPlan.includes(mk)){(byMonth[mk]=byMonth[mk]||{})[k]=plan[k];}});
+                        try{
+                          for(const mk of monthsInPlan){
+                            const ref=window.firebaseDB.collection("archives").doc("arch-"+mk);
+                            const prev=(await ref.get()).data()||{};
+                            const merged={...(prev.plan?JSON.parse(prev.plan):{}),...byMonth[mk]};
+                            /* v10.101 : copie miroir, écrite une fois pour toutes — les archives ne sont pas
+                               reprises par la sauvegarde quotidienne, ce double est leur filet dans Firebase. */
+                            window.firebaseDB.collection("archives").doc("copie-arch-"+mk).set({plan:JSON.stringify(merged),_ts:Date.now(),_copie:1}).catch(e2=>console.log("copie archive:",e2));
+                            await ref.set({plan:JSON.stringify(merged),_ts:Date.now()});
+                          }
+                        }catch(e){toast("Échec de la copie en archive — RIEN n'a été retiré","warn");return;}
+                        const blob=new Blob([JSON.stringify(byMonth,null,1)],{type:"application/json"});
+                        const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="archive-cardio-"+monthsInPlan[0]+"_"+monthsInPlan[monthsInPlan.length-1]+".json";a2.click();
+                        setPlan(p=>{const n2={};Object.keys(p).forEach(k=>{if(!monthsInPlan.includes(k.slice(0,7)))n2[k]=p[k];});return n2;});
+                        Object.keys(byMonth).forEach(mk=>{archFetched.current[mk]=true;});
+                        /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
+                           continue ». Un semestre dont la FIN est dans les mois archivés
+                           disparaît, avec ses internes et les noms de juniors qui y sont
+                           rattachés. Le dernier mois archivé donne la borne. */
+                        const lastMk=monthsInPlan[monthsInPlan.length-1];
+                        setMedecins(l2=>l2.map(m2=>{const g=djPurgeMed(m2,intCfg,lastMk);return g?{...m2,dj:g}:m2;}));
+                        setIntCfg(p3=>({...p3,sems:(((p3&&p3.sems)||[]).filter(s3=>String(s3.fin||"").slice(0,7)>lastMk))}));
+                        setArchPlan(p2=>{const add={};Object.keys(byMonth).forEach(mk=>Object.assign(add,byMonth[mk]));return {...p2,...add};});
+                        toast("Archivage terminé : "+monthsInPlan.length+" mois copiés puis retirés des données actives","info");refreshArchList();
+                      }} style={{fontSize:11,padding:"4px 14px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>🗄 Archiver ces mois</button>
+                  </div>}
+                {archivedList.length>0&&<div style={{marginTop:8,paddingTop:7,borderTop:"1px dashed var(--border)"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>Mois archivés ({archivedList.length}) :</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                    {archivedList.map(mk=>(
+                      <span key={mk} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,fontWeight:700,padding:"3px 7px",borderRadius:12,border:"1px solid #7c3aed",background:"rgba(124,58,237,.07)",color:"#7c3aed"}}>
+                        🗄 {mk}
+                        <button title="Désarchiver : remettre ce mois dans les données actives" onClick={async()=>{
+                            if(!window.confirm("Désarchiver "+mk+" ? Le mois sera remis dans les données actives (les cases actives existantes sont conservées en cas de doublon)."))return;
+                            try{
+                              const ref=window.firebaseDB.collection("archives").doc("arch-"+mk);
+                              const d2=(await ref.get()).data();
+                              if(!d2||!d2.plan){toast("Archive introuvable","warn");return;}
+                              const frag=JSON.parse(d2.plan);
+                              setPlan(p=>({...frag,...p}));
+                              setArchPlan(p=>{const n2={};Object.keys(p).forEach(k=>{if(k.indexOf(mk)!==0)n2[k]=p[k];});return n2;});
+                              delete archFetched.current[mk];
+                              await ref.delete();
+                              refreshArchList();
+                              toast("Mois "+mk+" désarchivé — de retour dans les données actives","info");
+                            }catch(e){toast("Échec du désarchivage","warn");}
+                          }} style={{border:"none",background:"none",cursor:"pointer",fontSize:10,padding:0,color:"#16a34a",fontWeight:900}}>↩</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>}
+              </div>);
+            })()}
           </div>
 
           <div style={S.card}>
