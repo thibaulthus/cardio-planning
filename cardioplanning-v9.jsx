@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.101 — 21/08/2026";
+const APP_VERSION="v10.103 — 21/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4425,8 +4425,8 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}),
-  HT({children:"💾 Sauvegarde sur mon ordinateur"}),
-  HP({children:["Dans Paramètres, l'encart ",HE("b",null,"Sauvegarde sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui permettent de tout remettre en place. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
+  HT({children:"💻 Copie sur mon ordinateur"}),
+  HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui permettent de tout remettre en place. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
   HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). La date de dernière sauvegarde et le compteur sont propres à ",HE("b",null,"chaque ordinateur"),"."]}))},
 
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
@@ -5832,8 +5832,8 @@ function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,
   const lbl=perLibelle(per.sy,per.sm);
   const dat=(ts)=>new Date(ts).toLocaleDateString("fr-FR")+" "+new Date(ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
   return(
-    <div style={{...S.card,marginBottom:10}} id="set-export">
-      <div style={{fontWeight:700,color:"#f59e0b",fontSize:13,marginBottom:6}}>💾 Sauvegarde sur mon ordinateur</div>
+    <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}} id="set-export">
+      <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>💻 Copie sur mon ordinateur</div>
       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un fichier gardé chez vous, indépendant de l'application et de sa synchronisation. Le tableau sert à rediffuser le planning ; le fichier de données sert à le remettre en place.</div>
 
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
@@ -7661,6 +7661,7 @@ function CardioPlanning(){
   },[plan,tourMed,medecins]);
   const [docSize,setDocSize]=useState(null);
   const [docDet,setDocDet]=useState(null);   /* v10.101 : poids par champ, pour le détail de la jauge */
+  const [impWait,setImpWait]=useState(null);  /* v10.103 : fichier d'import lu, en attente de confirmation dans la page */
   const [archivedList,setArchivedList]=useState([]);
   const refreshArchList=useCallback(async()=>{
     try{
@@ -9309,13 +9310,25 @@ function CardioPlanning(){
     setExpBusy(true);
     try{
       let src;
-      if(expSrc==="now")src={plan:plan,notes:notes,tourMed:tourMed,tourDerog:tourDerog,medecins:medecins,actes:actes,salleReg:salleReg};
+      if(expSrc==="now")src={plan:plan,notes:notes,tourMed:tourMed,tourDerog:tourDerog,medecins:medecins,actes:actes,salleReg:salleReg,planningType:planningType};
       else{
         const dd=(await window.firebaseDB.collection("backups").doc(expSrc).get()).data()||{};
         const pj=(x,def)=>{try{return typeof x==="string"?JSON.parse(x):(x||def);}catch(e){return def;}};
+        /* v10.102 : l'équipe et les activités d'une sauvegarde sont en V2 (map + ordre)
+           depuis la v9.7 — l'ancien champ, purgé, sortait une liste vide ou périmée. */
+        const rdV2=(mp,ordRaw,leg)=>{
+          if(!mp)return pj(leg,[]);
+          const vals={};Object.keys(mp).forEach(k=>{const v=mp[k];vals[k]=typeof v==="string"?JSON.parse(v):v;});
+          const ord=pj(ordRaw,null);
+          const ids=Array.isArray(ord)?ord.map(String).filter(id=>vals[id]!==undefined):[];
+          const rest=Object.keys(vals).filter(id=>ids.indexOf(id)<0);
+          return ids.concat(rest).map(id=>vals[id]);
+        };
         src={plan:dd.planV2||{},notes:pj(dd.notes,{}),tourMed:pj(dd.tourMed,{}),tourDerog:pj(dd.tourDerog,{}),
-             medecins:pj(dd.medecins,[]),actes:pj(dd.actes,[]),salleReg:pj(dd.salleReg,[])};
+             medecins:rdV2(dd.medecinsV2,dd.medecinsV2Order,dd.medecins),actes:rdV2(dd.actesV2,dd.actesV2Order,dd.actes),salleReg:pj(dd.salleReg,[]),
+             planningType:(dd.planningTypeV2!==undefined?pj(dd.planningTypeV2,{}):pj(dd.planningType,{}))};
       }
+      src.exportDate=new Date().toISOString();src.version="v7";   /* v10.102 : relisible par 📂 Importer */
       const nom="planning-"+expPer.sy+"-"+String(expPer.sm+1).padStart(2,"0");
       if(kind==="tableau")expTelecharge(nom+".xls",expTable(expPer,src));
       else expTelecharge(nom+"-donnees.json",JSON.stringify(src),"application/json;charset=utf-8");
@@ -9324,7 +9337,7 @@ function CardioPlanning(){
       toast("Sauvegarde téléchargée","info");
     }catch(e){console.log("export:",e);toast("Échec de la sauvegarde","warn");}
     setExpBusy(false);
-  },[expSrc,expPer,plan,notes,tourMed,tourDerog,medecins,actes,salleReg]);
+  },[expSrc,expPer,plan,notes,tourMed,tourDerog,medecins,actes,salleReg,planningType]);
 
   /* ── Login ── */
   // Show loading while Firebase connects (so medPins are available for login)
@@ -10347,9 +10360,6 @@ header::-webkit-scrollbar { display: none; }
             </div>
           </div>}
 
-          {isEdit&&<ExportCard per={expPer} setPer={setExpPer} source={expSrc} setSource={setExpSrc}
-            backups={backupList} seuil={expSeuil} setSeuil={setExpSeuil} dernier={expLast}
-            onExport={doExport} occupe={expBusy}/>}
           <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]}/>
           <div style={{...S.card,marginBottom:10}}>
             {/* Vacances scolaires */}
@@ -10559,47 +10569,56 @@ header::-webkit-scrollbar { display: none; }
               </div>
               <button style={{...S.qBtn}} onClick={()=>makeBackup(true)}>💾 Sauvegarder maintenant</button>
             </div>
-            <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",margin:"2px 0 4px"}}>💻 Copie sur votre ordinateur</div>
-            <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>« Sauvegarder » télécharge un fichier (cardio-backup-….json) dans les Téléchargements de cet appareil — gardez-le : c'est votre seule copie hors Firebase. « Importer » relit un tel fichier pour tout restaurer.</div>
+            {isEdit&&<ExportCard per={expPer} setPer={setExpPer} source={expSrc} setSource={setExpSrc}
+              backups={backupList} seuil={expSeuil} setSeuil={setExpSeuil} dernier={expLast} onExport={doExport} occupe={expBusy}/>}
+            <div style={{fontSize:10,color:"var(--txt3)",marginBottom:6}}>📂 Importer relit un fichier de données (.json) et remet tout en place.</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              <button style={{...S.btnP,background:"#e3b341",color:"#111"}} onClick={()=>{
-                const data={plan,tourMed,planningType,notes,medecins,actes,editPin,adminPin,adminEnabled,adminCanReports,adminCanNotes,
-                  exportDate:new Date().toISOString(),version:"v6"};
-                const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-                const url=URL.createObjectURL(blob);
-                const a=document.createElement("a");
-                const today=new Date();
-                const ds=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
-                a.href=url;a.download="cardio-backup-"+ds+".json";a.click();
-                URL.revokeObjectURL(url);
-                toast("Sauvegarde téléchargée");
-              }}>💾 Sauvegarder</button>
+              
               {isEdit&&<button style={{...S.btnP,background:"#7c3aed"}} onClick={()=>{
+                /* v10.103 : champ ATTACHÉ au document (sinon Safari iOS peut le jeter avant
+                   son onchange) et confirmation rendue DANS la page (confirm() peut être
+                   muet en mode écran d'accueil : il répond non sans s'afficher). */
                 const input=document.createElement("input");
                 input.type="file";input.accept=".json";
+                input.style.position="fixed";input.style.left="-9999px";input.style.top="0";
+                document.body.appendChild(input);
+                const fini=()=>{try{document.body.removeChild(input);}catch(e2){}};
                 input.onchange=e=>{
-                  const file=e.target.files[0];if(!file)return;
+                  const file=e.target.files[0];if(!file){fini();return;}
                   const reader=new FileReader();
                   reader.onload=ev=>{
+                    fini();
                     try{
                       const data=JSON.parse(ev.target.result);
                       if(!data.version)throw new Error("Fichier invalide");
                       const d=new Date(data.exportDate).toLocaleDateString("fr-FR");
-                      if(!confirm("Restaurer la sauvegarde du "+d+" ?\nToutes les données actuelles seront remplacées."))return;
-                      if(data.plan)setPlan(data.plan);
-                      if(data.tourMed)setTourMed(data.tourMed);
-                      if(data.planningType)setPlanningType(data.planningType);
-                      if(data.notes)setNotes(data.notes);
-                      if(data.medecins)setMedecins(data.medecins);
-                      if(data.actes)setActes(data.actes);
-                      toast("Sauvegarde restaurée");
-                    }catch(err){toast("Fichier invalide","warn");}
+                      setImpWait({data:data,ds:d});
+                    }catch(err){setImpWait(null);toast("Fichier invalide","warn");}
                   };
                   reader.readAsText(file);
                 };
                 input.click();
               }}>📂 Importer</button>}
             </div>
+            {impWait&&<div style={{marginTop:8,padding:10,borderRadius:8,border:"1px solid #f87171",background:"var(--bg2)"}}>
+              <div style={{fontSize:11,fontWeight:700,marginBottom:6}}>Restaurer la sauvegarde du {impWait.ds} ?</div>
+              <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Toutes les données actuelles seront remplacées par celles du fichier.</div>
+              <div style={{display:"flex",gap:8}}>
+                <button style={{...S.btnP,background:"#dc2626"}} onClick={()=>{
+                  const data=impWait.data;
+                  if(data.plan)setPlan(data.plan);
+                  if(data.tourMed)setTourMed(data.tourMed);
+                  if(data.planningType)setPlanningType(data.planningType);
+                  if(data.notes)setNotes(data.notes);
+                  if(data.medecins)setMedecins(data.medecins);
+                  if(data.actes)setActes(data.actes);
+                  if(data.tourDerog)setTourDerog(data.tourDerog);
+                  if(data.salleReg)setSalleReg(data.salleReg);
+                  setImpWait(null);toast("Sauvegarde restaurée");
+                }}>↩ Restaurer</button>
+                <button style={{...S.btnP,background:"var(--bg3)",color:"var(--txt2)"}} onClick={()=>setImpWait(null)}>✕ Annuler</button>
+              </div>
+            </div>}
             {isEdit&&(()=>{
               const {sy,sm}=perStart(year,month);
               const perStartDate=new Date(sy,sm,1);
@@ -10611,7 +10630,7 @@ header::-webkit-scrollbar { display: none; }
                 {monthsInPlan.length===0
                   ?<div style={{fontSize:10,color:"var(--txt3)"}}>Aucun mois antérieur à la période affichée dans les données actives — rien à archiver pour l'instant.</div>
                   :<div>
-                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>{monthsInPlan.length} mois archivable(s) : {monthsInPlan.join(", ")}. L'archivage copie ces cases dans Firebase — en deux exemplaires : l'archive et une copie de sécurité — télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture).</div>
+                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>{monthsInPlan.length} mois archivable(s) : {monthsInPlan.join(", ")}. L'archivage copie ces cases dans Firebase, télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture).</div>
                     <button onClick={async()=>{
                         if(!window.confirm("Archiver les "+monthsInPlan.length+" mois antérieurs à la période affichée ("+monthsInPlan.join(", ")+") ?\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
                         const okB=await makeBackup(true);
@@ -10623,9 +10642,6 @@ header::-webkit-scrollbar { display: none; }
                             const ref=window.firebaseDB.collection("archives").doc("arch-"+mk);
                             const prev=(await ref.get()).data()||{};
                             const merged={...(prev.plan?JSON.parse(prev.plan):{}),...byMonth[mk]};
-                            /* v10.101 : copie miroir, écrite une fois pour toutes — les archives ne sont pas
-                               reprises par la sauvegarde quotidienne, ce double est leur filet dans Firebase. */
-                            window.firebaseDB.collection("archives").doc("copie-arch-"+mk).set({plan:JSON.stringify(merged),_ts:Date.now(),_copie:1}).catch(e2=>console.log("copie archive:",e2));
                             await ref.set({plan:JSON.stringify(merged),_ts:Date.now()});
                           }
                         }catch(e){toast("Échec de la copie en archive — RIEN n'a été retiré","warn");return;}

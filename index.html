@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.102 — 21/08/2026";
+var APP_VERSION = "v10.103 — 21/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -8272,6 +8272,7 @@ function CardioPlanning() {
     }); }, [plan, tourMed, medecins]);
     var _30 = useState(null), docSize = _30[0], setDocSize = _30[1];
     var _30b = useState(null), docDet = _30b[0], setDocDet = _30b[1]; /* v10.101 : poids par champ */
+    var _impW = useState(null), impWait = _impW[0], setImpWait = _impW[1]; /* v10.103 : import en attente de confirmation */
     var _31 = useState([]), archivedList = _31[0], setArchivedList = _31[1];
     var refreshArchList = useCallback(function () { return __awaiter(_this, void 0, void 0, function () {
         var snap, ids_1, e_4;
@@ -11786,41 +11787,28 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 6 } }, "📂 Importer relit un fichier de données (.json) et remet tout en place."),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
                         isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#7c3aed" }), onClick: function () {
+                                /* v10.103 : champ attaché au document + confirmation dans la page (voir jsx) */
                                 var input = document.createElement("input");
                                 input.type = "file";
                                 input.accept = ".json";
+                                input.style.position = "fixed"; input.style.left = "-9999px"; input.style.top = "0";
+                                document.body.appendChild(input);
+                                var fini = function () { try { document.body.removeChild(input); } catch (e2) { } };
                                 input.onchange = function (e) {
                                     var file = e.target.files[0];
-                                    if (!file)
-                                        return;
+                                    if (!file) { fini(); return; }
                                     var reader = new FileReader();
                                     reader.onload = function (ev) {
+                                        fini();
                                         try {
                                             var data = JSON.parse(ev.target.result);
                                             if (!data.version)
                                                 throw new Error("Fichier invalide");
                                             var d = new Date(data.exportDate).toLocaleDateString("fr-FR");
-                                            if (!confirm("Restaurer la sauvegarde du " + d + " ?\nToutes les données actuelles seront remplacées."))
-                                                return;
-                                            if (data.plan)
-                                                setPlan(data.plan);
-                                            if (data.tourMed)
-                                                setTourMed(data.tourMed);
-                                            if (data.planningType)
-                                                setPlanningType(data.planningType);
-                                            if (data.notes)
-                                                setNotes(data.notes);
-                                            if (data.medecins)
-                                                setMedecins(data.medecins);
-                                            if (data.actes)
-                                                setActes(data.actes);
-                                            if (data.tourDerog)
-                                                setTourDerog(data.tourDerog);
-                                            if (data.salleReg)
-                                                setSalleReg(data.salleReg);
-                                            toast("Sauvegarde restaurée");
+                                            setImpWait({ data: data, ds: d });
                                         }
                                         catch (err) {
+                                            setImpWait(null);
                                             toast("Fichier invalide", "warn");
                                         }
                                     };
@@ -11828,6 +11816,32 @@ function CardioPlanning() {
                                 };
                                 input.click();
                             } }, "\uD83D\uDCC2 Importer")),
+                    impWait && React.createElement("div", { style: { marginTop: 8, padding: 10, borderRadius: 8, border: "1px solid #f87171", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, marginBottom: 6 } }, "Restaurer la sauvegarde du " + impWait.ds + " ?"),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "Toutes les données actuelles seront remplacées par celles du fichier."),
+                        React.createElement("div", { style: { display: "flex", gap: 8 } },
+                            React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#dc2626" }), onClick: function () {
+                                    var data = impWait.data;
+                                    if (data.plan)
+                                        setPlan(data.plan);
+                                    if (data.tourMed)
+                                        setTourMed(data.tourMed);
+                                    if (data.planningType)
+                                        setPlanningType(data.planningType);
+                                    if (data.notes)
+                                        setNotes(data.notes);
+                                    if (data.medecins)
+                                        setMedecins(data.medecins);
+                                    if (data.actes)
+                                        setActes(data.actes);
+                                    if (data.tourDerog)
+                                        setTourDerog(data.tourDerog);
+                                    if (data.salleReg)
+                                        setSalleReg(data.salleReg);
+                                    setImpWait(null);
+                                    toast("Sauvegarde restaurée");
+                                } }, "\u21A9 Restaurer"),
+                            React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "var(--bg3)", color: "var(--txt2)" }), onClick: function () { return setImpWait(null); } }, "\u2715 Annuler"))),
                 isEdit && (function () {
                         var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
                         var perStartDate = new Date(sy, sm, 1);
