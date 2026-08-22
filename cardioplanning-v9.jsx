@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.103 — 21/08/2026";
+const APP_VERSION="v10.104 — 21/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4426,7 +4426,7 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}),
   HT({children:"💻 Copie sur mon ordinateur"}),
-  HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui permettent de tout remettre en place. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
+  HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui contiennent l'intégralité des données (toutes périodes) et permettent de tout remettre en place via 📂 Importer. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
   HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). La date de dernière sauvegarde et le compteur sont propres à ",HE("b",null,"chaque ordinateur"),"."]}))},
 
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
@@ -5834,7 +5834,7 @@ function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,
   return(
     <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}} id="set-export">
       <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>💻 Copie sur mon ordinateur</div>
-      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un fichier gardé chez vous, indépendant de l'application et de sa synchronisation. Le tableau sert à rediffuser le planning ; le fichier de données sert à le remettre en place.</div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un fichier gardé chez vous, indépendant de l'application et de sa synchronisation. Le tableau ne couvre que la période choisie ci-dessous : il sert à rediffuser le planning. Les données brutes contiennent l'intégralité des données, toutes périodes confondues : elles servent à tout remettre en place via 📂 Importer.</div>
 
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
         <button onClick={()=>setPer(perPrev(per.sy,per.sm))} style={S.arr}>‹</button>
