@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.104 — 21/08/2026";
+const APP_VERSION="v10.105 — 22/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4420,7 +4420,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée. En naviguant vers un mois archivé, il se recharge automatiquement en consultation. Désarchivage possible mois par mois."]}),
+  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7115,6 +7115,125 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
   </div>;
 }
 
+/* ════ ARCHIVAGE ÉLARGI (v10.105) ══════════════════════════════════════════════
+   Jusqu'ici l'archivage n'emportait que les CASES. Le tour, les notes, les
+   souhaits, les reports et l'état de Construire des mois archivés restaient dans
+   le document actif et s'y accumulaient sans fin. Or `planning/main` est plafonné
+   à 1 Mo par Firestore (la jauge des Paramètres) : au-delà, Firebase REFUSE
+   l'écriture. Ces annexes mangent donc un plafond DUR, pas un quota élastique.
+
+   DEUX FORMATS DE CLÉS cohabitent dans les données datées, et les confondre est
+   exactement le bug v10.4 :
+     — « clair »      YYYY-MM-DD  (mois 1-based padé, dKey)
+     — « technique »  Y-M-D       (mois 0-based non padé, wKey / dk3)
+   Chaque famille déclare donc SON lecteur de mois. Jamais de slice(0,7) aveugle.
+
+   RÈGLE DES SEMAINES, la sienne : une semaine part quand son DERNIER jour (le
+   dimanche) appartient à un mois archivé — jamais avant. Une semaine à cheval
+   reste active tant que le mois suivant n'est pas archivé à son tour.
+
+   L'ASTREINTE est volontairement laissée en place : ses clés de jour et ses clés
+   de semaine ont le MÊME format et ne se distinguent pas l'une de l'autre. Moins
+   de 1 Ko en jeu, aucun gain à prendre ce risque. */
+const arPad=(y,m0)=>{const dt=new Date(y,m0,1);return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0");};
+/* mois d'une clé au format clair YYYY-MM-DD (tourDerog, gardeWish, gardeAvoid) */
+function arMoisClair(k){const s=String(k);return /^\d{4}-\d{2}-\d{2}/.test(s)?s.slice(0,7):null;}
+/* notes : "medId|YYYY-MM-DD|SLOT" — le medId peut contenir n'importe quoi */
+function arMoisNote(k){const p=String(k).split("|");return p.length>=2?arMoisClair(p[1]):null;}
+/* clé technique Y-M-D, éventuellement suivie de "|SLOT" */
+function arNums(k){const p=String(k).split("|")[0].split("-");
+  if(p.length!==3)return null;
+  const y=+p[0],m=+p[1],d=+p[2];
+  return (isFinite(y)&&isFinite(m)&&isFinite(d)&&y>1900&&m>=0&&m<=11&&d>=1&&d<=31)?[y,m,d]:null;}
+function arMoisTechJour(k){const n=arNums(k);return n?arPad(n[0],n[1]):null;}
+/* semaine : c'est le DIMANCHE (lundi + 6) qui décide */
+function arMoisTechSem(k){const n=arNums(k);if(!n)return null;
+  const dt=new Date(n[0],n[1],n[2]+6);return arPad(dt.getFullYear(),dt.getMonth());}
+/* build : clé de PÉRIODE "sy_sm" (sm 0-based) — c'est son DERNIER mois qui décide */
+function arMoisPeriode(k){const p=String(k).split("_");
+  if(p.length!==2)return null;const y=+p[0],m=+p[1];
+  return (isFinite(y)&&isFinite(m)&&y>1900&&m>=0&&m<=11)?arPad(y,m+PCFG.len-1):null;}
+
+/* familles à plat. `lu` = relue à la consultation d'un mois archivé (le tour et
+   les notes s'affichent dans la grille ; les souhaits, reports et Construire
+   n'ont aucune valeur pour un mois passé, ils partent sans retour d'écran). */
+const AR_FAM=[
+  {ch:"tourMed",    mois:arMoisTechSem, lu:true,  lib:"semaine de tour|semaines de tour"},
+  {ch:"tourDerog",  mois:arMoisClair,   lu:true,  lib:"dérogation de tour|dérogations de tour"},
+  {ch:"notes",      mois:arMoisNote,    lu:true,  lib:"note|notes"},
+  {ch:"tourWish",   mois:arMoisTechSem, lu:false, lib:"souhait de tour|souhaits de tour"},
+  {ch:"tourAvoid",  mois:arMoisTechSem, lu:false, lib:"tour à éviter|tours à éviter"},
+  {ch:"gardeWish",  mois:arMoisClair,   lu:false, lib:"souhait de garde|souhaits de garde"},
+  {ch:"gardeAvoid", mois:arMoisClair,   lu:false, lib:"garde à éviter|gardes à éviter"},
+  {ch:"build",      mois:arMoisPeriode, lu:false, lib:"période de Construire|périodes de Construire"},
+];
+/* familles indexées PAR MÉDECIN, avec les clés datées au deuxième niveau
+   (toutes au format technique) : csBlanches[mid][cle], csRep[mid].done/.to[cle] */
+const AR_MED=[
+  {ch:"csBlanches", sous:null,          lib:"semaine blanche|semaines blanches"},
+  {ch:"csRep",      sous:["done","to"], lib:"report de consultation|reports de consultation"},
+];
+const AR_LU=AR_FAM.filter(f=>f.lu).map(f=>f.ch);
+
+/* Découpe les données datées en fonction des mois archivés.
+   Rend {parts:{mois:{champ:…}}, cnt:{champ:n}, n, lib} — `parts` part en archive,
+   `lib` est la phrase annoncée dans la confirmation AVANT tout retrait. */
+function arDecoupe(src,mois){
+  const ok=(mk)=>!!mk&&mois.indexOf(mk)>=0;
+  const parts={},cnt={};
+  const met=(mk,ch,k,v,mid,sous)=>{
+    const P=parts[mk]=parts[mk]||{};
+    if(mid===undefined){(P[ch]=P[ch]||{})[k]=v;return;}
+    const M=(P[ch]=P[ch]||{});const O=(M[mid]=M[mid]||{});
+    if(sous){(O[sous]=O[sous]||{})[k]=v;}else O[k]=v;
+  };
+  AR_FAM.forEach(f=>{
+    const o=src[f.ch]||{};let n=0;
+    Object.keys(o).forEach(k=>{const mk=f.mois(k);if(ok(mk)){met(mk,f.ch,k,o[k]);n++;}});
+    cnt[f.ch]=n;
+  });
+  AR_MED.forEach(f=>{
+    const o=src[f.ch]||{};let n=0;
+    Object.keys(o).forEach(mid=>{
+      const cur=o[mid]||{};
+      if(!f.sous){Object.keys(cur).forEach(k=>{const mk=arMoisTechJour(k);if(ok(mk)){met(mk,f.ch,k,cur[k],mid);n++;}});}
+      else f.sous.forEach(s=>{const s2=cur[s]||{};
+        Object.keys(s2).forEach(k=>{const mk=arMoisTechJour(k);if(ok(mk)){met(mk,f.ch,k,s2[k],mid,s);n++;}});});
+    });
+    cnt[f.ch]=n;
+  });
+  let tot=0;const lib=[];
+  AR_FAM.concat(AR_MED).forEach(f=>{const n=cnt[f.ch]||0;if(!n)return;tot+=n;
+    const w=f.lib.split("|");lib.push(n+" "+(n>1?w[1]:w[0]));});
+  return {parts,cnt,n:tot,lib:lib.join(", ")};
+}
+
+/* Retire d'un état les clés des mois archivés. Toujours appelé DANS un updater
+   setX(o=>…) : entre le rendu et le clic, le serveur peut avoir livré des
+   modifications, et une valeur figée au rendu les écraserait (leçon v10.3). */
+function arPurge(o,mois,ok){const g={};Object.keys(o||{}).forEach(k=>{const mk=mois(k);if(!ok(mk))g[k]=o[k];});return g;}
+function arPurgeMed(o,sous,ok){const g={};
+  Object.keys(o||{}).forEach(mid=>{const cur=o[mid]||{};
+    if(!sous){const gg=arPurge(cur,arMoisTechJour,ok);if(Object.keys(gg).length)g[mid]=gg;}
+    else{const gg={};sous.forEach(s=>{const gs=arPurge(cur[s]||{},arMoisTechJour,ok);if(Object.keys(gs).length)gg[s]=gs;});
+      if(Object.keys(gg).length)g[mid]=gg;}});
+  return g;}
+
+/* Réinjecte un fragment d'annexe dans un état : ce qui est ACTIF gagne toujours,
+   comme la restauration des cases au désarchivage. */
+function arFusion(ch,cur,frag){
+  if(!frag||Object.keys(frag).length===0)return cur||{};
+  const med=AR_MED.filter(f=>f.ch===ch)[0];
+  if(!med)return {...frag,...(cur||{})};
+  const out={...(cur||{})};
+  Object.keys(frag).forEach(mid=>{
+    const f2=frag[mid]||{},c2=out[mid]||{};
+    if(!med.sous){out[mid]={...f2,...c2};return;}
+    const o={};
+    med.sous.forEach(s=>{const m2={...(f2[s]||{}),...(c2[s]||{})};if(Object.keys(m2).length)o[s]=m2;});
+    out[mid]=o;});
+  return out;}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -7281,6 +7400,8 @@ function CardioPlanning(){
   const [salleReg,setSalleReg]=useState([]); // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
   const [salleEdit,setSalleEdit]=useState(null); // salle en cours d'édition (activités associées)
   const [archPlan,setArchPlan]=useState({});   // cases archivées chargées pour consultation (lecture)
+  /* v10.105 : annexes archivées relues pour la consultation (tour, dérogations, notes) */
+  const [archAnx,setArchAnx]=useState({tourMed:{},tourDerog:{},notes:{}});
   const archFetched=useRef({});                // mois d'archives déjà demandés   // rapport persistant de la dernière répartition auto des astreintes
   const [periodCfg,setPeriodCfg]=useState({len:4,startM:6});
   PCFG.len=periodCfg.len;PCFG.startM=periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
@@ -7991,6 +8112,12 @@ function CardioPlanning(){
         const snap=await window.firebaseDB.collection("archives").doc("arch-"+mk).get();
         const d=snap&&snap.data&&snap.data();
         if(d&&d.plan){const frag=JSON.parse(d.plan);if(Object.keys(frag).length>0)setArchPlan(p=>({...p,...frag}));}
+        /* v10.105 : les annexes RELUES rejoignent le cache — sans elles, un mois
+           archivé s'afficherait sans son tour et sans ses notes. */
+        if(d&&d.annex){try{const an=JSON.parse(d.annex)||{};const add={};
+          AR_LU.forEach(ch=>{if(an[ch]&&Object.keys(an[ch]).length)add[ch]=an[ch];});
+          if(Object.keys(add).length)setArchAnx(p=>{const o={...p};Object.keys(add).forEach(ch=>{o[ch]=arFusion(ch,o[ch]||{},add[ch]);});return o;});
+        }catch(e2){}}
       }catch(e){}
     });
   },[year,month,plan]);
@@ -8400,10 +8527,15 @@ function CardioPlanning(){
   /* v10.35 : le corps est passe dans `expEntries` au niveau module, pour que
      l'export lise le planning EXACTEMENT comme l'ecran. tourDerog rejoint les
      dependances au passage — il manquait, une derogation ne rafraichissait pas. */
+  /* v10.105 : le tour, les dérogations et les notes d'un mois archivé viennent du
+     cache d'archives. L'ACTIF gagne toujours. Les écritures restent sur l'état brut. */
+  const tourMedAff=useMemo(()=>Object.keys(archAnx.tourMed).length?{...archAnx.tourMed,...tourMed}:tourMed,[tourMed,archAnx]);
+  const tourDerogAff=useMemo(()=>Object.keys(archAnx.tourDerog).length?{...archAnx.tourDerog,...tourDerog}:tourDerog,[tourDerog,archAnx]);
+  const notesAff=useMemo(()=>Object.keys(archAnx.notes).length?{...archAnx.notes,...notes}:notes,[notes,archAnx]);
   const getEntries=useCallback((medId,y2,m2,d2,slot)=>{
     const _p=Object.keys(archPlan).length>0?{...archPlan,...plan}:plan;
-    return expEntries(_p,tourMed,tourDerog,medId,y2,m2,d2,slot);
-  },[plan,archPlan,tourMed,tourDerog]);
+    return expEntries(_p,tourMedAff,tourDerogAff,medId,y2,m2,d2,slot);
+  },[plan,archPlan,tourMedAff,tourDerogAff]);
 
   const getEntry=useCallback((medId,y2,m2,d2,slot)=>getEntries(medId,y2,m2,d2,slot)[0]||null,[getEntries]);
 
@@ -9649,7 +9781,7 @@ header::-webkit-scrollbar { display: none; }
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>setIntGardeOn(v=>!v)} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfg,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfg,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay}/>}
         </div>
       )}
 
@@ -9659,12 +9791,12 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notes}
+      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notes}
+        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -9677,12 +9809,12 @@ header::-webkit-scrollbar { display: none; }
       {tab==="plateau"&&<ActTabView issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfg}
         rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
-        getEntries={getEntries} allDays={allDays} notes={notes} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
-        allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notes}
+        allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
       {false&&null&&<ActTabView title="🔬 PT Angio" titleColor="#c084fc"
@@ -9733,7 +9865,7 @@ header::-webkit-scrollbar { display: none; }
            {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
              <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}} onClick={()=>openPtModal(null)}>📋 Planning type</button>
            </div>}
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notes} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay}/>}
         </div>
       )}
 
@@ -10624,15 +10756,21 @@ header::-webkit-scrollbar { display: none; }
               const perStartDate=new Date(sy,sm,1);
               const monthsInPlan=Object.keys(plan).map(k=>k.slice(0,7)).filter((v,i2,a2)=>a2.indexOf(v)===i2)
                 .filter(mk=>{const y2=+mk.slice(0,4),m2=+mk.slice(5,7)-1;return new Date(y2,m2,1)<perStartDate;}).sort();
+              /* v10.105 : le découpage des données datées est calculé ICI, au rendu, pour
+                 pouvoir être ANNONCÉ dans la confirmation avant le moindre retrait. */
+              const anx=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,build,csRep,csBlanches},monthsInPlan);
               return(
               <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
                 <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🗄 Archivage</div>
                 {monthsInPlan.length===0
                   ?<div style={{fontSize:10,color:"var(--txt3)"}}>Aucun mois antérieur à la période affichée dans les données actives — rien à archiver pour l'instant.</div>
                   :<div>
-                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>{monthsInPlan.length} mois archivable(s) : {monthsInPlan.join(", ")}. L'archivage copie ces cases dans Firebase, télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Elles restent consultables en naviguant vers ces mois (lecture).</div>
+                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>{monthsInPlan.length} mois archivable(s) : {monthsInPlan.join(", ")}. L'archivage copie dans Firebase les cases de ces mois <b>et leurs données datées</b> (tour, notes, souhaits, reports, Construire), télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Le planning, le tour et les notes de ces mois restent consultables en naviguant vers eux (lecture).</div>
+                    {anx.n>0&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:5,padding:"4px 7px",borderRadius:6,border:"1px dashed var(--border)"}}>Données datées qui partiraient : {anx.lib}. Une semaine ne part que si son dimanche est dans un mois archivé.</div>}
                     <button onClick={async()=>{
-                        if(!window.confirm("Archiver les "+monthsInPlan.length+" mois antérieurs à la période affichée ("+monthsInPlan.join(", ")+") ?\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
+                        if(!window.confirm("Archiver les "+monthsInPlan.length+" mois antérieurs à la période affichée ("+monthsInPlan.join(", ")+") ?"
+                          +(anx.n>0?"\n\nPartent aussi : "+anx.lib+".":"")
+                          +"\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
                         const okB=await makeBackup(true);
                         if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))return;
                         const byMonth={};
@@ -10642,12 +10780,32 @@ header::-webkit-scrollbar { display: none; }
                             const ref=window.firebaseDB.collection("archives").doc("arch-"+mk);
                             const prev=(await ref.get()).data()||{};
                             const merged={...(prev.plan?JSON.parse(prev.plan):{}),...byMonth[mk]};
-                            await ref.set({plan:JSON.stringify(merged),_ts:Date.now()});
+                            /* v10.105 : les annexes du mois rejoignent le document d'archive, FUSIONNÉES
+                               avec ce qui s'y trouvait déjà (un mois peut être archivé en deux fois). */
+                            const pAnx=prev.annex?JSON.parse(prev.annex):{};
+                            const nAnx=anx.parts[mk]||{};
+                            const mAnx={...pAnx};
+                            Object.keys(nAnx).forEach(ch=>{mAnx[ch]=arFusion(ch,nAnx[ch],pAnx[ch]||{});});
+                            await ref.set({plan:JSON.stringify(merged),annex:JSON.stringify(mAnx),_ts:Date.now()});
                           }
                         }catch(e){toast("Échec de la copie en archive — RIEN n'a été retiré","warn");return;}
-                        const blob=new Blob([JSON.stringify(byMonth,null,1)],{type:"application/json"});
+                        const blob=new Blob([JSON.stringify({version:"arch-2",plan:byMonth,annexes:anx.parts},null,1)],{type:"application/json"});
                         const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="archive-cardio-"+monthsInPlan[0]+"_"+monthsInPlan[monthsInPlan.length-1]+".json";a2.click();
                         setPlan(p=>{const n2={};Object.keys(p).forEach(k=>{if(!monthsInPlan.includes(k.slice(0,7)))n2[k]=p[k];});return n2;});
+                        /* v10.105 : retrait des annexes. Toujours par UPDATER et par MOIS, jamais en
+                           reposant la valeur calculée au rendu — le serveur a pu livrer des
+                           modifications entre l'affichage et le clic (leçon v10.3). */
+                        const okM=(mk)=>!!mk&&monthsInPlan.indexOf(mk)>=0;
+                        setTourMed(o=>arPurge(o,arMoisTechSem,okM));
+                        setTourDerog(o=>arPurge(o,arMoisClair,okM));
+                        setNotes(o=>arPurge(o,arMoisNote,okM));
+                        setTourWish(o=>arPurge(o,arMoisTechSem,okM));
+                        setTourAvoid(o=>arPurge(o,arMoisTechSem,okM));
+                        setGardeWish(o=>arPurge(o,arMoisClair,okM));
+                        setGardeAvoid(o=>arPurge(o,arMoisClair,okM));
+                        setBuild(o=>arPurge(o,arMoisPeriode,okM));
+                        setCsBlanches(o=>arPurgeMed(o,null,okM));
+                        setCsRep(o=>arPurgeMed(o,["done","to"],okM));
                         Object.keys(byMonth).forEach(mk=>{archFetched.current[mk]=true;});
                         /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
                            continue ». Un semestre dont la FIN est dans les mois archivés
@@ -10657,6 +10815,12 @@ header::-webkit-scrollbar { display: none; }
                         setMedecins(l2=>l2.map(m2=>{const g=djPurgeMed(m2,intCfg,lastMk);return g?{...m2,dj:g}:m2;}));
                         setIntCfg(p3=>({...p3,sems:(((p3&&p3.sems)||[]).filter(s3=>String(s3.fin||"").slice(0,7)>lastMk))}));
                         setArchPlan(p2=>{const add={};Object.keys(byMonth).forEach(mk=>Object.assign(add,byMonth[mk]));return {...p2,...add};});
+                        /* les annexes RELUES rejoignent le cache de consultation tout de suite,
+                           sinon le tour et les notes du mois disparaîtraient jusqu'au rechargement */
+                        setArchAnx(p2=>{const o={...p2};
+                          Object.keys(anx.parts).forEach(mk=>{const A=anx.parts[mk];
+                            AR_LU.forEach(ch=>{if(A[ch])o[ch]=arFusion(ch,A[ch],o[ch]||{});});});
+                          return o;});
                         toast("Archivage terminé : "+monthsInPlan.length+" mois copiés puis retirés des données actives","info");refreshArchList();
                       }} style={{fontSize:11,padding:"4px 14px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>🗄 Archiver ces mois</button>
                   </div>}
@@ -10667,14 +10831,29 @@ header::-webkit-scrollbar { display: none; }
                       <span key={mk} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,fontWeight:700,padding:"3px 7px",borderRadius:12,border:"1px solid #7c3aed",background:"rgba(124,58,237,.07)",color:"#7c3aed"}}>
                         🗄 {mk}
                         <button title="Désarchiver : remettre ce mois dans les données actives" onClick={async()=>{
-                            if(!window.confirm("Désarchiver "+mk+" ? Le mois sera remis dans les données actives (les cases actives existantes sont conservées en cas de doublon)."))return;
+                            if(!window.confirm("Désarchiver "+mk+" ? Le mois sera remis dans les données actives, cases ET données datées (les valeurs actives existantes sont conservées en cas de doublon)."))return;
                             try{
                               const ref=window.firebaseDB.collection("archives").doc("arch-"+mk);
                               const d2=(await ref.get()).data();
                               if(!d2||!d2.plan){toast("Archive introuvable","warn");return;}
                               const frag=JSON.parse(d2.plan);
                               setPlan(p=>({...frag,...p}));
+                              /* v10.105 : le désarchivage est SYMÉTRIQUE — les annexes reviennent aussi */
+                              if(d2.annex){try{const an=JSON.parse(d2.annex)||{};
+                                if(an.tourMed)setTourMed(c=>arFusion("tourMed",c,an.tourMed));
+                                if(an.tourDerog)setTourDerog(c=>arFusion("tourDerog",c,an.tourDerog));
+                                if(an.notes)setNotes(c=>arFusion("notes",c,an.notes));
+                                if(an.tourWish)setTourWish(c=>arFusion("tourWish",c,an.tourWish));
+                                if(an.tourAvoid)setTourAvoid(c=>arFusion("tourAvoid",c,an.tourAvoid));
+                                if(an.gardeWish)setGardeWish(c=>arFusion("gardeWish",c,an.gardeWish));
+                                if(an.gardeAvoid)setGardeAvoid(c=>arFusion("gardeAvoid",c,an.gardeAvoid));
+                                if(an.build)setBuild(c=>arFusion("build",c,an.build));
+                                if(an.csRep)setCsRep(c=>arFusion("csRep",c,an.csRep));
+                                if(an.csBlanches)setCsBlanches(c=>arFusion("csBlanches",c,an.csBlanches));
+                              }catch(e3){}}
                               setArchPlan(p=>{const n2={};Object.keys(p).forEach(k=>{if(k.indexOf(mk)!==0)n2[k]=p[k];});return n2;});
+                              const okM=(m2)=>m2===mk;
+                              setArchAnx(p=>({tourMed:arPurge(p.tourMed,arMoisTechSem,okM),tourDerog:arPurge(p.tourDerog,arMoisClair,okM),notes:arPurge(p.notes,arMoisNote,okM)}));
                               delete archFetched.current[mk];
                               await ref.delete();
                               refreshArchList();
@@ -11343,7 +11522,7 @@ header::-webkit-scrollbar { display: none; }
 
             <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
               <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>📝 Note</div>
-              <textarea value={notes[nk(medId,y2,m2,d2,slot)]||""} onChange={e=>setNotes(p=>({...p,[nk(medId,y2,m2,d2,slot)]:e.target.value}))}
+              <textarea value={notesAff[nk(medId,y2,m2,d2,slot)]||""} onChange={e=>setNotes(p=>({...p,[nk(medId,y2,m2,d2,slot)]:e.target.value}))}
                 placeholder="Note visible au survol..." readOnly={!canEditThisMed||(isAdminEdit&&!adminCanNotes&&!entries.some(e2=>{const a2=acteById(e2.acteId);return a2&&a2[roleOkKey]===true;}))}
                 style={{width:"100%",padding:"6px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)",fontSize:12,fontFamily:"'Sora',sans-serif",resize:"vertical",minHeight:48,outline:"none"}}/>
             </div>
@@ -11536,8 +11715,8 @@ header::-webkit-scrollbar { display: none; }
         </div>);
       })()}
 
-      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||(isAdminEdit&&isCadre)} intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} setMData={setMData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
-      {modal==="pickMedSite"&&mData&&<PickMedSiteModal intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notes} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||(isAdminEdit&&isCadre)} intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} setMData={setMData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notesAff} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedSite"&&mData&&<PickMedSiteModal intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notesAff} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medsAff} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
       {modal==="editActe"&&mData&&(
