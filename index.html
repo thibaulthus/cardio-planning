@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.105 — 22/08/2026";
+var APP_VERSION = "v10.106 — 22/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4629,7 +4629,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout."]}),
+  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. L'éditeur peut toujours passer outre, un message l'en avertit."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7658,6 +7658,32 @@ function arFusion(ch, cur, frag) {
     return out;
 }
 
+/* ════ VERROU DES PÉRIODES CLOSES (v10.106) ════════════════════════════════════
+   Sa règle : « on ne modifie pas le passé », et la borne est la PÉRIODE — tout ce
+   qui précède le PREMIER JOUR de la période en cours (celle qui contient
+   aujourd'hui) est clos. Une période va du lendemain de la fin de la précédente
+   au dimanche qui la clôt, donc jamais du 1er au 31 : c'est perDaysList qui fait foi.
+
+   VOLONTAIREMENT INDÉPENDANT DE L'ARCHIVAGE. L'ancien bandeau violet se fondait sur
+   les archives CHARGÉES, or une archive n'est lue que si l'on navigue vers son mois :
+   il apparaissait après l'archivage puis disparaissait au changement de session. La
+   période, elle, est connue dès l'ouverture — l'indicateur est donc toujours juste,
+   même avant tout archivage.
+
+   SES DEUX DÉCISIONS DU 22/08/2026 : l'ÉDITEUR passe toujours, avec un simple
+   avertissement ; le verrou porte sur TOUT, absences et FMC comprises. */
+function verrouDebut() {
+    const t = new Date();
+    const p = perStart(t.getFullYear(), t.getMonth());
+    const l = perDaysList(p.sy, p.sm);
+    return l.length ? dKey(l[0].y, l[0].m, l[0].d) : "0000-00-00";
+}
+/* La borne et le droit de passer outre sont lus dans une REF : les fonctions
+   d'écriture ont des dépendances vides et ne doivent pas être recréées à chaque
+   changement de mode, sous peine de casser toutes les mémoïsations en aval. */
+function vBloque(r, y, m, d) { return dKey(y, m, d) < r.current.deb && !r.current.edit; }
+function vAvertit(r, y, m, d) { return dKey(y, m, d) < r.current.deb && r.current.edit; }
+
 function CardioPlanning() {
     var _this = this;
     var today = new Date();
@@ -9123,6 +9149,11 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ medPins: JSON.stringify(medPins) }); }, [medPins]);
     useEffect(function () { applyTheme(darkMode); }, [darkMode]);
+    useEffect(function () {
+        var f = function () { if (!document.hidden) setNotif(null); };
+        document.addEventListener("visibilitychange", f);
+        return function () { return document.removeEventListener("visibilitychange", f); };
+    }, []);
     var toast = function (msg, type) {
         if (type === void 0) { type = "ok"; }
         setNotif({ msg: msg, type: type });
@@ -9130,6 +9161,18 @@ function CardioPlanning() {
     };
     var acteById = useCallback(function (id) { return actes.find(function (a) { return a.id === id; }); }, [actes]);
     var isEdit = (accessMode === "edit" || (accessMode === "medecinEdit" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).niveau) || "basic") === "editeur" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).role) || "medecin") !== "attache")) && !netOff; /* v10.73 */ // hors ligne : lecture seule
+    var verrouDeb = useMemo(function () { return verrouDebut(); }, [PCFG.len, PCFG.startM, vacs]);
+    var estClos = useCallback(function (y2, m2, d2) { return dKey(y2, m2, d2) < verrouDeb; }, [verrouDeb]);
+    var perClose = useMemo(function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm);
+        return dKey(e.getFullYear(), e.getMonth(), e.getDate()) < verrouDeb; }, [year, month, verrouDeb]);
+    var vRef = useRef({ deb: verrouDeb, edit: false });
+    vRef.current = { deb: verrouDeb, edit: isEdit };
+    var vTRef = useRef(0);
+    var vToast = useCallback(function (passe) {
+        var n = Date.now(); if (n - vTRef.current < 1500) return; vTRef.current = n;
+        setNotif({ msg: passe ? "\u26A0 P\u00E9riode close \u2014 modification enregistr\u00E9e quand m\u00EAme" : "\uD83D\uDD12 P\u00E9riode close \u2014 modification impossible", type: "warn" });
+        setTimeout(function () { return setNotif(null); }, 3500);
+    }, []);
     // ─── Undo/Redo history (edit mode) ───
     const histRef = useRef({ stack: [], pas: [], idx: -1, restoring: 0 });
     /* v10.28 : un changement recu du SERVEUR n'est pas une action de cette personne.
@@ -9571,6 +9614,7 @@ function CardioPlanning() {
     }, [getEntries]);
     /* ── setEntry / addEntry / removeEntry ── */
     var setEntry = useCallback(function (medId, y2, m2, d2, slot, entry) {
+        if (vBloque(vRef, y2, m2, d2)) { vToast(false); return; }
         var key = sk(y2, m2, d2, slot);
         setPlan(function (p) {
             var _a;
@@ -9582,10 +9626,12 @@ function CardioPlanning() {
             return __assign(__assign({}, p), (_a = {}, _a[key] = dm, _a));
         });
         logCell(entry ? "add" : "del", medId, y2, m2, d2, slot, entry ? entry.acteId : null);
+        if (vAvertit(vRef, y2, m2, d2)) vToast(true);
     }, []);
     /* v9.58 : poser une activite FERME sur une case en choix ouvert, c'est TRANCHER,
        quel que soit le chemin. `wasCond` garde la memoire des branches ecartees. */
     var addEntry = useCallback(function (medId, y2, m2, d2, slot, entry) {
+        if (vBloque(vRef, y2, m2, d2)) { vToast(false); return; }
         var key = sk(y2, m2, d2, slot);
         var refusedBy = null;
         setPlan(function (p) {
@@ -9637,6 +9683,7 @@ function CardioPlanning() {
                 return;
             }
             logCell("add", medId, y2, m2, d2, slot, entry.acteId);
+            if (vAvertit(vRef, y2, m2, d2)) vToast(true);
         }, 0);
     }, []);
     /* Trancher depuis la modale de case : la branche choisie devient ferme, les autres
@@ -9715,6 +9762,8 @@ function CardioPlanning() {
         logCell("add", medId, y2, m2, d2, slot, acteId);
     }, []);
     var removeEntry = useCallback(function (medId, y2, m2, d2, slot, acteId) {
+        if (vBloque(vRef, y2, m2, d2)) { vToast(false); return; }
+        if (vAvertit(vRef, y2, m2, d2)) vToast(true);
         var key = sk(y2, m2, d2, slot);
         setPlan(function (p) {
             var _a;
@@ -10006,6 +10055,7 @@ function CardioPlanning() {
         var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, slots = _a.slots, _b = _a.absType, absType = _b === void 0 ? "ABSENCE" : _b, _sp = _a.slotsParJour, slotsParJour = _sp === void 0 ? null : _sp;
         var _c = parseDate(dateFrom), fy = _c[0], fm = _c[1], fd = _c[2];
         var fromT = new Date(fy, fm, fd).getTime(), toT = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+        var vSkip = false, vWarn = false;
         setPlan(function (p) {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
@@ -10014,6 +10064,8 @@ function CardioPlanning() {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
+                    if (vBloque(vRef, cy, cm, d)) { vSkip = true; return "continue"; }
+                    if (vAvertit(vRef, cy, cm, d)) vWarn = true;
                     (isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : slots)).forEach(function (sl) {
                         var _a;
                         var k = sk(cy, cm, d, sl);
@@ -10034,12 +10086,13 @@ function CardioPlanning() {
             }
             return next;
         });
-        toast(absType === "FORMATION" ? "Formation appliquée" : "Absence appliquée");
+        if (vSkip || vWarn) vToast(!vSkip); else toast(absType === "FORMATION" ? "Formation appliquée" : "Absence appliquée");
     }, []);
     var removeAbsence = useCallback(function (_a) {
         var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, _sp2 = _a.slotsParJour, slotsParJour = _sp2 === void 0 ? null : _sp2;
         var _b = parseDate(dateFrom), fy = _b[0], fm = _b[1], fd = _b[2];
         var fromT = new Date(fy, fm, fd).getTime(), toT = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+        var vSkip = false, vWarn = false;
         setPlan(function (p) {
             var next = __assign({}, p);
             var cy = fy, cm = fm;
@@ -10048,6 +10101,8 @@ function CardioPlanning() {
                     var t = new Date(cy, cm, d).getTime();
                     if (t < fromT || t > toT)
                         return "continue";
+                    if (vBloque(vRef, cy, cm, d)) { vSkip = true; return "continue"; }
+                    if (vAvertit(vRef, cy, cm, d)) vWarn = true;
                     (isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : ["M", "AM"]).concat(["JOUR"])).forEach(function (sl) {
                         var _a;
                         var k = sk(cy, cm, d, sl);
@@ -10077,7 +10132,7 @@ function CardioPlanning() {
             }
             return next;
         });
-        toast("Absence retirée");
+        if (vSkip || vWarn) vToast(!vSkip); else toast("Absence retirée");
     }, []);
     /* ── applyPlanningType ── */
     var _pio = useState(false), plIssOpen = _pio[0], setPlIssOpen = _pio[1];
@@ -10913,7 +10968,7 @@ function CardioPlanning() {
     var gardeProps = { onRemoveGarde: removeGardeDay, printWk: printWk, onPrint: function () { return setModal("print"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, getEntry: getEntry, allDays: allDays, isEdit: isEdit, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast };
     return (React.createElement("div", { style: S.app },
         React.createElement("style", null, setFoldCSS() + "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav{scrollbar-width:none;-ms-overflow-style:none}\nnav::-webkit-scrollbar { display: none; }\n/* v10.52 : sur ordinateur (pointeur souris), la barre reapparait — le navigateur\n   ne la dessine que si les onglets debordent, elle reste invisible sinon */\n@media (pointer:fine){\n  nav{scrollbar-width:thin}\n  nav::-webkit-scrollbar{display:block;height:5px}\n}\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
-        notif && React.createElement("div", { style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", borderColor: "#4ade80" }) }, notif.msg),
+        notif && React.createElement("div", { onClick: function () { return setNotif(null); }, title: "Cliquer pour fermer", style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", borderColor: "#4ade80", cursor: "pointer" }) }, notif.msg),
         netOff && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, "\uD83D\uDCF4 Hors ligne \u2014 dernier planning re\u00E7u \u00B7 lecture seule"),
         isMedEdit && botOn && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1d4ed8", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
             "\u270F\uFE0F " + (isInterEdit ? "\u00C9dition \u00E9tendue" : "Mode \u00E9dition restreinte") + " \u2014 Dr. ",
@@ -10935,6 +10990,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontSize: 8, color: "#484f58", display: "flex", alignItems: "center", gap: 4 } },
                         "CHL & CHB",
                         !isEdit && React.createElement("span", { style: { color: "#e3b341", marginLeft: 5 } }, "\uD83D\uDC41"),
+                        perClose && React.createElement("span", { title: "P\u00E9riode close : elle pr\u00E9c\u00E8de la p\u00E9riode en cours. Les modifications y sont bloqu\u00E9es (l'\u00E9diteur peut passer outre, avec avertissement).", style: { color: "#a78bfa", fontWeight: 800, marginLeft: 4, whiteSpace: "nowrap" } }, "\uD83D\uDD12 P\u00E9riode close"),
                         React.createElement("span", { style: { marginLeft: 4, width: 6, height: 6, borderRadius: "50%", display: "inline-block",
                                 background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: netOff ? "Hors ligne — lecture seule" : fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
             React.createElement("nav", { style: S.nav }, orderedTabs.map(function (_a) {
@@ -10942,24 +10998,7 @@ function CardioPlanning() {
                 return (React.createElement("button", { key: v, draggable: true, onDragStart: function () { return setDragTab(v); }, onDragOver: function (e) { e.preventDefault(); }, onDrop: function (e) { e.preventDefault(); if (dragTab && dragTab !== v) {
                         setTabOrder(function (p) { var a = __spreadArray([], p, true), fi = a.indexOf(dragTab), ti = a.indexOf(v); a.splice(fi, 1); a.splice(ti, 0, dragTab); return a; });
                     } setDragTab(null); }, onClick: function () { return goTab(v); }, style: __assign(__assign(__assign({}, S.nb), (tab === v ? S.nba : {})), { cursor: "grab", userSelect: "none" }) }, l));
-            })),
-            Object.keys(archPlan).length > 0 && (function () {
-                var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
-                var shown = [];
-                var _loop_12 = function (mi) {
-                    var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
-                    var mk = y2 + "-" + String(m2 + 1).padStart(2, "0");
-                    if (Object.keys(archPlan).some(function (k) { return k.indexOf(mk) === 0; }) && !Object.keys(plan).some(function (k) { return k.indexOf(mk) === 0; }))
-                        shown.push(MOIS[m2] + " " + y2);
-                };
-                for (var mi = 0; mi < PCFG.len; mi++) {
-                    _loop_12(mi);
-                }
-                return shown.length > 0 ? React.createElement("div", { style: { padding: "4px 12px", fontSize: 10, fontWeight: 700, color: "#7c3aed", background: "rgba(124,58,237,.08)", borderBottom: "1px solid var(--border)" } },
-                    "\uD83D\uDDC4 Donn\u00E9es archiv\u00E9es affich\u00E9es (",
-                    shown.join(", "),
-                    ") \u2014 consultation : les modifications iraient dans les donn\u00E9es actives.") : null;
-            })()),
+            }))),
         React.createElement("main", { style: __assign(__assign({}, S.main), { paddingBottom: GRID_FIT.indexOf(tab) >= 0 ? 12 : 110 }) },
             /* v9.48 : le filtre « depuis aujourd'hui » peut ne laisser aucun jour. */
             (function () {
@@ -12886,7 +12925,7 @@ function CardioPlanning() {
                     React.createElement("textarea", { value: notesAff[nk(medId, y2, m2, d2, slot)] || "", onChange: function (e) { return setNotes(function (p) {
                             var _a;
                             return (__assign(__assign({}, p), (_a = {}, _a[nk(medId, y2, m2, d2, slot)] = e.target.value, _a)));
-                        }); }, placeholder: "Note visible au survol...", readOnly: !canEditThisMed || (isAdminEdit && !adminCanNotes && !entries.some(function (e2) { var a2 = acteById(e2.acteId); return a2 && a2[roleOkKey] === true; })), style: { width: "100%", padding: "6px 8px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, fontFamily: "'Sora',sans-serif", resize: "vertical", minHeight: 48, outline: "none" } }))));
+                        }); }, placeholder: "Note visible au survol...", readOnly: (estClos(y2, m2, d2) && !isEdit) || !canEditThisMed || (isAdminEdit && !adminCanNotes && !entries.some(function (e2) { var a2 = acteById(e2.acteId); return a2 && a2[roleOkKey] === true; })), style: { width: "100%", padding: "6px 8px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, fontFamily: "'Sora',sans-serif", resize: "vertical", minHeight: 48, outline: "none" } }))));
         })(),
         modal === "editMedPin" && mData && (React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement("div", { style: S.mHd },

@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.105 — 22/08/2026";
+const APP_VERSION="v10.106 — 22/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4420,7 +4420,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout."]}),
+  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. L'éditeur peut toujours passer outre, un message l'en avertit."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7234,6 +7234,32 @@ function arFusion(ch,cur,frag){
     out[mid]=o;});
   return out;}
 
+/* ════ VERROU DES PÉRIODES CLOSES (v10.106) ════════════════════════════════════
+   Sa règle : « on ne modifie pas le passé », et la borne est la PÉRIODE — tout ce
+   qui précède le PREMIER JOUR de la période en cours (celle qui contient
+   aujourd'hui) est clos. Une période va du lendemain de la fin de la précédente
+   au dimanche qui la clôt, donc jamais du 1er au 31 : c'est perDaysList qui fait foi.
+
+   VOLONTAIREMENT INDÉPENDANT DE L'ARCHIVAGE. L'ancien bandeau violet se fondait sur
+   les archives CHARGÉES, or une archive n'est lue que si l'on navigue vers son mois :
+   il apparaissait après l'archivage puis disparaissait au changement de session. La
+   période, elle, est connue dès l'ouverture — l'indicateur est donc toujours juste,
+   même avant tout archivage.
+
+   SES DEUX DÉCISIONS DU 22/08/2026 : l'ÉDITEUR passe toujours, avec un simple
+   avertissement ; le verrou porte sur TOUT, absences et FMC comprises. */
+function verrouDebut(){
+  const t=new Date();
+  const p=perStart(t.getFullYear(),t.getMonth());
+  const l=perDaysList(p.sy,p.sm);
+  return l.length?dKey(l[0].y,l[0].m,l[0].d):"0000-00-00";
+}
+/* La borne et le droit de passer outre sont lus dans une REF : les fonctions
+   d'écriture ont des dépendances vides et ne doivent pas être recréées à chaque
+   changement de mode, sous peine de casser toutes les mémoïsations en aval. */
+function vBloque(r,y,m,d){return dKey(y,m,d)<r.current.deb&&!r.current.edit;}
+function vAvertit(r,y,m,d){return dKey(y,m,d)<r.current.deb&&r.current.edit;}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -8204,9 +8230,31 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medPins:JSON.stringify(medPins)});},[medPins]);
 
   useEffect(()=>{ applyTheme(darkMode); },[darkMode]);
+  /* v10.106 : sur iPhone, telecharger le fichier d'archive met la page en arriere-plan
+     et iOS gele les minuteries — le message restait affiche jusqu'a quitter la session.
+     Il s'efface donc aussi au retour au premier plan (et un clic le chasse). */
+  useEffect(()=>{const f=()=>{if(!document.hidden)setNotif(null);};
+    document.addEventListener("visibilitychange",f);
+    return()=>document.removeEventListener("visibilitychange",f);},[]);
   const toast=(msg,type="ok")=>{ setNotif({msg,type}); setTimeout(()=>setNotif(null),3500); };
   const acteById=useCallback(id=>actes.find(a=>a.id===id),[actes]);
   const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"&&(((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")!=="attache"))&&!netOff;  /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
+  /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
+     une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
+  const verrouDeb=useMemo(()=>verrouDebut(),[PCFG.len,PCFG.startM,vacs]);
+  const estClos=useCallback((y2,m2,d2)=>dKey(y2,m2,d2)<verrouDeb,[verrouDeb]);
+  /* la periode AFFICHEE est-elle close ? (son dernier jour precede la borne) */
+  const perClose=useMemo(()=>{const p=perStart(year,month);const e=perEnd(p.sy,p.sm);
+    return dKey(e.getFullYear(),e.getMonth(),e.getDate())<verrouDeb;},[year,month,verrouDeb]);
+  const vRef=useRef({deb:verrouDeb,edit:false});
+  vRef.current={deb:verrouDeb,edit:isEdit};
+  /* un seul message par geste : les operations de masse appellent l'ecriture en boucle */
+  const vTRef=useRef(0);
+  const vToast=useCallback((passe)=>{
+    const n=Date.now();if(n-vTRef.current<1500)return;vTRef.current=n;
+    setNotif({msg:passe?"⚠ Période close — modification enregistrée quand même":"🔒 Période close — modification impossible",type:"warn"});
+    setTimeout(()=>setNotif(null),3500);
+  },[]);
   // ─── Undo/Redo history (edit mode) ───
   const histRef=useRef({stack:[],pas:[],idx:-1,restoring:0});
   /* v10.28 : un changement recu du SERVEUR n'est pas une action de cette personne.
@@ -8553,9 +8601,11 @@ function CardioPlanning(){
 
   /* ── setEntry / addEntry / removeEntry ── */
   const setEntry=useCallback((medId,y2,m2,d2,slot,entry)=>{
+    if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.106 */
     const key=sk(y2,m2,d2,slot);
     setPlan(p=>{const dm={...(p[key]||{})};if(entry)dm[medId]=entry;else delete dm[medId];return{...p,[key]:dm};});
     logCell(entry?"add":"del",medId,y2,m2,d2,slot,entry?entry.acteId:null);
+    if(vAvertit(vRef,y2,m2,d2))vToast(true);
   },[]);
 
   /* v9.58 : poser une activité FERME sur une case qui porte un choix ouvert, c'est
@@ -8564,6 +8614,7 @@ function CardioPlanning(){
      et l'entrée posée garde leur mémoire dans `wasCond`, ce qui permet de rétablir le
      choix si on la retire ensuite. */
   const addEntry=useCallback((medId,y2,m2,d2,slot,entry)=>{
+    if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.106 */
     const key=sk(y2,m2,d2,slot);
     let refusedBy=null;
     setPlan(p=>{
@@ -8604,6 +8655,7 @@ function CardioPlanning(){
     setTimeout(()=>{
       if(refusedBy){toast("Ce créneau porte "+(EXCL_LABEL[refusedBy]||refusedBy)+" — retirez-la d'abord (×)","warn");return;}
       logCell("add",medId,y2,m2,d2,slot,entry.acteId);
+      if(vAvertit(vRef,y2,m2,d2))vToast(true);
     },0);
   },[]);
 
@@ -8663,6 +8715,8 @@ function CardioPlanning(){
   },[]);
 
   const removeEntry=useCallback((medId,y2,m2,d2,slot,acteId)=>{
+    if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.106 */
+    if(vAvertit(vRef,y2,m2,d2))vToast(true);
     const key=sk(y2,m2,d2,slot);
     setPlan(p=>{
       const dm={...(p[key]||{})};const ex=dm[medId];if(!ex)return p;
@@ -8875,6 +8929,7 @@ function CardioPlanning(){
   const applyAbsence=useCallback(({medId,dateFrom,dateTo,slots,absType="ABSENCE",slotsParJour=null})=>{
     const [fy,fm,fd]=parseDate(dateFrom);
     const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
+    let vSkip=false,vWarn=false;
     setPlan(p=>{
       let next={...p};
       let cy=fy,cm=fm;
@@ -8882,18 +8937,22 @@ function CardioPlanning(){
         for(let d=1;d<=dIM(cy,cm);d++){
           const t=new Date(cy,cm,d).getTime();
           if(t<fromT||t>toT)continue;
+          /* v10.106 : jour clos — saute pour tout le monde sauf l'editeur, averti */
+          if(vBloque(vRef,cy,cm,d)){vSkip=true;continue;}
+          if(vAvertit(vRef,cy,cm,d))vWarn=true;
           (isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):slots)).forEach(sl=>{const k=sk(cy,cm,d,sl);const dm={...(next[k]||{})};dm[medId]={acteId:absType||"ABSENCE",salle:null};next={...next,[k]:dm};});
         }
         if(cm===11){cy++;cm=0;}else cm++;
       }
       return next;
     });
-    toast(absType==="FORMATION"?"Formation appliquée":"Absence appliquée");
+    if(vSkip||vWarn)vToast(!vSkip);else toast(absType==="FORMATION"?"Formation appliquée":"Absence appliquée");
   },[]);
 
   const removeAbsence=useCallback(({medId,dateFrom,dateTo,slotsParJour=null})=>{
     const [fy,fm,fd]=parseDate(dateFrom);
     const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
+    let vSkip=false,vWarn=false;
     setPlan(p=>{
       let next={...p};
       let cy=fy,cm=fm;
@@ -8901,6 +8960,9 @@ function CardioPlanning(){
         for(let d=1;d<=dIM(cy,cm);d++){
           const t=new Date(cy,cm,d).getTime();
           if(t<fromT||t>toT)continue;
+          /* v10.106 : jour clos — saute pour tout le monde sauf l'editeur, averti */
+          if(vBloque(vRef,cy,cm,d)){vSkip=true;continue;}
+          if(vAvertit(vRef,cy,cm,d))vWarn=true;
           (isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):["M","AM"]).concat(["JOUR"])).forEach(sl=>{
             const k=sk(cy,cm,d,sl);
             if(!next[k]||!next[k][medId])return;
@@ -8914,7 +8976,7 @@ function CardioPlanning(){
       }
       return next;
     });
-    toast("Absence retirée");
+    if(vSkip||vWarn)vToast(!vSkip);else toast("Absence retirée");
   },[]);
 
   /* ── applyPlanningType ── */
@@ -9625,7 +9687,7 @@ header::-webkit-scrollbar { display: none; }
 }
 `}</style>
 
-      {notif&&<div style={{...S.notif,background:"var(--bg-td)",borderColor:"#4ade80"}}>{notif.msg}</div>}
+      {notif&&<div onClick={()=>setNotif(null)} title="Cliquer pour fermer" style={{...S.notif,background:"var(--bg-td)",borderColor:"#4ade80",cursor:"pointer"}}>{notif.msg}</div>}
       {netOff&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
         📴 Hors ligne — dernier planning reçu · lecture seule
       </div>}
@@ -9655,6 +9717,10 @@ header::-webkit-scrollbar { display: none; }
             <div style={{fontWeight:800,fontSize:14,color:"#f0f6fc"}}>CardioPlanning</div>
             <div style={{fontSize:8,color:"#484f58",display:"flex",alignItems:"center",gap:4}}>
               CHL & CHB{!isEdit&&<span style={{color:"#e3b341",marginLeft:5}}>👁</span>}
+              {/* v10.106 : l'indicateur vit dans le BLOC DE TITRE, pas dans la rangée de
+                  l'en-tête — celle-ci est un flex de hauteur fixe où tout ajout vole sa
+                  largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
+              {perClose&&<span title="Période close : elle précède la période en cours. Les modifications y sont bloquées (l'éditeur peut passer outre, avec avertissement)." style={{color:"#a78bfa",fontWeight:800,marginLeft:4,whiteSpace:"nowrap"}}>🔒 Période close</span>}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
@@ -9672,13 +9738,6 @@ header::-webkit-scrollbar { display: none; }
               style={{...S.nb,...(tab===v?S.nba:{}),cursor:"grab",userSelect:"none"}}>{l}</button>
           ))}
         </nav>
-      {Object.keys(archPlan).length>0&&(()=>{
-        const {sy,sm}=perStart(year,month);
-        const shown=[];
-        for(let mi=0;mi<PCFG.len;mi++){const m2=(sm+mi)%12,y2=sm+mi>11?sy+1:sy;const mk=y2+"-"+String(m2+1).padStart(2,"0");if(Object.keys(archPlan).some(k=>k.indexOf(mk)===0)&&!Object.keys(plan).some(k=>k.indexOf(mk)===0))shown.push(MOIS[m2]+" "+y2);}
-        return shown.length>0?<div style={{padding:"4px 12px",fontSize:10,fontWeight:700,color:"#7c3aed",background:"rgba(124,58,237,.08)",borderBottom:"1px solid var(--border)"}}>🗄 Données archivées affichées ({shown.join(", ")}) — consultation : les modifications iraient dans les données actives.</div>:null;
-      })()}
-
       </header>
 
       <main style={{...S.main,paddingBottom:GRID_FIT.indexOf(tab)>=0?12:110}}>
@@ -11523,7 +11582,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
               <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>📝 Note</div>
               <textarea value={notesAff[nk(medId,y2,m2,d2,slot)]||""} onChange={e=>setNotes(p=>({...p,[nk(medId,y2,m2,d2,slot)]:e.target.value}))}
-                placeholder="Note visible au survol..." readOnly={!canEditThisMed||(isAdminEdit&&!adminCanNotes&&!entries.some(e2=>{const a2=acteById(e2.acteId);return a2&&a2[roleOkKey]===true;}))}
+                placeholder="Note visible au survol..." readOnly={(estClos(y2,m2,d2)&&!isEdit)||!canEditThisMed||(isAdminEdit&&!adminCanNotes&&!entries.some(e2=>{const a2=acteById(e2.acteId);return a2&&a2[roleOkKey]===true;}))}
                 style={{width:"100%",padding:"6px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)",fontSize:12,fontFamily:"'Sora',sans-serif",resize:"vertical",minHeight:48,outline:"none"}}/>
             </div>
           </Ov>
