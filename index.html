@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.109 — 24/08/2026";
+var APP_VERSION = "v10.110 — 24/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4590,7 +4590,7 @@ const HELP_SECTIONS=[
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
   HStep({n:"6",children:[HE("b",null,"Ajuster")," — cases individuelles, échanges de gardes ⇄, dérogations de tour, notes 📝."]}),
-  HP({last:true,children:["En fin de période : archiver les mois écoulés (voir la tuile Archiver)."]}))},
+  HP({last:true,children:["En fin de période : archiver la période écoulée (voir la tuile Archiver)."]}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
   HP({children:["Pour chaque consultation perdue (absence, semaine de tour), l'application propose la ",HE("b",null,"semaine blanche libre la plus proche"),", jamais à plus d'",HE("b",null,"un mois"),", en avant comme en arrière, dans la période affichée. Une semaine sans solution se traite à la main : « ⇄ Chercher une autre semaine blanche » ouvre le choix complet, sans plafond. La ligne d'une blanche qui reçoit dit « peut accueillir le report de … » et se met à jour toute seule si vous décidez autrement."]}),
@@ -4644,11 +4644,11 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. Le verrou vaut pour tout le monde, éditeur compris. Pour une correction exceptionnelle, l'éditeur peut le lever dans Paramètres, encart 🔓 Périodes closes : il se remet en place au rechargement suivant."]}),
+  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close s'archive d'un bloc — ses cases sont retirées du plan actif (allège la base) et conservées dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers une période archivée, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible période par période : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. Le verrou vaut pour tout le monde, éditeur compris. Pour une correction exceptionnelle, l'éditeur peut le lever dans Paramètres, encart 🔓 Périodes closes : il se remet en place au rechargement suivant."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
-  HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les mois passés si elle monte."]}),
+  HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les périodes passées si elle monte."]}),
   HT({children:"💻 Copie sur mon ordinateur"}),
   HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui contiennent l'intégralité des données (toutes périodes) et permettent de tout remettre en place via 📂 Importer. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
   HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). La date de dernière sauvegarde et le compteur sont propres à ",HE("b",null,"chaque ordinateur"),"."]}))},
@@ -7493,185 +7493,143 @@ function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, s
         sel && React.createElement(InternesCellModal, { med: sel.med, y: sel.y, m: sel.m, d: sel.d, slot0: sel.slot0, onClose: () => setSel(null), actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, canSalle: canSalle, salleReg: salleReg, intSelf: intSelf }),
         gm && React.createElement(InternesGardeModal, { y: gm.y, m: gm.m, d: gm.d, jours: jours, onClose: () => setGm(null), intCfg: intCfg, getEntries: getEntries, setEntry: setEntry }));
 }
-/* ════ ARCHIVAGE ÉLARGI (v10.105) ══════════════════════════════════════════════
-   Jusqu'ici l'archivage n'emportait que les CASES. Le tour, les notes, les
-   souhaits, les reports et l'état de Construire des mois archivés restaient dans
-   le document actif et s'y accumulaient sans fin. Or `planning/main` est plafonné
-   à 1 Mo par Firestore (la jauge des Paramètres) : au-delà, Firebase REFUSE
-   l'écriture. Ces annexes mangent donc un plafond DUR, pas un quota élastique.
+/* ════ ARCHIVAGE PAR PÉRIODE (v10.110) ═════════════════════════════════════════
+   L'archive est un DOCUMENT PAR PÉRIODE (`archives/per-<sy>-<sm>`, sm technique
+   0-based — les arguments de perDaysList), et plus un par mois : le verrou, la
+   navigation et Construire raisonnent déjà en périodes, l'archive parle enfin
+   la même langue. Une seule lecture Firestore par période consultée au lieu de
+   cinq (4 mois + le débordement). `planning/main` reste plafonné à 1 Mo par
+   Firestore (la jauge des Paramètres) : au-delà, Firebase REFUSE l'écriture.
 
    DEUX FORMATS DE CLÉS cohabitent dans les données datées, et les confondre est
    exactement le bug v10.4 :
      — « clair »      YYYY-MM-DD  (mois 1-based padé, dKey)
      — « technique »  Y-M-D       (mois 0-based non padé, wKey / dk3)
-   Chaque famille déclare donc SON lecteur de mois. Jamais de slice(0,7) aveugle.
+   Chaque famille déclare donc SON lecteur de période. Jamais de slice aveugle.
 
-   RÈGLE DES SEMAINES, la sienne : une semaine part quand son DERNIER jour (le
-   dimanche) appartient à un mois archivé — jamais avant. Une semaine à cheval
-   reste active tant que le mois suivant n'est pas archivé à son tour.
+   RÈGLE DES SEMAINES (la sienne, v10.109) : les semaines d'une période vont du
+   lundi ≤ premier jour au dimanche ≤ dernier jour. Ici c'est donc le DIMANCHE
+   (lundi + 6) qui décide de la période d'une semaine — équivalence avec
+   perWeeksList prouvée au banc, y compris lundi férié et fin de vacances en
+   milieu de semaine.
 
-   L'ASTREINTE est volontairement laissée en place : ses clés de jour et ses clés
-   de semaine ont le MÊME format et ne se distinguent pas l'une de l'autre. Moins
-   de 1 Ko en jeu, aucun gain à prendre ce risque. */
-const arPad = (y, m0) => { const dt = new Date(y, m0, 1); return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0"); };
-/* mois d'une clé au format clair YYYY-MM-DD (tourDerog, gardeWish, gardeAvoid) */
-function arMoisClair(k) { const s = String(k); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 7) : null; }
+   L'ASTREINTE reste volontairement en place : ses clés de jour et de semaine
+   ont le MÊME format et ne se distinguent pas. Moins de 1 Ko en jeu. */
+const arPad=(y,m0)=>{const dt=new Date(y,m0,1);return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0");};
+const perIdOf=(sy,sm)=>sy+"-"+sm;
+/* La PÉRIODE d'un jour. perStart donne la période « calendaire » de son mois ;
+   un pas de correction suffit ensuite : un débordement (dimanche de clôture,
+   lundi férié, extension vacances plafonnée à 21 j) reste dans le PREMIER mois
+   de la période suivante — prouvé au banc sur 2026→2030. */
+function perOfDay(y,m0,d){
+  let p=perStart(y,m0);
+  const dt=new Date(y,m0,d);
+  const l=perDaysList(p.sy,p.sm);
+  if(l.length&&dt<new Date(l[0].y,l[0].m,l[0].d))p=perPrev(p.sy,p.sm);
+  else if(dt>perEnd(p.sy,p.sm))p=perNext(p.sy,p.sm);
+  return p;
+}
+/* période d'une clé au format clair YYYY-MM-DD (cases, tourDerog, gardeWish, gardeAvoid) */
+function arPerClair(k){const s=String(k);if(!/^\d{4}-\d{2}-\d{2}/.test(s))return null;
+  const p=perOfDay(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10));return perIdOf(p.sy,p.sm);}
 /* notes : "medId|YYYY-MM-DD|SLOT" — le medId peut contenir n'importe quoi */
-function arMoisNote(k) { const p = String(k).split("|"); return p.length >= 2 ? arMoisClair(p[1]) : null; }
+function arPerNote(k){const p=String(k).split("|");return p.length>=2?arPerClair(p[1]):null;}
 /* clé technique Y-M-D, éventuellement suivie de "|SLOT" */
-function arNums(k) {
-    const p = String(k).split("|")[0].split("-");
-    if (p.length !== 3)
-        return null;
-    const y = +p[0], m = +p[1], d = +p[2];
-    return (isFinite(y) && isFinite(m) && isFinite(d) && y > 1900 && m >= 0 && m <= 11 && d >= 1 && d <= 31) ? [y, m, d] : null;
-}
-function arMoisTechJour(k) { const n = arNums(k); return n ? arPad(n[0], n[1]) : null; }
-/* semaine : c'est le DIMANCHE (lundi + 6) qui décide */
-function arMoisTechSem(k) {
-    const n = arNums(k);
-    if (!n)
-        return null;
-    const dt = new Date(n[0], n[1], n[2] + 6);
-    return arPad(dt.getFullYear(), dt.getMonth());
-}
-/* build : clé de PÉRIODE "sy_sm" (sm 0-based) — c'est son DERNIER mois qui décide */
-function arMoisPeriode(k) {
-    const p = String(k).split("_");
-    if (p.length !== 2)
-        return null;
-    const y = +p[0], m = +p[1];
-    return (isFinite(y) && isFinite(m) && y > 1900 && m >= 0 && m <= 11) ? arPad(y, m + PCFG.len - 1) : null;
-}
-/* familles à plat. `lu` = relue à la consultation d'un mois archivé (le tour et
-   les notes s'affichent dans la grille ; les souhaits, reports et Construire
-   n'ont aucune valeur pour un mois passé, ils partent sans retour d'écran). */
-const AR_FAM = [
-    { ch: "tourMed", mois: arMoisTechSem, lu: true, lib: "semaine de tour|semaines de tour" },
-    { ch: "tourDerog", mois: arMoisClair, lu: true, lib: "dérogation de tour|dérogations de tour" },
-    { ch: "notes", mois: arMoisNote, lu: true, lib: "note|notes" },
-    { ch: "tourWish", mois: arMoisTechSem, lu: false, lib: "souhait de tour|souhaits de tour" },
-    { ch: "tourAvoid", mois: arMoisTechSem, lu: false, lib: "tour à éviter|tours à éviter" },
-    { ch: "gardeWish", mois: arMoisClair, lu: false, lib: "souhait de garde|souhaits de garde" },
-    { ch: "gardeAvoid", mois: arMoisClair, lu: false, lib: "garde à éviter|gardes à éviter" },
-    { ch: "build", mois: arMoisPeriode, lu: false, lib: "période de Construire|périodes de Construire" },
+function arNums(k){const p=String(k).split("|")[0].split("-");
+  if(p.length!==3)return null;
+  const y=+p[0],m=+p[1],d=+p[2];
+  return (isFinite(y)&&isFinite(m)&&isFinite(d)&&y>1900&&m>=0&&m<=11&&d>=1&&d<=31)?[y,m,d]:null;}
+function arPerTechJour(k){const n=arNums(k);if(!n)return null;
+  const p=perOfDay(n[0],n[1],n[2]);return perIdOf(p.sy,p.sm);}
+/* semaine (clé = son lundi) : le DIMANCHE décide — équivalent de perWeeksList */
+function arPerTechSem(k){const n=arNums(k);if(!n)return null;
+  const p=perOfDay(n[0],n[1],n[2]+6);return perIdOf(p.sy,p.sm);}
+/* build : clé "sy_sm" = DÉJÀ une clé de période, correspondance directe
+   (la règle « c'est son dernier mois qui décide » disparaît d'elle-même) */
+function arPerPeriode(k){const p=String(k).split("_");
+  if(p.length!==2)return null;const y=+p[0],m=+p[1];
+  return (isFinite(y)&&isFinite(m)&&y>1900&&m>=0&&m<=11)?perIdOf(y,m):null;}
+
+/* familles à plat. `lu` = relue à la consultation d'une période archivée (le
+   tour et les notes s'affichent dans la grille ; les souhaits, reports et
+   Construire n'ont aucune valeur pour une période passée, ils partent sans
+   retour d'écran). */
+const AR_FAM=[
+  {ch:"tourMed",    per:arPerTechSem, lu:true,  lib:"semaine de tour|semaines de tour"},
+  {ch:"tourDerog",  per:arPerClair,   lu:true,  lib:"dérogation de tour|dérogations de tour"},
+  {ch:"notes",      per:arPerNote,    lu:true,  lib:"note|notes"},
+  {ch:"tourWish",   per:arPerTechSem, lu:false, lib:"souhait de tour|souhaits de tour"},
+  {ch:"tourAvoid",  per:arPerTechSem, lu:false, lib:"tour à éviter|tours à éviter"},
+  {ch:"gardeWish",  per:arPerClair,   lu:false, lib:"souhait de garde|souhaits de garde"},
+  {ch:"gardeAvoid", per:arPerClair,   lu:false, lib:"garde à éviter|gardes à éviter"},
+  {ch:"build",      per:arPerPeriode, lu:false, lib:"période de Construire|périodes de Construire"},
 ];
 /* familles indexées PAR MÉDECIN, avec les clés datées au deuxième niveau
    (toutes au format technique) : csBlanches[mid][cle], csRep[mid].done/.to[cle] */
-const AR_MED = [
-    { ch: "csBlanches", sous: null, lib: "semaine blanche|semaines blanches" },
-    { ch: "csRep", sous: ["done", "to"], lib: "report de consultation|reports de consultation" },
+const AR_MED=[
+  {ch:"csBlanches", sous:null,          lib:"semaine blanche|semaines blanches"},
+  {ch:"csRep",      sous:["done","to"], lib:"report de consultation|reports de consultation"},
 ];
-const AR_LU = AR_FAM.filter(f => f.lu).map(f => f.ch);
-/* Découpe les données datées en fonction des mois archivés.
-   Rend {parts:{mois:{champ:…}}, cnt:{champ:n}, n, lib} — `parts` part en archive,
-   `lib` est la phrase annoncée dans la confirmation AVANT tout retrait. */
-function arDecoupe(src, mois) {
-    const ok = (mk) => !!mk && mois.indexOf(mk) >= 0;
-    const parts = {}, cnt = {};
-    const met = (mk, ch, k, v, mid, sous) => {
-        const P = parts[mk] = parts[mk] || {};
-        if (mid === undefined) {
-            (P[ch] = P[ch] || {})[k] = v;
-            return;
-        }
-        const M = (P[ch] = P[ch] || {});
-        const O = (M[mid] = M[mid] || {});
-        if (sous) {
-            (O[sous] = O[sous] || {})[k] = v;
-        }
-        else
-            O[k] = v;
-    };
-    AR_FAM.forEach(f => {
-        const o = src[f.ch] || {};
-        let n = 0;
-        Object.keys(o).forEach(k => { const mk = f.mois(k); if (ok(mk)) {
-            met(mk, f.ch, k, o[k]);
-            n++;
-        } });
-        cnt[f.ch] = n;
+const AR_LU=AR_FAM.filter(f=>f.lu).map(f=>f.ch);
+
+/* Découpe les données datées en fonction des périodes archivées.
+   Rend {parts:{periode:{champ:…}}, cnt:{champ:n}, n, lib} — `parts` part en
+   archive, `lib` est la phrase annoncée dans la confirmation AVANT tout retrait. */
+function arDecoupe(src,pers){
+  const ok=(pid)=>!!pid&&pers.indexOf(pid)>=0;
+  const parts={},cnt={};
+  const met=(pid,ch,k,v,mid,sous)=>{
+    const P=parts[pid]=parts[pid]||{};
+    if(mid===undefined){(P[ch]=P[ch]||{})[k]=v;return;}
+    const M=(P[ch]=P[ch]||{});const O=(M[mid]=M[mid]||{});
+    if(sous){(O[sous]=O[sous]||{})[k]=v;}else O[k]=v;
+  };
+  AR_FAM.forEach(f=>{
+    const o=src[f.ch]||{};let n=0;
+    Object.keys(o).forEach(k=>{const pid=f.per(k);if(ok(pid)){met(pid,f.ch,k,o[k]);n++;}});
+    cnt[f.ch]=n;
+  });
+  AR_MED.forEach(f=>{
+    const o=src[f.ch]||{};let n=0;
+    Object.keys(o).forEach(mid=>{
+      const cur=o[mid]||{};
+      if(!f.sous){Object.keys(cur).forEach(k=>{const pid=arPerTechJour(k);if(ok(pid)){met(pid,f.ch,k,cur[k],mid);n++;}});}
+      else f.sous.forEach(s=>{const s2=cur[s]||{};
+        Object.keys(s2).forEach(k=>{const pid=arPerTechJour(k);if(ok(pid)){met(pid,f.ch,k,s2[k],mid,s);n++;}});});
     });
-    AR_MED.forEach(f => {
-        const o = src[f.ch] || {};
-        let n = 0;
-        Object.keys(o).forEach(mid => {
-            const cur = o[mid] || {};
-            if (!f.sous) {
-                Object.keys(cur).forEach(k => { const mk = arMoisTechJour(k); if (ok(mk)) {
-                    met(mk, f.ch, k, cur[k], mid);
-                    n++;
-                } });
-            }
-            else
-                f.sous.forEach(s => {
-                    const s2 = cur[s] || {};
-                    Object.keys(s2).forEach(k => { const mk = arMoisTechJour(k); if (ok(mk)) {
-                        met(mk, f.ch, k, s2[k], mid, s);
-                        n++;
-                    } });
-                });
-        });
-        cnt[f.ch] = n;
-    });
-    let tot = 0;
-    const lib = [];
-    AR_FAM.concat(AR_MED).forEach(f => {
-        const n = cnt[f.ch] || 0;
-        if (!n)
-            return;
-        tot += n;
-        const w = f.lib.split("|");
-        lib.push(n + " " + (n > 1 ? w[1] : w[0]));
-    });
-    return { parts, cnt, n: tot, lib: lib.join(", ") };
+    cnt[f.ch]=n;
+  });
+  let tot=0;const lib=[];
+  AR_FAM.concat(AR_MED).forEach(f=>{const n=cnt[f.ch]||0;if(!n)return;tot+=n;
+    const w=f.lib.split("|");lib.push(n+" "+(n>1?w[1]:w[0]));});
+  return {parts,cnt,n:tot,lib:lib.join(", ")};
 }
-/* Retire d'un état les clés des mois archivés. Toujours appelé DANS un updater
-   setX(o=>…) : entre le rendu et le clic, le serveur peut avoir livré des
-   modifications, et une valeur figée au rendu les écraserait (leçon v10.3). */
-function arPurge(o, mois, ok) { const g = {}; Object.keys(o || {}).forEach(k => { const mk = mois(k); if (!ok(mk))
-    g[k] = o[k]; }); return g; }
-function arPurgeMed(o, sous, ok) {
-    const g = {};
-    Object.keys(o || {}).forEach(mid => {
-        const cur = o[mid] || {};
-        if (!sous) {
-            const gg = arPurge(cur, arMoisTechJour, ok);
-            if (Object.keys(gg).length)
-                g[mid] = gg;
-        }
-        else {
-            const gg = {};
-            sous.forEach(s => { const gs = arPurge(cur[s] || {}, arMoisTechJour, ok); if (Object.keys(gs).length)
-                gg[s] = gs; });
-            if (Object.keys(gg).length)
-                g[mid] = gg;
-        }
-    });
-    return g;
-}
+
+/* Retire d'un état les clés des périodes archivées. Toujours appelé DANS un
+   updater setX(o=>…) : entre le rendu et le clic, le serveur peut avoir livré
+   des modifications, et une valeur figée au rendu les écraserait (leçon v10.3). */
+function arPurge(o,per,ok){const g={};Object.keys(o||{}).forEach(k=>{const pid=per(k);if(!ok(pid))g[k]=o[k];});return g;}
+function arPurgeMed(o,sous,ok){const g={};
+  Object.keys(o||{}).forEach(mid=>{const cur=o[mid]||{};
+    if(!sous){const gg=arPurge(cur,arPerTechJour,ok);if(Object.keys(gg).length)g[mid]=gg;}
+    else{const gg={};sous.forEach(s=>{const gs=arPurge(cur[s]||{},arPerTechJour,ok);if(Object.keys(gs).length)gg[s]=gs;});
+      if(Object.keys(gg).length)g[mid]=gg;}});
+  return g;}
+
 /* Réinjecte un fragment d'annexe dans un état : ce qui est ACTIF gagne toujours,
    comme la restauration des cases au désarchivage. */
-function arFusion(ch, cur, frag) {
-    if (!frag || Object.keys(frag).length === 0)
-        return cur || {};
-    const med = AR_MED.filter(f => f.ch === ch)[0];
-    if (!med)
-        return Object.assign(Object.assign({}, frag), (cur || {}));
-    const out = Object.assign({}, (cur || {}));
-    Object.keys(frag).forEach(mid => {
-        const f2 = frag[mid] || {}, c2 = out[mid] || {};
-        if (!med.sous) {
-            out[mid] = Object.assign(Object.assign({}, f2), c2);
-            return;
-        }
-        const o = {};
-        med.sous.forEach(s => { const m2 = Object.assign(Object.assign({}, (f2[s] || {})), (c2[s] || {})); if (Object.keys(m2).length)
-            o[s] = m2; });
-        out[mid] = o;
-    });
-    return out;
-}
+function arFusion(ch,cur,frag){
+  if(!frag||Object.keys(frag).length===0)return cur||{};
+  const med=AR_MED.filter(f=>f.ch===ch)[0];
+  if(!med)return Object.assign({},frag,cur||{});
+  const out=Object.assign({},cur||{});
+  Object.keys(frag).forEach(mid=>{
+    const f2=frag[mid]||{},c2=out[mid]||{};
+    if(!med.sous){out[mid]=Object.assign({},f2,c2);return;}
+    const o={};
+    med.sous.forEach(s=>{const m2=Object.assign({},f2[s]||{},c2[s]||{});if(Object.keys(m2).length)o[s]=m2;});
+    out[mid]=o;});
+  return out;}
 
 /* ════ VERROU DES PÉRIODES CLOSES (v10.106) ════════════════════════════════════
    Sa règle : « on ne modifie pas le passé », et la borne est la PÉRIODE — tout ce
@@ -7928,7 +7886,7 @@ function CardioPlanning() {
     var _12 = useState(null), salleEdit = _12[0], setSalleEdit = _12[1]; // salle en cours d'édition (activités associées)
     var _13 = useState({}), archPlan = _13[0], setArchPlan = _13[1]; // cases archivées chargées pour consultation (lecture)
     var _arAnx = useState({ tourMed: {}, tourDerog: {}, notes: {} }), archAnx = _arAnx[0], setArchAnx = _arAnx[1];
-    var archFetched = useRef({}); // mois d'archives déjà demandés   // rapport persistant de la dernière répartition auto des astreintes
+    var archFetched = useRef({}); // périodes d'archives déjà demandées   // rapport persistant de la dernière répartition auto des astreintes
     var _14 = useState({ len: 4, startM: 6 }), periodCfg = _14[0], setPeriodCfg = _14[1];
     PCFG.len = periodCfg.len;
     PCFG.startM = periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
@@ -8510,9 +8468,9 @@ function CardioPlanning() {
                 case 1:
                     snap = _a.sent();
                     ids_1 = [];
-                    snap.forEach(function (d2) { if (d2.id && d2.id.indexOf("arch-") === 0)
-                        ids_1.push(d2.id.slice(5)); });
-                    ids_1.sort();
+                    snap.forEach(function (d2) { if (d2.id && d2.id.indexOf("per-") === 0)
+                        ids_1.push(d2.id.slice(4)); });
+                    ids_1.sort(function (a, b) { var x = a.split("-"), y2 = b.split("-"); return (+x[0] - +y2[0]) || (+x[1] - +y2[1]); });
                     setArchivedList(ids_1);
                     return [2 /*return*/, ids_1];
                 case 2:
@@ -9004,64 +8962,26 @@ function CardioPlanning() {
         saveToFirebase({ astReport: astReport || "" }); }, [astReport]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ salleReg: JSON.stringify(salleReg) }); }, [salleReg]);
-    // Consultation des archives : charge les mois archivés de la période affichée
-    useEffect(function () {
-        var _a = perStart(year, month), sy = _a.sy, sm = _a.sm;
-        var wanted = [];
-        var _pe = perEnd(sy, sm);
-        var _pemk = _pe.getFullYear() + "-" + String(_pe.getMonth() + 1).padStart(2, "0");
-        if (_pe.getMonth() !== (sm + PCFG.len - 1) % 12 && !archFetched.current[_pemk])
-            wanted.push(_pemk);
-        var _loop_7 = function (mi) {
-            var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
-            var mk = y2 + "-" + String(m2 + 1).padStart(2, "0");
-            /* v10.108 : on ne DEVINE plus « ce mois n'est pas archive » par la presence
-               d'une case vivante (voir le jsx). archFetched suffit. */
-            if (!archFetched.current[mk])
-                wanted.push(mk);
-        };
-        for (var mi = 0; mi < PCFG.len; mi++) {
-            _loop_7(mi);
-        }
-        if (wanted.length === 0)
-            return;
-        wanted.forEach(function (mk) { return __awaiter(_this, void 0, void 0, function () {
-            var snap, d, frag_1, e_8;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        archFetched.current[mk] = true;
-                        _a.label = 1;
-                    case 1:
-                        _a.trys.push([1, 3, , 4]);
-                        return [4 /*yield*/, window.firebaseDB.collection("archives").doc("arch-" + mk).get()];
-                    case 2:
-                        snap = _a.sent();
-                        d = snap && snap.data && snap.data();
-                        if (d && d.plan) {
-                            frag_1 = JSON.parse(d.plan);
-                            if (Object.keys(frag_1).length > 0)
-                                setArchPlan(function (p) { return (__assign(__assign({}, p), frag_1)); });
-                        }
-                        if (d && d.annex) {
-                            try {
-                                var an_1 = JSON.parse(d.annex) || {};
-                                var add_1 = {};
-                                AR_LU.forEach(function (ch) { if (an_1[ch] && Object.keys(an_1[ch]).length) add_1[ch] = an_1[ch]; });
-                                if (Object.keys(add_1).length)
-                                    setArchAnx(function (p) { var o = __assign({}, p); Object.keys(add_1).forEach(function (ch) { o[ch] = arFusion(ch, o[ch] || {}, add_1[ch]); }); return o; });
-                            }
-                            catch (e2) { }
-                        }
-                        return [3 /*break*/, 4];
-                    case 3:
-                        e_8 = _a.sent();
-                        return [3 /*break*/, 4];
-                    case 4: return [2 /*return*/];
-                }
-            });
-        }); });
-    }, [year, month]);
+  // Consultation des archives : charge le DOCUMENT DE PÉRIODE de la période affichée
+  // (v10.110 : un doc par période — une seule lecture au lieu de cinq, débordement compris).
+  useEffect(()=>{
+    const p=perStart(year,month);
+    const pid=p.sy+"-"+p.sm;
+    /* v10.108 : on ne devine pas « cette période n'est pas archivée » par la présence
+       d'une case vivante ; on demande l'archive une fois par période et par session. */
+    if(archFetched.current[pid])return;
+    archFetched.current[pid]=true;
+    window.firebaseDB.collection("archives").doc("per-"+pid).get().then(snap=>{
+      const d=snap&&snap.data&&snap.data();
+      if(d&&d.plan){const frag=JSON.parse(d.plan);if(Object.keys(frag).length>0)setArchPlan(pp=>Object.assign({},pp,frag));}
+      /* les annexes RELUES rejoignent le cache — sans elles, une période archivée
+         s'afficherait sans son tour et sans ses notes. */
+      if(d&&d.annex){try{const an=JSON.parse(d.annex)||{};const add={};
+        AR_LU.forEach(ch=>{if(an[ch]&&Object.keys(an[ch]).length)add[ch]=an[ch];});
+        if(Object.keys(add).length)setArchAnx(pp=>{const o=Object.assign({},pp);Object.keys(add).forEach(ch=>{o[ch]=arFusion(ch,o[ch]||{},add[ch]);});return o;});
+      }catch(e2){}}
+    }).catch(()=>{});
+  },[year,month]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
     useEffect(function () { if (!isFirstLoad.current)
@@ -12077,6 +11997,8 @@ function CardioPlanning() {
                                         restoreBackup(b.id); } }, "\u21A9 Restaurer"))); })),
                         React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
                     isEdit && React.createElement(ExportCard, { per: expPer, setPer: setExpPer, source: expSrc, setSource: setExpSrc, backups: backupList, seuil: expSeuil, setSeuil: setExpSeuil, dernier: expLast, onExport: doExport, occupe: expBusy }),
+                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "📂 Importer"),
                     React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 6 } }, "📂 Importer relit un fichier de données (.json) et remet tout en place."),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
                         isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#7c3aed" }), onClick: function () {
@@ -12134,7 +12056,7 @@ function CardioPlanning() {
                                     setImpWait(null);
                                     toast("Sauvegarde restaurée");
                                 } }, "\u21A9 Restaurer"),
-                            React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "var(--bg3)", color: "var(--txt2)" }), onClick: function () { return setImpWait(null); } }, "\u2715 Annuler"))),
+                            React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "var(--bg3)", color: "var(--txt2)" }), onClick: function () { return setImpWait(null); } }, "\u2715 Annuler")))),
                 isEdit && React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDD13 P\u00E9riodes closes"),
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 6 } },
@@ -12146,164 +12068,180 @@ function CardioPlanning() {
             "Autoriser la modification des p\u00E9riodes closes"),
         vUnlock && React.createElement("div", { style: { marginTop: 6, fontSize: 10, color: "#b45309", padding: "4px 7px", borderRadius: 6, border: "1px solid #f59e0b", background: "rgba(245,158,11,.10)" } }, "\u26A0 Verrou lev\u00E9 sur cet appareil et pour cette session seulement. Chaque modification faite sur une p\u00E9riode close vous sera signal\u00E9e.")),
                 isEdit && (() => {
-        const { sy, sm } = perStart(year, month);
-        const perStartDate = new Date(sy, sm, 1);
-        const monthsInPlan = Object.keys(plan).map(k => k.slice(0, 7)).filter((v, i2, a2) => a2.indexOf(v) === i2)
-            .filter(mk => { const y2 = +mk.slice(0, 4), m2 = +mk.slice(5, 7) - 1; return new Date(y2, m2, 1) < perStartDate; }).sort();
-        /* v10.105 : le découpage des données datées est calculé ICI, au rendu, pour
-           pouvoir être ANNONCÉ dans la confirmation avant le moindre retrait. */
-        const anx = arDecoupe({ tourMed, tourDerog, notes, tourWish, tourAvoid, gardeWish, gardeAvoid, build, csRep, csBlanches }, monthsInPlan);
-        return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDDC4 Archivage"),
-            monthsInPlan.length === 0
-                ? React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Aucun mois ant\u00E9rieur \u00E0 la p\u00E9riode affich\u00E9e dans les donn\u00E9es actives \u2014 rien \u00E0 archiver pour l'instant.")
-                : React.createElement("div", null,
-                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 5 } },
-                        monthsInPlan.length,
-                        " mois archivable(s) : ",
-                        monthsInPlan.join(", "),
-                        ". L'archivage copie dans Firebase les cases de ces mois ",
-                        React.createElement("b", null, "et leurs donn\u00E9es dat\u00E9es"),
-                        " (tour, notes, souhaits, reports, Construire), t\u00E9l\u00E9charge un fichier sur cet appareil (\u00E0 conserver : c'est votre copie hors Firebase), puis les retire des donn\u00E9es actives. Le planning, le tour et les notes de ces mois restent consultables en naviguant vers eux (lecture)."),
-                    anx.n > 0 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 5, padding: "4px 7px", borderRadius: 6, border: "1px dashed var(--border)" } },
-                        "Donn\u00E9es dat\u00E9es qui partiraient : ",
-                        anx.lib,
-                        ". Une semaine ne part que si son dimanche est dans un mois archiv\u00E9."),
-                    React.createElement("button", { onClick: async () => {
-                            if (!window.confirm("Archiver les " + monthsInPlan.length + " mois antérieurs à la période affichée (" + monthsInPlan.join(", ") + ") ?"
-                                + (anx.n > 0 ? "\n\nPartent aussi : " + anx.lib + "." : "")
-                                + "\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))
-                                return;
-                            const okB = await makeBackup(true);
-                            if (!okB && !window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))
-                                return;
-                            const byMonth = {};
-                            Object.keys(plan).forEach(k => { const mk = k.slice(0, 7); if (monthsInPlan.includes(mk)) {
-                                (byMonth[mk] = byMonth[mk] || {})[k] = plan[k];
-                            } });
-                            try {
-                                for (const mk of monthsInPlan) {
-                                    const ref = window.firebaseDB.collection("archives").doc("arch-" + mk);
-                                    const prev = (await ref.get()).data() || {};
-                                    const merged = Object.assign(Object.assign({}, (prev.plan ? JSON.parse(prev.plan) : {})), byMonth[mk]);
-                                    /* v10.105 : les annexes du mois rejoignent le document d'archive, FUSIONNÉES
-                                       avec ce qui s'y trouvait déjà (un mois peut être archivé en deux fois). */
-                                    const pAnx = prev.annex ? JSON.parse(prev.annex) : {};
-                                    const nAnx = anx.parts[mk] || {};
-                                    const mAnx = Object.assign({}, pAnx);
-                                    Object.keys(nAnx).forEach(ch => { mAnx[ch] = arFusion(ch, nAnx[ch], pAnx[ch] || {}); });
-                                    await ref.set({ plan: JSON.stringify(merged), annex: JSON.stringify(mAnx), _ts: Date.now() });
-                                }
+    const vDeb = verrouDebut();
+    /* v10.110 : « archivable » = période ENTIÈREMENT CLOSE — la même borne que le
+       verrou, quelle que soit la période affichée. L'ancien critère (« antérieur à
+       la période AFFICHÉE ») permettait d'archiver la période en cours en naviguant
+       vers la suivante. */
+    const perCmp = (a, b) => { const x = a.split("-"), y2 = b.split("-"); return (+x[0] - +y2[0]) || (+x[1] - +y2[1]); };
+    const perLib = (pid) => { const a = pid.split("-"); return perLibelle(+a[0], +a[1]); };
+    const perSet = {};
+    Object.keys(plan).forEach(k => { const pid = arPerClair(k); if (pid)
+        perSet[pid] = 1; });
+    const persInPlan = Object.keys(perSet).filter(pid => {
+        const a = pid.split("-");
+        const l = perDaysList(+a[0], +a[1]);
+        return l.length > 0 && dKey(l[l.length - 1].y, l[l.length - 1].m, l[l.length - 1].d) < vDeb;
+    }).sort(perCmp);
+    const perLibs = persInPlan.map(perLib);
+    /* le découpage des données datées est calculé ICI, au rendu, pour pouvoir être
+       ANNONCÉ dans la confirmation avant le moindre retrait. */
+    const anx = arDecoupe({ tourMed, tourDerog, notes, tourWish, tourAvoid, gardeWish, gardeAvoid, build, csRep, csBlanches }, persInPlan);
+    return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDDC4 Archivage"),
+        persInPlan.length === 0
+            ? React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Aucune p\u00E9riode close dans les donn\u00E9es actives \u2014 rien \u00E0 archiver pour l'instant.")
+            : React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 5 } },
+                    persInPlan.length,
+                    " p\u00E9riode(s) archivable(s) : ",
+                    perLibs.join(" · "),
+                    ". L'archivage copie dans Firebase les cases de ces p\u00E9riodes ",
+                    React.createElement("b", null, "et leurs donn\u00E9es dat\u00E9es"),
+                    " (tour, notes, souhaits, reports, Construire), t\u00E9l\u00E9charge un fichier sur cet appareil (\u00E0 conserver : c'est votre copie hors Firebase), puis les retire des donn\u00E9es actives. Le planning, le tour et les notes restent consultables en naviguant vers ces p\u00E9riodes (lecture)."),
+                anx.n > 0 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 5, padding: "4px 7px", borderRadius: 6, border: "1px dashed var(--border)" } },
+                    "Donn\u00E9es dat\u00E9es qui partiraient : ",
+                    anx.lib,
+                    ". Une semaine suit sa p\u00E9riode, celle de son dimanche."),
+                React.createElement("button", { onClick: async () => {
+                        if (!window.confirm("Archiver " + (persInPlan.length > 1 ? "les " + persInPlan.length + " périodes closes" : "la période close") + " (" + perLibs.join(", ") + ") ?"
+                            + (anx.n > 0 ? "\n\nPartent aussi : " + anx.lib + "." : "")
+                            + "\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))
+                            return;
+                        const okB = await makeBackup(true);
+                        if (!okB && !window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))
+                            return;
+                        const byPer = {};
+                        Object.keys(plan).forEach(k => { const pid = arPerClair(k); if (pid && persInPlan.indexOf(pid) >= 0) {
+                            (byPer[pid] = byPer[pid] || {})[k] = plan[k];
+                        } });
+                        try {
+                            for (const pid of persInPlan) {
+                                const ref = window.firebaseDB.collection("archives").doc("per-" + pid);
+                                const prev = (await ref.get()).data() || {};
+                                const merged = Object.assign({}, prev.plan ? JSON.parse(prev.plan) : {}, byPer[pid] || {});
+                                /* les annexes de la période rejoignent le document d'archive, FUSIONNÉES
+                                   avec ce qui s'y trouvait déjà (une période corrigée après déverrouillage
+                                   peut être archivée en deux fois). */
+                                const pAnx = prev.annex ? JSON.parse(prev.annex) : {};
+                                const nAnx = anx.parts[pid] || {};
+                                const mAnx = Object.assign({}, pAnx);
+                                Object.keys(nAnx).forEach(ch => { mAnx[ch] = arFusion(ch, nAnx[ch], pAnx[ch] || {}); });
+                                await ref.set({ plan: JSON.stringify(merged), annex: JSON.stringify(mAnx), _ts: Date.now() });
                             }
-                            catch (e) {
-                                toast("Échec de la copie en archive — RIEN n'a été retiré", "warn");
-                                return;
-                            }
-                            const blob = new Blob([JSON.stringify({ version: "arch-2", plan: byMonth, annexes: anx.parts }, null, 1)], { type: "application/json" });
-                            const a2 = document.createElement("a");
-                            a2.href = URL.createObjectURL(blob);
-                            a2.download = "archive-cardio-" + monthsInPlan[0] + "_" + monthsInPlan[monthsInPlan.length - 1] + ".json";
-                            a2.click();
-                            setPlan(p => { const n2 = {}; Object.keys(p).forEach(k => { if (!monthsInPlan.includes(k.slice(0, 7)))
-                                n2[k] = p[k]; }); return n2; });
-                            /* v10.105 : retrait des annexes. Toujours par UPDATER et par MOIS, jamais en
-                               reposant la valeur calculée au rendu — le serveur a pu livrer des
-                               modifications entre l'affichage et le clic (leçon v10.3). */
-                            const okM = (mk) => !!mk && monthsInPlan.indexOf(mk) >= 0;
-                            setTourMed(o => arPurge(o, arMoisTechSem, okM));
-                            setTourDerog(o => arPurge(o, arMoisClair, okM));
-                            setNotes(o => arPurge(o, arMoisNote, okM));
-                            setTourWish(o => arPurge(o, arMoisTechSem, okM));
-                            setTourAvoid(o => arPurge(o, arMoisTechSem, okM));
-                            setGardeWish(o => arPurge(o, arMoisClair, okM));
-                            setGardeAvoid(o => arPurge(o, arMoisClair, okM));
-                            setBuild(o => arPurge(o, arMoisPeriode, okM));
-                            setCsBlanches(o => arPurgeMed(o, null, okM));
-                            setCsRep(o => arPurgeMed(o, ["done", "to"], okM));
-                            Object.keys(byMonth).forEach(mk => { archFetched.current[mk] = true; });
-                            /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
-                               continue ». Un semestre dont la FIN est dans les mois archivés
-                               disparaît, avec ses internes et les noms de juniors qui y sont
-                               rattachés. Le dernier mois archivé donne la borne. */
-                            const lastMk = monthsInPlan[monthsInPlan.length - 1];
-                            setMedecins(l2 => l2.map(m2 => { const g = djPurgeMed(m2, intCfg, lastMk); return g ? Object.assign(Object.assign({}, m2), { dj: g }) : m2; }));
-                            setIntCfg(p3 => (Object.assign(Object.assign({}, p3), { sems: (((p3 && p3.sems) || []).filter(s3 => String(s3.fin || "").slice(0, 7) > lastMk)) })));
-                            setArchPlan(p2 => { const add = {}; Object.keys(byMonth).forEach(mk => Object.assign(add, byMonth[mk])); return Object.assign(Object.assign({}, p2), add); });
-                            /* les annexes RELUES rejoignent le cache de consultation tout de suite,
-                               sinon le tour et les notes du mois disparaîtraient jusqu'au rechargement */
-                            setArchAnx(p2 => {
-                                const o = Object.assign({}, p2);
-                                Object.keys(anx.parts).forEach(mk => {
-                                    const A = anx.parts[mk];
-                                    AR_LU.forEach(ch => { if (A[ch])
-                                        o[ch] = arFusion(ch, A[ch], o[ch] || {}); });
-                                });
-                                return o;
+                        }
+                        catch (e) {
+                            toast("Échec de la copie en archive — RIEN n'a été retiré", "warn");
+                            return;
+                        }
+                        const blob = new Blob([JSON.stringify({ version: "arch-per-1", plan: byPer, annexes: anx.parts }, null, 1)], { type: "application/json" });
+                        const a2 = document.createElement("a");
+                        a2.href = URL.createObjectURL(blob);
+                        a2.download = "archive-cardio-" + persInPlan[0] + "_" + persInPlan[persInPlan.length - 1] + ".json";
+                        a2.click();
+                        setPlan(p => { const n2 = {}; Object.keys(p).forEach(k => { const pid = arPerClair(k); if (!pid || persInPlan.indexOf(pid) < 0)
+                            n2[k] = p[k]; }); return n2; });
+                        /* retrait des annexes. Toujours par UPDATER et par période, jamais en
+                           reposant la valeur calculée au rendu — le serveur a pu livrer des
+                           modifications entre l'affichage et le clic (leçon v10.3). */
+                        const okP = (pid) => !!pid && persInPlan.indexOf(pid) >= 0;
+                        setTourMed(o => arPurge(o, arPerTechSem, okP));
+                        setTourDerog(o => arPurge(o, arPerClair, okP));
+                        setNotes(o => arPurge(o, arPerNote, okP));
+                        setTourWish(o => arPurge(o, arPerTechSem, okP));
+                        setTourAvoid(o => arPurge(o, arPerTechSem, okP));
+                        setGardeWish(o => arPurge(o, arPerClair, okP));
+                        setGardeAvoid(o => arPurge(o, arPerClair, okP));
+                        setBuild(o => arPurge(o, arPerPeriode, okP));
+                        setCsBlanches(o => arPurgeMed(o, null, okP));
+                        setCsRep(o => arPurgeMed(o, ["done", "to"], okP));
+                        persInPlan.forEach(pid => { archFetched.current[pid] = true; });
+                        /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
+                           continue ». Un semestre dont la FIN est dans les périodes archivées
+                           disparaît, avec ses internes et les noms de juniors qui y sont
+                           rattachés. Le dernier mois de la dernière période donne la borne. */
+                        const lpd = perDaysList(+persInPlan[persInPlan.length - 1].split("-")[0], +persInPlan[persInPlan.length - 1].split("-")[1]);
+                        const lastMk = arPad(lpd[lpd.length - 1].y, lpd[lpd.length - 1].m);
+                        setMedecins(l2 => l2.map(m2 => { const g = djPurgeMed(m2, intCfg, lastMk); return g ? Object.assign(Object.assign({}, m2), { dj: g }) : m2; }));
+                        setIntCfg(p3 => (Object.assign(Object.assign({}, p3), { sems: (((p3 && p3.sems) || []).filter(s3 => String(s3.fin || "").slice(0, 7) > lastMk)) })));
+                        setArchPlan(p2 => { const add = {}; Object.keys(byPer).forEach(pid => Object.assign(add, byPer[pid])); return Object.assign(Object.assign({}, p2), add); });
+                        /* les annexes RELUES rejoignent le cache de consultation tout de suite,
+                           sinon le tour et les notes de la période disparaîtraient jusqu'au rechargement */
+                        setArchAnx(p2 => {
+                            const o = Object.assign({}, p2);
+                            Object.keys(anx.parts).forEach(pid => {
+                                const A = anx.parts[pid];
+                                AR_LU.forEach(ch => { if (A[ch])
+                                    o[ch] = arFusion(ch, A[ch], o[ch] || {}); });
                             });
-                            toast("Archivage terminé : " + monthsInPlan.length + " mois copiés puis retirés des données actives", "info");
-                            refreshArchList();
-                        }, style: { fontSize: 11, padding: "4px 14px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDDC4 Archiver ces mois")),
-            archivedList.length > 0 && React.createElement("div", { style: { marginTop: 8, paddingTop: 7, borderTop: "1px dashed var(--border)" } },
-                React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } },
-                    "Mois archiv\u00E9s (",
-                    archivedList.length,
-                    ") :"),
-                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, archivedList.map(mk => (React.createElement("span", { key: mk, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: "1px solid #7c3aed", background: "rgba(124,58,237,.07)", color: "#7c3aed" } },
+                            return o;
+                        });
+                        toast("Archivage terminé : " + (persInPlan.length > 1 ? persInPlan.length + " périodes copiées puis retirées" : "1 période copiée puis retirée") + " des données actives", "info");
+                        refreshArchList();
+                    }, style: { fontSize: 11, padding: "4px 14px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } },
                     "\uD83D\uDDC4 ",
-                    mk,
-                    React.createElement("button", { title: "D\u00E9sarchiver : remettre ce mois dans les donn\u00E9es actives", onClick: async () => {
-                            if (!window.confirm("Désarchiver " + mk + " ? Le mois sera remis dans les données actives, cases ET données datées (les valeurs actives existantes sont conservées en cas de doublon)."))
+                    persInPlan.length > 1 ? "Archiver ces périodes" : "Archiver cette période")),
+        archivedList.length > 0 && React.createElement("div", { style: { marginTop: 8, paddingTop: 7, borderTop: "1px dashed var(--border)" } },
+            React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } },
+                "P\u00E9riodes archiv\u00E9es (",
+                archivedList.length,
+                ") :"),
+            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, archivedList.map(pid => (React.createElement("span", { key: pid, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: "1px solid #7c3aed", background: "rgba(124,58,237,.07)", color: "#7c3aed" } },
+                "\uD83D\uDDC4 ",
+                perLib(pid),
+                React.createElement("button", { title: "D\u00E9sarchiver : remettre cette p\u00E9riode dans les donn\u00E9es actives", onClick: async () => {
+                        if (!window.confirm("Désarchiver la période " + perLib(pid) + " ? Elle sera remise dans les données actives, cases ET données datées (les valeurs actives existantes sont conservées en cas de doublon)."))
+                            return;
+                        try {
+                            const ref = window.firebaseDB.collection("archives").doc("per-" + pid);
+                            const d2 = (await ref.get()).data();
+                            if (!d2 || !d2.plan) {
+                                toast("Archive introuvable", "warn");
                                 return;
-                            try {
-                                const ref = window.firebaseDB.collection("archives").doc("arch-" + mk);
-                                const d2 = (await ref.get()).data();
-                                if (!d2 || !d2.plan) {
-                                    toast("Archive introuvable", "warn");
-                                    return;
-                                }
-                                const frag = JSON.parse(d2.plan);
-                                setPlan(p => (Object.assign(Object.assign({}, frag), p)));
-                                /* v10.105 : le désarchivage est SYMÉTRIQUE — les annexes reviennent aussi */
-                                if (d2.annex) {
-                                    try {
-                                        const an = JSON.parse(d2.annex) || {};
-                                        if (an.tourMed)
-                                            setTourMed(c => arFusion("tourMed", c, an.tourMed));
-                                        if (an.tourDerog)
-                                            setTourDerog(c => arFusion("tourDerog", c, an.tourDerog));
-                                        if (an.notes)
-                                            setNotes(c => arFusion("notes", c, an.notes));
-                                        if (an.tourWish)
-                                            setTourWish(c => arFusion("tourWish", c, an.tourWish));
-                                        if (an.tourAvoid)
-                                            setTourAvoid(c => arFusion("tourAvoid", c, an.tourAvoid));
-                                        if (an.gardeWish)
-                                            setGardeWish(c => arFusion("gardeWish", c, an.gardeWish));
-                                        if (an.gardeAvoid)
-                                            setGardeAvoid(c => arFusion("gardeAvoid", c, an.gardeAvoid));
-                                        if (an.build)
-                                            setBuild(c => arFusion("build", c, an.build));
-                                        if (an.csRep)
-                                            setCsRep(c => arFusion("csRep", c, an.csRep));
-                                        if (an.csBlanches)
-                                            setCsBlanches(c => arFusion("csBlanches", c, an.csBlanches));
-                                    }
-                                    catch (e3) { }
-                                }
-                                setArchPlan(p => { const n2 = {}; Object.keys(p).forEach(k => { if (k.indexOf(mk) !== 0)
-                                    n2[k] = p[k]; }); return n2; });
-                                const okM = (m2) => m2 === mk;
-                                setArchAnx(p => ({ tourMed: arPurge(p.tourMed, arMoisTechSem, okM), tourDerog: arPurge(p.tourDerog, arMoisClair, okM), notes: arPurge(p.notes, arMoisNote, okM) }));
-                                delete archFetched.current[mk];
-                                await ref.delete();
-                                refreshArchList();
-                                toast("Mois " + mk + " désarchivé — de retour dans les données actives", "info");
                             }
-                            catch (e) {
-                                toast("Échec du désarchivage", "warn");
+                            const frag = JSON.parse(d2.plan);
+                            setPlan(p => (Object.assign(Object.assign({}, frag), p)));
+                            /* le désarchivage est SYMÉTRIQUE — les annexes reviennent aussi */
+                            if (d2.annex) {
+                                try {
+                                    const an = JSON.parse(d2.annex) || {};
+                                    if (an.tourMed)
+                                        setTourMed(c => arFusion("tourMed", c, an.tourMed));
+                                    if (an.tourDerog)
+                                        setTourDerog(c => arFusion("tourDerog", c, an.tourDerog));
+                                    if (an.notes)
+                                        setNotes(c => arFusion("notes", c, an.notes));
+                                    if (an.tourWish)
+                                        setTourWish(c => arFusion("tourWish", c, an.tourWish));
+                                    if (an.tourAvoid)
+                                        setTourAvoid(c => arFusion("tourAvoid", c, an.tourAvoid));
+                                    if (an.gardeWish)
+                                        setGardeWish(c => arFusion("gardeWish", c, an.gardeWish));
+                                    if (an.gardeAvoid)
+                                        setGardeAvoid(c => arFusion("gardeAvoid", c, an.gardeAvoid));
+                                    if (an.build)
+                                        setBuild(c => arFusion("build", c, an.build));
+                                    if (an.csRep)
+                                        setCsRep(c => arFusion("csRep", c, an.csRep));
+                                    if (an.csBlanches)
+                                        setCsBlanches(c => arFusion("csBlanches", c, an.csBlanches));
+                                }
+                                catch (e3) { }
                             }
-                        }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 10, padding: 0, color: "#16a34a", fontWeight: 900 } }, "\u21A9"))))))));
-    })()),
+                            setArchPlan(p => { const n2 = {}; Object.keys(p).forEach(k => { if (arPerClair(k) !== pid)
+                                n2[k] = p[k]; }); return n2; });
+                            const okP2 = (p2) => p2 === pid;
+                            setArchAnx(p => ({ tourMed: arPurge(p.tourMed, arPerTechSem, okP2), tourDerog: arPurge(p.tourDerog, arPerClair, okP2), notes: arPurge(p.notes, arPerNote, okP2) }));
+                            delete archFetched.current[pid];
+                            await ref.delete();
+                            refreshArchList();
+                            toast("Période " + perLib(pid) + " désarchivée — de retour dans les données actives", "info");
+                        }
+                        catch (e) {
+                            toast("Échec du désarchivage", "warn");
+                        }
+                    }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 10, padding: 0, color: "#16a34a", fontWeight: 900 } }, "\u21A9"))))))));
+})()),
                 React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDF13 Th\u00E8me"),
                         React.createElement("div", { style: { display: "flex", gap: 6 } },
