@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.107 — 22/08/2026";
+var APP_VERSION = "v10.108 — 24/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4629,7 +4629,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. L'éditeur peut toujours passer outre, un message l'en avertit."]}),
+  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. Le verrou vaut pour tout le monde, éditeur compris. Pour une correction exceptionnelle, l'éditeur peut le lever dans Paramètres, encart 🔓 Périodes closes : il se remet en place au rechargement suivant."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7670,8 +7670,12 @@ function arFusion(ch, cur, frag) {
    période, elle, est connue dès l'ouverture — l'indicateur est donc toujours juste,
    même avant tout archivage.
 
-   SES DEUX DÉCISIONS DU 22/08/2026 : l'ÉDITEUR passe toujours, avec un simple
-   avertissement ; le verrou porte sur TOUT, absences et FMC comprises. */
+   SA DÉCISION DU 24/08/2026 : le verrou vaut pour TOUT LE MONDE, éditeur compris
+   (« changer une case passée n'a aucun sens »). Le verrou porte sur TOUT, absences
+   et FMC comprises. Seule échappatoire : l'interrupteur de Paramètres, réservé à
+   l'éditeur, éteint par défaut et NON persisté — il se réarme au rechargement.
+   C'est lui, et lui seul, qui alimente `passe` ci-dessous ; `ed` ne sert qu'au
+   texte du message. */
 function verrouDebut() {
     const t = new Date();
     const p = perStart(t.getFullYear(), t.getMonth());
@@ -7681,8 +7685,8 @@ function verrouDebut() {
 /* La borne et le droit de passer outre sont lus dans une REF : les fonctions
    d'écriture ont des dépendances vides et ne doivent pas être recréées à chaque
    changement de mode, sous peine de casser toutes les mémoïsations en aval. */
-function vBloque(r, y, m, d) { return dKey(y, m, d) < r.current.deb && !r.current.edit; }
-function vAvertit(r, y, m, d) { return dKey(y, m, d) < r.current.deb && r.current.edit; }
+function vBloque(r, y, m, d) { return dKey(y, m, d) < r.current.deb && !r.current.passe; }
+function vAvertit(r, y, m, d) { return dKey(y, m, d) < r.current.deb && r.current.passe; }
 
 function CardioPlanning() {
     var _this = this;
@@ -8991,13 +8995,14 @@ function CardioPlanning() {
         var wanted = [];
         var _pe = perEnd(sy, sm);
         var _pemk = _pe.getFullYear() + "-" + String(_pe.getMonth() + 1).padStart(2, "0");
-        if (_pe.getMonth() !== (sm + PCFG.len - 1) % 12 && !Object.keys(plan).some(function (k) { return k.indexOf(_pemk) === 0; }))
+        if (_pe.getMonth() !== (sm + PCFG.len - 1) % 12 && !archFetched.current[_pemk])
             wanted.push(_pemk);
         var _loop_7 = function (mi) {
             var m2 = (sm + mi) % 12, y2 = sm + mi > 11 ? sy + 1 : sy;
             var mk = y2 + "-" + String(m2 + 1).padStart(2, "0");
-            var hasLive = Object.keys(plan).some(function (k) { return k.indexOf(mk) === 0; });
-            if (!hasLive && !archFetched.current[mk])
+            /* v10.108 : on ne DEVINE plus « ce mois n'est pas archive » par la presence
+               d'une case vivante (voir le jsx). archFetched suffit. */
+            if (!archFetched.current[mk])
                 wanted.push(mk);
         };
         for (var mi = 0; mi < PCFG.len; mi++) {
@@ -9041,7 +9046,7 @@ function CardioPlanning() {
                 }
             });
         }); });
-    }, [year, month, plan]);
+    }, [year, month]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
     useEffect(function () { if (!isFirstLoad.current)
@@ -9165,12 +9170,15 @@ function CardioPlanning() {
     var estClos = useCallback(function (y2, m2, d2) { return dKey(y2, m2, d2) < verrouDeb; }, [verrouDeb]);
     var perClose = useMemo(function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm);
         return dKey(e.getFullYear(), e.getMonth(), e.getDate()) < verrouDeb; }, [year, month, verrouDeb]);
-    var vRef = useRef({ deb: verrouDeb, edit: false });
-    vRef.current = { deb: verrouDeb, edit: isEdit };
+    /* v10.108 : l'interrupteur de Parametres. Session seulement — aucun
+       localStorage, aucun Firestore : le verrou se remet en place tout seul. */
+    var _vU = useState(false), vUnlock = _vU[0], setVUnlock = _vU[1];
+    var vRef = useRef({ deb: verrouDeb, passe: false, ed: false });
+    vRef.current = { deb: verrouDeb, passe: isEdit && vUnlock, ed: isEdit };
     var vTRef = useRef(0);
     var vToast = useCallback(function (passe) {
         var n = Date.now(); if (n - vTRef.current < 1500) return; vTRef.current = n;
-        setNotif({ msg: passe ? "\u26A0 P\u00E9riode close \u2014 modification enregistr\u00E9e quand m\u00EAme" : "\uD83D\uDD12 P\u00E9riode close \u2014 modification impossible", type: passe ? "warn" : "lock" });
+        setNotif({ msg: passe ? "\u26A0 P\u00E9riode close \u2014 modification enregistr\u00E9e quand m\u00EAme" : (vRef.current.ed ? "\uD83D\uDD12 P\u00E9riode close \u2014 modification impossible (d\u00E9verrouillage dans Param\u00E8tres)" : "\uD83D\uDD12 P\u00E9riode close \u2014 modification impossible"), type: passe ? "warn" : "lock" });
         setTimeout(function () { return setNotif(null); }, 3500);
     }, []);
     // ─── Undo/Redo history (edit mode) ───
@@ -10702,8 +10710,8 @@ function CardioPlanning() {
     var vOuvre = function (y2, m2, d2) {
         if (!estClos(y2, m2, d2))
             return true;
-        if (!isEdit) { vToast(false); return false; }
-        return window.confirm("\uD83D\uDD12 P\u00E9riode close \u2014 elle pr\u00E9c\u00E8de la p\u00E9riode en cours.\n\nVous \u00EAtes \u00E9diteur : vous pouvez modifier quand m\u00EAme, et chaque modification vous sera signal\u00E9e.\n\nOuvrir cette case ?");
+        if (!(isEdit && vUnlock)) { vToast(false); return false; }
+        return window.confirm("\uD83D\uDD12 P\u00E9riode close \u2014 elle pr\u00E9c\u00E8de la p\u00E9riode en cours.\n\nLe verrou est lev\u00E9 pour cette session : vous pouvez modifier, et chaque modification vous sera signal\u00E9e.\n\nOuvrir cette case ?");
     };
     var openCell = function (medId, y2, m2, d2, slot) {
         if (!canEdit(medId))
@@ -11001,7 +11009,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontSize: 8, color: "#484f58", display: "flex", alignItems: "center", gap: 4 } },
                         "CHL & CHB",
                         !isEdit && React.createElement("span", { style: { color: "#e3b341", marginLeft: 5 } }, "\uD83D\uDC41"),
-                        perClose && React.createElement("span", { title: "P\u00E9riode close : elle pr\u00E9c\u00E8de la p\u00E9riode en cours. Les modifications y sont bloqu\u00E9es (l'\u00E9diteur peut passer outre, avec avertissement).", style: { background: "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, "\uD83D\uDD12 P\u00C9RIODE CLOSE"),
+                        perClose && React.createElement("span", { title: "P\u00E9riode close : elle pr\u00E9c\u00E8de la p\u00E9riode en cours. Les modifications y sont bloqu\u00E9es pour tout le monde. L'\u00E9diteur peut lever le verrou depuis Param\u00E8tres, le temps d'une session.", style: { background: "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, "\uD83D\uDD12 P\u00C9RIODE CLOSE"),
                         React.createElement("span", { style: { marginLeft: 4, width: 6, height: 6, borderRadius: "50%", display: "inline-block",
                                 background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: netOff ? "Hors ligne — lecture seule" : fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
             React.createElement("nav", { style: S.nav }, orderedTabs.map(function (_a) {
@@ -12091,6 +12099,16 @@ function CardioPlanning() {
                                     toast("Sauvegarde restaurée");
                                 } }, "\u21A9 Restaurer"),
                             React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "var(--bg3)", color: "var(--txt2)" }), onClick: function () { return setImpWait(null); } }, "\u2715 Annuler"))),
+                isEdit && React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDD13 P\u00E9riodes closes"),
+        React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 6 } },
+            "Tout ce qui pr\u00E9c\u00E8de le premier jour de la p\u00E9riode en cours est en ",
+            React.createElement("b", null, "lecture seule, pour tout le monde"),
+            " \u2014 vous compris. Vous pouvez lever le verrou le temps d'une correction : il se remet en place tout seul au prochain chargement de l'application, et rien n'est enregistr\u00E9."),
+        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 7, fontSize: 11, fontWeight: 700, color: vUnlock ? "#b45309" : "var(--txt2)", cursor: "pointer" } },
+            React.createElement("input", { type: "checkbox", checked: vUnlock, onChange: e => { const v = e.target.checked; setVUnlock(v); toast(v ? "⚠ Périodes closes déverrouillées jusqu'au rechargement" : "🔒 Périodes closes de nouveau verrouillées", v ? "warn" : "info"); } }),
+            "Autoriser la modification des p\u00E9riodes closes"),
+        vUnlock && React.createElement("div", { style: { marginTop: 6, fontSize: 10, color: "#b45309", padding: "4px 7px", borderRadius: 6, border: "1px solid #f59e0b", background: "rgba(245,158,11,.10)" } }, "\u26A0 Verrou lev\u00E9 sur cet appareil et pour cette session seulement. Chaque modification faite sur une p\u00E9riode close vous sera signal\u00E9e.")),
                 isEdit && (() => {
         const { sy, sm } = perStart(year, month);
         const perStartDate = new Date(sy, sm, 1);

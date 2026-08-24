@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.107 — 22/08/2026";
+const APP_VERSION="v10.108 — 24/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4420,7 +4420,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. L'éditeur peut toujours passer outre, un message l'en avertit."]}),
+  HP({children:[HE("b",null,"Archiver un mois")," (Paramètres → Archives) : le mois est retiré du plan actif (allège la base) et conservé dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers un mois archivé, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible mois par mois : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. Le verrou vaut pour tout le monde, éditeur compris. Pour une correction exceptionnelle, l'éditeur peut le lever dans Paramètres, encart 🔓 Périodes closes : il se remet en place au rechargement suivant."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7246,8 +7246,12 @@ function arFusion(ch,cur,frag){
    période, elle, est connue dès l'ouverture — l'indicateur est donc toujours juste,
    même avant tout archivage.
 
-   SES DEUX DÉCISIONS DU 22/08/2026 : l'ÉDITEUR passe toujours, avec un simple
-   avertissement ; le verrou porte sur TOUT, absences et FMC comprises. */
+   SA DÉCISION DU 24/08/2026 : le verrou vaut pour TOUT LE MONDE, éditeur compris
+   (« changer une case passée n'a aucun sens »). Le verrou porte sur TOUT, absences
+   et FMC comprises. Seule échappatoire : l'interrupteur de Paramètres, réservé à
+   l'éditeur, éteint par défaut et NON persisté — il se réarme au rechargement.
+   C'est lui, et lui seul, qui alimente `passe` ci-dessous ; `ed` ne sert qu'au
+   texte du message. */
 function verrouDebut(){
   const t=new Date();
   const p=perStart(t.getFullYear(),t.getMonth());
@@ -7257,8 +7261,8 @@ function verrouDebut(){
 /* La borne et le droit de passer outre sont lus dans une REF : les fonctions
    d'écriture ont des dépendances vides et ne doivent pas être recréées à chaque
    changement de mode, sous peine de casser toutes les mémoïsations en aval. */
-function vBloque(r,y,m,d){return dKey(y,m,d)<r.current.deb&&!r.current.edit;}
-function vAvertit(r,y,m,d){return dKey(y,m,d)<r.current.deb&&r.current.edit;}
+function vBloque(r,y,m,d){return dKey(y,m,d)<r.current.deb&&!r.current.passe;}
+function vAvertit(r,y,m,d){return dKey(y,m,d)<r.current.deb&&r.current.passe;}
 
 function CardioPlanning(){
   const today=new Date();
@@ -8124,12 +8128,15 @@ function CardioPlanning(){
     const {sy,sm}=perStart(year,month);
     const wanted=[];
     const _pe=perEnd(sy,sm);const _pemk=_pe.getFullYear()+"-"+String(_pe.getMonth()+1).padStart(2,"0");
-    if(_pe.getMonth()!==(sm+PCFG.len-1)%12&&!Object.keys(plan).some(k=>k.indexOf(_pemk)===0))wanted.push(_pemk);
+    if(_pe.getMonth()!==(sm+PCFG.len-1)%12&&!archFetched.current[_pemk])wanted.push(_pemk);
     for(let mi=0;mi<PCFG.len;mi++){
       const m2=(sm+mi)%12,y2=sm+mi>11?sy+1:sy;
       const mk=y2+"-"+String(m2+1).padStart(2,"0");
-      const hasLive=Object.keys(plan).some(k=>k.indexOf(mk)===0);
-      if(!hasLive&&!archFetched.current[mk])wanted.push(mk);
+      /* v10.108 : on ne DEVINE plus « ce mois n'est pas archive » par la presence
+         d'une case vivante — une seule case laissee dans un mois archive suffisait a
+         ne plus jamais charger l'archive, et le mois s'ouvrait vide sauf cette case.
+         On demande l'archive une fois par mois et par session ; archFetched suffit. */
+      if(!archFetched.current[mk])wanted.push(mk);
     }
     if(wanted.length===0)return;
     wanted.forEach(async(mk)=>{
@@ -8146,7 +8153,7 @@ function CardioPlanning(){
         }catch(e2){}}
       }catch(e){}
     });
-  },[year,month,plan]);
+  },[year,month]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({periodCfg:JSON.stringify(periodCfg)});},[periodCfg]);
   useEffect(()=>{if(!isFirstLoad.current)flushPT(planningType);},[planningType]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({notes:JSON.stringify(notes)});},[notes]);
@@ -8246,13 +8253,16 @@ function CardioPlanning(){
   /* la periode AFFICHEE est-elle close ? (son dernier jour precede la borne) */
   const perClose=useMemo(()=>{const p=perStart(year,month);const e=perEnd(p.sy,p.sm);
     return dKey(e.getFullYear(),e.getMonth(),e.getDate())<verrouDeb;},[year,month,verrouDeb]);
-  const vRef=useRef({deb:verrouDeb,edit:false});
-  vRef.current={deb:verrouDeb,edit:isEdit};
+  /* v10.108 : l'interrupteur de Parametres. Session seulement — aucun
+     localStorage, aucun Firestore : le verrou se remet en place tout seul. */
+  const [vUnlock,setVUnlock]=useState(false);
+  const vRef=useRef({deb:verrouDeb,passe:false,ed:false});
+  vRef.current={deb:verrouDeb,passe:isEdit&&vUnlock,ed:isEdit};
   /* un seul message par geste : les operations de masse appellent l'ecriture en boucle */
   const vTRef=useRef(0);
   const vToast=useCallback((passe)=>{
     const n=Date.now();if(n-vTRef.current<1500)return;vTRef.current=n;
-    setNotif({msg:passe?"⚠ Période close — modification enregistrée quand même":"🔒 Période close — modification impossible",type:passe?"warn":"lock"});
+    setNotif({msg:passe?"⚠ Période close — modification enregistrée quand même":(vRef.current.ed?"🔒 Période close — modification impossible (déverrouillage dans Paramètres)":"🔒 Période close — modification impossible"),type:passe?"warn":"lock"});
     setTimeout(()=>setNotif(null),3500);
   },[]);
   // ─── Undo/Redo history (edit mode) ───
@@ -9421,14 +9431,12 @@ function CardioPlanning(){
     setYearMonth(p.sy,p.sm);
   };
   const [daySwapSpan,setDaySwapSpan]=useState("J");
-  /* v10.107, sa demande : sur une periode close, le non-editeur ne doit meme pas
-     pouvoir OUVRIR la modale ; l'editeur doit etre averti AVANT de l'ouvrir, puis
-     a chaque modification. Il assume la lourdeur : « je ne le ferai presque jamais ».
-     A revoir dans quelques mois — l'interdiction totale reste possible. */
+  /* v10.108 : plus personne n'ouvre une case close, editeur compris — sauf si
+     l'interrupteur de Parametres est leve, et alors la confirmation reste. */
   const vOuvre=(y2,m2,d2)=>{
     if(!estClos(y2,m2,d2))return true;
-    if(!isEdit){vToast(false);return false;}
-    return window.confirm("🔒 Période close — elle précède la période en cours.\n\nVous êtes éditeur : vous pouvez modifier quand même, et chaque modification vous sera signalée.\n\nOuvrir cette case ?");
+    if(!(isEdit&&vUnlock)){vToast(false);return false;}
+    return window.confirm("🔒 Période close — elle précède la période en cours.\n\nLe verrou est levé pour cette session : vous pouvez modifier, et chaque modification vous sera signalée.\n\nOuvrir cette case ?");
   };
   const openCell=(medId,y2,m2,d2,slot)=>{
     if(!canEdit(medId))return;
@@ -9735,7 +9743,7 @@ header::-webkit-scrollbar { display: none; }
               {/* v10.106 : l'indicateur vit dans le BLOC DE TITRE, pas dans la rangée de
                   l'en-tête — celle-ci est un flex de hauteur fixe où tout ajout vole sa
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
-              {perClose&&<span title="Période close : elle précède la période en cours. Les modifications y sont bloquées (l'éditeur peut passer outre, avec avertissement)." style={{background:"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>🔒 PÉRIODE CLOSE</span>}
+              {perClose&&<span title="Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session." style={{background:"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>🔒 PÉRIODE CLOSE</span>}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
@@ -10825,6 +10833,15 @@ header::-webkit-scrollbar { display: none; }
                 <button style={{...S.btnP,background:"var(--bg3)",color:"var(--txt2)"}} onClick={()=>setImpWait(null)}>✕ Annuler</button>
               </div>
             </div>}
+            {isEdit&&<div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🔓 Périodes closes</div>
+                <div style={{fontSize:10,color:"var(--txt2)",marginBottom:6}}>Tout ce qui précède le premier jour de la période en cours est en <b>lecture seule, pour tout le monde</b> — vous compris. Vous pouvez lever le verrou le temps d'une correction : il se remet en place tout seul au prochain chargement de l'application, et rien n'est enregistré.</div>
+                <label style={{display:"flex",alignItems:"center",gap:7,fontSize:11,fontWeight:700,color:vUnlock?"#b45309":"var(--txt2)",cursor:"pointer"}}>
+                  <input type="checkbox" checked={vUnlock} onChange={e=>{const v=e.target.checked;setVUnlock(v);toast(v?"⚠ Périodes closes déverrouillées jusqu'au rechargement":"🔒 Périodes closes de nouveau verrouillées",v?"warn":"info");}}/>
+                  Autoriser la modification des périodes closes
+                </label>
+                {vUnlock&&<div style={{marginTop:6,fontSize:10,color:"#b45309",padding:"4px 7px",borderRadius:6,border:"1px solid #f59e0b",background:"rgba(245,158,11,.10)"}}>⚠ Verrou levé sur cet appareil et pour cette session seulement. Chaque modification faite sur une période close vous sera signalée.</div>}
+              </div>}
             {isEdit&&(()=>{
               const {sy,sm}=perStart(year,month);
               const perStartDate=new Date(sy,sm,1);
