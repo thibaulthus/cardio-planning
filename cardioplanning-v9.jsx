@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.106 — 22/08/2026";
+const APP_VERSION="v10.107 — 22/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -8252,7 +8252,7 @@ function CardioPlanning(){
   const vTRef=useRef(0);
   const vToast=useCallback((passe)=>{
     const n=Date.now();if(n-vTRef.current<1500)return;vTRef.current=n;
-    setNotif({msg:passe?"⚠ Période close — modification enregistrée quand même":"🔒 Période close — modification impossible",type:"warn"});
+    setNotif({msg:passe?"⚠ Période close — modification enregistrée quand même":"🔒 Période close — modification impossible",type:passe?"warn":"lock"});
     setTimeout(()=>setNotif(null),3500);
   },[]);
   // ─── Undo/Redo history (edit mode) ───
@@ -9421,8 +9421,18 @@ function CardioPlanning(){
     setYearMonth(p.sy,p.sm);
   };
   const [daySwapSpan,setDaySwapSpan]=useState("J");
+  /* v10.107, sa demande : sur une periode close, le non-editeur ne doit meme pas
+     pouvoir OUVRIR la modale ; l'editeur doit etre averti AVANT de l'ouvrir, puis
+     a chaque modification. Il assume la lourdeur : « je ne le ferai presque jamais ».
+     A revoir dans quelques mois — l'interdiction totale reste possible. */
+  const vOuvre=(y2,m2,d2)=>{
+    if(!estClos(y2,m2,d2))return true;
+    if(!isEdit){vToast(false);return false;}
+    return window.confirm("🔒 Période close — elle précède la période en cours.\n\nVous êtes éditeur : vous pouvez modifier quand même, et chaque modification vous sera signalée.\n\nOuvrir cette case ?");
+  };
   const openCell=(medId,y2,m2,d2,slot)=>{
     if(!canEdit(medId))return;
+    if(!vOuvre(y2,m2,d2))return;
     setMData({medId,y:y2,m:m2,d:d2,slot});setModal("cell");
   };
 
@@ -9687,7 +9697,12 @@ header::-webkit-scrollbar { display: none; }
 }
 `}</style>
 
-      {notif&&<div onClick={()=>setNotif(null)} title="Cliquer pour fermer" style={{...S.notif,background:"var(--bg-td)",borderColor:"#4ade80",cursor:"pointer"}}>{notif.msg}</div>}
+      {/* v10.107 : la couleur SUIT le type — le style ignorait notif.type, un
+          avertissement s'affichait donc en vert comme une confirmation. */}
+      {notif&&<div onClick={()=>setNotif(null)} title="Cliquer pour fermer" style={{...S.notif,background:"var(--bg-td)",cursor:"pointer",
+        borderColor:notif.type==="warn"?"#f59e0b":notif.type==="lock"?"#a78bfa":"#4ade80",
+        borderWidth:notif.type==="ok"?1.5:2.5,
+        color:notif.type==="warn"?"#b45309":notif.type==="lock"?"#6d28d9":"var(--txt)"}}>{notif.msg}</div>}
       {netOff&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
         📴 Hors ligne — dernier planning reçu · lecture seule
       </div>}
@@ -9720,7 +9735,7 @@ header::-webkit-scrollbar { display: none; }
               {/* v10.106 : l'indicateur vit dans le BLOC DE TITRE, pas dans la rangée de
                   l'en-tête — celle-ci est un flex de hauteur fixe où tout ajout vole sa
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
-              {perClose&&<span title="Période close : elle précède la période en cours. Les modifications y sont bloquées (l'éditeur peut passer outre, avec avertissement)." style={{color:"#a78bfa",fontWeight:800,marginLeft:4,whiteSpace:"nowrap"}}>🔒 Période close</span>}
+              {perClose&&<span title="Période close : elle précède la période en cours. Les modifications y sont bloquées (l'éditeur peut passer outre, avec avertissement)." style={{background:"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>🔒 PÉRIODE CLOSE</span>}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
@@ -9851,12 +9866,12 @@ header::-webkit-scrollbar { display: none; }
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
 
       {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
-        onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
+        onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
         <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
-        onPickSite={({salle,siteActes,d,sl,y,m})=>{
+        onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
              figée. Une salle ajoutée à Béthune et autorisée pour le BIP est reconnue sans
@@ -9869,12 +9884,12 @@ header::-webkit-scrollbar { display: none; }
         rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
-        onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
+        onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
-        onPickSite={({salle,siteActes,d,sl,y,m})=>{setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
+        onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
       {false&&null&&<ActTabView title="🔬 PT Angio" titleColor="#c084fc"
         rows={[
@@ -9884,7 +9899,7 @@ header::-webkit-scrollbar { display: none; }
         ]}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} isEdit={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
-        onPickAct={({row,d,sl,y,m})=>{setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
+        onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
       {tab==="garde"&&<GardeView {...gardeProps}/>}
 

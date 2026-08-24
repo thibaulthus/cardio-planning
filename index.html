@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.106 — 22/08/2026";
+var APP_VERSION = "v10.107 — 22/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -9170,7 +9170,7 @@ function CardioPlanning() {
     var vTRef = useRef(0);
     var vToast = useCallback(function (passe) {
         var n = Date.now(); if (n - vTRef.current < 1500) return; vTRef.current = n;
-        setNotif({ msg: passe ? "\u26A0 P\u00E9riode close \u2014 modification enregistr\u00E9e quand m\u00EAme" : "\uD83D\uDD12 P\u00E9riode close \u2014 modification impossible", type: "warn" });
+        setNotif({ msg: passe ? "\u26A0 P\u00E9riode close \u2014 modification enregistr\u00E9e quand m\u00EAme" : "\uD83D\uDD12 P\u00E9riode close \u2014 modification impossible", type: passe ? "warn" : "lock" });
         setTimeout(function () { return setNotif(null); }, 3500);
     }, []);
     // ─── Undo/Redo history (edit mode) ───
@@ -10699,8 +10699,16 @@ function CardioPlanning() {
         setYearMonth(p.sy, p.sm);
     };
     var _36 = useState("J"), daySwapSpan = _36[0], setDaySwapSpan = _36[1];
+    var vOuvre = function (y2, m2, d2) {
+        if (!estClos(y2, m2, d2))
+            return true;
+        if (!isEdit) { vToast(false); return false; }
+        return window.confirm("\uD83D\uDD12 P\u00E9riode close \u2014 elle pr\u00E9c\u00E8de la p\u00E9riode en cours.\n\nVous \u00EAtes \u00E9diteur : vous pouvez modifier quand m\u00EAme, et chaque modification vous sera signal\u00E9e.\n\nOuvrir cette case ?");
+    };
     var openCell = function (medId, y2, m2, d2, slot) {
         if (!canEdit(medId))
+            return;
+        if (!vOuvre(y2, m2, d2))
             return;
         setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot });
         setModal("cell");
@@ -10968,7 +10976,10 @@ function CardioPlanning() {
     var gardeProps = { onRemoveGarde: removeGardeDay, printWk: printWk, onPrint: function () { return setModal("print"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, getEntry: getEntry, allDays: allDays, isEdit: isEdit, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast };
     return (React.createElement("div", { style: S.app },
         React.createElement("style", null, setFoldCSS() + "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav{scrollbar-width:none;-ms-overflow-style:none}\nnav::-webkit-scrollbar { display: none; }\n/* v10.52 : sur ordinateur (pointeur souris), la barre reapparait — le navigateur\n   ne la dessine que si les onglets debordent, elle reste invisible sinon */\n@media (pointer:fine){\n  nav{scrollbar-width:thin}\n  nav::-webkit-scrollbar{display:block;height:5px}\n}\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
-        notif && React.createElement("div", { onClick: function () { return setNotif(null); }, title: "Cliquer pour fermer", style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", borderColor: "#4ade80", cursor: "pointer" }) }, notif.msg),
+        notif && React.createElement("div", { onClick: function () { return setNotif(null); }, title: "Cliquer pour fermer", style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", cursor: "pointer",
+            borderColor: notif.type === "warn" ? "#f59e0b" : notif.type === "lock" ? "#a78bfa" : "#4ade80",
+            borderWidth: notif.type === "ok" ? 1.5 : 2.5,
+            color: notif.type === "warn" ? "#b45309" : notif.type === "lock" ? "#6d28d9" : "var(--txt)" }) }, notif.msg),
         netOff && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, "\uD83D\uDCF4 Hors ligne \u2014 dernier planning re\u00E7u \u00B7 lecture seule"),
         isMedEdit && botOn && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1d4ed8", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
             "\u270F\uFE0F " + (isInterEdit ? "\u00C9dition \u00E9tendue" : "Mode \u00E9dition restreinte") + " \u2014 Dr. ",
@@ -10990,7 +11001,7 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontSize: 8, color: "#484f58", display: "flex", alignItems: "center", gap: 4 } },
                         "CHL & CHB",
                         !isEdit && React.createElement("span", { style: { color: "#e3b341", marginLeft: 5 } }, "\uD83D\uDC41"),
-                        perClose && React.createElement("span", { title: "P\u00E9riode close : elle pr\u00E9c\u00E8de la p\u00E9riode en cours. Les modifications y sont bloqu\u00E9es (l'\u00E9diteur peut passer outre, avec avertissement).", style: { color: "#a78bfa", fontWeight: 800, marginLeft: 4, whiteSpace: "nowrap" } }, "\uD83D\uDD12 P\u00E9riode close"),
+                        perClose && React.createElement("span", { title: "P\u00E9riode close : elle pr\u00E9c\u00E8de la p\u00E9riode en cours. Les modifications y sont bloqu\u00E9es (l'\u00E9diteur peut passer outre, avec avertissement).", style: { background: "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, "\uD83D\uDD12 P\u00C9RIODE CLOSE"),
                         React.createElement("span", { style: { marginLeft: 4, width: 6, height: 6, borderRadius: "50%", display: "inline-block",
                                 background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: netOff ? "Hors ligne — lecture seule" : fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
             React.createElement("nav", { style: S.nav }, orderedTabs.map(function (_a) {
@@ -11110,12 +11121,14 @@ function CardioPlanning() {
             tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medsAff, getEntries: getEntries, tourMed: tourMed, isEdit: (isEdit || isInterEdit) && !isAttEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: function (per) { return openPtModal(null, "apply", per); }, onRemovePT: function (per) { return openPtModal(null, "remove", per); }, tourProps: tourProps, gardeProps: gardeProps }),
             tab === "chl" && React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", intCfg: intCfg, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notesAff, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
+                    if (!vOuvre(y, m, d)) return;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
             tab === "chb" && React.createElement("div", null,
                 React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["CHB"] || null, onOrder: function (cols) { setColModal({ site: "CHB", cols: cols }); setModal("colOrder"); }, site: "CHB", intCfg: intCfg, darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, notes: notesAff, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
+                    if (!vOuvre(y, m, d)) return;
                     var bip = actes.find(function (a) { return a.id === "BIP"; });
                     var full = bip && (bip.salles || []).includes(salle) ? __spreadArray(__spreadArray([], siteActes.filter(function (a) { return a.id !== "BIP"; }), true), [bip], false) : siteActes;
                     setMData({ salle: salle, siteActes: full, d: d, sl: sl, y: y, m: m });
@@ -11123,11 +11136,13 @@ function CardioPlanning() {
                 }, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod })),
             tab === "plateau" && React.createElement(ActTabView, { issMap: issAllMap, intCfg: intCfg, title: "\u2764\uFE0F PT Cardio", titleColor: "#e3b341", rows: ptRows, orderCtl: isEdit, onOrder: function () { return setModal("ptOrder"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, actes: actes, getEntries: getEntries, allDays: allDays, notes: notesAff, ideFeature: true, ideOn: ideOn, setIdeOn: setIdeOn, ideCfg: ideCfg, setIdeCfg: setIdeCfg, canIde: isEdit || (isAdminEdit && isCadre), printWk: printWk, onPrint: function () { return setModal("print"); }, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
+                    if (!vOuvre(y, m, d)) return;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
             tab === "angio" && React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, colOrder: colOrder["ANGIO"] || null, onOrder: function (cols) { setColModal({ site: "ANGIO", cols: cols }); setModal("colOrder"); }, site: "ANGIO", intCfg: intCfg, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notesAff, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
+                    if (!vOuvre(y, m, d)) return;
                     setMData({ salle: salle, siteActes: siteActes, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedSite");
                 }, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
@@ -11137,6 +11152,7 @@ function CardioPlanning() {
                     { label: "FOP / FAG", ids: ["FOP"], color: "#34d399", salle: null },
                 ], year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, actes: actes, getEntries: getEntries, allDays: allDays, isEdit: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
+                    if (!vOuvre(y, m, d)) return;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
