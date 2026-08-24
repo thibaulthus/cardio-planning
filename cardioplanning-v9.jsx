@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.108 — 24/08/2026";
+const APP_VERSION="v10.109 — 24/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -81,6 +81,30 @@ function perDaysList(sy,sm){
   const days=[];
   for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1))days.push({y:dt.getFullYear(),m:dt.getMonth(),d:dt.getDate()});
   return days;
+}
+/* v10.109 — LES SEMAINES D'UNE PERIODE. Sa regle du 24/08/2026, deux decoupages
+   assumes : une PERIODE va jusqu'au dernier dimanche, ou au lundi suivant s'il est
+   ferie ; le PLANNING TYPE et le TOUR, eux, se repartissent en SEMAINES COMPLETES —
+   du lundi qui precede ou egale le premier jour au dimanche qui precede ou egale le
+   dernier. Quand un lundi ferie est rattache a la periode precedente (1er novembre
+   2027), la semaine de ce lundi est donc la PREMIERE de la periode suivante : c'est
+   ce qu'il veut, le lundi etant ferie — « la semaine de tour va commencer a se
+   repartir le mardi ». Verifie sur 12 periodes (2026->2030) : aucune semaine
+   partagee, aucune oubliee. Ecrit en ES5 pur : texte identique dans les 2 fichiers.
+   La cle est celle de wKey — mois TECHNIQUE, sans zero de tete. */
+function perWeeksList(sy,sm){
+  var l=perDaysList(sy,sm);
+  if(!l.length)return[];
+  var a=new Date(l[0].y,l[0].m,l[0].d);
+  var b=new Date(l[l.length-1].y,l[l.length-1].m,l[l.length-1].d);
+  while(a.getDay()!==1)a.setDate(a.getDate()-1);
+  while(b.getDay()!==0)b.setDate(b.getDate()-1);
+  var out=[],cur=new Date(a);
+  while(cur<=b){
+    out.push({key:cur.getFullYear()+"-"+cur.getMonth()+"-"+cur.getDate(),label:cur.getDate()+" "+MOIS[cur.getMonth()].slice(0,4)});
+    cur.setDate(cur.getDate()+7);
+  }
+  return out;
 }
 const SYS=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE"];
 /* v9.64 : activités EXCLUSIVES — jamais en cohabitation dans une case. Soit l'une
@@ -3363,16 +3387,10 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
   const perLabelT=MOIS[perT.startM]+" — "+MOIS[(perT.startM+PCFG.len-1)%12];
   const prevPeriodT=()=>{const p=perPrev(perT.startY,perT.startM);setTourMonth(p.sm);setTourYear(p.sy);};
   const nextPeriodT=()=>{const p=perNext(perT.startY,perT.startM);setTourMonth(p.sm);setTourYear(p.sy);};
-  const weeksT=[];
-  const startDateT=new Date(perT.startY,perT.startM,1);
-  const fdT=new Date(startDateT);
-  while(fdT.getDay()!==1)fdT.setDate(fdT.getDate()+1);
-  const endDateT=new Date(perT.startY,perT.startM+PCFG.len,0);
-  const curT=new Date(fdT);
-  while(curT<=endDateT){
-    weeksT.push({key:curT.getFullYear()+"-"+curT.getMonth()+"-"+curT.getDate(),label:curT.getDate()+" "+MOIS[curT.getMonth()].slice(0,4)});
-    curT.setDate(curT.getDate()+7);
-  }
+  /* v10.109 : les semaines viennent des BORNES REELLES de la periode. Avant, elles
+     partaient du 1er lundi >= 1er du mois et s'arretaient au dernier jour du dernier
+     mois — juste tant qu'aucune extension ne deplacait une borne. */
+  const weeksT=perWeeksList(perT.startY,perT.startM);
   const tmCountPeriod=(medId)=>weeksT.reduce((n,w)=>{const wm2=tourMed[w.key]||{HC:[],USIC:[]};return((wm2.HC||[]).includes(medId)||(wm2.USIC||[]).includes(medId))?n+1:n;},0);
   const isBlockedInWeek=(medId,wk2)=>{
     const[wy2,wm2,wd2]=wk2.split("-").map(Number);
@@ -9032,7 +9050,7 @@ function CardioPlanning(){
     return {map,list,condList,counts};
   },[getEntries,acteById,allDays4,actes,salleReg]);
   /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
-  const applyPTFlex=useCallback((medId,monthsList,fromToday)=>{
+  const applyPTFlex=useCallback((medId,monthsList,fromToday,bornes)=>{
     const tod=new Date();tod.setHours(0,0,0,0);
     const targets=medId?medecins.filter(m=>m.id===medId):medecins;
     let nApplied=0;
@@ -9041,6 +9059,10 @@ function CardioPlanning(){
       monthsList.forEach(({y:ay,m:am})=>{
         const dim=new Date(ay,am+1,0).getDate();
         for(let d=1;d<=dim;d++){
+          /* v10.109 : hors des bornes reelles de la periode — les premiers jours du
+             1er mois appartiennent a la periode PRECEDENTE, souvent close. */
+          const _dk=dKey(ay,am,d);
+          if(bornes&&(_dk<bornes.deb||_dk>bornes.fin))continue;
           if(isWE(ay,am,d))continue;
           if(fromToday&&new Date(ay,am,d)<tod)continue;
           const dw=dow(ay,am,d);
@@ -9074,7 +9096,7 @@ function CardioPlanning(){
       return next;
     });
     const medLbl=medId?(medecins.find(m=>m.id===medId)||{}).init||"":"tous";
-    toast("Planning type appliqué ("+medLbl+", "+monthsList.length+" mois"+(fromToday?", à partir d'aujourd'hui":"")+")","info");
+    toast("Planning type appliqué ("+medLbl+", "+(bornes?bornes.n:monthsList.length)+" mois"+(fromToday?", à partir d'aujourd'hui":"")+")","info");
   },[medecins,planningType,tourMed]);
 
   /* v10.40 : désactivation — état et écriture. Le champ `off` voyage avec la
@@ -9095,7 +9117,7 @@ function CardioPlanning(){
     for(let i=0;i<PCFG.len;i++){const mm=(p.sm+i)%12,yy=p.sm+i>11?p.sy+1:p.sy;arr.push({y:yy,m:mm});}
     return arr;
   },[ptModal,year,month,PCFG.len,PCFG.startM]);
-  const removePTFlex=useCallback((medId,monthsList,fromToday)=>{
+  const removePTFlex=useCallback((medId,monthsList,fromToday,bornes)=>{
     const tod=new Date();tod.setHours(0,0,0,0);
     const KEEP=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"];
     const targetIds=medId?[medId]:medecins.map(m=>m.id);
@@ -9104,6 +9126,10 @@ function CardioPlanning(){
       monthsList.forEach(({y:ay,m:am})=>{
         const dim=new Date(ay,am+1,0).getDate();
         for(let d=1;d<=dim;d++){
+          /* v10.109 : hors des bornes reelles de la periode — les premiers jours du
+             1er mois appartiennent a la periode PRECEDENTE, souvent close. */
+          const _dk=dKey(ay,am,d);
+          if(bornes&&(_dk<bornes.deb||_dk>bornes.fin))continue;
           if(fromToday&&new Date(ay,am,d)<tod)continue;
           ["M","AM","JOUR","N"].forEach(sl=>{
             const k=sk(ay,am,d,sl);
@@ -9119,7 +9145,7 @@ function CardioPlanning(){
       });
       return next;
     });
-    toast("Affectations retirées ("+monthsList.length+" mois"+(fromToday?", à partir d'aujourd'hui":"")+"). Gardes, absences, formations et tour conservés.","info");
+    toast("Affectations retirées ("+(bornes?bornes.n:monthsList.length)+" mois"+(fromToday?", à partir d'aujourd'hui":"")+"). Gardes, absences, formations et tour conservés.","info");
   },[medecins]);
   const openPtModal=(medId,mode,per)=>{
     setPtMonths(ptPeriodMonths.map((_,i)=>i)); // tous cochés par défaut
@@ -9129,11 +9155,29 @@ function CardioPlanning(){
   const runPtModal=()=>{
     const list=ptPeriodMonths.filter((_,i)=>ptMonths.includes(i));
     if(list.length===0){toast("Sélectionnez au moins un mois","warn");return;}
+    /* v10.109 : les mois coches deviennent des SEGMENTS DE PERIODE. Cocher le PREMIER
+       mois demarre a la vraie borne de debut (le 6 juillet 2026, pas le 1er : les cinq
+       premiers jours appartiennent a la periode precedente, close). Cocher le DERNIER
+       va jusqu'a la fin reelle, debordement compris — le 1er novembre 2026 appartient
+       a la periode juillet-octobre, il suit donc le dernier mois et non le suivant. */
+    const _per=(ptModal&&ptModal.per)?ptModal.per:perStart(year,month);
+    const _jrs=perDaysList(_per.sy,_per.sm);
+    const _j1=_jrs[0],_j2=_jrs[_jrs.length-1];
+    const _prem=ptMonths.includes(0),_dern=ptMonths.includes(PCFG.len-1);
+    const bornes={deb:_prem?dKey(_j1.y,_j1.m,_j1.d):"0000-00-00",
+                  fin:_dern?dKey(_j2.y,_j2.m,_j2.d):"9999-99-99",n:list.length};
+    /* les jours de debordement vivent dans le mois SUIVANT : il faut le parcourir,
+       le filtre des bornes se chargeant de n'en garder que ces jours-la. */
+    const _liste=list.slice();
+    if(_dern){
+      const _last=ptPeriodMonths[PCFG.len-1];
+      for(let _r=_last.y*12+_last.m+1;_r<=_j2.y*12+_j2.m;_r++)_liste.push({y:Math.floor(_r/12),m:_r%12});
+    }
     if(ptModal.mode==="remove"){
       if(!window.confirm("Retirer toutes les affectations d'activités sur les mois sélectionnés ?"))return;
-      removePTFlex(ptModal.medId,list,ptFromToday);
+      removePTFlex(ptModal.medId,_liste,ptFromToday,bornes);
     }else{
-      applyPTFlex(ptModal.medId,list,ptFromToday);
+      applyPTFlex(ptModal.medId,_liste,ptFromToday,bornes);
     }
     setPtModal(null);
   };
