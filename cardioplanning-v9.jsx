@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.110 — 24/08/2026";
+const APP_VERSION="v10.111 — 25/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4438,7 +4438,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close s'archive d'un bloc — ses cases sont retirées du plan actif (allège la base) et conservées dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers une période archivée, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible période par période : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. Le verrou vaut pour tout le monde, éditeur compris. Pour une correction exceptionnelle, l'éditeur peut le lever dans Paramètres, encart 🔓 Périodes closes : il se remet en place au rechargement suivant."]}),
+  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close s'archive d'un bloc — ses cases sont retirées du plan actif (allège la base) et conservées dans une archive dédiée, avec ses données datées — tour, notes, souhaits, reports, Construire. En naviguant vers une période archivée, ses cases, son tour et ses notes se rechargent automatiquement en consultation. Désarchivage possible période par période : il rend tout. Une période close (antérieure à la période en cours) est en LECTURE SEULE : « 🔒 Période close » s'affiche sous le titre en haut à gauche — « 🗄 Période archivée » si elle est archivée — et les modifications y sont refusées. Le verrou vaut pour tout le monde, éditeur compris. Pour une correction exceptionnelle, l'éditeur peut le lever dans Paramètres, encart 🔓 Périodes closes : il se remet en place au rechargement suivant."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7554,8 +7554,12 @@ function CardioPlanning(){
     expBump(pairs.length);   /* v10.35 : cases modifiees depuis la derniere sauvegarde */
     localChange.current=true;
     (async()=>{
-      try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
-      catch(e){console.log("sync plan:",e);setFbStatus("error");if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:cur},{merge:true})).then(()=>setFbStatus("ok")).catch(e2=>{console.error("sync plan (repli):",e2);setFbStatus("error");});}
+      try{for(let i=0;i<pairs.length;i+=200)await updatePaths(PLANNING_DOC,pairs.slice(i,i+200));}
+      /* v10.111 : le repli {merge:true} FUSIONNAIT — les SUPPRESSIONS (celles de
+         l'archivage !) étaient perdues en silence et les cases ressuscitaient au
+         rechargement suivant. mergeFields remplace le champ planV2 en entier :
+         les retraits comptent. Lots ramenés à 200 par prudence. */
+      catch(e){console.error("sync plan ("+pairs.length+" paires):",e);setFbStatus("error");if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:cur},{mergeFields:["planV2"]})).then(()=>setFbStatus("ok")).catch(e2=>{console.error("sync plan (repli):",e2);setFbStatus("error");});}
     })();
   },[]);
 
@@ -7858,6 +7862,7 @@ function CardioPlanning(){
       ids.sort((a,b)=>{const x=a.split("-"),y2=b.split("-");return (+x[0]-+y2[0])||(+x[1]-+y2[1]);});setArchivedList(ids);return ids;
     }catch(e){return [];}
   },[]);
+  useEffect(()=>{refreshArchList();},[refreshArchList]); /* v10.111 : le badge « période archivée » a besoin de la liste dès l'ouverture */
   useEffect(()=>{
     if(tab!=="partage")return;
     refreshBackupList();
@@ -8279,16 +8284,19 @@ function CardioPlanning(){
   /* la periode AFFICHEE est-elle close ? (son dernier jour precede la borne) */
   const perClose=useMemo(()=>{const p=perStart(year,month);const e=perEnd(p.sy,p.sm);
     return dKey(e.getFullYear(),e.getMonth(),e.getDate())<verrouDeb;},[year,month,verrouDeb]);
+  /* v10.111 : la période affichée est-elle ARCHIVÉE ? Badge et messages dédiés —
+     sa demande : distinguer à l'écran une période close d'une période archivée. */
+  const perArchivee=useMemo(()=>{const p=perStart(year,month);return archivedList.indexOf(p.sy+"-"+p.sm)>=0;},[year,month,archivedList]);
   /* v10.108 : l'interrupteur de Parametres. Session seulement — aucun
      localStorage, aucun Firestore : le verrou se remet en place tout seul. */
   const [vUnlock,setVUnlock]=useState(false);
   const vRef=useRef({deb:verrouDeb,passe:false,ed:false});
-  vRef.current={deb:verrouDeb,passe:isEdit&&vUnlock,ed:isEdit};
+  vRef.current={deb:verrouDeb,passe:isEdit&&vUnlock,ed:isEdit,arch:perArchivee};
   /* un seul message par geste : les operations de masse appellent l'ecriture en boucle */
   const vTRef=useRef(0);
   const vToast=useCallback((passe)=>{
     const n=Date.now();if(n-vTRef.current<1500)return;vTRef.current=n;
-    setNotif({msg:passe?"⚠ Période close — modification enregistrée quand même":(vRef.current.ed?"🔒 Période close — modification impossible (déverrouillage dans Paramètres)":"🔒 Période close — modification impossible"),type:passe?"warn":"lock"});
+    setNotif({msg:passe?"⚠ Période close — modification enregistrée quand même":(vRef.current.arch?"🗄 Période archivée — modification impossible (désarchivage dans Paramètres)":vRef.current.ed?"🔒 Période close — modification impossible (déverrouillage dans Paramètres)":"🔒 Période close — modification impossible"),type:passe?"warn":"lock"});
     setTimeout(()=>setNotif(null),3500);
   },[]);
   // ─── Undo/Redo history (edit mode) ───
@@ -8616,10 +8624,14 @@ function CardioPlanning(){
   const tourMedAff=useMemo(()=>Object.keys(archAnx.tourMed).length?{...archAnx.tourMed,...tourMed}:tourMed,[tourMed,archAnx]);
   const tourDerogAff=useMemo(()=>Object.keys(archAnx.tourDerog).length?{...archAnx.tourDerog,...tourDerog}:tourDerog,[tourDerog,archAnx]);
   const notesAff=useMemo(()=>Object.keys(archAnx.notes).length?{...archAnx.notes,...notes}:notes,[notes,archAnx]);
+  /* v10.111 : la fusion plan+archives est calculée UNE fois par changement, plus à
+     CHAQUE appel — getEntries est appelé des milliers de fois par rendu, et étaler
+     un objet de plusieurs centaines de clés à chaque appel gelait toute l'application
+     dès qu'une archive était chargée (son signalement du 25/08/2026). */
+  const planAff=useMemo(()=>Object.keys(archPlan).length>0?{...archPlan,...plan}:plan,[plan,archPlan]);
   const getEntries=useCallback((medId,y2,m2,d2,slot)=>{
-    const _p=Object.keys(archPlan).length>0?{...archPlan,...plan}:plan;
-    return expEntries(_p,tourMedAff,tourDerogAff,medId,y2,m2,d2,slot);
-  },[plan,archPlan,tourMedAff,tourDerogAff]);
+    return expEntries(planAff,tourMedAff,tourDerogAff,medId,y2,m2,d2,slot);
+  },[planAff,tourMedAff,tourDerogAff]);
 
   const getEntry=useCallback((medId,y2,m2,d2,slot)=>getEntries(medId,y2,m2,d2,slot)[0]||null,[getEntries]);
 
@@ -9795,7 +9807,7 @@ header::-webkit-scrollbar { display: none; }
               {/* v10.106 : l'indicateur vit dans le BLOC DE TITRE, pas dans la rangée de
                   l'en-tête — celle-ci est un flex de hauteur fixe où tout ajout vole sa
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
-              {perClose&&<span title="Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session." style={{background:"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>🔒 PÉRIODE CLOSE</span>}
+              {perClose&&<span title={perArchivee?"Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier.":"Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session."} style={{background:perArchivee?"#0e7490":"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perArchivee?"🗄 PÉRIODE ARCHIVÉE":"🔒 PÉRIODE CLOSE"}</span>}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
@@ -10899,10 +10911,8 @@ header::-webkit-scrollbar { display: none; }
               </div>}
             {isEdit&&(()=>{
               const vDeb=verrouDebut();
-              /* v10.110 : « archivable » = période ENTIÈREMENT CLOSE — la même borne que le
-                 verrou, quelle que soit la période affichée. L'ancien critère (« antérieur à
-                 la période AFFICHÉE ») permettait d'archiver la période en cours en naviguant
-                 vers la suivante. */
+              /* « archivable » = période ENTIÈREMENT CLOSE — la même borne que le verrou,
+                 quelle que soit la période affichée (durcissement v10.110). */
               const perCmp=(a,b)=>{const x=a.split("-"),y2=b.split("-");return (+x[0]-+y2[0])||(+x[1]-+y2[1]);};
               const perLib=(pid)=>{const a=pid.split("-");return perLibelle(+a[0],+a[1]);};
               const perSet={};
@@ -10911,76 +10921,85 @@ header::-webkit-scrollbar { display: none; }
                 const a=pid.split("-");const l=perDaysList(+a[0],+a[1]);
                 return l.length>0&&dKey(l[l.length-1].y,l[l.length-1].m,l[l.length-1].d)<vDeb;
               }).sort(perCmp);
-              const perLibs=persInPlan.map(perLib);
-              /* le découpage des données datées est calculé ICI, au rendu, pour pouvoir être
-                 ANNONCÉ dans la confirmation avant le moindre retrait. */
               const anx=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,build,csRep,csBlanches},persInPlan);
+              /* v10.111 : archivage période par période (sa demande) — la même mécanique,
+                 paramétrée par la liste. Le découpage est recalculé AU CLIC pour être
+                 annoncé dans la confirmation avant le moindre retrait. */
+              const archiverPers=async(list)=>{
+                const libs=list.map(perLib);
+                const anxL=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,build,csRep,csBlanches},list);
+                if(!window.confirm("Archiver "+(list.length>1?"les "+list.length+" périodes closes":"la période close")+" ("+libs.join(", ")+") ?"
+                  +(anxL.n>0?"\n\nPartent aussi : "+anxL.lib+".":"")
+                  +"\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
+                const okB=await makeBackup(true);
+                if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))return;
+                const byPer={};
+                Object.keys(plan).forEach(k=>{const pid=arPerClair(k);if(pid&&list.indexOf(pid)>=0){(byPer[pid]=byPer[pid]||{})[k]=plan[k];}});
+                try{
+                  for(const pid of list){
+                    const ref=window.firebaseDB.collection("archives").doc("per-"+pid);
+                    const prev=(await ref.get()).data()||{};
+                    const merged=Object.assign({},prev.plan?JSON.parse(prev.plan):{},byPer[pid]||{});
+                    /* les annexes de la période rejoignent le document d'archive, FUSIONNÉES
+                       avec ce qui s'y trouvait déjà (une période corrigée après déverrouillage
+                       peut être archivée en deux fois). */
+                    const pAnx=prev.annex?JSON.parse(prev.annex):{};
+                    const nAnx=anxL.parts[pid]||{};
+                    const mAnx=Object.assign({},pAnx);
+                    Object.keys(nAnx).forEach(ch=>{mAnx[ch]=arFusion(ch,nAnx[ch],pAnx[ch]||{});});
+                    await ref.set({plan:JSON.stringify(merged),annex:JSON.stringify(mAnx),_ts:Date.now()});
+                  }
+                }catch(e){toast("Échec de la copie en archive — RIEN n'a été retiré","warn");return;}
+                const blob=new Blob([JSON.stringify({version:"arch-per-1",plan:byPer,annexes:anxL.parts},null,1)],{type:"application/json"});
+                const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="archive-cardio-"+list[0]+"_"+list[list.length-1]+".json";a2.click();
+                setPlan(p=>{const n2={};Object.keys(p).forEach(k=>{const pid=arPerClair(k);if(!pid||list.indexOf(pid)<0)n2[k]=p[k];});return n2;});
+                /* retrait des annexes. Toujours par UPDATER et par période, jamais en
+                   reposant la valeur calculée au rendu — le serveur a pu livrer des
+                   modifications entre l'affichage et le clic (leçon v10.3). */
+                const okP=(pid)=>!!pid&&list.indexOf(pid)>=0;
+                setTourMed(o=>arPurge(o,arPerTechSem,okP));
+                setTourDerog(o=>arPurge(o,arPerClair,okP));
+                setNotes(o=>arPurge(o,arPerNote,okP));
+                setTourWish(o=>arPurge(o,arPerTechSem,okP));
+                setTourAvoid(o=>arPurge(o,arPerTechSem,okP));
+                setGardeWish(o=>arPurge(o,arPerClair,okP));
+                setGardeAvoid(o=>arPurge(o,arPerClair,okP));
+                setBuild(o=>arPurge(o,arPerPeriode,okP));
+                setCsBlanches(o=>arPurgeMed(o,null,okP));
+                setCsRep(o=>arPurgeMed(o,["done","to"],okP));
+                list.forEach(pid=>{archFetched.current[pid]=true;});
+                /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
+                   continue ». Un semestre dont la FIN est dans les périodes archivées
+                   disparaît, avec ses internes et les noms de juniors qui y sont
+                   rattachés. Le dernier mois de la dernière période donne la borne. */
+                const lpd=perDaysList(+list[list.length-1].split("-")[0],+list[list.length-1].split("-")[1]);
+                const lastMk=arPad(lpd[lpd.length-1].y,lpd[lpd.length-1].m);
+                setMedecins(l2=>l2.map(m2=>{const g=djPurgeMed(m2,intCfg,lastMk);return g?{...m2,dj:g}:m2;}));
+                setIntCfg(p3=>({...p3,sems:(((p3&&p3.sems)||[]).filter(s3=>String(s3.fin||"").slice(0,7)>lastMk))}));
+                setArchPlan(p2=>{const add={};Object.keys(byPer).forEach(pid=>Object.assign(add,byPer[pid]));return {...p2,...add};});
+                /* les annexes RELUES rejoignent le cache de consultation tout de suite,
+                   sinon le tour et les notes de la période disparaîtraient jusqu'au rechargement */
+                setArchAnx(p2=>{const o={...p2};
+                  Object.keys(anxL.parts).forEach(pid=>{const A=anxL.parts[pid];
+                    AR_LU.forEach(ch=>{if(A[ch])o[ch]=arFusion(ch,A[ch],o[ch]||{});});});
+                  return o;});
+                toast("Archivage terminé : "+(list.length>1?list.length+" périodes copiées puis retirées":"1 période copiée puis retirée")+" des données actives","info");refreshArchList();
+              };
               return(
               <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
                 <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🗄 Archivage</div>
                 {persInPlan.length===0
                   ?<div style={{fontSize:10,color:"var(--txt3)"}}>Aucune période close dans les données actives — rien à archiver pour l'instant.</div>
                   :<div>
-                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>{persInPlan.length} période(s) archivable(s) : {perLibs.join(" · ")}. L'archivage copie dans Firebase les cases de ces périodes <b>et leurs données datées</b> (tour, notes, souhaits, reports, Construire), télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Le planning, le tour et les notes restent consultables en naviguant vers ces périodes (lecture).</div>
+                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>L'archivage copie dans Firebase les cases de la période <b>et ses données datées</b> (tour, notes, souhaits, reports, Construire), télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Le planning, le tour et les notes restent consultables en naviguant vers la période (lecture).</div>
                     {anx.n>0&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:5,padding:"4px 7px",borderRadius:6,border:"1px dashed var(--border)"}}>Données datées qui partiraient : {anx.lib}. Une semaine suit sa période, celle de son dimanche.</div>}
-                    <button onClick={async()=>{
-                        if(!window.confirm("Archiver "+(persInPlan.length>1?"les "+persInPlan.length+" périodes closes":"la période close")+" ("+perLibs.join(", ")+") ?"
-                          +(anx.n>0?"\n\nPartent aussi : "+anx.lib+".":"")
-                          +"\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
-                        const okB=await makeBackup(true);
-                        if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))return;
-                        const byPer={};
-                        Object.keys(plan).forEach(k=>{const pid=arPerClair(k);if(pid&&persInPlan.indexOf(pid)>=0){(byPer[pid]=byPer[pid]||{})[k]=plan[k];}});
-                        try{
-                          for(const pid of persInPlan){
-                            const ref=window.firebaseDB.collection("archives").doc("per-"+pid);
-                            const prev=(await ref.get()).data()||{};
-                            const merged=Object.assign({},prev.plan?JSON.parse(prev.plan):{},byPer[pid]||{});
-                            /* les annexes de la période rejoignent le document d'archive, FUSIONNÉES
-                               avec ce qui s'y trouvait déjà (une période corrigée après déverrouillage
-                               peut être archivée en deux fois). */
-                            const pAnx=prev.annex?JSON.parse(prev.annex):{};
-                            const nAnx=anx.parts[pid]||{};
-                            const mAnx=Object.assign({},pAnx);
-                            Object.keys(nAnx).forEach(ch=>{mAnx[ch]=arFusion(ch,nAnx[ch],pAnx[ch]||{});});
-                            await ref.set({plan:JSON.stringify(merged),annex:JSON.stringify(mAnx),_ts:Date.now()});
-                          }
-                        }catch(e){toast("Échec de la copie en archive — RIEN n'a été retiré","warn");return;}
-                        const blob=new Blob([JSON.stringify({version:"arch-per-1",plan:byPer,annexes:anx.parts},null,1)],{type:"application/json"});
-                        const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="archive-cardio-"+persInPlan[0]+"_"+persInPlan[persInPlan.length-1]+".json";a2.click();
-                        setPlan(p=>{const n2={};Object.keys(p).forEach(k=>{const pid=arPerClair(k);if(!pid||persInPlan.indexOf(pid)<0)n2[k]=p[k];});return n2;});
-                        /* retrait des annexes. Toujours par UPDATER et par période, jamais en
-                           reposant la valeur calculée au rendu — le serveur a pu livrer des
-                           modifications entre l'affichage et le clic (leçon v10.3). */
-                        const okP=(pid)=>!!pid&&persInPlan.indexOf(pid)>=0;
-                        setTourMed(o=>arPurge(o,arPerTechSem,okP));
-                        setTourDerog(o=>arPurge(o,arPerClair,okP));
-                        setNotes(o=>arPurge(o,arPerNote,okP));
-                        setTourWish(o=>arPurge(o,arPerTechSem,okP));
-                        setTourAvoid(o=>arPurge(o,arPerTechSem,okP));
-                        setGardeWish(o=>arPurge(o,arPerClair,okP));
-                        setGardeAvoid(o=>arPurge(o,arPerClair,okP));
-                        setBuild(o=>arPurge(o,arPerPeriode,okP));
-                        setCsBlanches(o=>arPurgeMed(o,null,okP));
-                        setCsRep(o=>arPurgeMed(o,["done","to"],okP));
-                        persInPlan.forEach(pid=>{archFetched.current[pid]=true;});
-                        /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
-                           continue ». Un semestre dont la FIN est dans les périodes archivées
-                           disparaît, avec ses internes et les noms de juniors qui y sont
-                           rattachés. Le dernier mois de la dernière période donne la borne. */
-                        const lpd=perDaysList(+persInPlan[persInPlan.length-1].split("-")[0],+persInPlan[persInPlan.length-1].split("-")[1]);
-                        const lastMk=arPad(lpd[lpd.length-1].y,lpd[lpd.length-1].m);
-                        setMedecins(l2=>l2.map(m2=>{const g=djPurgeMed(m2,intCfg,lastMk);return g?{...m2,dj:g}:m2;}));
-                        setIntCfg(p3=>({...p3,sems:(((p3&&p3.sems)||[]).filter(s3=>String(s3.fin||"").slice(0,7)>lastMk))}));
-                        setArchPlan(p2=>{const add={};Object.keys(byPer).forEach(pid=>Object.assign(add,byPer[pid]));return {...p2,...add};});
-                        /* les annexes RELUES rejoignent le cache de consultation tout de suite,
-                           sinon le tour et les notes de la période disparaîtraient jusqu'au rechargement */
-                        setArchAnx(p2=>{const o={...p2};
-                          Object.keys(anx.parts).forEach(pid=>{const A=anx.parts[pid];
-                            AR_LU.forEach(ch=>{if(A[ch])o[ch]=arFusion(ch,A[ch],o[ch]||{});});});
-                          return o;});
-                        toast("Archivage terminé : "+(persInPlan.length>1?persInPlan.length+" périodes copiées puis retirées":"1 période copiée puis retirée")+" des données actives","info");refreshArchList();
-                      }} style={{fontSize:11,padding:"4px 14px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>🗄 {persInPlan.length>1?"Archiver ces périodes":"Archiver cette période"}</button>
+                    {persInPlan.map(pid=>(
+                      <div key={pid} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                        <span style={{fontSize:11,fontWeight:700,color:"var(--txt)"}}>{perLib(pid)}</span>
+                        <button onClick={()=>archiverPers([pid])} style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>🗄 Archiver</button>
+                      </div>
+                    ))}
+                    {persInPlan.length>1&&<button onClick={()=>archiverPers(persInPlan)} style={{marginTop:2,fontSize:11,padding:"4px 14px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.18)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>🗄 Tout archiver ({persInPlan.length} périodes)</button>}
                   </div>}
                 {archivedList.length>0&&<div style={{marginTop:8,paddingTop:7,borderTop:"1px dashed var(--border)"}}>
                   <div style={{fontSize:10,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>Périodes archivées ({archivedList.length}) :</div>
