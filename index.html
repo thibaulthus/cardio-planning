@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.111 — 25/08/2026";
+var APP_VERSION = "v10.112 — 25/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -9099,11 +9099,16 @@ function CardioPlanning() {
         document.addEventListener("visibilitychange", f);
         return function () { return document.removeEventListener("visibilitychange", f); };
     }, []);
+    /* v10.112 : UN SEUL minuteur d'effacement, réarmé à chaque message — deux toasts
+       rapprochés se volaient l'effacement, et un minuteur gelé par iOS (leçon v10.106)
+       laissait le message affiché sans fin. Le changement d'onglet le chasse aussi. */
+    var notifTRef = useRef(0);
     var toast = function (msg, type) {
         if (type === void 0) { type = "ok"; }
         setNotif({ msg: msg, type: type });
-        setTimeout(function () { return setNotif(null); }, 3500);
+        clearTimeout(notifTRef.current); notifTRef.current = setTimeout(function () { return setNotif(null); }, 3500);
     };
+    useEffect(function () { setNotif(null); }, [tab]);
     var acteById = useCallback(function (id) { return actes.find(function (a) { return a.id === id; }); }, [actes]);
     var isEdit = (accessMode === "edit" || (accessMode === "medecinEdit" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).niveau) || "basic") === "editeur" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).role) || "medecin") !== "attache")) && !netOff; /* v10.73 */ // hors ligne : lecture seule
     var verrouDeb = useMemo(function () { return verrouDebut(); }, [PCFG.len, PCFG.startM, vacs]);
@@ -9122,7 +9127,7 @@ function CardioPlanning() {
     var vToast = useCallback(function (passe) {
         var n = Date.now(); if (n - vTRef.current < 1500) return; vTRef.current = n;
         setNotif({ msg: passe ? "\u26A0 P\u00E9riode close \u2014 modification enregistr\u00E9e quand m\u00EAme" : (vRef.current.arch ? "\uD83D\uDDC4 P\u00E9riode archiv\u00E9e \u2014 modification impossible (d\u00E9sarchivage dans Param\u00E8tres)" : vRef.current.ed ? "\uD83D\uDD12 P\u00E9riode close \u2014 modification impossible (d\u00E9verrouillage dans Param\u00E8tres)" : "\uD83D\uDD12 P\u00E9riode close \u2014 modification impossible"), type: passe ? "warn" : "lock" });
-        setTimeout(function () { return setNotif(null); }, 3500);
+        clearTimeout(notifTRef.current); notifTRef.current = setTimeout(function () { return setNotif(null); }, 3500);
     }, []);
     // ─── Undo/Redo history (edit mode) ───
     const histRef = useRef({ stack: [], pas: [], idx: -1, restoring: 0 });
@@ -12130,11 +12135,25 @@ function CardioPlanning() {
             toast("Échec de la copie en archive — RIEN n'a été retiré", "warn");
             return;
         }
-        const blob = new Blob([JSON.stringify({ version: "arch-per-1", plan: byPer, annexes: anxL.parts }, null, 1)], { type: "application/json" });
-        const a2 = document.createElement("a");
-        a2.href = URL.createObjectURL(blob);
-        a2.download = "archive-cardio-" + list[0] + "_" + list[list.length - 1] + ".json";
-        a2.click();
+        /* v10.112 : LES RETRAITS D'ABORD, LE TÉLÉCHARGEMENT EN DERNIER. Sur iPhone,
+           le téléchargement met la page en arrière-plan et iOS gèle réseau et
+           minuteries (leçon v10.106) : en v10.110/111 les suppressions, envoyées
+           par la synchronisation APRÈS le clic, ne partaient jamais — les cases
+           ressuscitaient au rechargement et la liste des périodes archivées restait
+           vide. Les retraits sont donc écrits et CONFIRMÉS ici, avant tout
+           téléchargement ; la synchronisation ne fera ensuite que les reconstater
+           (supprimer un champ déjà absent est sans effet). */
+        const delPairs = [];
+        Object.keys(byPer).forEach(pid => Object.keys(byPer[pid]).forEach(k => delPairs.push([["planV2", k], "__DELETE__"])));
+        try {
+            if (PLANNING_DOC && updatePaths)
+                for (let i2 = 0; i2 < delPairs.length; i2 += 200)
+                    await updatePaths(PLANNING_DOC, delPairs.slice(i2, i2 + 200));
+        }
+        catch (e) {
+            toast("Échec du retrait des cases — les archives sont écrites, les données actives n'ont pas bougé. Réessayez.", "warn");
+            return;
+        }
         setPlan(p => { const n2 = {}; Object.keys(p).forEach(k => { const pid = arPerClair(k); if (!pid || list.indexOf(pid) < 0)
             n2[k] = p[k]; }); return n2; });
         /* retrait des annexes. Toujours par UPDATER et par période, jamais en
@@ -12172,8 +12191,15 @@ function CardioPlanning() {
             });
             return o;
         });
+        await refreshArchList(); /* v10.112 : pastilles et badge à jour AVANT le téléchargement */
         toast("Archivage terminé : " + (list.length > 1 ? list.length + " périodes copiées puis retirées" : "1 période copiée puis retirée") + " des données actives", "info");
-        refreshArchList();
+        /* le fichier part en dernier, une fois les écritures critiques confirmées ;
+           le court délai laisse aussi partir l'enregistrement des annexes */
+        const blob = new Blob([JSON.stringify({ version: "arch-per-1", plan: byPer, annexes: anxL.parts }, null, 1)], { type: "application/json" });
+        const a2 = document.createElement("a");
+        a2.href = URL.createObjectURL(blob);
+        a2.download = "archive-cardio-" + list[0] + "_" + list[list.length - 1] + ".json";
+        setTimeout(() => { a2.click(); }, 800);
     };
     return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDDC4 Archivage"),
@@ -12248,7 +12274,7 @@ function CardioPlanning() {
                             setArchAnx(p => ({ tourMed: arPurge(p.tourMed, arPerTechSem, okP2), tourDerog: arPurge(p.tourDerog, arPerClair, okP2), notes: arPurge(p.notes, arPerNote, okP2) }));
                             delete archFetched.current[pid];
                             await ref.delete();
-                            refreshArchList();
+                            await refreshArchList();
                             toast("Période " + perLib(pid) + " désarchivée — de retour dans les données actives", "info");
                         }
                         catch (e) {
