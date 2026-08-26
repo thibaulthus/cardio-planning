@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.117 — 26/08/2026";
+var APP_VERSION = "v10.118 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -601,9 +601,30 @@ var ptCell = function (a1, s1, a2, s2, a3, s3, c1) {
     /* v9.68 : c1 (7e élément du planning type) marque une activité SEULE comme choix
        ouvert « en attente » — même comportement qu'à 2 ou 3 branches (v9.62). */
     if (brs.length === 1)
-        return c1 ? { acteId: brs[0][0], salle: brs[0][1] || null, cond: 1 } : { acteId: brs[0][0], salle: brs[0][1] || null };
-    return brs.map(function (b) { return ({ acteId: b[0], salle: b[1] || null, cond: 1 }); });
+        return c1 ? { acteId: brs[0][0], salle: brs[0][1] || null, cond: 1, pt: 1 } : { acteId: brs[0][0], salle: brs[0][1] || null, pt: 1 }; /* v10.118 : pt:1 = posée par le planning type */
+    return brs.map(function (b) { return ({ acteId: b[0], salle: b[1] || null, cond: 1, pt: 1 }); });
 };
+/* v10.118 : cases posées par le planning type. Chaque entrée écrite par le PT porte
+   pt:1 (invisible a l'ecran). Une case « appartient » au planning type si toutes ses
+   entrées portent la marque, OU si son contenu est EXACTEMENT ce que le PT y poserait
+   (cases écrites avant la marque). Tout le reste est MANUEL : appliquer, retirer le
+   planning type ou prendre le tour n'y touche plus — on compte et on montre (Voir). */
+var cellSig=function(c){return JSON.stringify(cellEs(c).map(function(e){return [e.acteId,e.salle||null,e.cond?1:0];}));};
+var ptOwn=function(ex,ptSlot){
+  if(!ex)return true;
+  var es=cellEs(ex);
+  if(es.length&&es.every(function(e){return e&&e.pt;}))return true;
+  if(!ptSlot||!ptSlot[0])return false;
+  var ref=ptCell(ptSlot[0],ptSlot[1],ptSlot[2],ptSlot[3],ptSlot[4],ptSlot[5],ptSlot[6]);
+  return !!ref&&cellSig(ex)===cellSig(ref);
+};
+var ptOwnTP=function(ex){
+  if(!ex)return true;
+  var es=cellEs(ex);
+  if(es.length&&es.every(function(e){return e&&e.pt;}))return true;
+  return cellSig(ex)===JSON.stringify([["TP",null,0]]);
+};
+var HL={on:{},t:0};   /* liseré temporaire des cases conservées (hlVoir) */
 function CondBadges(_a) {
     var es = _a.es, acteById = _a.acteById, noteT = _a.noteT;
     var firm = (es || []).filter(function (e) { return e && e.acteId && !e.cond; });
@@ -940,7 +961,7 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
                             /* v10.81 : preferences de tour (bande lun-ven) et de garde (icone du jour) */
                             const pf = prefFor ? prefFor(med.id, ey, em, d) : null;
                             const prefBg = pf && pf.tour ? (pf.tour === "wish" ? "rgba(56,139,253,.20)" : "rgba(248,81,73,.18)") : null;
-                            return React.createElement("td", { key: med.id, title: offC ? ("Indisponible — désactivé " + medOffL(med).map(r => "du " + offFr(r.du) + " au " + offFr(r.au)).join(", ")) : ((issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined), style: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (prefBg ? { background: prefBg } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), (offC ? { background: "repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)", opacity: .55, cursor: "default" } : {})), { display: "table-cell", verticalAlign: "middle", position: "relative" }), onContextMenu: onCellHistory ? e => { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? () => { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(() => { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? () => clearTimeout(_gvLpT) : undefined, onTouchMove: onCellHistory ? () => clearTimeout(_gvLpT) : undefined, onClick: bl || offC || !isEdit ? undefined : () => { if (_gvLpF) {
+                            return React.createElement("td", { key: med.id, title: offC ? ("Indisponible — désactivé " + medOffL(med).map(r => "du " + offFr(r.du) + " au " + offFr(r.au)).join(", ")) : ((issueT ? issueT + (noteT ? " | " + noteT : "") : noteT) || undefined), style: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, S.td), (we ? S.tdWE : {})), (isAst ? { background: "var(--ast-bg)", boxShadow: astSh } : {})), (prefBg ? { background: prefBg } : {})), (bl ? { background: "var(--bg)", opacity: .4, cursor: "default" } : { cursor: isEdit ? "pointer" : "default" })), (offC ? { background: "repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)", opacity: .55, cursor: "default" } : {})), __assign(__assign({}, (HL.on[sk(ey, em, d, sl) + "|" + med.id] ? { outline: "3px solid #e3b341", outlineOffset: -3 } : {})), { display: "table-cell", verticalAlign: "middle", position: "relative" })), onContextMenu: onCellHistory ? e => { e.preventDefault(); onCellHistory(med.id, ey, em, d, sl); } : undefined, onTouchStart: onCellHistory ? () => { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(() => { _gvLpF = true; onCellHistory(med.id, ey, em, d, sl); }, 600); } : undefined, onTouchEnd: onCellHistory ? () => clearTimeout(_gvLpT) : undefined, onTouchMove: onCellHistory ? () => clearTimeout(_gvLpT) : undefined, onClick: bl || offC || !isEdit ? undefined : () => { if (_gvLpF) {
                                     _gvLpF = false;
                                     return;
                                 } onCell(med.id, ey, em, d, sl); } },
@@ -4690,6 +4711,7 @@ const HELP_SECTIONS=[
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés."]}),
+  HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, notes, souhaits, reports, Construire), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour et ses notes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. Seule l'astreinte reste volontairement dans les données actives (poids négligeable)."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
@@ -7983,6 +8005,7 @@ function CardioPlanning() {
     var _m = useState(null), modal = _m[0], setModal = _m[1];
     var _o = useState(null), mData = _o[0], setMData = _o[1];
     var _q = useState(null), notif = _q[0], setNotif = _q[1];
+    var _hlT = useState(0), hlTick = _hlT[0], setHlTick = _hlT[1]; /* v10.118 : re-rendu du liseré */
     var _r = useState([]), planFilter = _r[0], setPlanFilter = _r[1];
     var _t = useState(false), showFull = _t[0], setShowFull = _t[1];
     var viewPeriod = true;
@@ -8988,6 +9011,7 @@ function CardioPlanning() {
     var clearWeekActivities = useCallback(function (pairs) {
         // pairs: [{medId,weekKey}] — retire les activités (dont TP) des nouveaux tourneurs, garde abs/gardes/formations
         var PROT2 = ["ABSENCE", "GARDE", "REPOS_GARDE", "FORM", "FORMATION"]; // sans TP : retire expres des nouveaux tourneurs
+        var garde = []; /* v10.118 : cases manuelles épargnées */
         setPlan(function (p) {
             var next = __assign({}, p);
             pairs.forEach(function (_a) {
@@ -8998,6 +9022,7 @@ function CardioPlanning() {
                     var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
                     if (isWE(dy, dm3, dd))
                         return "continue";
+                    var dw2 = dow(dy, dm3, dd);
                     ["M", "AM"].forEach(function (sl) {
                         var k = sk(dy, dm3, dd, sl);
                         if (!next[k] || !next[k][medId])
@@ -9005,6 +9030,10 @@ function CardioPlanning() {
                         var e = next[k][medId];
                         if (cellHasAny(e, PROT2))
                             return;
+                        /* v10.118 : seules les cases du planning type (et le TP) partent — une case
+                           posée à la main survit à la prise du tour, et on le signale (Voir). */
+                        var ptW = ((planningType[medId] || {})[dw2] || {})[sl];
+                        if (!(ptOwnTP(e) || ptOwn(e, ptW))) { garde.push({ c: k + "|" + medId, y: dy, m: dm3 }); return; }
                         var dm2 = __assign({}, next[k]);
                         delete dm2[medId];
                         next[k] = dm2;
@@ -9016,7 +9045,8 @@ function CardioPlanning() {
             });
             return next;
         });
-    }, []);
+        setTimeout(function () { if (garde.length) toast(garde.length + (garde.length > 1 ? " cases manuelles conservées" : " case manuelle conservée") + " (prise du tour)", "info", { n: garde.length, cells: garde }); }, 0); /* v10.118 */
+    }, [planningType]);
     var reapplyPTWeek = useCallback(function (medId, weekKey) {
         secrMuteRef.current = Date.now(); /* v10.115 : le planning type n'émet pas de notification */
         var med = medecins.find(function (m) { return m.id === medId; });
@@ -9024,6 +9054,7 @@ function CardioPlanning() {
             return;
         var pt = planningType[medId];
         var PROT2 = PROT_TOUR;
+        var garde = []; /* v10.118 */
         var _a = weekKey.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
         setPlan(function (p) {
             var next = __assign({}, p);
@@ -9041,9 +9072,10 @@ function CardioPlanning() {
                     if (cellHasAny(ex, PROT2))
                         return;
                     if (isOff) {
+                        if (!ptOwnTP(ex)) { if (ex) garde.push({ c: k + "|" + medId, y: dy, m: dm3 }); return; } /* v10.118 */
                         if (!next[k])
                             next[k] = {};
-                        next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[medId] = { acteId: "TP", salle: null }, _a));
+                        next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[medId] = { acteId: "TP", salle: null, pt: 1 }, _a));
                         return;
                     }
                     if (!pt || !pt[dw2])
@@ -9051,6 +9083,7 @@ function CardioPlanning() {
                     var _c = (pt[dw2][sl]) || [null, null], acteId = _c[0], salle = _c[1], a2x = _c[2] || null, s2x = _c[3] || null, a3x = _c[4] || null, s3x = _c[5] || null, c1x = _c[6] || null;
                     if (!acteId)
                         return;
+                    if (!ptOwn(ex, pt[dw2][sl])) { if (ex) garde.push({ c: k + "|" + medId, y: dy, m: dm3 }); return; } /* v10.118 : posée à la main — on n'y touche pas */
                     if (!next[k])
                         next[k] = {};
                     next[k] = __assign(__assign({}, next[k]), (_b = {}, _b[medId] = ptCell(acteId, salle, a2x, s2x, a3x, s3x, c1x), _b));
@@ -9061,6 +9094,7 @@ function CardioPlanning() {
             }
             return next;
         });
+        setTimeout(function () { if (garde.length) toast(garde.length + (garde.length > 1 ? " cases manuelles conservées" : " case manuelle conservée") + " (retour du planning type)", "info", { n: garde.length, cells: garde }); }, 0); /* v10.118 */
     }, [medecins, planningType]);
     /* ── Temps partiel & USIC : dérogation + TP + junior remplaçant ── */
     var applyTPForWeek = useCallback(function (medId, weekKeyOrList) {
@@ -9090,7 +9124,7 @@ function CardioPlanning() {
                 var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
                 var dk2 = dKey(dy, dm3, dd);
                 newDerog[dk2] = medId;
-                ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][medId] = { acteId: "TP", salle: null }; });
+                ["M", "AM"].forEach(function (sl) { planPatch[sk(dy, dm3, dd, sl)] = planPatch[sk(dy, dm3, dd, sl)] || {}; planPatch[sk(dy, dm3, dd, sl)][medId] = { acteId: "TP", salle: null, pt: 1 }; }); /* v10.118 */
                 // junior dispo ce jour : pas absent, pas déjà tourneur cette semaine
                 var wmW = tourMed[weekKey] || { HC: [], USIC: [] };
                 var busyIds = __spreadArray(__spreadArray([], (wmW.HC || []), true), (wmW.USIC || []), true);
@@ -9398,11 +9432,13 @@ function CardioPlanning() {
        rapprochés se volaient l'effacement, et un minuteur gelé par iOS (leçon v10.106)
        laissait le message affiché sans fin. Le changement d'onglet le chasse aussi. */
     var notifTRef = useRef(0);
-    var toast = function (msg, type) {
+    var toast = function (msg, type, act) {
         if (type === void 0) { type = "ok"; }
-        setNotif({ msg: msg, type: type });
-        clearTimeout(notifTRef.current); notifTRef.current = setTimeout(function () { return setNotif(null); }, 3500);
+        if (act === void 0) { act = null; }
+        setNotif({ msg: msg, type: type, act: act }); /* v10.118 : un toast porteur d'action reste jusqu'au clic, au changement d'onglet ou au message suivant */
+        clearTimeout(notifTRef.current); if (!act) notifTRef.current = setTimeout(function () { return setNotif(null); }, 3500);
     };
+    var hlVoir = function (cells) { HL.on = {}; (cells || []).forEach(function (x) { HL.on[x.c] = 1; }); if (cells && cells.length) { setYear(cells[0].y); setMonth(cells[0].m); } setTab("planning"); setHlTick(function (t) { return t + 1; }); clearTimeout(HL.t); HL.t = setTimeout(function () { HL.on = {}; setHlTick(function (t) { return t + 1; }); }, 8000); }; /* v10.118 : liseré temporaire sur les cases conservées, chassé au bout de 8 s */
     useEffect(function () { setNotif(null); }, [tab]);
     var acteById = useCallback(function (id) { return actes.find(function (a) { return a.id === id; }); }, [actes]);
     var isEdit = (accessMode === "edit" || (accessMode === "medecinEdit" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).niveau) || "basic") === "editeur" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).role) || "medecin") !== "attache")) && !netOff; /* v10.73 */ // hors ligne : lecture seule
@@ -9967,6 +10003,7 @@ function CardioPlanning() {
             var allBr = arr.filter(function (e) { return e && e.cond; }).map(function (e) { return e.acteId; });
             var ent = __assign({}, win);
             delete ent.cond;
+            delete ent.pt; /* v10.118 : trancher est un geste manuel */
             if (allBr.length > 1)
                 ent.wasCond = allBr;
             var nx = arr.filter(function (e) { return !(e && e.cond); }).concat([ent]);
@@ -10469,6 +10506,7 @@ function CardioPlanning() {
         tod.setHours(0, 0, 0, 0);
         var targets = medId ? medecins.filter(function (m) { return m.id === medId; }) : medecins;
         var nApplied = 0;
+        var garde = []; /* v10.118 : cases manuelles épargnées */
         setPlan(function (p) {
             var next = __assign({}, p);
             monthsList.forEach(function (_a) {
@@ -10499,9 +10537,10 @@ function CardioPlanning() {
                                 var k = sk(ay, am, d, sl), ex = (next[k] || {})[med.id];
                                 if (cellHasAny(ex, PROT_TOUR))
                                     return;
+                                if (!ptOwnTP(ex)) { garde.push({ c: k + "|" + med.id, y: ay, m: am }); return; } /* v10.118 */
                                 if (!next[k])
                                     next[k] = {};
-                                next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = { acteId: "TP", salle: null }, _a));
+                                next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = { acteId: "TP", salle: null, pt: 1 }, _a));
                                 nApplied++;
                             });
                             return;
@@ -10517,6 +10556,7 @@ function CardioPlanning() {
                             var _b = (pt[dw][sl]) || [null, null], acteId = _b[0], salle = _b[1], _c = _b[2], a2x = _c === void 0 ? null : _c, _d = _b[3], s2x = _d === void 0 ? null : _d, _e = _b[4], a3x = _e === void 0 ? null : _e, _f = _b[5], s3x = _f === void 0 ? null : _f, _g = _b[6], c1x = _g === void 0 ? null : _g;
                             if (!acteId)
                                 return;
+                            if (!ptOwn(ex, pt[dw][sl])) { garde.push({ c: k + "|" + med.id, y: ay, m: am }); return; } /* v10.118 : posée à la main — on n'y touche pas */
                             if (!next[k])
                                 next[k] = {};
                             next[k] = __assign(__assign({}, next[k]), (_a = {}, _a[med.id] = ptCell(acteId, salle, a2x, s2x, a3x, s3x, c1x), _a));
@@ -10531,7 +10571,11 @@ function CardioPlanning() {
             return next;
         });
         var medLbl = medId ? (medecins.find(function (m) { return m.id === medId; }) || {}).init || "" : "tous";
-        toast("Planning type appliqué (" + medLbl + ", " + (bornes ? bornes.n : monthsList.length) + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")", "info");
+        setTimeout(function () { /* v10.118 : le décompte se constate dans le réducteur, le message part après */
+            var base = "Planning type appliqué (" + medLbl + ", " + (bornes ? bornes.n : monthsList.length) + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")";
+            if (garde.length) toast(base + " — " + garde.length + (garde.length > 1 ? " cases manuelles conservées" : " case manuelle conservée"), "info", { n: garde.length, cells: garde });
+            else toast(base, "info");
+        }, 0);
     }, [medecins, planningType, tourMed]);
     /* v10.40 : désactivation — état et écriture. Le champ `off` voyage avec la
        fiche : la synchro de l'équipe l'emporte, aucun document nouveau. */
@@ -10559,6 +10603,7 @@ function CardioPlanning() {
         tod.setHours(0, 0, 0, 0);
         var KEEP = ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "ABSENCE", "FORM", "FORMATION"];
         var targetIds = medId ? [medId] : medecins.map(function (m) { return m.id; });
+        var garde = []; /* v10.118 : cases manuelles épargnées */
         setPlan(function (p) {
             var next = __assign({}, p);
             monthsList.forEach(function (_a) {
@@ -10583,10 +10628,13 @@ function CardioPlanning() {
                             var e = dm[mid];
                             if (!e)
                                 return;
-                            if (!cellHasAny(e, KEEP)) {
-                                delete dm[mid];
-                                changed = true;
-                            }
+                            if (cellHasAny(e, KEEP))
+                                return;
+                            /* v10.118 : le retrait n'emporte que les cases du planning type (et le TP) */
+                            var ptW = (sl === "M" || sl === "AM") ? (((planningType[mid] || {})[dow(ay, am, d)] || {})[sl]) : null;
+                            if (!(ptOwnTP(e) || ptOwn(e, ptW))) { garde.push({ c: k + "|" + mid, y: ay, m: am }); return; }
+                            delete dm[mid];
+                            changed = true;
                         });
                         if (changed)
                             next[k] = dm;
@@ -10598,8 +10646,12 @@ function CardioPlanning() {
             });
             return next;
         });
-        toast("Affectations retirées (" + (bornes ? bornes.n : monthsList.length) + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + "). Gardes, absences, formations et tour conservés.", "info");
-    }, [medecins]);
+        setTimeout(function () { /* v10.118 */
+            var base = "Affectations du planning type retirées (" + (bornes ? bornes.n : monthsList.length) + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + "). Gardes, absences, formations et tour conservés.";
+            if (garde.length) toast(base + " " + garde.length + (garde.length > 1 ? " cases manuelles conservées" : " case manuelle conservée") + ".", "info", { n: garde.length, cells: garde });
+            else toast(base, "info");
+        }, 0);
+    }, [medecins, planningType]);
     var openPtModal = function (medId, mode, per) {
         setPtMonths(ptPeriodMonths.map(function (_, i) { return i; })); // tous cochés par défaut
         setPtFromToday(false); // nominal : depuis le début de la période
@@ -11272,7 +11324,7 @@ function CardioPlanning() {
         notif && React.createElement("div", { onClick: function () { return setNotif(null); }, title: "Cliquer pour fermer", style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", cursor: "pointer",
             borderColor: notif.type === "warn" ? "#f59e0b" : notif.type === "lock" ? "#a78bfa" : "#4ade80",
             borderWidth: notif.type === "ok" ? 1.5 : 2.5,
-            color: notif.type === "warn" ? "#b45309" : notif.type === "lock" ? "#6d28d9" : "var(--txt)" }) }, notif.msg),
+            color: notif.type === "warn" ? "#b45309" : notif.type === "lock" ? "#6d28d9" : "var(--txt)" }) }, notif.msg, notif.act && React.createElement("button", { onClick: function (e) { e.stopPropagation(); var c = notif.act.cells; setNotif(null); hlVoir(c); }, style: { marginLeft: 10, padding: "3px 10px", borderRadius: 6, border: "1.5px solid #e3b341", background: "rgba(227,179,65,.12)", color: "#b45309", fontWeight: 800, fontSize: 12, cursor: "pointer" } }, "Voir" + (notif.act.n > 1 ? " (" + notif.act.n + ")" : ""))),
         netOff && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, "\uD83D\uDCF4 Hors ligne \u2014 dernier planning re\u00E7u \u00B7 lecture seule"),
         isMedEdit && botOn && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1d4ed8", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
             "\u270F\uFE0F " + (isInterEdit ? "\u00C9dition \u00E9tendue" : "Mode \u00E9dition restreinte") + " \u2014 Dr. ",
