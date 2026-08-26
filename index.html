@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.120 — 26/08/2026";
+var APP_VERSION = "v10.121 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4648,7 +4648,7 @@ const HELP_SECTIONS=[
   HP({children:["Trois conditions, toutes les trois : l'activité fait partie des ",HE("b",null,"activités suivies")," (cochées dans Paramètres, encart 🔔), le médecin est un ",HE("b",null,"titulaire"),", et la période du jour a été ",HE("b",null,"diffusée")," (tuile 8 de Construire). Avant la diffusion, on construit librement — rien n'est émis."]}),
   HP({children:["Une absence ou une FMC qui recouvre une activité suivie la signale « retirée », avec sa cause. Un déplacement donne deux lignes : « retirée » à l'ancienne date, « ajoutée » à la nouvelle. Une modification aussitôt annulée s'efface d'elle-même. Le tour, les gardes et l'application du planning type n'émettent rien en tant que tels."]}),
   HP({children:["Une notification ne vaut que ",HE("b",null,"tant que sa date est à venir")," : passée, plus personne ne peut rien en faire, elle ",HE("b",null,"s'efface d'elle-même"),", traitée ou non. Le jour même reste affiché ; c'est le lendemain qu'elle disparaît."]}),
-  HP({last:true,children:["Les notifications suivent l'archivage : archiver une période retire aussi les siennes. Attachés : à venir."]}))},
+  HP({last:true,children:["Les notifications suivent l'archivage : archiver une période retire aussi les siennes. Les attachés peuvent être suivis : cochez-les un par un dans les réglages des notifications (Paramètres) — aucun ne l'est par défaut."]}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
   HP({children:["Pour chaque consultation perdue (absence, semaine de tour), l'application propose la ",HE("b",null,"semaine blanche libre la plus proche"),", jamais à plus d'",HE("b",null,"un mois"),", en avant comme en arrière, dans la période affichée. Une semaine sans solution se traite à la main : « ⇄ Chercher une autre semaine blanche » ouvre le choix complet, sans plafond. La ligne d'une blanche qui reçoit dit « peut accueillir le report de … » et se met à jour toute seule si vous décidez autrement."]}),
@@ -8033,7 +8033,7 @@ function CardioPlanning() {
     /* v10.115 : notifications secrétaires — entrées {med|act|dKey|slot:{s:±1,ts,c?}} et
        réglages {acts:[activités suivies], dif:{période:date de diffusion}} */
     var _secrN = useState({}), secrNotif = _secrN[0], setSecrNotif = _secrN[1];
-    var _secrC = useState({ acts: [], dif: {} }), secrCfg = _secrC[0], setSecrCfg = _secrC[1];
+    var _secrC = useState({ acts: [], dif: {}, atts: [] }), secrCfg = _secrC[0], setSecrCfg = _secrC[1]; /* v10.121 : atts = attachés suivis */
     var _csB = useState({}), csBlanches = _csB[0], setCsBlanches = _csB[1];
     var _cr = useState({}), csRep = _cr[0], setCsRep = _cr[1]; // {medId:{"y-m-d":true}} jours sans consultation (logiciel métier)
     var _csA = useState({}), csActsSel = _csA[0], setCsActsSel = _csA[1]; // {medId:[acteIds]} activités comptées comme consultation
@@ -8167,8 +8167,10 @@ function CardioPlanning() {
         var cfg = secrRef.current.cfg || {}, actsOk = cfg.acts || [], difs = cfg.dif || {};
         if (!chg.length || !actsOk.length)
             return;
+        var attsOk = cfg.atts || []; /* v10.121 : un attaché n'émet que s'il est coché */
         var medOk = {};
-        (secrRef.current.meds || []).forEach(function (m) { if (m && (m.role || "medecin") === "medecin")
+        (secrRef.current.meds || []).forEach(function (m) { if (!m)
+            return; var r = m.role || "medecin"; if (r === "medecin" || (r === "attache" && attsOk.indexOf(m.id) >= 0))
             medOk[m.id] = 1; });
         var suivie = function (a) { return actsOk.indexOf(a) >= 0 && SECR_EXCL.indexOf(a) < 0; };
         var ids = function (cell, mid) { var e = (cell || {})[mid]; var l = Array.isArray(e) ? e : (e ? [e] : []); var out = []; l.forEach(function (x) { if (x && x.acteId && !x.cond && out.indexOf(x.acteId) < 0)
@@ -8584,7 +8586,7 @@ function CardioPlanning() {
                     if (data.secrCfg) {
                         try {
                             var _sc = JSON.parse(data.secrCfg) || {};
-                            setSecrCfg({ acts: _sc.acts || [], dif: _sc.dif || {} });
+                            setSecrCfg({ acts: _sc.acts || [], dif: _sc.dif || {}, atts: _sc.atts || [] });
                         }
                         catch (e) { }
                     }
@@ -12395,7 +12397,9 @@ function CardioPlanning() {
                                         l.push(a.id); return __assign(__assign({}, c), { acts: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (on ? "#f59e0b" : "var(--border)"), background: on ? "rgba(245,158,11,.13)" : "var(--bg3)", color: on ? "#b45309" : "var(--txt2)" } }, (on ? "✓ " : "") + (a.short || a.label));
                             })));
                     }),
-                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Seuls les m\u00E9decins titulaires sont suivis pour le moment. Attach\u00E9s : \u00E0 venir."))),
+                    React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 } }, "Attach\u00E9s suivis"),
+                    React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 } }, /* v10.121 */ medecins.filter(function (m) { return (m.role || "") === "attache"; }).map(function (m) { var on = (secrCfg.atts || []).indexOf(m.id) >= 0; return React.createElement("button", { key: m.id, disabled: !isEdit, onClick: function () { return setSecrCfg(function (c) { var l = (c.atts || []).slice(); var i2 = l.indexOf(m.id); if (i2 >= 0) l.splice(i2, 1); else l.push(m.id); return __assign(__assign({}, c), { atts: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (on ? "#f59e0b" : "var(--border)"), background: on ? "rgba(245,158,11,.13)" : "var(--bg3)", color: on ? "#b45309" : "var(--txt2)" } }, (on ? "\u2713 " : "") + m.init); })),
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Tous les titulaires sont suivis d'office ; un attach\u00E9 ne l'est que s'il est coch\u00E9 ici."))),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde & archivage"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois."),

@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.120 — 26/08/2026";
+const APP_VERSION="v10.121 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4439,7 +4439,7 @@ const HELP_SECTIONS=[
   HP({children:["Trois conditions, toutes les trois : l'activité fait partie des ",HE("b",null,"activités suivies")," (cochées dans Paramètres, encart 🔔), le médecin est un ",HE("b",null,"titulaire"),", et la période du jour a été ",HE("b",null,"diffusée")," (tuile 8 de Construire). Avant la diffusion, on construit librement — rien n'est émis."]}),
   HP({children:["Une absence ou une FMC qui recouvre une activité suivie la signale « retirée », avec sa cause. Un déplacement donne deux lignes : « retirée » à l'ancienne date, « ajoutée » à la nouvelle. Une modification aussitôt annulée s'efface d'elle-même. Le tour, les gardes et l'application du planning type n'émettent rien en tant que tels."]}),
   HP({children:["Une notification ne vaut que ",HE("b",null,"tant que sa date est à venir")," : passée, plus personne ne peut rien en faire, elle ",HE("b",null,"s'efface d'elle-même"),", traitée ou non. Le jour même reste affiché ; c'est le lendemain qu'elle disparaît."]}),
-  HP({last:true,children:["Les notifications suivent l'archivage : archiver une période retire aussi les siennes. Attachés : à venir."]}))},
+  HP({last:true,children:["Les notifications suivent l'archivage : archiver une période retire aussi les siennes. Les attachés peuvent être suivis : cochez-les un par un dans les réglages des notifications (Paramètres) — aucun ne l'est par défaut."]}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
   HP({children:["Pour chaque consultation perdue (absence, semaine de tour), l'application propose la ",HE("b",null,"semaine blanche libre la plus proche"),", jamais à plus d'",HE("b",null,"un mois"),", en avant comme en arrière, dans la période affichée. Une semaine sans solution se traite à la main : « ⇄ Chercher une autre semaine blanche » ouvre le choix complet, sans plafond. La ligne d'une blanche qui reçoit dit « peut accueillir le report de … » et se met à jour toute seule si vous décidez autrement."]}),
@@ -7621,7 +7621,7 @@ function CardioPlanning(){
   /* v10.115 : notifications secrétaires — entrées {med|act|dKey|slot:{s:±1,ts,c?}} et
      réglages {acts:[activités suivies], dif:{période:date de diffusion}} */
   const [secrNotif,setSecrNotif]=useState({});
-  const [secrCfg,setSecrCfg]=useState({acts:[],dif:{}});
+  const [secrCfg,setSecrCfg]=useState({acts:[],dif:{},atts:[]});   /* v10.121 : atts = attachés suivis */
   const [csBlanches,setCsBlanches]=useState({}); // {medId:{"y-m-d":true}} jours sans consultation (logiciel métier)
   const [csRep,setCsRep]=useState({}); // v9.14 {medId:{done:{wk:true},to:{"dKey|sl":{d,sl,n}}}}
   const [csActsSel,setCsActsSel]=useState({});   // {medId:[acteIds]} activités comptées comme consultation
@@ -7733,7 +7733,8 @@ function CardioPlanning(){
     if(secrMuteRef.current){const rec=Date.now()-secrMuteRef.current<3000;secrMuteRef.current=0;if(rec)return;}
     const cfg=secrRef.current.cfg||{},actsOk=cfg.acts||[],difs=cfg.dif||{};
     if(!chg.length||!actsOk.length)return;
-    const medOk={};(secrRef.current.meds||[]).forEach(m=>{if(m&&(m.role||"medecin")==="medecin")medOk[m.id]=1;});
+    const attsOk=cfg.atts||[];   /* v10.121 : un attaché n'émet que s'il est coché */
+    const medOk={};(secrRef.current.meds||[]).forEach(m=>{if(!m)return;const r=m.role||"medecin";if(r==="medecin"||(r==="attache"&&attsOk.indexOf(m.id)>=0))medOk[m.id]=1;});
     const suivie=(a)=>actsOk.indexOf(a)>=0&&SECR_EXCL.indexOf(a)<0;
     const ids=(cell,mid)=>{const e=(cell||{})[mid];const l=Array.isArray(e)?e:(e?[e]:[]);
       const out=[];l.forEach(x=>{if(x&&x.acteId&&!x.cond&&out.indexOf(x.acteId)<0)out.push(x.acteId);});return out;};
@@ -7986,7 +7987,7 @@ function CardioPlanning(){
           if(data.gardeAvoid)setGardeAvoid(JSON.parse(data.gardeAvoid));
           if(data.gardeWish)setGardeWish(JSON.parse(data.gardeWish));
           if(data.secrNotif){try{setSecrNotif(JSON.parse(data.secrNotif)||{});}catch(e){}}
-          if(data.secrCfg){try{const c=JSON.parse(data.secrCfg)||{};setSecrCfg({acts:c.acts||[],dif:c.dif||{}});}catch(e){}}
+          if(data.secrCfg){try{const c=JSON.parse(data.secrCfg)||{};setSecrCfg({acts:c.acts||[],dif:c.dif||{},atts:c.atts||[]});}catch(e){}}
           if(data.csBlanches)setCsBlanches(JSON.parse(data.csBlanches));
           if(data.csRep)setCsRep(JSON.parse(data.csRep));
           if(data.csActsSel)setCsActsSel(JSON.parse(data.csActsSel));
@@ -10994,7 +10995,13 @@ header::-webkit-scrollbar { display: none; }
                   </div>
                 </div>;
               })}
-              <div style={{fontSize:10,color:"var(--txt3)"}}>Seuls les médecins titulaires sont suivis pour le moment. Attachés : à venir.</div>
+              <div style={{fontSize:10,fontWeight:700,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Attachés suivis</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>{/* v10.121 */}
+                {medecins.filter(m=>(m.role||"")==="attache").map(m=>{const on=(secrCfg.atts||[]).indexOf(m.id)>=0;
+                  return <button key={m.id} disabled={!isEdit} onClick={()=>setSecrCfg(c=>{const l=(c.atts||[]).slice();const i2=l.indexOf(m.id);if(i2>=0)l.splice(i2,1);else l.push(m.id);return {...c,atts:l};})}
+                    style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:isEdit?"pointer":"default",border:"1px solid "+(on?"#f59e0b":"var(--border)"),background:on?"rgba(245,158,11,.13)":"var(--bg3)",color:on?"#b45309":"var(--txt2)"}}>{(on?"✓ ":"")+m.init}</button>;})}
+              </div>
+              <div style={{fontSize:10,color:"var(--txt3)"}}>Tous les titulaires sont suivis d'office ; un attaché ne l'est que s'il est coché ici.</div>
             </div>
           </div>
 
