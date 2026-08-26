@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.119 — 26/08/2026";
+var APP_VERSION = "v10.120 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4666,7 +4666,7 @@ const HELP_SECTIONS=[
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
   HTab({t:"🎓 Internes",children:["le planning des internes, par semestre de 6 mois : demi-journées, colonne de garde, jauge et statistiques. Onglet facultatif, activé dans Paramètres."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
-  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période — par mois ou par semaines, au choix dans la fenêtre d'application (nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée)."]}),
+  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et sa fenêtre d'application — appliquer ou retirer, par mois ou par semaines. Les semaines entièrement passées ne s'affichent plus ; nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée."]}),
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
@@ -12931,6 +12931,10 @@ function CardioPlanning() {
                 React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 12, fontWeight: 600 } }, ptModal.medId
                     ? ("Pour : " + ((medecins.find(function (m2) { return m2.id === ptModal.medId; }) || {}).prenom || "") + " " + ((medecins.find(function (m2) { return m2.id === ptModal.medId; }) || {}).nom || ""))
                     : "Pour : tous les médecins"),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Action"),
+                React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10 } }, /* v10.120 : le retrait se choisit dans la modale */
+                    React.createElement("button", { onClick: function () { return setPtModal(function (m) { return __assign(__assign({}, m), { mode: "apply" }); }); }, style: { flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: ptModal.mode !== "remove" ? "1.5px solid #1d4ed8" : "1px solid var(--border)", background: ptModal.mode !== "remove" ? "rgba(29,78,216,.12)" : "var(--bg2)", color: ptModal.mode !== "remove" ? "#1d4ed8" : "var(--txt2)" } }, "\u25B6 Appliquer"),
+                    React.createElement("button", { onClick: function () { return setPtModal(function (m) { return __assign(__assign({}, m), { mode: "remove" }); }); }, style: { flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: ptModal.mode === "remove" ? "1.5px solid #dc2626" : "1px solid var(--border)", background: ptModal.mode === "remove" ? "rgba(220,38,38,.10)" : "var(--bg2)", color: ptModal.mode === "remove" ? "#dc2626" : "var(--txt2)" } }, "\uD83E\uDDF9 Retirer")),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Port\u00E9e"),
                 React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10 } },
                     React.createElement("button", { onClick: function () { return setPtScope("mois"); }, style: { flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: ptScope === "mois" ? "1.5px solid #1d4ed8" : "1px solid var(--border)", background: ptScope === "mois" ? "rgba(29,78,216,.12)" : "var(--bg2)", color: ptScope === "mois" ? "#1d4ed8" : "var(--txt2)" } }, "Par mois"),
@@ -12944,7 +12948,7 @@ function CardioPlanning() {
                         pm.y)); }))),
                 ptScope === "sem" && React.createElement(React.Fragment, null,
                     React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Semaines \u00E0 appliquer \u00B7 lundi \u2192 vendredi"),
-                    React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 } }, ptPeriodWeeks.map(function (w, i) { var on = ptWeeks.includes(i); return (React.createElement("button", { key: w.key, onClick: function () { return setPtWeeks(function (p) { return on ? p.filter(function (x) { return x !== i; }) : __spreadArray(__spreadArray([], p, true), [i], false); }); }, style: { padding: "6px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontWeight: on ? 800 : 400, border: on ? "1.5px solid #1d4ed8" : "1px solid var(--border)", background: on ? "rgba(29,78,216,.12)" : "var(--bg2)", color: on ? "#1d4ed8" : "var(--txt2)" } }, (on ? "\u2713 " : "") + w.label)); }))),
+                    React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 } }, ptPeriodWeeks.map(function (w, i) { var p2 = w.key.split("-").map(Number); var dimW = new Date(p2[0], p2[1], p2[2] + 6); if (dKey(dimW.getFullYear(), dimW.getMonth(), dimW.getDate()) < verrouJ) return null; /* v10.120 : semaine entièrement passée — masquée */ var on = ptWeeks.includes(i); return (React.createElement("button", { key: w.key, onClick: function () { return setPtWeeks(function (p) { return on ? p.filter(function (x) { return x !== i; }) : __spreadArray(__spreadArray([], p, true), [i], false); }); }, style: { padding: "6px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontWeight: on ? 800 : 400, border: on ? "1.5px solid #1d4ed8" : "1px solid var(--border)", background: on ? "rgba(29,78,216,.12)" : "var(--bg2)", color: on ? "#1d4ed8" : "var(--txt2)" } }, (on ? "\u2713 " : "") + w.label)); }))),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Point de d\u00E9part"),
                 React.createElement("div", { style: { display: "flex", gap: 12, marginBottom: 16 } },
                     React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", cursor: "pointer" } },

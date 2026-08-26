@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.119 — 26/08/2026";
+const APP_VERSION="v10.120 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4457,7 +4457,7 @@ const HELP_SECTIONS=[
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
   HTab({t:"🎓 Internes",children:["le planning des internes, par semestre de 6 mois : demi-journées, colonne de garde, jauge et statistiques. Onglet facultatif, activé dans Paramètres."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
-  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période — par mois ou par semaines, au choix dans la fenêtre d'application (nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée)."]}),
+  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et sa fenêtre d'application — appliquer ou retirer, par mois ou par semaines. Les semaines entièrement passées ne s'affichent plus ; nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée."]}),
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
@@ -11629,6 +11629,11 @@ header::-webkit-scrollbar { display: none; }
                 ?("Pour : "+((medecins.find(m2=>m2.id===ptModal.medId)||{}).prenom||"")+" "+((medecins.find(m2=>m2.id===ptModal.medId)||{}).nom||""))
                 :"Pour : tous les médecins"}
             </div>
+            <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Action</div>
+            <div style={{display:"flex",gap:8,marginBottom:10}}>{/* v10.120 : le retrait se choisit dans la modale */}
+              <button onClick={()=>setPtModal(m=>({...m,mode:"apply"}))} style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:ptModal.mode!=="remove"?"1.5px solid #1d4ed8":"1px solid var(--border)",background:ptModal.mode!=="remove"?"rgba(29,78,216,.12)":"var(--bg2)",color:ptModal.mode!=="remove"?"#1d4ed8":"var(--txt2)"}}>▶ Appliquer</button>
+              <button onClick={()=>setPtModal(m=>({...m,mode:"remove"}))} style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:ptModal.mode==="remove"?"1.5px solid #dc2626":"1px solid var(--border)",background:ptModal.mode==="remove"?"rgba(220,38,38,.10)":"var(--bg2)",color:ptModal.mode==="remove"?"#dc2626":"var(--txt2)"}}>🧹 Retirer</button>
+            </div>
             <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Portée</div>
             <div style={{display:"flex",gap:8,marginBottom:10}}>
               <button onClick={()=>setPtScope("mois")} style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:ptScope==="mois"?"1.5px solid #1d4ed8":"1px solid var(--border)",background:ptScope==="mois"?"rgba(29,78,216,.12)":"var(--bg2)",color:ptScope==="mois"?"#1d4ed8":"var(--txt2)"}}>Par mois</button>
@@ -11649,7 +11654,8 @@ header::-webkit-scrollbar { display: none; }
             {ptScope==="sem"&&<>
             <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Semaines à appliquer · lundi → vendredi</div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-              {ptPeriodWeeks.map((w,i)=>{const on=ptWeeks.includes(i);return(
+              {ptPeriodWeeks.map((w,i)=>{const p2=w.key.split("-").map(Number);const dimW=new Date(p2[0],p2[1],p2[2]+6);if(dKey(dimW.getFullYear(),dimW.getMonth(),dimW.getDate())<verrouJ)return null;   /* v10.120 : semaine entièrement passée — masquée */
+              const on=ptWeeks.includes(i);return(
                 <button key={w.key} onClick={()=>setPtWeeks(p=>on?p.filter(x=>x!==i):[...p,i])} style={{padding:"6px 10px",borderRadius:7,fontSize:12,cursor:"pointer",fontWeight:on?800:400,border:on?"1.5px solid #1d4ed8":"1px solid var(--border)",background:on?"rgba(29,78,216,.12)":"var(--bg2)",color:on?"#1d4ed8":"var(--txt2)"}}>{(on?"✓ ":"")+w.label}</button>
               );})}
             </div>
