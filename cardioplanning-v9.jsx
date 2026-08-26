@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.121 — 26/08/2026";
+const APP_VERSION="v10.122 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -5788,14 +5788,17 @@ function secrPurgePasse(o){const t=secrToday();let ch=false;const n={};
   Object.keys(o||{}).forEach(k=>{const p=String(k).split("|");
     if(p.length>=3&&p[2]<t){ch=true;return;}n[k]=o[k];});
   return ch?n:null;}
-function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDarkMode}){
+function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDarkMode,secrAtts}){
   const [ouvert,setOuvert]=React.useState({});
-  const meds=(medecins||[]).filter(m=>(m.role||"medecin")==="medecin");
   /* clé = med|act|dKey|slot — regroupée par médecin puis par activité */
   const parMed={},auj=secrToday();
   Object.keys(secrNotif||{}).forEach(k=>{const p=k.split("|");if(p.length<4)return;
     if(p[2]<auj)return;   /* v10.116 : date passée = plus rien à reporter */
     const o=parMed[p[0]]=parMed[p[0]]||{};(o[p[1]]=o[p[1]]||[]).push({k,act:p[1],dk:p[2],sl:p[3],...(secrNotif[k]||{})});});
+  /* v10.122 : les titulaires d'office, puis les attachés SUIVIS — et tout attaché
+     qui a encore des notifications en attente, même décoché entre-temps. */
+  const meds=(medecins||[]).filter(m=>(m.role||"medecin")==="medecin")
+    .concat((medecins||[]).filter(m=>(m.role||"")==="attache"&&(((secrAtts||[]).indexOf(m.id)>=0)||Object.keys(parMed[m.id]||{}).length>0)));
   const ack=(keys)=>{if(!canAck)return;setSecrNotif(o=>{const n={...o};keys.forEach(k=>{delete n[k];});return n;});};
   return(
     <div>
@@ -10444,7 +10447,7 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
       {tab==="internes"&&<InternesView intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
-      {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);

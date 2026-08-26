@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.121 — 26/08/2026";
+var APP_VERSION = "v10.122 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -6021,9 +6021,8 @@ function secrPurgePasse(o) {
     return ch ? n : null;
 }
 function SecrTab(_a) {
-    var medecins = _a.medecins, acteById = _a.acteById, secrNotif = _a.secrNotif, setSecrNotif = _a.setSecrNotif, canAck = _a.canAck, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode;
+    var medecins = _a.medecins, acteById = _a.acteById, secrNotif = _a.secrNotif, setSecrNotif = _a.setSecrNotif, canAck = _a.canAck, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, secrAtts = _a.secrAtts;
     var _b = React.useState({}), ouvert = _b[0], setOuvert = _b[1];
-    var meds = (medecins || []).filter(function (m) { return (m.role || "medecin") === "medecin"; });
     /* clé = med|act|dKey|slot — regroupée par médecin puis par activité */
     var parMed = {}, auj = secrToday();
     Object.keys(secrNotif || {}).forEach(function (k) {
@@ -6035,6 +6034,10 @@ function SecrTab(_a) {
         var o = parMed[p[0]] = parMed[p[0]] || {};
         (o[p[1]] = o[p[1]] || []).push(__assign({ k: k, act: p[1], dk: p[2], sl: p[3] }, (secrNotif[k] || {})));
     });
+    /* v10.122 : les titulaires d'office, puis les attachés SUIVIS — et tout attaché
+       qui a encore des notifications en attente, même décoché entre-temps. */
+    var meds = (medecins || []).filter(function (m) { return (m.role || "medecin") === "medecin"; })
+        .concat((medecins || []).filter(function (m) { return (m.role || "") === "attache" && (((secrAtts || []).indexOf(m.id) >= 0) || Object.keys(parMed[m.id] || {}).length > 0); }));
     var ack = function (keys) { if (!canAck)
         return; setSecrNotif(function (o) { var n = __assign({}, o); keys.forEach(function (k) { delete n[k]; }); return n; }); };
     return (React.createElement("div", null,
@@ -11652,7 +11655,7 @@ function CardioPlanning() {
                 React.createElement(InternesEquipe, { intCfg: intCfg, setIntCfg: setIntCfg, isEdit: isEdit }))),
             tab === "reports" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(ReportsView, { salleReg: salleReg, medecins: medsAff, actes: actes, getEntries: getEntries, tourMed: tourMed, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminOkKey: roleOkKey, adminReports: isAdminEdit && adminCanReports, adminName: adminName, removeEntry: removeEntry, year: year, month: month, toast: toast })),
             tab === "internes" && React.createElement(InternesView, { intCfg: intCfg, setIntCfg: setIntCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, setShowFull: setShowFull, canEdit: isEdit || (isInterEdit && !isAttEdit) || isAdminEdit || isInterne, canSalle: isEdit || (isInterEdit && !isAttEdit) || (isAdminEdit && isCadre), salleReg: salleReg, intSelf: isInterne, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
-            tab === "notifications" && React.createElement(SecrTab, { medecins: medsAff, acteById: acteById, secrNotif: secrNotif, setSecrNotif: setSecrNotif, canAck: !netOff, darkMode: darkMode, setDarkMode: setDarkMode }),
+            tab === "notifications" && React.createElement(SecrTab, { medecins: medsAff, acteById: acteById, secrNotif: secrNotif, setSecrNotif: setSecrNotif, secrAtts: secrCfg.atts || [], canAck: !netOff, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "aide" && React.createElement("div", null, React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } }, React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")), React.createElement(HelpView, null)),
             tab === "astreinte" && (function () {
                 var astMeds = medecins.filter(function (m) { return m.astreinte === true; });
