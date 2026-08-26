@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.118 — 26/08/2026";
+const APP_VERSION="v10.119 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4457,7 +4457,7 @@ const HELP_SECTIONS=[
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
   HTab({t:"🎓 Internes",children:["le planning des internes, par semestre de 6 mois : demi-journées, colonne de garde, jauge et statistiques. Onglet facultatif, activé dans Paramètres."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
-  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période."]}),
+  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période — par mois ou par semaines, au choix dans la fenêtre d'application (nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée)."]}),
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
@@ -9361,7 +9361,10 @@ function CardioPlanning(){
           /* v10.109 : hors des bornes reelles de la periode — les premiers jours du
              1er mois appartiennent a la periode PRECEDENTE, souvent close. */
           const _dk=dKey(ay,am,d);
-          if(bornes&&(_dk<bornes.deb||_dk>bornes.fin))continue;
+          if(bornes){   /* v10.119 : la portée par semaines est une liste d'intervalles */
+            if(bornes.ranges){if(!bornes.ranges.some(r=>_dk>=r.deb&&_dk<=r.fin))continue;}
+            else if(_dk<bornes.deb||_dk>bornes.fin)continue;
+          }
           if(isWE(ay,am,d))continue;
           if(fromToday&&new Date(ay,am,d)<tod)continue;
           if(vBloque(vRef,ay,am,d))continue;   /* v10.117 : jamais sur une journée passée */
@@ -9399,7 +9402,7 @@ function CardioPlanning(){
     });
     const medLbl=medId?(medecins.find(m=>m.id===medId)||{}).init||"":"tous";
     setTimeout(()=>{   /* v10.118 : le décompte se constate dans le réducteur, le message part après */
-      const base="Planning type appliqué ("+medLbl+", "+(bornes?bornes.n:monthsList.length)+" mois"+(fromToday?", à partir d'aujourd'hui":"")+")";
+      const base="Planning type appliqué ("+medLbl+", "+(bornes&&bornes.lib?bornes.lib:(bornes?bornes.n:monthsList.length)+" mois")+(fromToday?", à partir d'aujourd'hui":"")+")";
       if(garde.length)toast(base+" — "+garde.length+(garde.length>1?" cases manuelles conservées":" case manuelle conservée"),"info",{n:garde.length,cells:garde});
       else toast(base,"info");
     },0);
@@ -9415,13 +9418,20 @@ function CardioPlanning(){
   /* ── Modale d'application du PT ── */
   const [ptModal,setPtModal]=React.useState(null); // null | {medId:null|number}
   const [ptMonths,setPtMonths]=React.useState([]); // indices cochés
-  const [ptFromToday,setPtFromToday]=React.useState(false);
+  const [ptFromToday,setPtFromToday]=React.useState(true);   /* v10.119 : nominal = à partir d'aujourd'hui */
+  const [ptScope,setPtScope]=React.useState("mois");   /* v10.119 : mois | sem */
+  const [ptWeeks,setPtWeeks]=React.useState([]);
   const ptPeriodMonths=React.useMemo(()=>{
     /* v10.30 : depuis Construire, la fenetre porte sur la periode de CET onglet,
        pas sur le mois global — sinon on appliquerait le planning type a cote. */
     const p=(ptModal&&ptModal.per)?ptModal.per:perStart(year,month);const arr=[];
     for(let i=0;i<PCFG.len;i++){const mm=(p.sm+i)%12,yy=p.sm+i>11?p.sy+1:p.sy;arr.push({y:yy,m:mm});}
     return arr;
+  },[ptModal,year,month,PCFG.len,PCFG.startM]);
+  const ptPeriodWeeks=React.useMemo(()=>{
+    /* v10.119 : les semaines de la même période, pour la portée par semaines. */
+    const p=(ptModal&&ptModal.per)?ptModal.per:perStart(year,month);
+    return perWeeksList(p.sy,p.sm);
   },[ptModal,year,month,PCFG.len,PCFG.startM]);
   const removePTFlex=useCallback((medId,monthsList,fromToday,bornes)=>{
     secrMuteRef.current=Date.now();   /* v10.115 : le planning type n'émet pas de notification */
@@ -9437,7 +9447,10 @@ function CardioPlanning(){
           /* v10.109 : hors des bornes reelles de la periode — les premiers jours du
              1er mois appartiennent a la periode PRECEDENTE, souvent close. */
           const _dk=dKey(ay,am,d);
-          if(bornes&&(_dk<bornes.deb||_dk>bornes.fin))continue;
+          if(bornes){   /* v10.119 : la portée par semaines est une liste d'intervalles */
+            if(bornes.ranges){if(!bornes.ranges.some(r=>_dk>=r.deb&&_dk<=r.fin))continue;}
+            else if(_dk<bornes.deb||_dk>bornes.fin)continue;
+          }
           if(fromToday&&new Date(ay,am,d)<tod)continue;
           if(vBloque(vRef,ay,am,d))continue;   /* v10.117 : jamais sur une journée passée */
           ["M","AM","JOUR","N"].forEach(sl=>{
@@ -9459,39 +9472,66 @@ function CardioPlanning(){
       return next;
     });
     setTimeout(()=>{   /* v10.118 */
-      const base="Affectations du planning type retirées ("+(bornes?bornes.n:monthsList.length)+" mois"+(fromToday?", à partir d'aujourd'hui":"")+"). Gardes, absences, formations et tour conservés.";
+      const base="Affectations du planning type retirées ("+(bornes&&bornes.lib?bornes.lib:(bornes?bornes.n:monthsList.length)+" mois")+(fromToday?", à partir d'aujourd'hui":"")+"). Gardes, absences, formations et tour conservés.";
       if(garde.length)toast(base+" "+garde.length+(garde.length>1?" cases manuelles conservées":" case manuelle conservée")+".","info",{n:garde.length,cells:garde});
       else toast(base,"info");
     },0);
   },[medecins,planningType]);
   const openPtModal=(medId,mode,per)=>{
     setPtMonths(ptPeriodMonths.map((_,i)=>i)); // tous cochés par défaut
-    setPtFromToday(false); // nominal : depuis le début de la période
+    setPtScope("mois");setPtWeeks([]);   /* v10.119 */
+    setPtFromToday(true); // v10.119 : nominal = à partir d'aujourd'hui (le passé est de toute façon verrouillé)
     setPtModal({medId:medId||null,mode:mode||"apply",per:per||null});
   };
   const runPtModal=()=>{
-    const list=ptPeriodMonths.filter((_,i)=>ptMonths.includes(i));
-    if(list.length===0){toast("Sélectionnez au moins un mois","warn");return;}
-    /* v10.109 : les mois coches deviennent des SEGMENTS DE PERIODE. Cocher le PREMIER
-       mois demarre a la vraie borne de debut (le 6 juillet 2026, pas le 1er : les cinq
-       premiers jours appartiennent a la periode precedente, close). Cocher le DERNIER
-       va jusqu'a la fin reelle, debordement compris — le 1er novembre 2026 appartient
-       a la periode juillet-octobre, il suit donc le dernier mois et non le suivant. */
     const _per=(ptModal&&ptModal.per)?ptModal.per:perStart(year,month);
     const _jrs=perDaysList(_per.sy,_per.sm);
     const _j1=_jrs[0],_j2=_jrs[_jrs.length-1];
-    const _prem=ptMonths.includes(0),_dern=ptMonths.includes(PCFG.len-1);
-    const bornes={deb:_prem?dKey(_j1.y,_j1.m,_j1.d):"0000-00-00",
-                  fin:_dern?dKey(_j2.y,_j2.m,_j2.d):"9999-99-99",n:list.length};
-    /* les jours de debordement vivent dans le mois SUIVANT : il faut le parcourir,
-       le filtre des bornes se chargeant de n'en garder que ces jours-la. */
-    const _liste=list.slice();
-    if(_dern){
-      const _last=ptPeriodMonths[PCFG.len-1];
-      for(let _r=_last.y*12+_last.m+1;_r<=_j2.y*12+_j2.m;_r++)_liste.push({y:Math.floor(_r/12),m:_r%12});
+    const _kd=dKey(_j1.y,_j1.m,_j1.d),_kf=dKey(_j2.y,_j2.m,_j2.d);
+    let _liste,bornes;
+    if(ptScope==="sem"){
+      /* v10.119 : portée par semaines — chaque semaine cochée devient un intervalle
+         lundi→dimanche, borné à la période réelle. Le remplissage reste lun→ven
+         (isWE saute les week-ends comme toujours). */
+      const sel=ptPeriodWeeks.filter((_,i)=>ptWeeks.includes(i));
+      if(sel.length===0){toast("Sélectionnez au moins une semaine","warn");return;}
+      const ranges=[];const moisSet={};
+      sel.forEach(w=>{
+        const p2=w.key.split("-").map(Number);
+        const lun=new Date(p2[0],p2[1],p2[2]),dim=new Date(p2[0],p2[1],p2[2]+6);
+        let d1=dKey(lun.getFullYear(),lun.getMonth(),lun.getDate());
+        let d2=dKey(dim.getFullYear(),dim.getMonth(),dim.getDate());
+        if(d1<_kd)d1=_kd;
+        if(d2>_kf)d2=_kf;
+        if(d1>d2)return;
+        ranges.push({deb:d1,fin:d2});
+        moisSet[lun.getFullYear()+"-"+lun.getMonth()]=1;
+        moisSet[dim.getFullYear()+"-"+dim.getMonth()]=1;
+      });
+      if(ranges.length===0){toast("Ces semaines sont hors de la période","warn");return;}
+      _liste=Object.keys(moisSet).map(k=>{const q=k.split("-").map(Number);return{y:q[0],m:q[1]};});
+      bornes={ranges:ranges,n:ranges.length,
+              lib:ranges.length===1?("semaine du "+sel[0].label):(ranges.length+" semaines")};
+    }else{
+      const list=ptPeriodMonths.filter((_,i)=>ptMonths.includes(i));
+      if(list.length===0){toast("Sélectionnez au moins un mois","warn");return;}
+      /* v10.109 : les mois coches deviennent des SEGMENTS DE PERIODE. Cocher le PREMIER
+         mois demarre a la vraie borne de debut (le 6 juillet 2026, pas le 1er : les cinq
+         premiers jours appartiennent a la periode precedente, close). Cocher le DERNIER
+         va jusqu'a la fin reelle, debordement compris — le 1er novembre 2026 appartient
+         a la periode juillet-octobre, il suit donc le dernier mois et non le suivant. */
+      const _prem=ptMonths.includes(0),_dern=ptMonths.includes(PCFG.len-1);
+      bornes={deb:_prem?_kd:"0000-00-00",fin:_dern?_kf:"9999-99-99",n:list.length};
+      /* les jours de debordement vivent dans le mois SUIVANT : il faut le parcourir,
+         le filtre des bornes se chargeant de n'en garder que ces jours-la. */
+      _liste=list.slice();
+      if(_dern){
+        const _last=ptPeriodMonths[PCFG.len-1];
+        for(let _r=_last.y*12+_last.m+1;_r<=_j2.y*12+_j2.m;_r++)_liste.push({y:Math.floor(_r/12),m:_r%12});
+      }
     }
     if(ptModal.mode==="remove"){
-      if(!window.confirm("Retirer toutes les affectations d'activités sur les mois sélectionnés ?"))return;
+      if(!window.confirm("Retirer toutes les affectations d'activités sur "+(ptScope==="sem"?"les semaines sélectionnées":"les mois sélectionnés")+" ?"))return;
       removePTFlex(ptModal.medId,_liste,ptFromToday,bornes);
     }else{
       applyPTFlex(ptModal.medId,_liste,ptFromToday,bornes);
@@ -11589,6 +11629,12 @@ header::-webkit-scrollbar { display: none; }
                 ?("Pour : "+((medecins.find(m2=>m2.id===ptModal.medId)||{}).prenom||"")+" "+((medecins.find(m2=>m2.id===ptModal.medId)||{}).nom||""))
                 :"Pour : tous les médecins"}
             </div>
+            <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Portée</div>
+            <div style={{display:"flex",gap:8,marginBottom:10}}>
+              <button onClick={()=>setPtScope("mois")} style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:ptScope==="mois"?"1.5px solid #1d4ed8":"1px solid var(--border)",background:ptScope==="mois"?"rgba(29,78,216,.12)":"var(--bg2)",color:ptScope==="mois"?"#1d4ed8":"var(--txt2)"}}>Par mois</button>
+              <button onClick={()=>setPtScope("sem")} style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:ptScope==="sem"?"1.5px solid #1d4ed8":"1px solid var(--border)",background:ptScope==="sem"?"rgba(29,78,216,.12)":"var(--bg2)",color:ptScope==="sem"?"#1d4ed8":"var(--txt2)"}}>📆 Par semaines</button>
+            </div>
+            {ptScope==="mois"&&<>
             <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Mois à appliquer</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
               {ptPeriodMonths.map((pm,i)=>(
@@ -11599,6 +11645,15 @@ header::-webkit-scrollbar { display: none; }
                 </label>
               ))}
             </div>
+            </>}
+            {ptScope==="sem"&&<>
+            <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Semaines à appliquer · lundi → vendredi</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+              {ptPeriodWeeks.map((w,i)=>{const on=ptWeeks.includes(i);return(
+                <button key={w.key} onClick={()=>setPtWeeks(p=>on?p.filter(x=>x!==i):[...p,i])} style={{padding:"6px 10px",borderRadius:7,fontSize:12,cursor:"pointer",fontWeight:on?800:400,border:on?"1.5px solid #1d4ed8":"1px solid var(--border)",background:on?"rgba(29,78,216,.12)":"var(--bg2)",color:on?"#1d4ed8":"var(--txt2)"}}>{(on?"✓ ":"")+w.label}</button>
+              );})}
+            </div>
+            </>}
             <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Point de départ</div>
             <div style={{display:"flex",gap:12,marginBottom:16}}>
               <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"var(--txt)",cursor:"pointer"}}>

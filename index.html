@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.118 — 26/08/2026";
+var APP_VERSION = "v10.119 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4666,7 +4666,7 @@ const HELP_SECTIONS=[
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
   HTab({t:"🎓 Internes",children:["le planning des internes, par semestre de 6 mois : demi-journées, colonne de garde, jauge et statistiques. Onglet facultatif, activé dans Paramètres."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
-  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période."]}),
+  HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et son application sur la période — par mois ou par semaines, au choix dans la fenêtre d'application (nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée)."]}),
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
@@ -10515,8 +10515,10 @@ function CardioPlanning() {
                 var _loop_10 = function (d) {
                     /* v10.109 : hors des bornes reelles de la periode (voir le jsx). */
                     var _dk = dKey(ay, am, d);
-                    if (bornes && (_dk < bornes.deb || _dk > bornes.fin))
-                        return "continue";
+                    if (bornes) { /* v10.119 : la portée par semaines est une liste d'intervalles */
+                        if (bornes.ranges) { if (!bornes.ranges.some(function (r) { return _dk >= r.deb && _dk <= r.fin; })) return "continue"; }
+                        else if (_dk < bornes.deb || _dk > bornes.fin) return "continue";
+                    }
                     if (isWE(ay, am, d))
                         return "continue";
                     if (fromToday && new Date(ay, am, d) < tod)
@@ -10572,7 +10574,7 @@ function CardioPlanning() {
         });
         var medLbl = medId ? (medecins.find(function (m) { return m.id === medId; }) || {}).init || "" : "tous";
         setTimeout(function () { /* v10.118 : le décompte se constate dans le réducteur, le message part après */
-            var base = "Planning type appliqué (" + medLbl + ", " + (bornes ? bornes.n : monthsList.length) + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + ")";
+            var base = "Planning type appliqué (" + medLbl + ", " + (bornes && bornes.lib ? bornes.lib : (bornes ? bornes.n : monthsList.length) + " mois") + (fromToday ? ", à partir d'aujourd'hui" : "") + ")";
             if (garde.length) toast(base + " — " + garde.length + (garde.length > 1 ? " cases manuelles conservées" : " case manuelle conservée"), "info", { n: garde.length, cells: garde });
             else toast(base, "info");
         }, 0);
@@ -10586,7 +10588,9 @@ function CardioPlanning() {
     /* ── Modale d'application du PT ── */
     var _33 = React.useState(null), ptModal = _33[0], setPtModal = _33[1]; // null | {medId:null|number}
     var _34 = React.useState([]), ptMonths = _34[0], setPtMonths = _34[1]; // indices cochés
-    var _35 = React.useState(false), ptFromToday = _35[0], setPtFromToday = _35[1];
+    var _35 = React.useState(true), ptFromToday = _35[0], setPtFromToday = _35[1]; /* v10.119 : nominal = à partir d'aujourd'hui */
+    var _35s = React.useState("mois"), ptScope = _35s[0], setPtScope = _35s[1]; /* v10.119 : mois | sem */
+    var _35w = React.useState([]), ptWeeks = _35w[0], setPtWeeks = _35w[1];
     var ptPeriodMonths = React.useMemo(function () {
         /* v10.30 : depuis Construire, la fenetre porte sur la periode de CET onglet */
         var p = (ptModal && ptModal.per) ? ptModal.per : perStart(year, month);
@@ -10596,6 +10600,11 @@ function CardioPlanning() {
             arr.push({ y: yy, m: mm });
         }
         return arr;
+    }, [ptModal, year, month, PCFG.len, PCFG.startM]);
+    var ptPeriodWeeks = React.useMemo(function () {
+        /* v10.119 : les semaines de la même période, pour la portée par semaines. */
+        var p = (ptModal && ptModal.per) ? ptModal.per : perStart(year, month);
+        return perWeeksList(p.sy, p.sm);
     }, [ptModal, year, month, PCFG.len, PCFG.startM]);
     var removePTFlex = useCallback(function (medId, monthsList, fromToday, bornes) {
         secrMuteRef.current = Date.now(); /* v10.115 : le planning type n'émet pas de notification */
@@ -10612,8 +10621,10 @@ function CardioPlanning() {
                 var _loop_11 = function (d) {
                     /* v10.109 : hors des bornes reelles de la periode (voir le jsx). */
                     var _dk = dKey(ay, am, d);
-                    if (bornes && (_dk < bornes.deb || _dk > bornes.fin))
-                        return "continue";
+                    if (bornes) { /* v10.119 : la portée par semaines est une liste d'intervalles */
+                        if (bornes.ranges) { if (!bornes.ranges.some(function (r) { return _dk >= r.deb && _dk <= r.fin; })) return "continue"; }
+                        else if (_dk < bornes.deb || _dk > bornes.fin) return "continue";
+                    }
                     if (fromToday && new Date(ay, am, d) < tod)
                         return "continue";
                     if (vBloque(vRef, ay, am, d))
@@ -10647,37 +10658,72 @@ function CardioPlanning() {
             return next;
         });
         setTimeout(function () { /* v10.118 */
-            var base = "Affectations du planning type retirées (" + (bornes ? bornes.n : monthsList.length) + " mois" + (fromToday ? ", à partir d'aujourd'hui" : "") + "). Gardes, absences, formations et tour conservés.";
+            var base = "Affectations du planning type retirées (" + (bornes && bornes.lib ? bornes.lib : (bornes ? bornes.n : monthsList.length) + " mois") + (fromToday ? ", à partir d'aujourd'hui" : "") + "). Gardes, absences, formations et tour conservés.";
             if (garde.length) toast(base + " " + garde.length + (garde.length > 1 ? " cases manuelles conservées" : " case manuelle conservée") + ".", "info", { n: garde.length, cells: garde });
             else toast(base, "info");
         }, 0);
     }, [medecins, planningType]);
     var openPtModal = function (medId, mode, per) {
         setPtMonths(ptPeriodMonths.map(function (_, i) { return i; })); // tous cochés par défaut
-        setPtFromToday(false); // nominal : depuis le début de la période
+        setPtScope("mois"); setPtWeeks([]); /* v10.119 */
+        setPtFromToday(true); // v10.119 : nominal = à partir d'aujourd'hui (le passé est de toute façon verrouillé)
         setPtModal({ medId: medId || null, mode: mode || "apply", per: per || null });
     };
     var runPtModal = function () {
-        var list = ptPeriodMonths.filter(function (_, i) { return ptMonths.includes(i); });
-        if (list.length === 0) {
-            toast("Sélectionnez au moins un mois", "warn");
-            return;
-        }
-        /* v10.109 : les mois coches deviennent des SEGMENTS DE PERIODE (voir le jsx). */
         var _per = (ptModal && ptModal.per) ? ptModal.per : perStart(year, month);
         var _jrs = perDaysList(_per.sy, _per.sm);
         var _j1 = _jrs[0], _j2 = _jrs[_jrs.length - 1];
-        var _prem = ptMonths.includes(0), _dern = ptMonths.includes(PCFG.len - 1);
-        var bornes = { deb: _prem ? dKey(_j1.y, _j1.m, _j1.d) : "0000-00-00",
-            fin: _dern ? dKey(_j2.y, _j2.m, _j2.d) : "9999-99-99", n: list.length };
-        var _liste = list.slice();
-        if (_dern) {
-            var _last = ptPeriodMonths[PCFG.len - 1];
-            for (var _r = _last.y * 12 + _last.m + 1; _r <= _j2.y * 12 + _j2.m; _r++)
-                _liste.push({ y: Math.floor(_r / 12), m: _r % 12 });
+        var _kd = dKey(_j1.y, _j1.m, _j1.d), _kf = dKey(_j2.y, _j2.m, _j2.d);
+        var _liste, bornes;
+        if (ptScope === "sem") {
+            /* v10.119 : portée par semaines — chaque semaine cochée devient un intervalle
+               lundi→dimanche, borné à la période réelle. Le remplissage reste lun→ven. */
+            var sel = ptPeriodWeeks.filter(function (_, i) { return ptWeeks.includes(i); });
+            if (sel.length === 0) {
+                toast("Sélectionnez au moins une semaine", "warn");
+                return;
+            }
+            var ranges = [];
+            var moisSet = {};
+            sel.forEach(function (w) {
+                var p2 = w.key.split("-").map(Number);
+                var lun = new Date(p2[0], p2[1], p2[2]), dim = new Date(p2[0], p2[1], p2[2] + 6);
+                var d1 = dKey(lun.getFullYear(), lun.getMonth(), lun.getDate());
+                var d2 = dKey(dim.getFullYear(), dim.getMonth(), dim.getDate());
+                if (d1 < _kd) d1 = _kd;
+                if (d2 > _kf) d2 = _kf;
+                if (d1 > d2) return;
+                ranges.push({ deb: d1, fin: d2 });
+                moisSet[lun.getFullYear() + "-" + lun.getMonth()] = 1;
+                moisSet[dim.getFullYear() + "-" + dim.getMonth()] = 1;
+            });
+            if (ranges.length === 0) {
+                toast("Ces semaines sont hors de la période", "warn");
+                return;
+            }
+            _liste = Object.keys(moisSet).map(function (k) { var q = k.split("-").map(Number); return { y: q[0], m: q[1] }; });
+            bornes = { ranges: ranges, n: ranges.length,
+                lib: ranges.length === 1 ? ("semaine du " + sel[0].label) : (ranges.length + " semaines") };
+        }
+        else {
+            var list = ptPeriodMonths.filter(function (_, i) { return ptMonths.includes(i); });
+            if (list.length === 0) {
+                toast("Sélectionnez au moins un mois", "warn");
+                return;
+            }
+            /* v10.109 : les mois coches deviennent des SEGMENTS DE PERIODE (voir le jsx). */
+            var _prem = ptMonths.includes(0), _dern = ptMonths.includes(PCFG.len - 1);
+            bornes = { deb: _prem ? _kd : "0000-00-00",
+                fin: _dern ? _kf : "9999-99-99", n: list.length };
+            _liste = list.slice();
+            if (_dern) {
+                var _last = ptPeriodMonths[PCFG.len - 1];
+                for (var _r = _last.y * 12 + _last.m + 1; _r <= _j2.y * 12 + _j2.m; _r++)
+                    _liste.push({ y: Math.floor(_r / 12), m: _r % 12 });
+            }
         }
         if (ptModal.mode === "remove") {
-            if (!window.confirm("Retirer toutes les affectations d'activités sur les mois sélectionnés ?"))
+            if (!window.confirm("Retirer toutes les affectations d'activités sur " + (ptScope === "sem" ? "les semaines sélectionnées" : "les mois sélectionnés") + " ?"))
                 return;
             removePTFlex(ptModal.medId, _liste, ptFromToday, bornes);
         }
@@ -12885,12 +12931,20 @@ function CardioPlanning() {
                 React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 12, fontWeight: 600 } }, ptModal.medId
                     ? ("Pour : " + ((medecins.find(function (m2) { return m2.id === ptModal.medId; }) || {}).prenom || "") + " " + ((medecins.find(function (m2) { return m2.id === ptModal.medId; }) || {}).nom || ""))
                     : "Pour : tous les médecins"),
-                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Mois \u00E0 appliquer"),
-                React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 } }, ptPeriodMonths.map(function (pm, i) { return (React.createElement("label", { key: i, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", padding: "5px 10px", borderRadius: 7, border: "1px solid " + (ptMonths.includes(i) ? "#1d4ed8" : "var(--border)"), background: ptMonths.includes(i) ? "rgba(29,78,216,.12)" : "var(--bg2)", cursor: "pointer" } },
-                    React.createElement("input", { type: "checkbox", checked: ptMonths.includes(i), onChange: function () { return setPtMonths(function (p) { return p.includes(i) ? p.filter(function (x) { return x !== i; }) : __spreadArray(__spreadArray([], p, true), [i], false); }); } }),
-                    MOIS[pm.m],
-                    " ",
-                    pm.y)); })),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Port\u00E9e"),
+                React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10 } },
+                    React.createElement("button", { onClick: function () { return setPtScope("mois"); }, style: { flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: ptScope === "mois" ? "1.5px solid #1d4ed8" : "1px solid var(--border)", background: ptScope === "mois" ? "rgba(29,78,216,.12)" : "var(--bg2)", color: ptScope === "mois" ? "#1d4ed8" : "var(--txt2)" } }, "Par mois"),
+                    React.createElement("button", { onClick: function () { return setPtScope("sem"); }, style: { flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: ptScope === "sem" ? "1.5px solid #1d4ed8" : "1px solid var(--border)", background: ptScope === "sem" ? "rgba(29,78,216,.12)" : "var(--bg2)", color: ptScope === "sem" ? "#1d4ed8" : "var(--txt2)" } }, "\uD83D\uDCC6 Par semaines")),
+                ptScope === "mois" && React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Mois \u00E0 appliquer"),
+                    React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 } }, ptPeriodMonths.map(function (pm, i) { return (React.createElement("label", { key: i, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", padding: "5px 10px", borderRadius: 7, border: "1px solid " + (ptMonths.includes(i) ? "#1d4ed8" : "var(--border)"), background: ptMonths.includes(i) ? "rgba(29,78,216,.12)" : "var(--bg2)", cursor: "pointer" } },
+                        React.createElement("input", { type: "checkbox", checked: ptMonths.includes(i), onChange: function () { return setPtMonths(function (p) { return p.includes(i) ? p.filter(function (x) { return x !== i; }) : __spreadArray(__spreadArray([], p, true), [i], false); }); } }),
+                        MOIS[pm.m],
+                        " ",
+                        pm.y)); }))),
+                ptScope === "sem" && React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Semaines \u00E0 appliquer \u00B7 lundi \u2192 vendredi"),
+                    React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 } }, ptPeriodWeeks.map(function (w, i) { var on = ptWeeks.includes(i); return (React.createElement("button", { key: w.key, onClick: function () { return setPtWeeks(function (p) { return on ? p.filter(function (x) { return x !== i; }) : __spreadArray(__spreadArray([], p, true), [i], false); }); }, style: { padding: "6px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontWeight: on ? 800 : 400, border: on ? "1.5px solid #1d4ed8" : "1px solid var(--border)", background: on ? "rgba(29,78,216,.12)" : "var(--bg2)", color: on ? "#1d4ed8" : "var(--txt2)" } }, (on ? "\u2713 " : "") + w.label)); }))),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 } }, "Point de d\u00E9part"),
                 React.createElement("div", { style: { display: "flex", gap: 12, marginBottom: 16 } },
                     React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--txt)", cursor: "pointer" } },
