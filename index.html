@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.115 — 26/08/2026";
+var APP_VERSION = "v10.116 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4626,6 +4626,7 @@ const HELP_SECTIONS=[
   HT({children:"Ce qui déclenche une notification"}),
   HP({children:["Trois conditions, toutes les trois : l'activité fait partie des ",HE("b",null,"activités suivies")," (cochées dans Paramètres, encart 🔔), le médecin est un ",HE("b",null,"titulaire"),", et la période du jour a été ",HE("b",null,"diffusée")," (tuile 8 de Construire). Avant la diffusion, on construit librement — rien n'est émis."]}),
   HP({children:["Une absence ou une FMC qui recouvre une activité suivie la signale « retirée », avec sa cause. Un déplacement donne deux lignes : « retirée » à l'ancienne date, « ajoutée » à la nouvelle. Une modification aussitôt annulée s'efface d'elle-même. Le tour, les gardes et l'application du planning type n'émettent rien en tant que tels."]}),
+  HP({children:["Une notification ne vaut que ",HE("b",null,"tant que sa date est à venir")," : passée, plus personne ne peut rien en faire, elle ",HE("b",null,"s'efface d'elle-même"),", traitée ou non. Le jour même reste affiché ; c'est le lendemain qu'elle disparaît."]}),
   HP({last:true,children:["Les notifications suivent l'archivage : archiver une période retire aussi les siennes. Attachés : à venir."]}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
@@ -5976,16 +5977,38 @@ function secrDate(dk) {
     var d = new Date(+p[0], +p[1] - 1, +p[2]);
     return SECR_J[d.getDay()] + " " + d.getDate() + " " + SECR_M[d.getMonth()];
 }
+/* v10.116 : une notification ne vaut que TANT QUE SA DATE EST À VENIR. Passée,
+   plus personne ne peut rien en faire — elle s'efface d'elle-même, traitée ou
+   non. Le jour même reste affiché (la secrétaire peut encore agir le matin
+   pour l'après-midi) ; c'est le lendemain qu'elle disparaît. Rend null quand
+   il n'y a rien à retirer, pour ne pas réécrire l'état sans raison. */
+function secrToday() { var d = new Date(); return dKey(d.getFullYear(), d.getMonth(), d.getDate()); }
+function secrPurgePasse(o) {
+    var t = secrToday();
+    var ch = false;
+    var n = {};
+    Object.keys(o || {}).forEach(function (k) {
+        var p = String(k).split("|");
+        if (p.length >= 3 && p[2] < t) {
+            ch = true;
+            return;
+        }
+        n[k] = o[k];
+    });
+    return ch ? n : null;
+}
 function SecrTab(_a) {
     var medecins = _a.medecins, acteById = _a.acteById, secrNotif = _a.secrNotif, setSecrNotif = _a.setSecrNotif, canAck = _a.canAck, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode;
     var _b = React.useState({}), ouvert = _b[0], setOuvert = _b[1];
     var meds = (medecins || []).filter(function (m) { return (m.role || "medecin") === "medecin"; });
     /* clé = med|act|dKey|slot — regroupée par médecin puis par activité */
-    var parMed = {};
+    var parMed = {}, auj = secrToday();
     Object.keys(secrNotif || {}).forEach(function (k) {
         var p = k.split("|");
         if (p.length < 4)
             return;
+        if (p[2] < auj)
+            return; /* v10.116 : date passée = plus rien à reporter */
         var o = parMed[p[0]] = parMed[p[0]] || {};
         (o[p[1]] = o[p[1]] || []).push(__assign({ k: k, act: p[1], dk: p[2], sl: p[3] }, (secrNotif[k] || {})));
     });
@@ -9208,6 +9231,13 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ secrCfg: JSON.stringify(secrCfg) }); }, [secrCfg]);
     useEffect(function () { secrRef.current = { cfg: secrCfg, meds: medecins }; }, [secrCfg, medecins]);
+    /* v10.116 : expiration des notifications dont la date est passée. Le premier
+       effet couvre le chargement et chaque réception serveur ; le second le
+       passage de minuit sur un appareil resté ouvert. Idempotent : deux appareils
+       qui purgent en même temps aboutissent au même état. */
+    useEffect(function () { var p = secrPurgePasse(secrNotif); if (p)
+        setSecrNotif(p); }, [secrNotif]);
+    useEffect(function () { var t = setInterval(function () { return setSecrNotif(function (o) { return secrPurgePasse(o) || o; }); }, 1800000); return function () { return clearInterval(t); }; }, []);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ csBlanches: JSON.stringify(csBlanches) }); }, [csBlanches]);
     useEffect(function () { if (!isFirstLoad.current)
@@ -12227,17 +12257,25 @@ function CardioPlanning() {
                         React.createElement("button", { onClick: function () { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDD14 Notifications aux secr\u00E9taires"),
-        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Cochez les activit\u00E9s \u00E0 suivre : d\u00E8s qu'une p\u00E9riode est diffus\u00E9e (tuile 8 de Construire), chaque ajout ou retrait de ces activit\u00E9s pour un m\u00E9decin titulaire cr\u00E9e une ligne dans l'onglet \uD83D\uDD14 Notifications."),
-        React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 } }, actes.filter(function (a) { return a && !a.isSystem && SECR_EXCL.indexOf(a.id) < 0; }).map(function (a) {
-            var on = (secrCfg.acts || []).indexOf(a.id) >= 0;
-            return React.createElement("button", { key: a.id, disabled: !isEdit, onClick: function () { return setSecrCfg(function (c) { var l = (c.acts || []).slice(); var i2 = l.indexOf(a.id); if (i2 >= 0)
-                    l.splice(i2, 1);
-                else
-                    l.push(a.id); return __assign(__assign({}, c), { acts: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (on ? "#f59e0b" : "var(--border)"), background: on ? "rgba(245,158,11,.13)" : "var(--bg3)", color: on ? "#b45309" : "var(--txt2)" } }, (on ? "✓ " : "") + (a.short || a.label));
-        })),
-        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Seuls les m\u00E9decins titulaires sont suivis pour le moment. Attach\u00E9s : \u00E0 venir.")),
+                React.createElement("div", { style: { fontWeight: 700, color: "#f59e0b", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD14 Notifications aux secr\u00E9taires"),
+                React.createElement("div", null,
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Cochez les activit\u00E9s \u00E0 suivre : d\u00E8s qu'une p\u00E9riode est diffus\u00E9e (tuile 8 de Construire), chaque ajout ou retrait de ces activit\u00E9s pour un m\u00E9decin titulaire cr\u00E9e une ligne dans l'onglet \uD83D\uDD14 Notifications. Une ligne dont la date est pass\u00E9e s'efface d'elle-m\u00EAme."),
+                    ["tous", "CHL", "CHB"].map(function (site3) {
+                        var lst = actes.filter(function (a) { return a && !a.isSystem && SECR_EXCL.indexOf(a.id) < 0 && (a.site || "tous") === site3; });
+                        if (!lst.length)
+                            return null;
+                        return React.createElement("div", { key: site3, style: { marginBottom: 8 } },
+                            React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 } }, site3 === "tous" ? "Toutes" : site3),
+                            React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, lst.map(function (a) {
+                                var on = (secrCfg.acts || []).indexOf(a.id) >= 0;
+                                return React.createElement("button", { key: a.id, disabled: !isEdit, onClick: function () { return setSecrCfg(function (c) { var l = (c.acts || []).slice(); var i2 = l.indexOf(a.id); if (i2 >= 0)
+                                        l.splice(i2, 1);
+                                    else
+                                        l.push(a.id); return __assign(__assign({}, c), { acts: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (on ? "#f59e0b" : "var(--border)"), background: on ? "rgba(245,158,11,.13)" : "var(--bg3)", color: on ? "#b45309" : "var(--txt2)" } }, (on ? "✓ " : "") + (a.short || a.label));
+                            })));
+                    }),
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Seuls les m\u00E9decins titulaires sont suivis pour le moment. Attach\u00E9s : \u00E0 venir."))),
+                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde & archivage"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois."),
                 docSize !== null && (function () {

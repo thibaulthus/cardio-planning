@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.115 — 26/08/2026";
+const APP_VERSION="v10.116 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4417,6 +4417,7 @@ const HELP_SECTIONS=[
   HT({children:"Ce qui déclenche une notification"}),
   HP({children:["Trois conditions, toutes les trois : l'activité fait partie des ",HE("b",null,"activités suivies")," (cochées dans Paramètres, encart 🔔), le médecin est un ",HE("b",null,"titulaire"),", et la période du jour a été ",HE("b",null,"diffusée")," (tuile 8 de Construire). Avant la diffusion, on construit librement — rien n'est émis."]}),
   HP({children:["Une absence ou une FMC qui recouvre une activité suivie la signale « retirée », avec sa cause. Un déplacement donne deux lignes : « retirée » à l'ancienne date, « ajoutée » à la nouvelle. Une modification aussitôt annulée s'efface d'elle-même. Le tour, les gardes et l'application du planning type n'émettent rien en tant que tels."]}),
+  HP({children:["Une notification ne vaut que ",HE("b",null,"tant que sa date est à venir")," : passée, plus personne ne peut rien en faire, elle ",HE("b",null,"s'efface d'elle-même"),", traitée ou non. Le jour même reste affiché ; c'est le lendemain qu'elle disparaît."]}),
   HP({last:true,children:["Les notifications suivent l'archivage : archiver une période retire aussi les siennes. Attachés : à venir."]}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
@@ -5754,12 +5755,23 @@ const SECR_J=["dim","lun","mar","mer","jeu","ven","sam"];
 const SECR_M=["janv","févr","mars","avril","mai","juin","juil","août","sept","oct","nov","déc"];
 function secrDate(dk){const p=String(dk).split("-");const d=new Date(+p[0],+p[1]-1,+p[2]);
   return SECR_J[d.getDay()]+" "+d.getDate()+" "+SECR_M[d.getMonth()];}
+/* v10.116 : une notification ne vaut que TANT QUE SA DATE EST À VENIR. Passée,
+   plus personne ne peut rien en faire — elle s'efface d'elle-même, traitée ou
+   non. Le jour même reste affiché (la secrétaire peut encore agir le matin
+   pour l'après-midi) ; c'est le lendemain qu'elle disparaît. Rend null quand
+   il n'y a rien à retirer, pour ne pas réécrire l'état sans raison. */
+function secrToday(){const d=new Date();return dKey(d.getFullYear(),d.getMonth(),d.getDate());}
+function secrPurgePasse(o){const t=secrToday();let ch=false;const n={};
+  Object.keys(o||{}).forEach(k=>{const p=String(k).split("|");
+    if(p.length>=3&&p[2]<t){ch=true;return;}n[k]=o[k];});
+  return ch?n:null;}
 function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDarkMode}){
   const [ouvert,setOuvert]=React.useState({});
   const meds=(medecins||[]).filter(m=>(m.role||"medecin")==="medecin");
   /* clé = med|act|dKey|slot — regroupée par médecin puis par activité */
-  const parMed={};
+  const parMed={},auj=secrToday();
   Object.keys(secrNotif||{}).forEach(k=>{const p=k.split("|");if(p.length<4)return;
+    if(p[2]<auj)return;   /* v10.116 : date passée = plus rien à reporter */
     const o=parMed[p[0]]=parMed[p[0]]||{};(o[p[1]]=o[p[1]]||[]).push({k,act:p[1],dk:p[2],sl:p[3],...(secrNotif[k]||{})});});
   const ack=(keys)=>{if(!canAck)return;setSecrNotif(o=>{const n={...o};keys.forEach(k=>{delete n[k];});return n;});};
   return(
@@ -8362,6 +8374,12 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({secrNotif:JSON.stringify(secrNotif)});},[secrNotif]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({secrCfg:JSON.stringify(secrCfg)});},[secrCfg]);
   useEffect(()=>{secrRef.current={cfg:secrCfg,meds:medecins};},[secrCfg,medecins]);
+  /* v10.116 : expiration des notifications dont la date est passée. Le premier
+     effet couvre le chargement et chaque réception serveur ; le second le
+     passage de minuit sur un appareil resté ouvert. Idempotent : deux appareils
+     qui purgent en même temps aboutissent au même état. */
+  useEffect(()=>{const p=secrPurgePasse(secrNotif);if(p)setSecrNotif(p);},[secrNotif]);
+  useEffect(()=>{const t=setInterval(()=>setSecrNotif(o=>secrPurgePasse(o)||o),1800000);return()=>clearInterval(t);},[]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csBlanches:JSON.stringify(csBlanches)});},[csBlanches]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csRep:JSON.stringify(csRep)});},[csRep]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsSel:JSON.stringify(csActsSel)});},[csActsSel]);
@@ -10853,6 +10871,26 @@ header::-webkit-scrollbar { display: none; }
 
           <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]}/>
           <div style={{...S.card,marginBottom:10}}>
+            <div style={{fontWeight:700,color:"#f59e0b",fontSize:13,marginBottom:6}}>🔔 Notifications aux secrétaires</div>
+            <div>
+              <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Cochez les activités à suivre : dès qu'une période est diffusée (tuile 8 de Construire), chaque ajout ou retrait de ces activités pour un médecin titulaire crée une ligne dans l'onglet 🔔 Notifications. Une ligne dont la date est passée s'efface d'elle-même.</div>
+              {["tous","CHL","CHB"].map(site3=>{
+                const lst=actes.filter(a=>a&&!a.isSystem&&SECR_EXCL.indexOf(a.id)<0&&(a.site||"tous")===site3);
+                if(!lst.length)return null;
+                return <div key={site3} style={{marginBottom:8}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>{site3==="tous"?"Toutes":site3}</div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {lst.map(a=>{const on=(secrCfg.acts||[]).indexOf(a.id)>=0;
+                      return <button key={a.id} disabled={!isEdit} onClick={()=>setSecrCfg(c=>{const l=(c.acts||[]).slice();const i2=l.indexOf(a.id);if(i2>=0)l.splice(i2,1);else l.push(a.id);return {...c,acts:l};})}
+                        style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:isEdit?"pointer":"default",border:"1px solid "+(on?"#f59e0b":"var(--border)"),background:on?"rgba(245,158,11,.13)":"var(--bg3)",color:on?"#b45309":"var(--txt2)"}}>{(on?"✓ ":"")+(a.short||a.label)}</button>;})}
+                  </div>
+                </div>;
+              })}
+              <div style={{fontSize:10,color:"var(--txt3)"}}>Seuls les médecins titulaires sont suivis pour le moment. Attachés : à venir.</div>
+            </div>
+          </div>
+
+          <div style={{...S.card,marginBottom:10}}>
             {/* Vacances scolaires */}
             <div style={{...S.card,marginBottom:10}}>
               <div style={{fontWeight:700,fontSize:13,color:"var(--txt)",marginBottom:8}}>🏖 Vacances scolaires</div>
@@ -11003,17 +11041,6 @@ header::-webkit-scrollbar { display: none; }
                 <button onClick={()=>setDarkMode(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:darkMode?"var(--nav-act)":"var(--bg2)",color:darkMode?"var(--nav-act-c)":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>🌓 Nuit</button>
               </div>
               <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil (le bouton 🌓 des onglets fait pareil).</div>
-            </div>
-
-            <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🔔 Notifications aux secrétaires</div>
-              <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Cochez les activités à suivre : dès qu'une période est diffusée (tuile 8 de Construire), chaque ajout ou retrait de ces activités pour un médecin titulaire crée une ligne dans l'onglet 🔔 Notifications.</div>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
-                {actes.filter(a=>a&&!a.isSystem&&SECR_EXCL.indexOf(a.id)<0).map(a=>{const on=(secrCfg.acts||[]).indexOf(a.id)>=0;
-                  return <button key={a.id} disabled={!isEdit} onClick={()=>setSecrCfg(c=>{const l=(c.acts||[]).slice();const i2=l.indexOf(a.id);if(i2>=0)l.splice(i2,1);else l.push(a.id);return {...c,acts:l};})}
-                    style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:isEdit?"pointer":"default",border:"1px solid "+(on?"#f59e0b":"var(--border)"),background:on?"rgba(245,158,11,.13)":"var(--bg3)",color:on?"#b45309":"var(--txt2)"}}>{(on?"✓ ":"")+(a.short||a.label)}</button>;})}
-              </div>
-              <div style={{fontSize:10,color:"var(--txt3)"}}>Seuls les médecins titulaires sont suivis pour le moment. Attachés : à venir.</div>
             </div>
 
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
