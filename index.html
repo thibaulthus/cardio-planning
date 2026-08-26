@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.122 — 26/08/2026";
+var APP_VERSION = "v10.123 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -1672,7 +1672,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
     const [gardeModal, setGardeModal] = React.useState(false);
     const [lastGReport, setLastGReport] = React.useState(null);
     const [gMax, setGMax] = React.useState({}); // {medId: maxGardes} optionnel
-    const gardeMeds = djListePeriode(medecins, perDaysList(gvSy, gvSm)).filter(m => m.garde);
+    const gardeMeds = djListePeriode(medecins, perDaysList(gvSy, gvSm)).filter(m => m.garde && !m._nonPourvu); /* v10.123 */
     const FACT = { less: 0.75, normal: 1, more: 1.25 };
     // Tous les jours de la période (complets, indépendants de showFull)
     const gvAllDays = React.useMemo(() => perDaysList(gvSy, gvSm), [gvSy, gvSm, PCFG.len]);
@@ -3711,7 +3711,7 @@ function TourTab(_a) {
         return infos;
     };
     var medsPerT = djListePeriode(medecins, perDaysList(perT.startY, perT.startM));
-    var tourMeds = medsPerT.filter(function (m) { return m.tourMed; });
+    var tourMeds = medsPerT.filter(function (m) { return m.tourMed && !m._nonPourvu; }); /* v10.123 */
     var horsTourSpecMeds = medsPerT.filter(function (m) { return m.role === "medecin" && !m.tourMed && m.surSpec; });
     /* v9.84 : couleurs des surspécialités réglables. Elles étaient écrites en dur ici —
        une information dans le code que l'utilisateur ne pouvait pas atteindre. Elles
@@ -4470,7 +4470,7 @@ function StatsTab(_a) {
     var GARDE_WE = { id: "GARDE_WE", label: "Garde WE et fériés", short: "G WE", color: "#f59e0b" };
     var allTrack = __spreadArray([GARDE_ACTE, GARDE_SEM, GARDE_JEU, GARDE_WE], trackActes, true);
     // Count per med per acte
-    var allStatMeds = djListePeriode(medecins, days).filter(function (m) { return m.role === "medecin"; });
+    var allStatMeds = djListePeriode(medecins, days).filter(function (m) { return m.role === "medecin" && !m._nonPourvu; }); /* v10.123 */
     var _e = React.useState([]), medFilter = _e[0], setMedFilter = _e[1];
     var _f = React.useState(null), sortCol = _f[0], setSortCol = _f[1]; // {col,dir:'desc'|'asc'}
     var meds = medFilter.length > 0 ? allStatMeds.filter(function (m) { return medFilter.includes(m.id); }) : allStatMeds;
@@ -4756,6 +4756,7 @@ const HELP_SECTIONS=[
   HP({children:["Tant qu'aucun nom n'est saisi pour un semestre, le rôle est ",HE("b",null,"hachuré et verrouillé")," sur ces dates (voir la section précédente), et sa colonne disparaît si toute la période est concernée. La personne n'existe pas encore : rien ne peut lui être posé, pas même un congé. ",HE("b",null,"Saisir le nom déverrouille")," aussitôt, sans autre manipulation."]}),
   HP({children:["⚠ Conséquence pratique : ",HE("b",null,"saisissez les noms avant de construire la période"),". Sinon le planning type saute ces mois, et il faudra le réappliquer une fois les noms entrés."]}),
   HP({children:["Effacer un nom déjà saisi ",HE("b",null,"n'efface aucune activité")," : les cases se reverrouillent, le contenu reste dessous. La fiche le ",HE("b",null,"compte")," et propose de retirer ces activités si c'est ce que vous voulez."]}),
+  HP({children:["Un rôle ",HE("b",null,"sans titulaire sur toute la période")," ne compte pas pour une personne : il sort des listes et des totaux des tuiles Tour et Gardes (et des Stats), et la répartition automatique l'ignore. Ses cases restent visibles, hachurées, dans le planning — et l'éditeur peut toujours lui poser une garde à la main depuis la grille."]}),
   HT({children:"Quand le changement tombe au milieu d'une période"}),
   HP({last:true,children:["Le changement du 2 novembre tombe sur une frontière de période : rien à gérer. Seule la période ",HE("b",null,"mars-juin")," contient une bascule. Dans ce cas, l'en-tête de colonne montre ",HE("b",null,"un seul jeu d'initiales"),", celui du titulaire du moment, et bascule tout seul le jour dit. Dans Construire, le tour et les gardes, le rôle reste ",HE("b",null,"une seule ligne")," portant les deux noms (« X puis Y ») : il compte ainsi sur la période entière, comme tout le monde."]}))},
 
@@ -6651,7 +6652,7 @@ function djListePeriode(meds, jours) {
             }
         });
         if (!ini.length)
-            return b;
+            return Object.assign({}, b, { _nonPourvu: true }); /* v10.123 : role sans titulaire sur la periode — visible mais hors decomptes */
         return Object.assign(Object.assign({}, b), { djRole0: { init: b.init, nom: b.nom, prenom: b.prenom }, initAuth: b.init, init: ini.join("/"), nom: noms.join(" / "), prenom: "", _lib: noms.join(" puis ") });
     });
 }
