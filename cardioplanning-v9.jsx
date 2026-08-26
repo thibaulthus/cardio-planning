@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.114 — 25/08/2026";
+const APP_VERSION="v10.115 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4392,9 +4392,9 @@ const HELP_SECTIONS=[
   HP({last:true,children:["Dans les deux cas, l'icône ouvre toujours la dernière version : c'est le site lui-même, aucune mise à jour manuelle à faire. Astuce : refaites simplement l'ajout si vous changez de téléphone."]}))},
 
 {id:"construire",icon:"🧱",title:"Construire — créer le planning pas à pas",body:()=>HE("div",null,
-  HP({children:["L'onglet ",HE("b",null,"Construire")," guide la fabrication d'une période en ",HE("b",null,"7 étapes"),", dans l'ordre réel du travail : congés, tour, gardes, absences de tout le monde, planning type, surspécialités, bip. Chaque étape est une tuile qui s'ouvre et se replie ; la première non terminée est ouverte à l'arrivée."]}),
+  HP({children:["L'onglet ",HE("b",null,"Construire")," guide la fabrication d'une période en ",HE("b",null,"8 étapes"),", dans l'ordre réel du travail : congés, tour, gardes, absences de tout le monde, planning type, surspécialités, bip, diffusion. Chaque étape est une tuile qui s'ouvre et se replie ; la première non terminée est ouverte à l'arrivée."]}),
   HP({children:["La ",HE("b",null,"période se choisit en haut"),", une seule fois, et vaut pour toutes les tuiles — l'onglet s'ouvre sur la ",HE("b",null,"période suivante"),", celle qu'on construit. Les tuiles Tour et Gardes reprennent ces deux écrans en entier : leurs onglets ne sont plus affichés dans la barre, ils vivent désormais ici."]}),
-  HP({children:["Une étape mesurable se termine ",HE("b",null,"d'elle-même"),' (pastille « terminé ») ; seule l\'étape 5, planning type, se valide à la main. Rien n\'est bloquant : une étape en retard n\'empêche jamais d\'avancer.']}),
+  HP({children:["Une étape mesurable se termine ",HE("b",null,"d'elle-même"),' (pastille « terminé ») ; seule l\'étape 5, planning type, se valide à la main, et l\'étape 8 se termine par le bouton 📢 Diffuser. Rien n\'est bloquant : une étape en retard n\'empêche jamais d\'avancer.']}),
   HT({children:"Les demandes à l'équipe"}),
   HP({children:["Depuis la tuile 1, trois demandes s'ouvrent séparément : ",HE("b",null,"poser ses congés"),", ",HE("b",null,"préférences de tour"),", ",HE("b",null,"préférences de gardes"),". Chaque médecin concerné voit alors un ",HE("b",null,"bandeau dans son Planning"),", quelle que soit la période affichée, avec un bouton pour aller à la bonne période et « ✓ C'est fait » qui coche sa ligne. Les préférences de tour ne partent qu'à ceux qui tournent, celles de gardes à ceux qui en prennent."]}),
   HP({children:["Accès : éditeur et intermédiaires. Le bouton du ",HE("b",null,"Bip de Béthune")," vit dans la tuile 7 (il n'est plus dans l'onglet CHB)."]}),
@@ -4410,6 +4410,14 @@ const HELP_SECTIONS=[
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
   HStep({n:"6",children:[HE("b",null,"Ajuster")," — cases individuelles, échanges de gardes ⇄, dérogations de tour, notes 📝."]}),
   HP({last:true,children:["En fin de période : archiver la période écoulée (voir la tuile Archiver)."]}))},
+
+{id:"notifications",icon:"🔔",title:"Notifications — prévenir les secrétaires",body:()=>HE("div",null,
+  HP({children:["L'onglet ",HE("b",null,"🔔 Notifications")," liste, médecin par médecin, les modifications du planning que les secrétaires doivent reporter dans le logiciel de consultations : une ",HE("b",null,"tuile par médecin")," avec le nombre de modifications en attente, et à l'intérieur les lignes groupées ",HE("b",null,"par activité puis par date"),", avec leur sens — ",HE("b",null,"ajoutée")," ou ",HE("b",null,"retirée")," — et la cause quand il y en a une (absence, FMC, repos de garde)."]}),
+  HP({children:["Chaque ligne se traite d'un ",HE("b",null,"✓")," ; « Tout traiter » vide la tuile. L'acquittement est ",HE("b",null,"libre, sans code")," : chaque secrétaire nettoie les tuiles de ses médecins."]}),
+  HT({children:"Ce qui déclenche une notification"}),
+  HP({children:["Trois conditions, toutes les trois : l'activité fait partie des ",HE("b",null,"activités suivies")," (cochées dans Paramètres, encart 🔔), le médecin est un ",HE("b",null,"titulaire"),", et la période du jour a été ",HE("b",null,"diffusée")," (tuile 8 de Construire). Avant la diffusion, on construit librement — rien n'est émis."]}),
+  HP({children:["Une absence ou une FMC qui recouvre une activité suivie la signale « retirée », avec sa cause. Un déplacement donne deux lignes : « retirée » à l'ancienne date, « ajoutée » à la nouvelle. Une modification aussitôt annulée s'efface d'elle-même. Le tour, les gardes et l'application du planning type n'émettent rien en tant que tels."]}),
+  HP({last:true,children:["Les notifications suivent l'archivage : archiver une période retire aussi les siennes. Attachés : à venir."]}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
   HP({children:["Pour chaque consultation perdue (absence, semaine de tour), l'application propose la ",HE("b",null,"semaine blanche libre la plus proche"),", jamais à plus d'",HE("b",null,"un mois"),", en avant comme en arrière, dans la période affichée. Une semaine sans solution se traite à la main : « ⇄ Chercher une autre semaine blanche » ouvre le choix complet, sans plafond. La ligne d'une blanche qui reçoit dit « peut accueillir le report de … » et se met à jour toute seule si vous décidez autrement."]}),
@@ -5525,11 +5533,12 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
   );
 }
 
-function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps}){
+function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps,secrDif,onDiffuser,onAnnulerDif}){
   /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
   const [bPer,setBPer]=React.useState(()=>{if(BUILD_MEM.per)return BUILD_MEM.per;const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
   const allerA=(p)=>{BUILD_MEM.per={sy:p.sy,sm:p.sm};setBPer({sy:p.sy,sm:p.sm});};
   const pKey=bPer.sy+"_"+bPer.sm;
+  const bPid=perIdOf(bPer.sy,bPer.sm);   /* v10.115 : identifiant de période des notifications */
   const B=(build||{})[pKey]||{};
   const patchB=(patch)=>setBuild(p=>{const cur=(p||{})[pKey]||{};return {...(p||{}),[pKey]:{...cur,...patch}};});
   const sign=()=>({by:author||"?",at:new Date().toLocaleDateString("fr-FR")});
@@ -5600,12 +5609,13 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     4:autres.length>0&&nAutres===autres.length,
     5:false,
     6:nSpec===BUILD_SPECS.length,
-    7:bips.tot>0&&bips.ok===bips.tot};
+    7:bips.tot>0&&bips.ok===bips.tot,
+    8:!!(secrDif||{})[bPid]};
   const estFait=(n)=>!!(valide(n)||autoOk[n]);
 
   /* la premiere etape non terminee est ouverte au premier affichage ; une etape
      validee se REFERME (sa demande) et ne se rouvre jamais toute seule */
-  const [ouv,setOuv]=React.useState(()=>{if(BUILD_MEM.ouv)return BUILD_MEM.ouv;for(let n=1;n<=7;n++){if(!autoOk[n])return {[n]:true};}return {};});
+  const [ouv,setOuv]=React.useState(()=>{if(BUILD_MEM.ouv)return BUILD_MEM.ouv;for(let n=1;n<=8;n++){if(!autoOk[n])return {[n]:true};}return {};});
   const majOuv=(f)=>setOuv(o=>{const r=f(o);BUILD_MEM.ouv=r;return r;});
   const toggle=(n)=>majOuv(o=>({...o,[n]:!o[n]}));
   const setEtape=(n)=>{
@@ -5688,7 +5698,18 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
          {isEdit&&<button onClick={onOpenBip} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}}>📟 Répartition du Bip</button>}
          <BuildLien txt="→ Onglet CHB" onClick={()=>goTab("chb")}/>
-       </div></div>}
+       </div></div>},
+    {n:8,icon:"📢",titre:"Diffuser le planning",sansPointage:true,
+     sous:(secrDif||{})[bPid]?("diffusé le "+(secrDif||{})[bPid]):"pas encore diffusé",
+     alerte:null,
+     body:<div>
+       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>La diffusion marque le planning de la période comme communiqué à l'équipe : à partir de là, chaque modification d'une activité suivie alimente l'onglet 🔔 Notifications pour les secrétaires. Avant la diffusion, on construit librement — rien n'est émis. Les activités suivies se cochent dans Paramètres, encart 🔔.</div>
+       {isEdit&&!(secrDif||{})[bPid]&&<button onClick={()=>onDiffuser(bPid)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #f59e0b",background:"rgba(245,158,11,.10)",color:"#b45309",fontWeight:800,cursor:"pointer"}}>📢 Diffuser la période</button>}
+       {(secrDif||{})[bPid]&&<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+         <span style={{fontSize:11,fontWeight:800,color:"#3fb950"}}>{"✓ Période diffusée le "+(secrDif||{})[bPid]}</span>
+         {isEdit&&<button onClick={()=>onAnnulerDif(bPid)} title="Annuler la diffusion : les notifications cessent pour cette période (celles déjà émises restent)" style={{fontSize:10,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt3)",borderRadius:6,cursor:"pointer",padding:"2px 8px"}}>annuler</button>}
+       </div>}
+     </div>}
   ];
 
   const nFaits=tuiles.filter(t=>estFait(t.n)).length;
@@ -5707,20 +5728,85 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8,margin:"8px 0 14px"}}>
         <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg3)",overflow:"hidden"}}>
-          <div style={{height:"100%",width:Math.round(nFaits/7*100)+"%",background:"#3fb950"}}/>
+          <div style={{height:"100%",width:Math.round(nFaits/8*100)+"%",background:"#3fb950"}}/>
         </div>
-        <div style={{fontSize:11,color:"var(--txt2)",fontWeight:700,whiteSpace:"nowrap"}}>{nFaits+" étape"+(nFaits>1?"s":"")+" sur 7"}</div>
+        <div style={{fontSize:11,color:"var(--txt2)",fontWeight:700,whiteSpace:"nowrap"}}>{nFaits+" étape"+(nFaits>1?"s":"")+" sur 8"}</div>
       </div>
       {!isEdit&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Lecture seule : le pointage est réservé aux personnes qui peuvent modifier le planning.</div>}
       {tuiles.map(t=>(
         <BuildTile key={t.n} n={t.n} icon={t.icon} titre={t.titre} sous={t.sous} ouvert={!!ouv[t.n]} onToggle={()=>toggle(t.n)}
-          alerte={t.alerte} fait={valide(t.n)} auto={autoOk[t.n]} onFait={()=>setEtape(t.n)} peutFaire={isEdit&&!autoOk[t.n]}>
+          alerte={t.alerte} fait={valide(t.n)} auto={autoOk[t.n]} onFait={()=>setEtape(t.n)} peutFaire={isEdit&&!autoOk[t.n]&&!t.sansPointage}>
           {t.body}
         </BuildTile>
       ))}
       <div style={{fontSize:10,color:"var(--txt3)",textAlign:"center",marginTop:10}}>Les alertes signalent, elles ne bloquent pas : une étape non terminée n'empêche jamais d'avancer.</div>
     </div>
   );
+}
+
+/* ═══════════════ v10.115 : ONGLET NOTIFICATIONS (alerte secrétaires) ═══════════════
+   Une tuile par médecin titulaire, badge = modifications en attente ; tuile ouverte =
+   groupes par activité, lignes datées avec le sens (ajoutée / retirée) et la cause.
+   L'acquittement (✓) est LIBRE, sans code : chaque secrétaire nettoie ses tuiles.
+   L'émission se fait au diff de flushPlan — voir CardioPlanning. */
+const SECR_SLOTS={M:"matin",AM:"après-midi",JOUR:"journée",N:"nuit"};
+const SECR_J=["dim","lun","mar","mer","jeu","ven","sam"];
+const SECR_M=["janv","févr","mars","avril","mai","juin","juil","août","sept","oct","nov","déc"];
+function secrDate(dk){const p=String(dk).split("-");const d=new Date(+p[0],+p[1]-1,+p[2]);
+  return SECR_J[d.getDay()]+" "+d.getDate()+" "+SECR_M[d.getMonth()];}
+function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDarkMode}){
+  const [ouvert,setOuvert]=React.useState({});
+  const meds=(medecins||[]).filter(m=>(m.role||"medecin")==="medecin");
+  /* clé = med|act|dKey|slot — regroupée par médecin puis par activité */
+  const parMed={};
+  Object.keys(secrNotif||{}).forEach(k=>{const p=k.split("|");if(p.length<4)return;
+    const o=parMed[p[0]]=parMed[p[0]]||{};(o[p[1]]=o[p[1]]||[]).push({k,act:p[1],dk:p[2],sl:p[3],...(secrNotif[k]||{})});});
+  const ack=(keys)=>{if(!canAck)return;setSecrNotif(o=>{const n={...o};keys.forEach(k=>{delete n[k];});return n;});};
+  return(
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <h2 style={S.mTit}>🔔 Notifications</h2>
+        <div style={{marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
+      </div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>Les modifications du planning à reporter dans le logiciel de consultations, médecin par médecin. Chaque ligne se traite d'un ✓, sans code — chacun nettoie les tuiles de ses médecins.</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:8}}>
+        {meds.map(m=>{
+          const grp=parMed[m.id]||{};
+          const acts=Object.keys(grp);
+          const nTot=acts.reduce((s2,a)=>s2+grp[a].length,0);
+          const ouv=!!ouvert[m.id];
+          const allKeys=acts.reduce((l,a)=>l.concat(grp[a].map(e=>e.k)),[]);
+          return(
+            <div key={m.id} style={{border:"1px solid "+(nTot?"#f59e0b":"var(--border)"),borderRadius:10,background:"var(--card)",opacity:nTot?1:.55,gridColumn:ouv?"1 / -1":"auto"}}>
+              <div onClick={()=>setOuvert(o=>({...o,[m.id]:!o[m.id]}))} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer"}}>
+                <span style={{fontWeight:800,fontSize:13,color:"var(--txt)"}}>{(m.prenom?m.prenom+" ":"")+(m.nom||m.init||"")}</span>
+                {nTot>0
+                  ?<span style={{marginLeft:"auto",minWidth:20,textAlign:"center",fontSize:11,fontWeight:900,borderRadius:10,padding:"1px 7px",background:"#f59e0b",color:"#fff"}}>{nTot}</span>
+                  :<span style={{marginLeft:"auto",fontSize:10,color:"var(--txt3)"}}>à jour</span>}
+                <span style={{fontSize:10,color:"var(--txt3)"}}>{ouv?"▲":"▼"}</span>
+              </div>
+              {ouv&&nTot===0&&<div style={{padding:"0 10px 10px",fontSize:11,color:"var(--txt3)"}}>Aucune modification à traiter.</div>}
+              {ouv&&nTot>0&&(
+                <div style={{padding:"0 10px 10px"}}>
+                  {acts.map(a=>{const ai=acteById?acteById(a):null;const lst=grp[a].slice().sort((x,y)=>x.dk<y.dk?-1:x.dk>y.dk?1:(x.sl<y.sl?-1:1));
+                    return(
+                      <div key={a} style={{marginBottom:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                          <span style={{fontSize:10,fontWeight:900,borderRadius:6,padding:"2px 8px",background:(ai&&(ai.bg||ai.color))||"var(--bg3)",color:"#fff"}}>{((ai&&(ai.short||ai.label))||a)+" · "+lst.length}</span>
+                        </div>
+                        {lst.map(e=>(
+                          <div key={e.k} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",borderBottom:"1px dashed var(--border2)"}}>
+                            <span style={{fontSize:11,color:"var(--txt)",fontWeight:600}}>{secrDate(e.dk)+" · "+(SECR_SLOTS[e.sl]||e.sl)}</span>
+                            <span style={{fontSize:11,fontWeight:800,color:e.s>0?"#3fb950":"#f85149"}}>{(e.s>0?"— ajoutée":"— retirée")+(e.c?" ("+e.c+")":"")}</span>
+                            {canAck&&<button onClick={()=>ack([e.k])} title="Traité : retirer cette ligne" style={{marginLeft:"auto",border:"1px solid #3fb950",background:"rgba(63,185,80,.12)",color:"#3fb950",borderRadius:6,fontSize:11,fontWeight:900,cursor:"pointer",padding:"1px 8px"}}>✓</button>}
+                          </div>))}
+                      </div>);})}
+                  {canAck&&<button onClick={()=>ack(allKeys)} style={{marginTop:4,border:"1px solid #3fb950",background:"rgba(63,185,80,.12)",color:"#3fb950",borderRadius:6,fontSize:11,fontWeight:800,cursor:"pointer",padding:"3px 12px"}}>✓ Tout traiter</button>}
+                </div>)}
+            </div>);})}
+      </div>
+      {meds.length===0&&<div style={{fontSize:11,color:"var(--txt3)"}}>Aucun médecin titulaire dans l'équipe.</div>}
+    </div>);
 }
 
 /* ═══════════════ v10.35 : SAUVEGARDE EXPLOITABLE ═══════════════
@@ -7223,6 +7309,15 @@ function arPerPeriode(k){const p=String(k).split("_");
    tour et les notes s'affichent dans la grille ; les souhaits, reports et
    Construire n'ont aucune valeur pour une période passée, ils partent sans
    retour d'écran). */
+/* ═══ v10.115 : notifications secrétaires — constantes partagées ═══
+   Une notification = clé "medId|acteId|YYYY-MM-DD|slot" → {s:+1 ajoutée / -1 retirée,
+   ts, c: cause éventuelle}. SECR_EXCL = les activités « de structure » qui n'émettent
+   jamais en tant que telles (mais peuvent être la CAUSE d'un retrait). */
+const SECR_EXCL=["TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TP"];
+const SECR_MAX=400;   /* plafond d'entrées : au-delà, les plus anciennes tombent */
+/* période d'une clé de notification : son 3e segment est un jour au format clair */
+function arPerSecr(k){const p=String(k).split("|");return p.length>=3?arPerClair(p[2]):null;}
+
 const AR_FAM=[
   {ch:"tourMed",    per:arPerTechSem, lu:true,  lib:"semaine de tour|semaines de tour"},
   {ch:"tourDerog",  per:arPerClair,   lu:true,  lib:"dérogation de tour|dérogations de tour"},
@@ -7231,6 +7326,7 @@ const AR_FAM=[
   {ch:"tourAvoid",  per:arPerTechSem, lu:false, lib:"tour à éviter|tours à éviter"},
   {ch:"gardeWish",  per:arPerClair,   lu:false, lib:"souhait de garde|souhaits de garde"},
   {ch:"gardeAvoid", per:arPerClair,   lu:false, lib:"garde à éviter|gardes à éviter"},
+  {ch:"secrNotif",  per:arPerSecr,    lu:false, lib:"notification secrétaire|notifications secrétaires"},
   {ch:"build",      per:arPerPeriode, lu:false, lib:"période de Construire|périodes de Construire"},
 ];
 /* familles indexées PAR MÉDECIN, avec les clés datées au deuxième niveau
@@ -7429,7 +7525,7 @@ function CardioPlanning(){
     if(mq.addEventListener)mq.addEventListener("change",onChg);else if(mq.addListener)mq.addListener(onChg);
     return ()=>{if(mq.removeEventListener)mq.removeEventListener("change",onChg);else if(mq.removeListener)mq.removeListener(onChg);};
   },[]);
-  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["internes","🎓 Internes"],["construire","🏗️ Construire"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["attache","👔 Attachés"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
+  const DEFAULT_TABS=[["planning","📅 Planning"],["chl","🏥 CHL"],["chb","🏥 CHB"],["plateau","❤️ PT Cardio"],["angio","🔬 PT Angio"],["internes","🎓 Internes"],["construire","🏗️ Construire"],["tourmedical","🔄 Tour"],["garde","🌙 Gardes"],["astreinte","📞 Astreinte"],["reports","📥 Reports"],["notifications","🔔 Notifications"],["attache","👔 Attachés"],["plantype","📋 Type"],["equipe","👥 Équipe"],["activites","⚙️ Activités"],["stats","📊 Stats"],["aide","❓ Aide"],["partage","⚙️ Paramètres"]];
   /* v10.78 : « Internes » rejoint « PT Angio ». L'ordre ENREGISTRE sur l'appareil fait foi
      (cp6_taborder_v3), donc changer DEFAULT_TABS ne suffisait pas : sur un appareil deja
      utilise, l'onglet serait reste en fin de liste. On passe donc a une nouvelle cle et,
@@ -7438,15 +7534,20 @@ function CardioPlanning(){
   const [tabOrder,setTabOrder]=useState(()=>{ try{
     const all=DEFAULT_TABS.map(t=>t[0]);
     const compl=ids=>[...ids.filter(id=>all.includes(id)),...all.filter(id=>!ids.includes(id))];
+    /* v10.115 : « Notifications » rejoint « Reports » — même manœuvre que la v10.78 */
+    const apresReports=ids=>{const m=ids.filter(id=>id!=="notifications");
+      const i=m.indexOf("reports"); m.splice(i>=0?i+1:m.length,0,"notifications"); return m;};
+    const v5=localStorage.getItem("cp6_taborder_v5");
+    if(v5) return compl(JSON.parse(v5));
     const v=localStorage.getItem("cp6_taborder_v4");
-    if(v) return compl(JSON.parse(v));
+    if(v) return apresReports(compl(JSON.parse(v)));
     const anc=localStorage.getItem("cp6_taborder_v3");
     if(anc){ const m=compl(JSON.parse(anc)).filter(id=>id!=="internes");
-      const i=m.indexOf("angio"); m.splice(i>=0?i+1:m.length,0,"internes"); return m; }
+      const i=m.indexOf("angio"); m.splice(i>=0?i+1:m.length,0,"internes"); return apresReports(m); }
     return all;
   }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
-  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v4",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
+  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v5",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
 
   const [modal,setModal]=useState(null);
   const [mData,setMData]=useState(null);
@@ -7474,6 +7575,10 @@ function CardioPlanning(){
   const [tourWish,setTourWish]=useState({});   // {weekKey:{medId:true}} souhaite tourner
   const [gardeAvoid,setGardeAvoid]=useState({}); // {dateKey:{medId:true}} préfère pas de garde ce jour
   const [gardeWish,setGardeWish]=useState({});   // {dateKey:{medId:true}} souhaite la garde ce jour
+  /* v10.115 : notifications secrétaires — entrées {med|act|dKey|slot:{s:±1,ts,c?}} et
+     réglages {acts:[activités suivies], dif:{période:date de diffusion}} */
+  const [secrNotif,setSecrNotif]=useState({});
+  const [secrCfg,setSecrCfg]=useState({acts:[],dif:{}});
   const [csBlanches,setCsBlanches]=useState({}); // {medId:{"y-m-d":true}} jours sans consultation (logiciel métier)
   const [csRep,setCsRep]=useState({}); // v9.14 {medId:{done:{wk:true},to:{"dKey|sl":{d,sl,n}}}}
   const [csActsSel,setCsActsSel]=useState({});   // {medId:[acteIds]} activités comptées comme consultation
@@ -7572,12 +7677,77 @@ function CardioPlanning(){
   const ptMigrated=useRef(false);
   /* ── v9.7 : écriture du plan en delta — seules les cases modifiées partent vers Firebase,
      la fusion se fait champ par champ côté serveur : zéro écrasement entre éditeurs simultanés ── */
+  /* ═══ v10.115 : notifications secrétaires — émission au diff de flushPlan ═══
+     Un seul point de passage : tous les onglets, toutes les modales, les opérations
+     de masse — et jamais les échos du serveur (la réception met planSynced à jour
+     AVANT setPlan, le diff est donc vide). secrMuteRef (horodaté, auto-expirant en
+     3 s pour qu'un flag orphelin n'avale jamais la modification suivante) est posé
+     par les chemins « de structure » : application et retrait du planning type,
+     archivage et désarchivage — pas des modifications réelles à reporter. */
+  const secrRef=useRef({cfg:{},meds:[]});
+  const secrMuteRef=useRef(0);
+  const secrEmit=useCallback((prev,cur,chg)=>{
+    if(secrMuteRef.current){const rec=Date.now()-secrMuteRef.current<3000;secrMuteRef.current=0;if(rec)return;}
+    const cfg=secrRef.current.cfg||{},actsOk=cfg.acts||[],difs=cfg.dif||{};
+    if(!chg.length||!actsOk.length)return;
+    const medOk={};(secrRef.current.meds||[]).forEach(m=>{if(m&&(m.role||"medecin")==="medecin")medOk[m.id]=1;});
+    const suivie=(a)=>actsOk.indexOf(a)>=0&&SECR_EXCL.indexOf(a)<0;
+    const ids=(cell,mid)=>{const e=(cell||{})[mid];const l=Array.isArray(e)?e:(e?[e]:[]);
+      const out=[];l.forEach(x=>{if(x&&x.acteId&&!x.cond&&out.indexOf(x.acteId)<0)out.push(x.acteId);});return out;};
+    const causeDe=(l)=>l.indexOf("ABSENCE")>=0?"absence":(l.indexOf("FORM")>=0||l.indexOf("FORMATION")>=0)?"FMC":l.indexOf("REPOS_GARDE")>=0?"repos de garde":null;
+    const evts=[];
+    const em=(mid,a,dk,sl,sens,c)=>{const e={k:mid+"|"+a+"|"+dk+"|"+sl,s:sens};if(c)e.c=c;evts.push(e);};
+    chg.forEach(k=>{
+      const p=k.split("|");if(p.length<2)return;
+      const dk=p[0],sl=p[1];if(sl==="N")return;
+      const pid=arPerClair(dk);if(!pid||!difs[pid])return;
+      const pc=prev[k],cc=cur[k];
+      const mids={};Object.keys(pc||{}).forEach(m=>{mids[m]=1;});Object.keys(cc||{}).forEach(m=>{mids[m]=1;});
+      Object.keys(mids).forEach(mid=>{
+        if(!medOk[mid])return;
+        const av=ids(pc,mid),ap=ids(cc,mid);
+        const cause=causeDe(ap);
+        ap.forEach(a=>{if(av.indexOf(a)<0&&suivie(a))em(mid,a,dk,sl,1);});
+        av.forEach(a=>{if(ap.indexOf(a)<0&&suivie(a))em(mid,a,dk,sl,-1,cause);});
+        /* Une absence/FMC posée en JOURNÉE ENTIÈRE ne touche pas les cases M/AM :
+           elle les MASQUE (expansion JOUR de getEntries). Quand la case JOUR gagne
+           une exclusive, les activités suivies encore posées en M/AM ce jour-là
+           sont donc bel et bien retirées du planning réel — on le notifie ; et on
+           les ré-annonce si l'exclusive est retirée (elles réapparaissent). */
+        if(sl==="JOUR"){
+          const exAv=causeDe(av),exAp=cause;
+          if(!!exAv!==!!exAp){
+            ["M","AM"].forEach(sl2=>{
+              ids(cur[dk+"|"+sl2],mid).forEach(a=>{
+                if(!suivie(a))return;
+                if(exAp)em(mid,a,dk,sl2,-1,exAp);else em(mid,a,dk,sl2,1);
+              });
+            });
+          }
+        }
+      });
+    });
+    if(!evts.length)return;
+    setSecrNotif(o=>{
+      const n={...o};
+      evts.forEach(e=>{
+        const ex=n[e.k];
+        if(ex&&ex.s!==e.s){delete n[e.k];return;}   /* l'inverse non traité annule : l'erreur corrigée ne dérange personne */
+        n[e.k]={s:e.s,ts:Date.now()};if(e.c)n[e.k].c=e.c;
+      });
+      const ks=Object.keys(n);
+      if(ks.length>SECR_MAX){ks.sort((a,b)=>((n[a]||{}).ts||0)-((n[b]||{}).ts||0));ks.slice(0,ks.length-SECR_MAX).forEach(k2=>{delete n[k2];});}
+      return n;
+    });
+  },[]);
+
   const flushPlan=useCallback((cur)=>{
     if(!PLANNING_DOC||!updatePaths)return;
     const prev=planSynced.current||{};
-    const pairs=[];
-    Object.keys(cur).forEach(k=>{const v=fbSafeCell(cur[k]);if(JSON.stringify(v)!==JSON.stringify(prev[k])){pairs.push([["planV2",k],v]);planPending.current[k]=v;}});
-    Object.keys(prev).forEach(k=>{if(!(k in cur)){pairs.push([["planV2",k],"__DELETE__"]);planPending.current[k]=null;}});
+    const pairs=[],chg=[];
+    Object.keys(cur).forEach(k=>{const v=fbSafeCell(cur[k]);if(JSON.stringify(v)!==JSON.stringify(prev[k])){pairs.push([["planV2",k],v]);planPending.current[k]=v;chg.push(k);}});
+    Object.keys(prev).forEach(k=>{if(!(k in cur)){pairs.push([["planV2",k],"__DELETE__"]);planPending.current[k]=null;chg.push(k);}});
+    secrEmit(prev,cur,chg);   /* v10.115 : notifications secrétaires — avant l'écrasement de prev */
     planSynced.current=cur;
     if(pairs.length===0)return;
     expBump(pairs.length);   /* v10.35 : cases modifiees depuis la derniere sauvegarde */
@@ -7772,6 +7942,8 @@ function CardioPlanning(){
           if(data.tourWish)setTourWish(JSON.parse(data.tourWish));
           if(data.gardeAvoid)setGardeAvoid(JSON.parse(data.gardeAvoid));
           if(data.gardeWish)setGardeWish(JSON.parse(data.gardeWish));
+          if(data.secrNotif){try{setSecrNotif(JSON.parse(data.secrNotif)||{});}catch(e){}}
+          if(data.secrCfg){try{const c=JSON.parse(data.secrCfg)||{};setSecrCfg({acts:c.acts||[],dif:c.dif||{}});}catch(e){}}
           if(data.csBlanches)setCsBlanches(JSON.parse(data.csBlanches));
           if(data.csRep)setCsRep(JSON.parse(data.csRep));
           if(data.csActsSel)setCsActsSel(JSON.parse(data.csActsSel));
@@ -8032,6 +8204,7 @@ function CardioPlanning(){
     });
   },[]);
   const reapplyPTWeek=useCallback((medId,weekKey)=>{
+    secrMuteRef.current=Date.now();   /* v10.115 : le planning type n'émet pas de notification */
     const med=medecins.find(m=>m.id===medId);if(!med)return;
     const pt=planningType[medId];
     const PROT2=PROT_TOUR;
@@ -8186,6 +8359,9 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourWish:JSON.stringify(tourWish)});},[tourWish]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({gardeAvoid:JSON.stringify(gardeAvoid)});},[gardeAvoid]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({gardeWish:JSON.stringify(gardeWish)});},[gardeWish]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({secrNotif:JSON.stringify(secrNotif)});},[secrNotif]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({secrCfg:JSON.stringify(secrCfg)});},[secrCfg]);
+  useEffect(()=>{secrRef.current={cfg:secrCfg,meds:medecins};},[secrCfg,medecins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csBlanches:JSON.stringify(csBlanches)});},[csBlanches]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csRep:JSON.stringify(csRep)});},[csRep]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsSel:JSON.stringify(csActsSel)});},[csActsSel]);
@@ -9105,6 +9281,7 @@ function CardioPlanning(){
   },[getEntries,acteById,allDays4,actes,salleReg]);
   /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
   const applyPTFlex=useCallback((medId,monthsList,fromToday,bornes)=>{
+    secrMuteRef.current=Date.now();   /* v10.115 : le planning type n'émet pas de notification */
     const tod=new Date();tod.setHours(0,0,0,0);
     const targets=medId?medecins.filter(m=>m.id===medId):medecins;
     let nApplied=0;
@@ -9172,6 +9349,7 @@ function CardioPlanning(){
     return arr;
   },[ptModal,year,month,PCFG.len,PCFG.startM]);
   const removePTFlex=useCallback((medId,monthsList,fromToday,bornes)=>{
+    secrMuteRef.current=Date.now();   /* v10.115 : le planning type n'émet pas de notification */
     const tod=new Date();tod.setHours(0,0,0,0);
     const KEEP=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"];
     const targetIds=medId?[medId]:medecins.map(m=>m.id);
@@ -9969,7 +10147,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="tourmedical"&&<TourTab {...tourProps}/>}
 
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
-      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} tourProps={tourProps} gardeProps={gardeProps}/>}
+      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
       {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -10139,6 +10317,7 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
       {tab==="internes"&&<InternesView intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -10826,6 +11005,17 @@ header::-webkit-scrollbar { display: none; }
               <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil (le bouton 🌓 des onglets fait pareil).</div>
             </div>
 
+            <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🔔 Notifications aux secrétaires</div>
+              <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Cochez les activités à suivre : dès qu'une période est diffusée (tuile 8 de Construire), chaque ajout ou retrait de ces activités pour un médecin titulaire crée une ligne dans l'onglet 🔔 Notifications.</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
+                {actes.filter(a=>a&&!a.isSystem&&SECR_EXCL.indexOf(a.id)<0).map(a=>{const on=(secrCfg.acts||[]).indexOf(a.id)>=0;
+                  return <button key={a.id} disabled={!isEdit} onClick={()=>setSecrCfg(c=>{const l=(c.acts||[]).slice();const i2=l.indexOf(a.id);if(i2>=0)l.splice(i2,1);else l.push(a.id);return {...c,acts:l};})}
+                    style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:isEdit?"pointer":"default",border:"1px solid "+(on?"#f59e0b":"var(--border)"),background:on?"rgba(245,158,11,.13)":"var(--bg3)",color:on?"#b45309":"var(--txt2)"}}>{(on?"✓ ":"")+(a.short||a.label)}</button>;})}
+              </div>
+              <div style={{fontSize:10,color:"var(--txt3)"}}>Seuls les médecins titulaires sont suivis pour le moment. Attachés : à venir.</div>
+            </div>
+
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
               Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois.
@@ -10955,13 +11145,13 @@ header::-webkit-scrollbar { display: none; }
                 const a=pid.split("-");const l=perDaysList(+a[0],+a[1]);
                 return l.length>0&&dKey(l[l.length-1].y,l[l.length-1].m,l[l.length-1].d)<vDeb;
               }).sort(perCmp);
-              const anx=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,build,csRep,csBlanches},persInPlan);
+              const anx=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,secrNotif,build,csRep,csBlanches},persInPlan);
               /* v10.111 : archivage période par période (sa demande) — la même mécanique,
                  paramétrée par la liste. Le découpage est recalculé AU CLIC pour être
                  annoncé dans la confirmation avant le moindre retrait. */
               const archiverPers=async(list)=>{
                 const libs=list.map(perLib);
-                const anxL=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,build,csRep,csBlanches},list);
+                const anxL=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,secrNotif,build,csRep,csBlanches},list);
                 if(!window.confirm("Archiver "+(list.length>1?"les "+list.length+" périodes closes":"la période close")+" ("+libs.join(", ")+") ?"
                   +(anxL.n>0?"\n\nPartent aussi : "+anxL.lib+".":"")
                   +"\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
@@ -10997,6 +11187,7 @@ header::-webkit-scrollbar { display: none; }
                 try{
                   if(PLANNING_DOC&&updatePaths)for(let i2=0;i2<delPairs.length;i2+=200)await updatePaths(PLANNING_DOC,delPairs.slice(i2,i2+200));
                 }catch(e){toast("Échec du retrait des cases — les archives sont écrites, les données actives n'ont pas bougé. Réessayez.","warn");return;}
+                secrMuteRef.current=Date.now();   /* v10.115 : l'archivage n'est pas une modification à reporter */
                 setPlan(p=>{const n2={};Object.keys(p).forEach(k=>{const pid=arPerClair(k);if(!pid||list.indexOf(pid)<0)n2[k]=p[k];});return n2;});
                 /* retrait des annexes. Toujours par UPDATER et par période, jamais en
                    reposant la valeur calculée au rendu — le serveur a pu livrer des
@@ -11009,6 +11200,7 @@ header::-webkit-scrollbar { display: none; }
                 setTourAvoid(o=>arPurge(o,arPerTechSem,okP));
                 setGardeWish(o=>arPurge(o,arPerClair,okP));
                 setGardeAvoid(o=>arPurge(o,arPerClair,okP));
+                setSecrNotif(o=>arPurge(o,arPerSecr,okP));   /* v10.115 */
                 setBuild(o=>arPurge(o,arPerPeriode,okP));
                 setCsBlanches(o=>arPurgeMed(o,null,okP));
                 setCsRep(o=>arPurgeMed(o,["done","to"],okP));
@@ -11065,6 +11257,7 @@ header::-webkit-scrollbar { display: none; }
                               const d2=(await ref.get()).data();
                               if(!d2||!d2.plan){toast("Archive introuvable","warn");return;}
                               const frag=JSON.parse(d2.plan);
+                              secrMuteRef.current=Date.now();   /* v10.115 : le désarchivage non plus */
                               setPlan(p=>({...frag,...p}));
                               /* le désarchivage est SYMÉTRIQUE — les annexes reviennent aussi */
                               if(d2.annex){try{const an=JSON.parse(d2.annex)||{};
@@ -11075,6 +11268,7 @@ header::-webkit-scrollbar { display: none; }
                                 if(an.tourAvoid)setTourAvoid(c=>arFusion("tourAvoid",c,an.tourAvoid));
                                 if(an.gardeWish)setGardeWish(c=>arFusion("gardeWish",c,an.gardeWish));
                                 if(an.gardeAvoid)setGardeAvoid(c=>arFusion("gardeAvoid",c,an.gardeAvoid));
+                                if(an.secrNotif)setSecrNotif(c=>arFusion("secrNotif",c,an.secrNotif));
                                 if(an.build)setBuild(c=>arFusion("build",c,an.build));
                                 if(an.csRep)setCsRep(c=>arFusion("csRep",c,an.csRep));
                                 if(an.csBlanches)setCsBlanches(c=>arFusion("csBlanches",c,an.csBlanches));
