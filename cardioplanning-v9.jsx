@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.116 — 26/08/2026";
+const APP_VERSION="v10.117 — 26/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4480,7 +4480,8 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Les périodes closes")," : tout ce qui précède le premier jour de la période en cours est en LECTURE SEULE, pour tout le monde, éditeur compris — « 🔒 Période close » s'affiche sous le titre en haut à gauche et les modifications y sont refusées. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant."]}),
+  HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés."]}),
+  HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, notes, souhaits, reports, Construire), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour et ses notes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. Seule l'astreinte reste volontairement dans les données actives (poids négligeable)."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
@@ -7426,6 +7427,13 @@ function arFusion(ch,cur,frag){
    l'éditeur, éteint par défaut et NON persisté — il se réarme au rechargement.
    C'est lui, et lui seul, qui alimente `passe` ci-dessous ; `ed` ne sert qu'au
    texte du message. */
+/* v10.117 : la borne d'ÉCRITURE devient le JOUR — « changer une journée déjà
+   passée n'a aucun sens » (sa règle du 24/08, appliquée à la maille du jour).
+   Le jour même reste modifiable en entier. `verrouDebut` (premier jour de la
+   période en cours) SUBSISTE : elle garde ses deux autres emplois, le badge
+   « 🔒 Période close » et le critère d'archivabilité — une période ne devient
+   archivable que lorsqu'elle est ENTIÈREMENT close, pas parce qu'on est le 2. */
+function verrouJour(){const t=new Date();return dKey(t.getFullYear(),t.getMonth(),t.getDate());}
 function verrouDebut(){
   const t=new Date();
   const p=perStart(t.getFullYear(),t.getMonth());
@@ -8508,7 +8516,11 @@ function CardioPlanning(){
   /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
      une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
   const verrouDeb=useMemo(()=>verrouDebut(),[PCFG.len,PCFG.startM,vacs]);
-  const estClos=useCallback((y2,m2,d2)=>dKey(y2,m2,d2)<verrouDeb,[verrouDeb]);
+  /* v10.117 : borne d'ÉCRITURE = aujourd'hui. Recalculée à chaque rendu (coût
+     nul) : un appareil laissé ouvert toute la nuit verrouille le jour écoulé
+     dès le rendu suivant, sans rechargement. */
+  const verrouJ=verrouJour();
+  const estClos=useCallback((y2,m2,d2)=>dKey(y2,m2,d2)<verrouJ,[verrouJ]);
   /* la periode AFFICHEE est-elle close ? (son dernier jour precede la borne) */
   const perClose=useMemo(()=>{const p=perStart(year,month);const e=perEnd(p.sy,p.sm);
     return dKey(e.getFullYear(),e.getMonth(),e.getDate())<verrouDeb;},[year,month,verrouDeb]);
@@ -8518,13 +8530,17 @@ function CardioPlanning(){
   /* v10.108 : l'interrupteur de Parametres. Session seulement — aucun
      localStorage, aucun Firestore : le verrou se remet en place tout seul. */
   const [vUnlock,setVUnlock]=useState(false);
-  const vRef=useRef({deb:verrouDeb,passe:false,ed:false});
-  vRef.current={deb:verrouDeb,passe:isEdit&&vUnlock,ed:isEdit,arch:perArchivee};
+  const vRef=useRef({deb:verrouJ,passe:false,ed:false});
+  vRef.current={deb:verrouJ,passe:isEdit&&vUnlock,ed:isEdit,arch:perArchivee,clos:perClose};
   /* un seul message par geste : les operations de masse appellent l'ecriture en boucle */
   const vTRef=useRef(0);
   const vToast=useCallback((passe)=>{
     const n=Date.now();if(n-vTRef.current<1500)return;vTRef.current=n;
-    setNotif({msg:passe?"⚠ Période close — modification enregistrée quand même":(vRef.current.arch?"🗄 Période archivée — modification impossible (désarchivage dans Paramètres)":vRef.current.ed?"🔒 Période close — modification impossible (déverrouillage dans Paramètres)":"🔒 Période close — modification impossible"),type:passe?"warn":"lock"});
+    /* v10.117 : trois situations, trois messages — la période affichée décide.
+       Une période entièrement passée reste « close » ; à l'intérieur de la
+       période en cours, c'est la JOURNÉE qui est passée. */
+    const quoi=vRef.current.arch?"🗄 Période archivée":vRef.current.clos?"🔒 Période close":"🔒 Journée passée";
+    setNotif({msg:passe?("⚠ "+quoi.slice(2)+" — modification enregistrée quand même"):(vRef.current.arch?quoi+" — modification impossible (désarchivage dans Paramètres)":vRef.current.ed?quoi+" — modification impossible (déverrouillage dans Paramètres)":quoi+" — modification impossible"),type:passe?"warn":"lock"});
     clearTimeout(notifTRef.current);notifTRef.current=setTimeout(()=>setNotif(null),3500);
   },[]);
   // ─── Undo/Redo history (edit mode) ───
@@ -9314,6 +9330,7 @@ function CardioPlanning(){
           if(bornes&&(_dk<bornes.deb||_dk>bornes.fin))continue;
           if(isWE(ay,am,d))continue;
           if(fromToday&&new Date(ay,am,d)<tod)continue;
+          if(vBloque(vRef,ay,am,d))continue;   /* v10.117 : jamais sur une journée passée */
           const dw=dow(ay,am,d);
           const wk=wKey(ay,am,d),wm=tourMed[wk]||{HC:[],USIC:[]};
           const allTm=[...(wm.HC||[]),...(wm.USIC||[])];
@@ -9381,6 +9398,7 @@ function CardioPlanning(){
           const _dk=dKey(ay,am,d);
           if(bornes&&(_dk<bornes.deb||_dk>bornes.fin))continue;
           if(fromToday&&new Date(ay,am,d)<tod)continue;
+          if(vBloque(vRef,ay,am,d))continue;   /* v10.117 : jamais sur une journée passée */
           ["M","AM","JOUR","N"].forEach(sl=>{
             const k=sk(ay,am,d,sl);
             if(!next[k])return;
@@ -9621,6 +9639,7 @@ function CardioPlanning(){
         for(let d=1;d<=dIM(cy,cm);d++){
           const t=new Date(cy,cm,d).getTime();
           if(t<fromT||t>toT)continue;
+          if(vBloque(vRef,cy,cm,d))continue;   /* v10.117 : jamais sur une journée passée */
           /* v10.13 : la GARDE est enregistrée dans le créneau « N », qui n'était jamais
              parcouru — d'où le repos retiré mais la garde conservée. On l'ajoute quand on
              ne conserve pas les gardes. Le TOUR, lui, ne vit pas dans le planning mais
@@ -9730,7 +9749,7 @@ function CardioPlanning(){
   const vOuvre=(y2,m2,d2)=>{
     if(!estClos(y2,m2,d2))return true;
     if(!(isEdit&&vUnlock)){vToast(false);return false;}
-    return window.confirm("🔒 Période close — elle précède la période en cours.\n\nLe verrou est levé pour cette session : vous pouvez modifier, et chaque modification vous sera signalée.\n\nOuvrir cette case ?");
+    return window.confirm((perClose?"🔒 Période close — elle précède la période en cours.":"🔒 Journée passée — elle précède aujourd'hui.")+"\n\nLe verrou est levé pour cette session : vous pouvez modifier, et chaque modification vous sera signalée.\n\nOuvrir cette case ?");
   };
   const openCell=(medId,y2,m2,d2,slot)=>{
     if(!canEdit(medId))return;
@@ -11152,11 +11171,11 @@ header::-webkit-scrollbar { display: none; }
             </div>}
             </div>
             {isEdit&&<div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🔓 Périodes closes</div>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🔓 Journées passées et périodes closes</div>
                 <div style={{fontSize:10,color:"var(--txt2)",marginBottom:6}}>Tout ce qui précède le premier jour de la période en cours est en <b>lecture seule, pour tout le monde</b> — vous compris. Vous pouvez lever le verrou le temps d'une correction : il se remet en place tout seul au prochain chargement de l'application, et rien n'est enregistré.</div>
                 <label style={{display:"flex",alignItems:"center",gap:7,fontSize:11,fontWeight:700,color:vUnlock?"#b45309":"var(--txt2)",cursor:"pointer"}}>
-                  <input type="checkbox" checked={vUnlock} onChange={e=>{const v=e.target.checked;setVUnlock(v);toast(v?"⚠ Périodes closes déverrouillées jusqu'au rechargement":"🔒 Périodes closes de nouveau verrouillées",v?"warn":"info");}}/>
-                  Autoriser la modification des périodes closes
+                  <input type="checkbox" checked={vUnlock} onChange={e=>{const v=e.target.checked;setVUnlock(v);toast(v?"⚠ Journées passées déverrouillées jusqu'au rechargement":"🔒 Journées passées de nouveau verrouillées",v?"warn":"info");}}/>
+                  Autoriser la modification des journées passées
                 </label>
                 {vUnlock&&<div style={{marginTop:6,fontSize:10,color:"#b45309",padding:"4px 7px",borderRadius:6,border:"1px solid #f59e0b",background:"rgba(245,158,11,.10)"}}>⚠ Verrou levé sur cet appareil et pour cette session seulement. Chaque modification faite sur une période close vous sera signalée.</div>}
               </div>}
