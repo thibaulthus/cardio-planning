@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.124 — 27/08/2026";
+const APP_VERSION="v10.126 — 27/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4501,11 +4501,11 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés."]}),
+  HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
-  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, notes, souhaits, reports, Construire), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour et ses notes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. Seule l'astreinte reste volontairement dans les données actives (poids négligeable)."]}),
+  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7343,6 +7343,12 @@ function arPerTechJour(k){const n=arNums(k);if(!n)return null;
 /* semaine (clé = son lundi) : le DIMANCHE décide — équivalent de perWeeksList */
 function arPerTechSem(k){const n=arNums(k);if(!n)return null;
   const p=perOfDay(n[0],n[1],n[2]+6);return perIdOf(p.sy,p.sm);}
+/* astreinte (v10.125) : un LUNDI est une clé de SEMAINE — son dimanche décide,
+   comme perWeeksList — car avec VAC_RULE une période peut se clore en pleine
+   semaine ; tout autre jour est une exception : le jour décide. */
+function arPerAst(k){const n=arNums(k);if(!n)return null;
+  const dw=new Date(n[0],n[1],n[2]).getDay();
+  const p=perOfDay(n[0],n[1],n[2]+(dw===1?6:0));return perIdOf(p.sy,p.sm);}
 /* build : clé "sy_sm" = DÉJÀ une clé de période, correspondance directe
    (la règle « c'est son dernier mois qui décide » disparaît d'elle-même) */
 function arPerPeriode(k){const p=String(k).split("_");
@@ -7370,6 +7376,10 @@ const AR_FAM=[
   {ch:"tourAvoid",  per:arPerTechSem, lu:false, lib:"tour à éviter|tours à éviter"},
   {ch:"gardeWish",  per:arPerClair,   lu:false, lib:"souhait de garde|souhaits de garde"},
   {ch:"gardeAvoid", per:arPerClair,   lu:false, lib:"garde à éviter|gardes à éviter"},
+  /* v10.125 : l'astreinte part avec la période (sa décision du 27/08/2026). Un lundi
+     est une semaine (son dimanche décide), un autre jour une exception (le jour
+     décide) — voir arPerAst : VAC_RULE peut clore une période en pleine semaine. */
+  {ch:"astreinte",  per:arPerAst,     lu:true,  lib:"affectation d'astreinte|affectations d'astreinte"},
   {ch:"secrNotif",  per:arPerSecr,    lu:false, lib:"notification secrétaire|notifications secrétaires"},
   {ch:"build",      per:arPerPeriode, lu:false, lib:"période de Construire|périodes de Construire"},
 ];
@@ -7380,6 +7390,36 @@ const AR_MED=[
   {ch:"csRep",      sous:["done","to"], lib:"report de consultation|reports de consultation"},
 ];
 const AR_LU=AR_FAM.filter(f=>f.lu).map(f=>f.ch);
+/* v10.125 : annexes de STRUCTURE — semestres d'internes (sems, par id) et noms de
+   juniors (djs, aplatis en "medId|deb" pour que la fusion à un niveau d'arFusion
+   reste correcte). Relues comme AR_LU, jamais purgeables par clé de jour. */
+const AR_XTRA=["sems","djs"];
+/* Copie, AVANT le retrait de la v10.88, les semestres ENTIÈREMENT clos et les noms de
+   juniors correspondants dans l'annexe de CHAQUE période archivée qu'ils recouvrent
+   (un semestre chevauche deux périodes : le consulter doit marcher depuis chacune).
+   La borne est la même que le retrait : fin <= dernier mois de la dernière période. */
+function arSemsDjs(intCfg,medecins,list,lastMk){
+  const sems=intSemsTri(intCfg);
+  const clos=sems.filter(s=>String(s.fin||"").slice(0,7)<=lastMk);
+  const djC=[];
+  (medecins||[]).forEach(m=>{djL(m).forEach(x=>{
+    const s=sems.find(y=>(y.id&&x.sem&&y.id===x.sem)||y.deb===x.deb);
+    const deb=s?s.deb:x.deb,fin=String((s?s.fin:djFin(x.deb))||"");
+    if(fin.slice(0,7)<=lastMk)djC.push({mid:String(m.id),deb:deb,fin:fin,e:x});
+  });});
+  const out={};
+  list.forEach(pid=>{
+    const a=pid.split("-");const l=perDaysList(+a[0],+a[1]);
+    if(!l.length)return;
+    const p1=intISO2(l[0].y,l[0].m,l[0].d),p2=intISO2(l[l.length-1].y,l[l.length-1].m,l[l.length-1].d);
+    const S={},D={};
+    clos.forEach(s=>{if(s.deb<=p2&&s.fin>=p1)S[String(s.id||s.deb)]=s;});
+    djC.forEach(c=>{if(c.deb<=p2&&c.fin>=p1)D[c.mid+"|"+(c.e.deb||c.deb)]={mid:c.mid,e:c.e};});
+    const o={};if(Object.keys(S).length)o.sems=S;if(Object.keys(D).length)o.djs=D;
+    if(Object.keys(o).length)out[pid]=o;
+  });
+  return out;
+}
 
 /* Découpe les données datées en fonction des périodes archivées.
    Rend {parts:{periode:{champ:…}}, cnt:{champ:n}, n, lib} — `parts` part en
@@ -7654,7 +7694,7 @@ function CardioPlanning(){
   const [salleEdit,setSalleEdit]=useState(null); // salle en cours d'édition (activités associées)
   const [archPlan,setArchPlan]=useState({});   // cases archivées chargées pour consultation (lecture)
   /* v10.105 : annexes archivées relues pour la consultation (tour, dérogations, notes) */
-  const [archAnx,setArchAnx]=useState({tourMed:{},tourDerog:{},notes:{}});
+  const [archAnx,setArchAnx]=useState({tourMed:{},tourDerog:{},notes:{},astreinte:{}});
   const archFetched=useRef({});                // périodes d'archives déjà demandées   // rapport persistant de la dernière répartition auto des astreintes
   const [periodCfg,setPeriodCfg]=useState({len:4,startM:6});
   PCFG.len=periodCfg.len;PCFG.startM=periodCfg.startM; // config répartition par période {perKey:{weeks,excl,p2hc,p2usic,mins}}
@@ -7667,14 +7707,15 @@ function CardioPlanning(){
   // Get astreinte medId for a given day
   const getAstreinteForDay=React.useCallback((y,m,d)=>{
     const dayKey=y+"-"+m+"-"+d;
-    const v=astreinte[dayKey]!==undefined?astreinte[dayKey]:(()=>{
+    const aA=archAnx.astreinte||{};
+    const v=astreinte[dayKey]!==undefined?astreinte[dayKey]:aA[dayKey]!==undefined?aA[dayKey]:(()=>{
       const dt=new Date(y,m,d);const day=dt.getDay();const diff=day===0?-6:1-day;
       const mon=new Date(dt);mon.setDate(dt.getDate()+diff);
       const wk=mon.getFullYear()+"-"+mon.getMonth()+"-"+mon.getDate();
-      return astreinte[wk];
+      return astreinte[wk]!==undefined?astreinte[wk]:aA[wk];
     })();
     return(v!==undefined&&v!==null)?String(v):null;
-  },[astreinte]);
+  },[astreinte,archAnx]);
   // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
   const [astYear,setAstYear]=useState(()=>new Date().getFullYear());
   const [astMonth,setAstMonth]=useState(()=>new Date().getMonth());
@@ -8454,7 +8495,7 @@ function CardioPlanning(){
       /* les annexes RELUES rejoignent le cache — sans elles, une période archivée
          s'afficherait sans son tour et sans ses notes. */
       if(d&&d.annex){try{const an=JSON.parse(d.annex)||{};const add={};
-        AR_LU.forEach(ch=>{if(an[ch]&&Object.keys(an[ch]).length)add[ch]=an[ch];});
+        AR_LU.concat(AR_XTRA).forEach(ch=>{if(an[ch]&&Object.keys(an[ch]).length)add[ch]=an[ch];});
         if(Object.keys(add).length)setArchAnx(pp=>{const o=Object.assign({},pp);Object.keys(add).forEach(ch=>{o[ch]=arFusion(ch,o[ch]||{},add[ch]);});return o;});
       }catch(e2){}}
     }).catch(()=>{});
@@ -8912,6 +8953,7 @@ function CardioPlanning(){
   const tourMedAff=useMemo(()=>Object.keys(archAnx.tourMed).length?{...archAnx.tourMed,...tourMed}:tourMed,[tourMed,archAnx]);
   const tourDerogAff=useMemo(()=>Object.keys(archAnx.tourDerog).length?{...archAnx.tourDerog,...tourDerog}:tourDerog,[tourDerog,archAnx]);
   const notesAff=useMemo(()=>Object.keys(archAnx.notes).length?{...archAnx.notes,...notes}:notes,[notes,archAnx]);
+  const astAff=useMemo(()=>Object.keys(archAnx.astreinte||{}).length?{...(archAnx.astreinte||{}),...astreinte}:astreinte,[astreinte,archAnx]);
   /* v10.111 : la fusion plan+archives est calculée UNE fois par changement, plus à
      CHAQUE appel — getEntries est appelé des milliers de fois par rendu, et étaler
      un objet de plusieurs centaines de clés à chaque appel gelait toute l'application
@@ -9196,6 +9238,7 @@ function CardioPlanning(){
           RE2("button",{onClick:bipClear,style:{fontSize:12,padding:"6px 13px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.10)",color:"#dc2626"}},"🗑 Effacer les bips de la période"))));
   };
   const removeGardeDay=(y3,m3,d3)=>{
+    if(vBloque(vRef,y3,m3,d3)){vToast(false);return;}   /* v10.126 */
     setPlan(p=>{
       let next={...p};const gIds=[];
       ["N","JOUR"].forEach(sl=>{const k=sk(y3,m3,d3,sl);const dm={...(next[k]||{})};let ch=false;
@@ -9209,11 +9252,12 @@ function CardioPlanning(){
         if(ch)next={...next,[k]:dm};});
       return next;
     });
-    toast("Garde et repos retir\u00e9s","info");
+    if(vAvertit(vRef,y3,m3,d3))vToast(true);else toast("Garde et repos retir\u00e9s","info");
   };
 
   const applyGarde=useCallback((medId,y2,m2,d2)=>{
     if(accessMode==="adminEdit")return;
+    if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.126 : le verrou couvre les gardes */
     logCell("add",medId,y2,m2,d2,"N","GARDE");
     /* v9.65 : la garde la veille d'une absence ou d'une FMC reste PERMISE (décision
        utilisateur), mais elle est signalée — le repos ne sera pas posé, la v9.64
@@ -9256,7 +9300,8 @@ function CardioPlanning(){
       return next;
     });
     setTimeout(()=>{
-      if(nxWarn)toast("⚠ Absence ou FMC le lendemain — garde posée SANS repos","warn");
+      if(vAvertit(vRef,y2,m2,d2))vToast(true);   /* v10.126 : déverrouillé — écrit, mais averti */
+      else if(nxWarn)toast("⚠ Absence ou FMC le lendemain — garde posée SANS repos","warn");
       else toast("Garde + repos automatique","info");
     },0);
   },[]);
@@ -9880,7 +9925,27 @@ function CardioPlanning(){
   const djA1=djZ?dKey(djZ.y,djZ.m,djZ.d):djTodayIso;
   const djRefIso=(djTodayIso>=djA0&&djTodayIso<=djA1)?djTodayIso:djA0;
   djSetSems(intCfg,djA1);
-  const medsAff=djSubst(medecins,intCfg,djRefIso);
+  /* v10.125 : la photo d'archive — semestres et noms de juniors des périodes
+     archivées CHARGÉES, fusionnés POUR L'AFFICHAGE seulement. Les états réels
+     restent purgés : rien ne repart vers Firebase (Équipe garde intCfg/medecins). */
+  const intCfgAff=useMemo(()=>{
+    const arS=archAnx.sems||{};const ks=Object.keys(arS);
+    if(!ks.length)return intCfg;
+    const cur=(intCfg&&intCfg.sems)||[];const have={};cur.forEach(s=>{have[String(s.id||s.deb)]=1;have["d"+s.deb]=1;});
+    const add=ks.map(k=>arS[k]).filter(s=>s&&!have[String(s.id||s.deb)]&&!have["d"+s.deb]);
+    return add.length?Object.assign({},intCfg,{sems:cur.concat(add)}):intCfg;
+  },[intCfg,archAnx]);
+  const medsDj=useMemo(()=>{
+    const arD=archAnx.djs||{};if(!Object.keys(arD).length)return medecins;
+    const parMed={};Object.keys(arD).forEach(k=>{const c=arD[k];if(c&&c.mid)(parMed[c.mid]=parMed[c.mid]||[]).push(c.e);});
+    return medecins.map(m=>{
+      const add0=parMed[String(m.id)];if(!add0)return m;
+      const l=djL(m);const have={};l.forEach(x=>{have[String(x.sem||x.deb)]=1;have["d"+x.deb]=1;});
+      const add=add0.filter(x=>x&&!have[String(x.sem||x.deb)]&&!have["d"+x.deb]);
+      return add.length?Object.assign({},m,{dj:l.concat(add)}):m;
+    });
+  },[medecins,archAnx]);
+  const medsAff=djSubst(medsDj,intCfgAff,djRefIso);
   const medPlan=medsAff.filter(m=>m.role==="medecin");
   const medAttache=medsAff.filter(m=>m.role==="attache");
   // ── Ordre d'affichage : déplace un médecin dans son groupe de rôle (ordre du tableau = ordre partout) ──
@@ -10288,7 +10353,7 @@ header::-webkit-scrollbar { display: none; }
             {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>setIntGardeOn(v=>!v)} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfg,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay}/>}
         </div>
       )}
 
@@ -10298,12 +10363,12 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
+      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfg} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
+        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -10313,13 +10378,13 @@ header::-webkit-scrollbar { display: none; }
           const full=bip&&(bip.salles||[]).includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
-      {tab==="plateau"&&<ActTabView issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfg}
+      {tab==="plateau"&&<ActTabView issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfgAff}
         rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfg} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -10465,7 +10530,7 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
-      {tab==="internes"&&<InternesView intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="internes"&&<InternesView intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
@@ -10476,7 +10541,7 @@ header::-webkit-scrollbar { display: none; }
         const astForDay2=(y,m,d)=>{
           const dk=y+"-"+m+"-"+d;
           const wk=monKey2(y,m,d);
-          const v=astreinte[dk]!==undefined?astreinte[dk]:astreinte[wk];
+          const v=astAff[dk]!==undefined?astAff[dk]:astAff[wk];
           return(v!==undefined&&v!==null)?String(v):null;
         };
         const JOURS_C=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
@@ -10514,6 +10579,7 @@ header::-webkit-scrollbar { display: none; }
           return sls.some(sl=>getEntries(mid,y,m,d,sl).some(e=>ABS_IDS.includes(e.acteId)));
         });
         const runAstAuto=()=>{
+          {const ld=allDays4M[allDays4M.length-1];if(vBloque(vRef,ld.y,ld.m,ld.d)){vToast(false);return;}if(vAvertit(vRef,ld.y,ld.m,ld.d))vToast(true);}   /* v10.126 */
           if(astMeds.length===0){toast("Aucun médecin d'astreinte (cochez-le dans l'onglet Équipe)","warn");return;}
           if(!window.confirm("Assigner automatiquement une semaine d'astreinte (lun→dim) sur chaque semaine vide de la période, équitablement entre "+astMeds.length+" médecins ?\nLes semaines et jours déjà posés sont conservés."))return;
           const counts={};astMeds.forEach(m2=>{counts[String(m2.id)]=0;});
@@ -10580,6 +10646,7 @@ header::-webkit-scrollbar { display: none; }
           toast("Astreintes : "+nA+" semaine(s) assignée(s)","info");
         };
         const clearAstPeriod=()=>{
+          {const ld=allDays4M[allDays4M.length-1];if(vBloque(vRef,ld.y,ld.m,ld.d)){vToast(false);return;}if(vAvertit(vRef,ld.y,ld.m,ld.d))vToast(true);}   /* v10.126 */
           if(!window.confirm("Retirer TOUTES les astreintes de la période affichée ("+pLabel+") ?"))return;
           if(!window.confirm("Confirmer définitivement ? (récupérable via Annuler ↶)"))return;
           setAstreinte(p=>{
@@ -10666,11 +10733,11 @@ header::-webkit-scrollbar { display: none; }
                 return <div style={{padding:"4px 0",maxWidth:620}}>
                   {sems.map(sem=>{
                     const j0=sem.jours[0],j9=sem.jours[sem.jours.length-1];
-                    const exc=sem.jours.filter(o=>{const dk=o.y+"-"+o.m+"-"+o.d;return dk!==sem.wk&&typeof astreinte[dk]==="string";});
+                    const exc=sem.jours.filter(o=>{const dk=o.y+"-"+o.m+"-"+o.d;return dk!==sem.wk&&typeof astAff[dk]==="string";});
                     /* v10.26 : les semaines a exception ne s'ouvrent plus d'elles-memes —
                        la bande des jours (a droite) dit deja qui remplace qui et quand. */
                     const ouvert=astSemOuv[sem.wk]===true;
-                    const midS=astreinte[sem.wk];
+                    const midS=astAff[sem.wk];
                     const medS=midS?medecins.find(x=>String(x.id)===String(midS)):null;
                     const auj=sem.jours.some(o=>o.d===astToday.getDate()&&o.m===astToday.getMonth()&&o.y===astToday.getFullYear());
                     return <div key={sem.wk} style={{border:"1px solid "+(exc.length?"#7c3aed":"var(--border)"),
@@ -10681,6 +10748,10 @@ header::-webkit-scrollbar { display: none; }
                         <span style={{color:"var(--txt3)",fontSize:11,width:10}}>{ouvert?"▾":"▸"}</span>
                         <span style={{fontSize:12,fontWeight:700,minWidth:130}}>{fmtJ(j0)} → {fmtJ(j9)}</span>
                         <span onClick={e=>{if(!canAst)return;e.stopPropagation();
+                          /* v10.126 : semaine close = son DIMANCHE est verrouillé (arPerAst) */
+                          const q=sem.wk.split("-").map(Number),su=new Date(q[0],q[1],q[2]+6);
+                          if(vBloque(vRef,su.getFullYear(),su.getMonth(),su.getDate())){vToast(false);return;}
+                          if(vAvertit(vRef,su.getFullYear(),su.getMonth(),su.getDate()))vToast(true);
                           setAstPickModal({dayKey:sem.wk,wKey:sem.wk,isWeek:true,label:"semaine du "+fmtJ(j0)});}}
                           style={{cursor:canAst?"pointer":"default",display:"flex",alignItems:"center",gap:6}}>
                           {medS?<>
@@ -10719,13 +10790,14 @@ header::-webkit-scrollbar { display: none; }
                       {ouvert&&<div style={{borderTop:"1px solid var(--border)",background:"var(--bg)"}}>
                         {sem.jours.map(({y,m,d})=>{
                           const dk=y+"-"+m+"-"+d;
-                          const hasExc=dk!==sem.wk&&typeof astreinte[dk]==="string";
+                          const hasExc=dk!==sem.wk&&typeof astAff[dk]==="string";
                           const mid=astForDay2(y,m,d);
                           const med=mid?medecins.find(x=>String(x.id)===String(mid)):null;
                           const isAbsMed=med?(getEntries(med.id,y,m,d,"M").some(e=>ABS_IDS.includes(e.acteId))||getEntries(med.id,y,m,d,"JOUR").some(e=>ABS_IDS.includes(e.acteId))):false;
                           const dw2=new Date(y,m,d).getDay();
-                          return <div key={dk} onClick={canAst?()=>setAstPickModal({dayKey:dk,wKey:sem.wk,isWeek:false,
-                            label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]}):undefined}
+                          return <div key={dk} onClick={canAst?()=>{if(vBloque(vRef,y,m,d)){vToast(false);return;}if(vAvertit(vRef,y,m,d))vToast(true);   /* v10.126 */
+                            setAstPickModal({dayKey:dk,wKey:sem.wk,isWeek:false,
+                            label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]});}:undefined}
                             style={{display:"flex",alignItems:"center",gap:10,padding:"5px 11px 5px 32px",fontSize:12,
                               borderBottom:"1px solid var(--border)",cursor:canAst?"pointer":"default",
                               background:hasExc?"rgba(124,58,237,.06)":"transparent",fontWeight:hasExc?700:400}}>
@@ -10753,7 +10825,7 @@ header::-webkit-scrollbar { display: none; }
         const astMeds2=medecins.filter(m=>m.astreinte===true);
         const monKey2b=(y,m,d)=>{const dt=new Date(y,m,d);const dw=dt.getDay();const diff=dw===0?-6:1-dw;const mn=new Date(dt);mn.setDate(d+diff);return mn.getFullYear()+"-"+mn.getMonth()+"-"+mn.getDate();};
         const {dayKey,wKey,isWeek,label}=astPickModal;
-        const curId=isWeek?astreinte[wKey]:astPickModal&&dayKey&&astreinte[dayKey]!==undefined?astreinte[dayKey]:astreinte[wKey];
+        const curId=isWeek?astAff[wKey]:astPickModal&&dayKey&&astAff[dayKey]!==undefined?astAff[dayKey]:astAff[wKey];
         // Check if med is absent for the relevant day(s)
         const isAbsDay=(medId,y,m,d)=>
           getEntries(medId,y,m,d,"M").some(e=>["ABSENCE","FORMATION"].includes(e.acteId))||
@@ -11309,16 +11381,23 @@ header::-webkit-scrollbar { display: none; }
                 const a=pid.split("-");const l=perDaysList(+a[0],+a[1]);
                 return l.length>0&&dKey(l[l.length-1].y,l[l.length-1].m,l[l.length-1].d)<vDeb;
               }).sort(perCmp);
-              const anx=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,secrNotif,build,csRep,csBlanches},persInPlan);
+              const anx=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,astreinte,secrNotif,build,csRep,csBlanches},persInPlan);
               /* v10.111 : archivage période par période (sa demande) — la même mécanique,
                  paramétrée par la liste. Le découpage est recalculé AU CLIC pour être
                  annoncé dans la confirmation avant le moindre retrait. */
               const archiverPers=async(list)=>{
                 const libs=list.map(perLib);
-                const anxL=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,secrNotif,build,csRep,csBlanches},list);
+                const anxL=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,astreinte,secrNotif,build,csRep,csBlanches},list);
+        /* v10.125 : semestres d'internes clos et noms de juniors — copiés dans
+           l'annexe de chaque période recouverte AVANT leur retrait (v10.88), et donc
+           aussi dans le fichier téléchargé. Même borne que le retrait. */
+        const lpd0=perDaysList(+list[list.length-1].split("-")[0],+list[list.length-1].split("-")[1]);
+        const lastMkA=arPad(lpd0[lpd0.length-1].y,lpd0[lpd0.length-1].m);
+        const xtra=arSemsDjs(intCfg,medecins,list,lastMkA);
+        Object.keys(xtra).forEach(pid=>{anxL.parts[pid]=Object.assign({},anxL.parts[pid]||{},xtra[pid]);});
                 if(!window.confirm("Archiver "+(list.length>1?"les "+list.length+" périodes closes":"la période close")+" ("+libs.join(", ")+") ?"
                   +(anxL.n>0?"\n\nPartent aussi : "+anxL.lib+".":"")
-                  +"\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
+                  +"\n\nLes semestres entièrement archivés seront copiés dans l'archive puis retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))return;
                 const okB=await makeBackup(true);
                 if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))return;
                 const byPer={};
@@ -11364,6 +11443,7 @@ header::-webkit-scrollbar { display: none; }
                 setTourAvoid(o=>arPurge(o,arPerTechSem,okP));
                 setGardeWish(o=>arPurge(o,arPerClair,okP));
                 setGardeAvoid(o=>arPurge(o,arPerClair,okP));
+                setAstreinte(o=>arPurge(o,arPerAst,okP));   /* v10.125 */
                 setSecrNotif(o=>arPurge(o,arPerSecr,okP));   /* v10.115 */
                 setBuild(o=>arPurge(o,arPerPeriode,okP));
                 setCsBlanches(o=>arPurgeMed(o,null,okP));
@@ -11382,7 +11462,7 @@ header::-webkit-scrollbar { display: none; }
                    sinon le tour et les notes de la période disparaîtraient jusqu'au rechargement */
                 setArchAnx(p2=>{const o={...p2};
                   Object.keys(anxL.parts).forEach(pid=>{const A=anxL.parts[pid];
-                    AR_LU.forEach(ch=>{if(A[ch])o[ch]=arFusion(ch,A[ch],o[ch]||{});});});
+                    AR_LU.concat(AR_XTRA).forEach(ch=>{if(A[ch])o[ch]=arFusion(ch,A[ch],o[ch]||{});});});
                   return o;});
                 await refreshArchList();   /* v10.112 : pastilles et badge à jour AVANT le téléchargement */
                 toast("Archivage terminé : "+(list.length>1?list.length+" périodes copiées puis retirées":"1 période copiée puis retirée")+" des données actives","info");
@@ -11398,7 +11478,7 @@ header::-webkit-scrollbar { display: none; }
                 {persInPlan.length===0
                   ?<div style={{fontSize:10,color:"var(--txt3)"}}>Aucune période close dans les données actives — rien à archiver pour l'instant.</div>
                   :<div>
-                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>L'archivage copie dans Firebase les cases de la période <b>et ses données datées</b> (tour, notes, souhaits, reports, Construire), télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Le planning, le tour et les notes restent consultables en naviguant vers la période (lecture).</div>
+                    <div style={{fontSize:10,color:"var(--txt2)",marginBottom:5}}>L'archivage copie dans Firebase les cases de la période <b>et ses données datées</b> (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier sur cet appareil (à conserver : c'est votre copie hors Firebase), puis les retire des données actives. Le planning, le tour, les notes, l'astreinte et les internes restent consultables en naviguant vers la période (lecture).</div>
                     {anx.n>0&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:5,padding:"4px 7px",borderRadius:6,border:"1px dashed var(--border)"}}>Données datées qui partiraient : {anx.lib}. Une semaine suit sa période, celle de son dimanche.</div>}
                     {persInPlan.map(pid=>(
                       <div key={pid} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
@@ -11436,6 +11516,10 @@ header::-webkit-scrollbar { display: none; }
                                 if(an.build)setBuild(c=>arFusion("build",c,an.build));
                                 if(an.csRep)setCsRep(c=>arFusion("csRep",c,an.csRep));
                                 if(an.csBlanches)setCsBlanches(c=>arFusion("csBlanches",c,an.csBlanches));
+                                if(an.astreinte)setAstreinte(c=>arFusion("astreinte",c,an.astreinte));
+                                /* v10.125 : les structures reviennent aussi — sans doublon d'id */
+                                if(an.sems)setIntCfg(p=>{const cur=((p&&p.sems)||[]);const have={};cur.forEach(s=>{have[String(s.id||s.deb)]=1;});const add=Object.keys(an.sems).map(k=>an.sems[k]).filter(s=>s&&!have[String(s.id||s.deb)]);return add.length?Object.assign({},p,{sems:cur.concat(add)}):p;});
+                                if(an.djs)setMedecins(l2=>l2.map(m2=>{const add0=[];Object.keys(an.djs).forEach(k=>{const c=an.djs[k];if(c&&String(c.mid)===String(m2.id))add0.push(c.e);});if(!add0.length)return m2;const l=djL(m2);const have={};l.forEach(x=>{have[String(x.sem||x.deb)]=1;});const add=add0.filter(x=>x&&!have[String(x.sem||x.deb)]);return add.length?Object.assign({},m2,{dj:l.concat(add)}):m2;}));
                               }catch(e3){}}
                               setArchPlan(p=>{const n2={};Object.keys(p).forEach(k=>{if(arPerClair(k)!==pid)n2[k]=p[k];});return n2;});
                               const okP2=(p2)=>p2===pid;
@@ -12322,8 +12406,8 @@ header::-webkit-scrollbar { display: none; }
         </div>);
       })()}
 
-      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||(isAdminEdit&&isCadre)} intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} setMData={setMData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notesAff} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
-      {modal==="pickMedSite"&&mData&&<PickMedSiteModal intCfg={intCfg} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notesAff} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
+      {modal==="pickMedAct"&&mData&&<PickMedActModal patchAct={patchActivity} canDif={isEdit||(isAdminEdit&&isCadre)} intCfg={intCfgAff} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} setMData={setMData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notesAff} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)}/>}
+      {modal==="pickMedSite"&&mData&&<PickMedSiteModal intCfg={intCfgAff} canInt={isEdit||isInterEdit||(isAdminEdit&&isCadre)} mData={mData} medecins={medsAff} actes={actes} getEntries={getEntries} isMedAvailable={isMedAvailable} addEntry={addEntry} removeEntry={removeEntry} adminOnly={isAdminEdit} okKey={roleOkKey} notes={notesAff} setNotes={setNotes} canNotes={adminCanNotes} selfOnly={isMedEdit&&!isInterEdit?editMedId:null} onClose={()=>setModal(null)} darkMode={darkMode}/>}
       {modal==="editPT"&&mData&&<EditPTModal mData={mData} setMData={setMData} medecins={medsAff} actes={actes} planningType={planningType} setPlanningType={setPlanningType} onClose={()=>setModal(null)}/>}
 
       {modal==="editActe"&&mData&&(

@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.124 — 27/08/2026";
+var APP_VERSION = "v10.126 — 27/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4710,11 +4710,11 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés."]}),
+  HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
-  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, notes, souhaits, reports, Construire), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour et ses notes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. Seule l'astreinte reste volontairement dans les données actives (poids négligeable)."]}),
+  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7718,6 +7718,12 @@ function arPerTechJour(k){const n=arNums(k);if(!n)return null;
 /* semaine (clé = son lundi) : le DIMANCHE décide — équivalent de perWeeksList */
 function arPerTechSem(k){const n=arNums(k);if(!n)return null;
   const p=perOfDay(n[0],n[1],n[2]+6);return perIdOf(p.sy,p.sm);}
+/* astreinte (v10.125) : un LUNDI est une clé de SEMAINE — son dimanche décide,
+   comme perWeeksList — car avec VAC_RULE une période peut se clore en pleine
+   semaine ; tout autre jour est une exception : le jour décide. */
+function arPerAst(k){const n=arNums(k);if(!n)return null;
+  const dw=new Date(n[0],n[1],n[2]).getDay();
+  const p=perOfDay(n[0],n[1],n[2]+(dw===1?6:0));return perIdOf(p.sy,p.sm);}
 /* build : clé "sy_sm" = DÉJÀ une clé de période, correspondance directe
    (la règle « c'est son dernier mois qui décide » disparaît d'elle-même) */
 function arPerPeriode(k){const p=String(k).split("_");
@@ -7745,6 +7751,10 @@ const AR_FAM=[
   {ch:"tourAvoid",  per:arPerTechSem, lu:false, lib:"tour à éviter|tours à éviter"},
   {ch:"gardeWish",  per:arPerClair,   lu:false, lib:"souhait de garde|souhaits de garde"},
   {ch:"gardeAvoid", per:arPerClair,   lu:false, lib:"garde à éviter|gardes à éviter"},
+  /* v10.125 : l'astreinte part avec la période (sa décision du 27/08/2026). Un lundi
+     est une semaine (son dimanche décide), un autre jour une exception (le jour
+     décide) — voir arPerAst : VAC_RULE peut clore une période en pleine semaine. */
+  {ch:"astreinte",  per:arPerAst,     lu:true,  lib:"affectation d'astreinte|affectations d'astreinte"},
   {ch:"secrNotif",  per:arPerSecr,    lu:false, lib:"notification secrétaire|notifications secrétaires"},
   {ch:"build",      per:arPerPeriode, lu:false, lib:"période de Construire|périodes de Construire"},
 ];
@@ -7755,6 +7765,36 @@ const AR_MED=[
   {ch:"csRep",      sous:["done","to"], lib:"report de consultation|reports de consultation"},
 ];
 const AR_LU=AR_FAM.filter(f=>f.lu).map(f=>f.ch);
+/* v10.125 : annexes de STRUCTURE — semestres d'internes (sems, par id) et noms de
+   juniors (djs, aplatis en "medId|deb" pour que la fusion à un niveau d'arFusion
+   reste correcte). Relues comme AR_LU, jamais purgeables par clé de jour. */
+const AR_XTRA=["sems","djs"];
+/* Copie, AVANT le retrait de la v10.88, les semestres ENTIÈREMENT clos et les noms de
+   juniors correspondants dans l'annexe de CHAQUE période archivée qu'ils recouvrent
+   (un semestre chevauche deux périodes : le consulter doit marcher depuis chacune).
+   La borne est la même que le retrait : fin <= dernier mois de la dernière période. */
+function arSemsDjs(intCfg,medecins,list,lastMk){
+  const sems=intSemsTri(intCfg);
+  const clos=sems.filter(s=>String(s.fin||"").slice(0,7)<=lastMk);
+  const djC=[];
+  (medecins||[]).forEach(m=>{djL(m).forEach(x=>{
+    const s=sems.find(y=>(y.id&&x.sem&&y.id===x.sem)||y.deb===x.deb);
+    const deb=s?s.deb:x.deb,fin=String((s?s.fin:djFin(x.deb))||"");
+    if(fin.slice(0,7)<=lastMk)djC.push({mid:String(m.id),deb:deb,fin:fin,e:x});
+  });});
+  const out={};
+  list.forEach(pid=>{
+    const a=pid.split("-");const l=perDaysList(+a[0],+a[1]);
+    if(!l.length)return;
+    const p1=intISO2(l[0].y,l[0].m,l[0].d),p2=intISO2(l[l.length-1].y,l[l.length-1].m,l[l.length-1].d);
+    const S={},D={};
+    clos.forEach(s=>{if(s.deb<=p2&&s.fin>=p1)S[String(s.id||s.deb)]=s;});
+    djC.forEach(c=>{if(c.deb<=p2&&c.fin>=p1)D[c.mid+"|"+(c.e.deb||c.deb)]={mid:c.mid,e:c.e};});
+    const o={};if(Object.keys(S).length)o.sems=S;if(Object.keys(D).length)o.djs=D;
+    if(Object.keys(o).length)out[pid]=o;
+  });
+  return out;
+}
 
 /* Découpe les données datées en fonction des périodes archivées.
    Rend {parts:{periode:{champ:…}}, cnt:{champ:n}, n, lib} — `parts` part en
@@ -8087,7 +8127,7 @@ function CardioPlanning() {
     var _11 = useState([]), salleReg = _11[0], setSalleReg = _11[1]; // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
     var _12 = useState(null), salleEdit = _12[0], setSalleEdit = _12[1]; // salle en cours d'édition (activités associées)
     var _13 = useState({}), archPlan = _13[0], setArchPlan = _13[1]; // cases archivées chargées pour consultation (lecture)
-    var _arAnx = useState({ tourMed: {}, tourDerog: {}, notes: {} }), archAnx = _arAnx[0], setArchAnx = _arAnx[1];
+    var _arAnx = useState({ tourMed: {}, tourDerog: {}, notes: {}, astreinte: {} }), archAnx = _arAnx[0], setArchAnx = _arAnx[1];
     var archFetched = useRef({}); // périodes d'archives déjà demandées   // rapport persistant de la dernière répartition auto des astreintes
     var _14 = useState({ len: 4, startM: 6 }), periodCfg = _14[0], setPeriodCfg = _14[1];
     PCFG.len = periodCfg.len;
@@ -8101,17 +8141,18 @@ function CardioPlanning() {
     // Get astreinte medId for a given day
     var getAstreinteForDay = React.useCallback(function (y, m, d) {
         var dayKey = y + "-" + m + "-" + d;
-        var v = astreinte[dayKey] !== undefined ? astreinte[dayKey] : (function () {
+        var aA = archAnx.astreinte || {};
+        var v = astreinte[dayKey] !== undefined ? astreinte[dayKey] : aA[dayKey] !== undefined ? aA[dayKey] : (function () {
             var dt = new Date(y, m, d);
             var day = dt.getDay();
             var diff = day === 0 ? -6 : 1 - day;
             var mon = new Date(dt);
             mon.setDate(dt.getDate() + diff);
             var wk = mon.getFullYear() + "-" + mon.getMonth() + "-" + mon.getDate();
-            return astreinte[wk];
+            return astreinte[wk] !== undefined ? astreinte[wk] : aA[wk];
         })();
         return (v !== undefined && v !== null) ? String(v) : null;
-    }, [astreinte]);
+    }, [astreinte, archAnx]);
     // ASTREINTE_MEDS is now dynamic from medecins.astreinte flag
     var _20 = useState(function () { return new Date().getFullYear(); }), astYear = _20[0], setAstYear = _20[1];
     var _21 = useState(function () { return new Date().getMonth(); }), astMonth = _21[0], setAstMonth = _21[1];
@@ -9322,7 +9363,7 @@ function CardioPlanning() {
       /* les annexes RELUES rejoignent le cache — sans elles, une période archivée
          s'afficherait sans son tour et sans ses notes. */
       if(d&&d.annex){try{const an=JSON.parse(d.annex)||{};const add={};
-        AR_LU.forEach(ch=>{if(an[ch]&&Object.keys(an[ch]).length)add[ch]=an[ch];});
+        AR_LU.concat(AR_XTRA).forEach(ch=>{if(an[ch]&&Object.keys(an[ch]).length)add[ch]=an[ch];});
         if(Object.keys(add).length)setArchAnx(pp=>{const o=Object.assign({},pp);Object.keys(add).forEach(ch=>{o[ch]=arFusion(ch,o[ch]||{},add[ch]);});return o;});
       }catch(e2){}}
     }).catch(()=>{});
@@ -9899,6 +9940,7 @@ function CardioPlanning() {
     var tourMedAff = useMemo(function () { return Object.keys(archAnx.tourMed).length ? __assign(__assign({}, archAnx.tourMed), tourMed) : tourMed; }, [tourMed, archAnx]);
     var tourDerogAff = useMemo(function () { return Object.keys(archAnx.tourDerog).length ? __assign(__assign({}, archAnx.tourDerog), tourDerog) : tourDerog; }, [tourDerog, archAnx]);
     var notesAff = useMemo(function () { return Object.keys(archAnx.notes).length ? __assign(__assign({}, archAnx.notes), notes) : notes; }, [notes, archAnx]);
+    var astAff = useMemo(function () { return Object.keys(archAnx.astreinte || {}).length ? __assign(__assign({}, (archAnx.astreinte || {})), astreinte) : astreinte; }, [astreinte, archAnx]);
     /* v10.111 : la fusion plan+archives est calculée UNE fois par changement, plus à
        CHAQUE appel — getEntries est appelé des milliers de fois par rendu, et étaler
        un objet de plusieurs centaines de clés à chaque appel gelait toute l'application
@@ -10238,6 +10280,7 @@ function CardioPlanning() {
           RE2("button",{onClick:bipClear,style:{fontSize:12,padding:"6px 13px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.10)",color:"#dc2626"}},"🗑 Effacer les bips de la période"))));
   };
     var removeGardeDay = function (y3, m3, d3) {
+        if (vBloque(vRef, y3, m3, d3)) { vToast(false); return; } /* v10.126 */
         setPlan(function (p) {
             var next = __assign({}, p);
             var gIds = [];
@@ -10280,11 +10323,12 @@ function CardioPlanning() {
             });
             return next;
         });
-        toast("Garde et repos retir\u00e9s", "info");
+        if (vAvertit(vRef, y3, m3, d3)) vToast(true); else toast("Garde et repos retir\u00e9s", "info");
     };
     var applyGarde = useCallback(function (medId, y2, m2, d2) {
         if (accessMode === "adminEdit")
             return;
+        if (vBloque(vRef, y2, m2, d2)) { vToast(false); return; } /* v10.126 : le verrou couvre les gardes */
         logCell("add", medId, y2, m2, d2, "N", "GARDE");
         /* v9.65 : la garde la veille d'une absence ou d'une FMC reste PERMISE (décision
            utilisateur), mais elle est signalée — le repos ne sera pas posé, la v9.64
@@ -10356,7 +10400,9 @@ function CardioPlanning() {
             return next;
         });
         setTimeout(function () {
-            if (nxWarn)
+            if (vAvertit(vRef, y2, m2, d2))
+                vToast(true); /* v10.126 : déverrouillé — écrit, mais averti */
+            else if (nxWarn)
                 toast("⚠ Absence ou FMC le lendemain — garde posée SANS repos", "warn");
             else
                 toast("Garde + repos automatique", "info");
@@ -11135,7 +11181,27 @@ function CardioPlanning() {
     var djA1 = djZ ? dKey(djZ.y, djZ.m, djZ.d) : djTodayIso;
     var djRefIso = (djTodayIso >= djA0 && djTodayIso <= djA1) ? djTodayIso : djA0;
     djSetSems(intCfg, djA1);
-    var medsAff = djSubst(medecins, intCfg, djRefIso);
+    /* v10.125 : la photo d'archive — semestres et noms de juniors des périodes
+     archivées CHARGÉES, fusionnés POUR L'AFFICHAGE seulement. Les états réels
+     restent purgés : rien ne repart vers Firebase (Équipe garde intCfg/medecins). */
+    var intCfgAff=useMemo(()=>{
+      var arS=archAnx.sems||{};const ks=Object.keys(arS);
+    if(!ks.length)return intCfg;
+      var cur=(intCfg&&intCfg.sems)||[];const have={};cur.forEach(s=>{have[String(s.id||s.deb)]=1;have["d"+s.deb]=1;});
+      var add=ks.map(k=>arS[k]).filter(s=>s&&!have[String(s.id||s.deb)]&&!have["d"+s.deb]);
+    return add.length?Object.assign({},intCfg,{sems:cur.concat(add)}):intCfg;
+    },[intCfg,archAnx]);
+    var medsDj=useMemo(()=>{
+      var arD=archAnx.djs||{};if(!Object.keys(arD).length)return medecins;
+      var parMed={};Object.keys(arD).forEach(k=>{const c=arD[k];if(c&&c.mid)(parMed[c.mid]=parMed[c.mid]||[]).push(c.e);});
+    return medecins.map(m=>{
+        var add0=parMed[String(m.id)];if(!add0)return m;
+        var l=djL(m);const have={};l.forEach(x=>{have[String(x.sem||x.deb)]=1;have["d"+x.deb]=1;});
+        var add=add0.filter(x=>x&&!have[String(x.sem||x.deb)]&&!have["d"+x.deb]);
+      return add.length?Object.assign({},m,{dj:l.concat(add)}):m;
+    });
+    },[medecins,archAnx]);
+    var medsAff = djSubst(medsDj, intCfgAff, djRefIso);
     var medPlan = medsAff.filter(function (m) { return m.role === "medecin"; });
     var medAttache = medsAff.filter(function (m) { return m.role === "attache"; });
     // ── Ordre d'affichage : déplace un médecin dans son groupe de rôle (ordre du tableau = ordre partout) ──
@@ -11684,7 +11750,7 @@ function CardioPlanning() {
                 var astForDay2 = function (y, m, d) {
                     var dk = y + "-" + m + "-" + d;
                     var wk = monKey2(y, m, d);
-                    var v = astreinte[dk] !== undefined ? astreinte[dk] : astreinte[wk];
+                    var v = astAff[dk] !== undefined ? astAff[dk] : astAff[wk];
                     return (v !== undefined && v !== null) ? String(v) : null;
                 };
                 var JOURS_C = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -11730,6 +11796,7 @@ function CardioPlanning() {
                     return sls.some(function (sl) { return getEntries(mid, y, m, d, sl).some(function (e) { return ABS_IDS.includes(e.acteId); }); });
                 }); };
                 var runAstAuto = function () {
+                    { var ld = allDays4M[allDays4M.length - 1]; if (vBloque(vRef, ld.y, ld.m, ld.d)) { vToast(false); return; } if (vAvertit(vRef, ld.y, ld.m, ld.d)) vToast(true); } /* v10.126 */
                     if (astMeds.length === 0) {
                         toast("Aucun médecin d'astreinte (cochez-le dans l'onglet Équipe)", "warn");
                         return;
@@ -11834,6 +11901,7 @@ function CardioPlanning() {
                     toast("Astreintes : " + nA + " semaine(s) assignée(s)", "info");
                 };
                 var clearAstPeriod = function () {
+                    { var ld = allDays4M[allDays4M.length - 1]; if (vBloque(vRef, ld.y, ld.m, ld.d)) { vToast(false); return; } if (vAvertit(vRef, ld.y, ld.m, ld.d)) vToast(true); } /* v10.126 */
                     if (!window.confirm("Retirer TOUTES les astreintes de la période affichée (" + pLabel + ") ?"))
                         return;
                     if (!window.confirm("Confirmer définitivement ? (récupérable via Annuler ↶)"))
@@ -11919,9 +11987,9 @@ function CardioPlanning() {
                         var fmtJ = function (o) { return o.d + " " + MOIS[o.m].slice(0, 4).toLowerCase() + "."; };
                         return React.createElement("div", { style: { padding: "4px 0", maxWidth: 620 } }, sems.map(function (sem) {
                             var j0 = sem.jours[0], j9 = sem.jours[sem.jours.length - 1];
-                            var exc = sem.jours.filter(function (o) { var dk = o.y + "-" + o.m + "-" + o.d; return dk !== sem.wk && typeof astreinte[dk] === "string"; });
+                            var exc = sem.jours.filter(function (o) { var dk = o.y + "-" + o.m + "-" + o.d; return dk !== sem.wk && typeof astAff[dk] === "string"; });
                             var ouvert = astSemOuv[sem.wk] === true;
-                            var midS = astreinte[sem.wk];
+                            var midS = astAff[sem.wk];
                             var medS = midS ? medecins.find(function (x) { return String(x.id) === String(midS); }) : null;
                             var auj = sem.jours.some(function (o) { return o.d === astToday.getDate() && o.m === astToday.getMonth() && o.y === astToday.getFullYear(); });
                             return React.createElement("div", { key: sem.wk, style: { border: "1px solid " + (exc.length ? "#7c3aed" : "var(--border)"),
@@ -11941,6 +12009,10 @@ function CardioPlanning() {
                                             if (!canAst)
                                                 return;
                                             e.stopPropagation();
+                                            /* v10.126 : semaine close = son DIMANCHE est verrouillé (arPerAst) */
+                                            var q = sem.wk.split("-").map(Number), su = new Date(q[0], q[1], q[2] + 6);
+                                            if (vBloque(vRef, su.getFullYear(), su.getMonth(), su.getDate())) { vToast(false); return; }
+                                            if (vAvertit(vRef, su.getFullYear(), su.getMonth(), su.getDate())) vToast(true);
                                             setAstPickModal({ dayKey: sem.wk, wKey: sem.wk, isWeek: true, label: "semaine du " + fmtJ(j0) });
                                         }, style: { cursor: canAst ? "pointer" : "default", display: "flex", alignItems: "center", gap: 6 } }, medS ? React.createElement(React.Fragment, null,
                                         React.createElement("span", { style: { width: 22, height: 22, borderRadius: "50%", background: medS.color, display: "flex",
@@ -11968,12 +12040,12 @@ function CardioPlanning() {
                                 ouvert && React.createElement("div", { style: { borderTop: "1px solid var(--border)", background: "var(--bg)" } }, sem.jours.map(function (_a) {
                                     var y = _a.y, m = _a.m, d = _a.d;
                                     var dk = y + "-" + m + "-" + d;
-                                    var hasExc = dk !== sem.wk && typeof astreinte[dk] === "string";
+                                    var hasExc = dk !== sem.wk && typeof astAff[dk] === "string";
                                     var mid = astForDay2(y, m, d);
                                     var med = mid ? medecins.find(function (x) { return String(x.id) === String(mid); }) : null;
                                     var isAbsMed = med ? (getEntries(med.id, y, m, d, "M").some(function (e) { return ABS_IDS.includes(e.acteId); }) || getEntries(med.id, y, m, d, "JOUR").some(function (e) { return ABS_IDS.includes(e.acteId); })) : false;
                                     var dw2 = new Date(y, m, d).getDay();
-                                    return React.createElement("div", { key: dk, onClick: canAst ? function () { return setAstPickModal({ dayKey: dk, wKey: sem.wk, isWeek: false,
+                                    return React.createElement("div", { key: dk, onClick: canAst ? function () { if (vBloque(vRef, y, m, d)) { vToast(false); return; } if (vAvertit(vRef, y, m, d)) vToast(true); /* v10.126 */ return setAstPickModal({ dayKey: dk, wKey: sem.wk, isWeek: false,
                                             label: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"][dw2] + " " + d + " " + MOIS[m] }); } : undefined, style: { display: "flex", alignItems: "center", gap: 10, padding: "5px 11px 5px 32px", fontSize: 12,
                                             borderBottom: "1px solid var(--border)", cursor: canAst ? "pointer" : "default",
                                             background: hasExc ? "rgba(124,58,237,.06)" : "transparent", fontWeight: hasExc ? 700 : 400 } },
@@ -12002,7 +12074,7 @@ function CardioPlanning() {
                 var astMeds2 = medecins.filter(function (m) { return m.astreinte === true; });
                 var monKey2b = function (y, m, d) { var dt = new Date(y, m, d); var dw = dt.getDay(); var diff = dw === 0 ? -6 : 1 - dw; var mn = new Date(dt); mn.setDate(d + diff); return mn.getFullYear() + "-" + mn.getMonth() + "-" + mn.getDate(); };
                 var dayKey = astPickModal.dayKey, wKey = astPickModal.wKey, isWeek = astPickModal.isWeek, label = astPickModal.label;
-                var curId = isWeek ? astreinte[wKey] : astPickModal && dayKey && astreinte[dayKey] !== undefined ? astreinte[dayKey] : astreinte[wKey];
+                var curId = isWeek ? astAff[wKey] : astPickModal && dayKey && astAff[dayKey] !== undefined ? astAff[dayKey] : astAff[wKey];
                 // Check if med is absent for the relevant day(s)
                 var isAbsDay = function (medId, y, m, d) {
                     return getEntries(medId, y, m, d, "M").some(function (e) { return ["ABSENCE", "FORMATION"].includes(e.acteId); }) ||
@@ -12555,16 +12627,23 @@ function CardioPlanning() {
         const l = perDaysList(+a[0], +a[1]);
         return l.length > 0 && dKey(l[l.length - 1].y, l[l.length - 1].m, l[l.length - 1].d) < vDeb;
     }).sort(perCmp);
-    const anx = arDecoupe({ tourMed, tourDerog, notes, tourWish, tourAvoid, gardeWish, gardeAvoid, secrNotif, build, csRep, csBlanches }, persInPlan);
+    const anx = arDecoupe({ tourMed, tourDerog, notes, tourWish, tourAvoid, gardeWish, gardeAvoid, astreinte, secrNotif, build, csRep, csBlanches }, persInPlan);
     /* v10.111 : archivage période par période (sa demande) — la même mécanique,
        paramétrée par la liste. Le découpage est recalculé AU CLIC pour être
        annoncé dans la confirmation avant le moindre retrait. */
     const archiverPers = async (list) => {
         const libs = list.map(perLib);
-        const anxL = arDecoupe({ tourMed, tourDerog, notes, tourWish, tourAvoid, gardeWish, gardeAvoid, secrNotif, build, csRep, csBlanches }, list);
+        const anxL = arDecoupe({ tourMed, tourDerog, notes, tourWish, tourAvoid, gardeWish, gardeAvoid, astreinte, secrNotif, build, csRep, csBlanches }, list);
+        /* v10.125 : semestres d'internes clos et noms de juniors — copiés dans
+           l'annexe de chaque période recouverte AVANT leur retrait (v10.88), et donc
+           aussi dans le fichier téléchargé. Même borne que le retrait. */
+        const lpd0=perDaysList(+list[list.length-1].split("-")[0],+list[list.length-1].split("-")[1]);
+        const lastMkA=arPad(lpd0[lpd0.length-1].y,lpd0[lpd0.length-1].m);
+        const xtra=arSemsDjs(intCfg,medecins,list,lastMkA);
+        Object.keys(xtra).forEach(pid=>{anxL.parts[pid]=Object.assign({},anxL.parts[pid]||{},xtra[pid]);});
         if (!window.confirm("Archiver " + (list.length > 1 ? "les " + list.length + " périodes closes" : "la période close") + " (" + libs.join(", ") + ") ?"
             + (anxL.n > 0 ? "\n\nPartent aussi : " + anxL.lib + "." : "")
-            + "\n\nLes semestres entièrement archivés seront aussi retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))
+            + "\n\nLes semestres entièrement archivés seront copiés dans l'archive puis retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))
             return;
         const okB = await makeBackup(true);
         if (!okB && !window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))
@@ -12625,6 +12704,7 @@ function CardioPlanning() {
         setTourAvoid(o => arPurge(o, arPerTechSem, okP));
         setGardeWish(o => arPurge(o, arPerClair, okP));
         setGardeAvoid(o => arPurge(o, arPerClair, okP));
+        setAstreinte(o => arPurge(o, arPerAst, okP)); /* v10.125 */
         setSecrNotif(o => arPurge(o, arPerSecr, okP)); /* v10.115 */
         setBuild(o => arPurge(o, arPerPeriode, okP));
         setCsBlanches(o => arPurgeMed(o, null, okP));
@@ -12645,7 +12725,7 @@ function CardioPlanning() {
             const o = Object.assign({}, p2);
             Object.keys(anxL.parts).forEach(pid => {
                 const A = anxL.parts[pid];
-                AR_LU.forEach(ch => { if (A[ch])
+                AR_LU.concat(AR_XTRA).forEach(ch => { if (A[ch])
                     o[ch] = arFusion(ch, A[ch], o[ch] || {}); });
             });
             return o;
@@ -12668,7 +12748,7 @@ function CardioPlanning() {
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 5 } },
                     "L'archivage copie dans Firebase les cases de la p\u00E9riode ",
                     React.createElement("b", null, "et ses donn\u00E9es dat\u00E9es"),
-                    " (tour, notes, souhaits, reports, Construire), t\u00E9l\u00E9charge un fichier sur cet appareil (\u00E0 conserver : c'est votre copie hors Firebase), puis les retire des donn\u00E9es actives. Le planning, le tour et les notes restent consultables en naviguant vers la p\u00E9riode (lecture)."),
+                    " (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), t\u00E9l\u00E9charge un fichier sur cet appareil (\u00E0 conserver : c'est votre copie hors Firebase), puis les retire des donn\u00E9es actives. Le planning, le tour, les notes, l'astreinte et les internes restent consultables en naviguant vers la p\u00E9riode (lecture)."),
                 anx.n > 0 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 5, padding: "4px 7px", borderRadius: 6, border: "1px dashed var(--border)" } },
                     "Donn\u00E9es dat\u00E9es qui partiraient : ",
                     anx.lib,
@@ -12727,6 +12807,13 @@ function CardioPlanning() {
                                         setCsRep(c => arFusion("csRep", c, an.csRep));
                                     if (an.csBlanches)
                                         setCsBlanches(c => arFusion("csBlanches", c, an.csBlanches));
+                                    if (an.astreinte)
+                                        setAstreinte(c => arFusion("astreinte", c, an.astreinte));
+                                    /* v10.125 : les structures reviennent aussi — sans doublon d'id */
+                                    if (an.sems)
+                                        setIntCfg(p => { const cur = ((p && p.sems) || []); const have = {}; cur.forEach(s => { have[String(s.id || s.deb)] = 1; }); const add = Object.keys(an.sems).map(k => an.sems[k]).filter(s => s && !have[String(s.id || s.deb)]); return add.length ? Object.assign({}, p, { sems: cur.concat(add) }) : p; });
+                                    if (an.djs)
+                                        setMedecins(l2 => l2.map(m2 => { const add0 = []; Object.keys(an.djs).forEach(k => { const c = an.djs[k]; if (c && String(c.mid) === String(m2.id)) add0.push(c.e); }); if (!add0.length) return m2; const l = djL(m2); const have = {}; l.forEach(x => { have[String(x.sem || x.deb)] = 1; }); const add = add0.filter(x => x && !have[String(x.sem || x.deb)]); return add.length ? Object.assign({}, m2, { dj: l.concat(add) }) : m2; }));
                                 }
                                 catch (e3) { }
                             }
