@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.123 — 26/08/2026";
+const APP_VERSION="v10.124 — 27/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4503,6 +4503,7 @@ const HELP_SECTIONS=[
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
+  HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, notes, souhaits, reports, Construire), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour et ses notes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. Seule l'astreinte reste volontairement dans les données actives (poids négligeable)."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
@@ -6133,7 +6134,7 @@ function DeactModal({med,perDays,perLbl,onSave,onClose,countActs=null,onClear=nu
      posé sur les dates choisies et propose de le retirer d'un coup. */
   const rSel=mode===0?{du:du0,au:au0}:{du:d1,au:d2};
   const rOK=!!(rSel.du&&rSel.au&&rSel.au>=rSel.du);
-  const nAct=(countActs&&rOK)?countActs(rSel.du,rSel.au):0;
+  const nAct=(countActs&&rOK)?countActs(rSel.du,rSel.au):null;   /* v10.124 : objet détaillé */
   const bt=(sel)=>({display:"flex",gap:8,alignItems:"flex-start",padding:"8px 9px",border:"1px solid "+(sel?"#8b5cf6":"var(--border)"),borderRadius:8,marginBottom:6,cursor:"pointer",background:sel?"rgba(139,92,246,.08)":"transparent"});
   return(
     <div onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
@@ -6165,10 +6166,12 @@ function DeactModal({med,perDays,perLbl,onSave,onClose,countActs=null,onClear=nu
               au <input type="date" value={d2} onChange={e=>setD2(e.target.value)} style={{...S.fi,width:132,padding:"3px 6px"}}/>
             </div></div>
         </div>
-        {nAct>0&&<div style={{border:"1px solid #ef4444",background:"rgba(239,68,68,.07)",borderRadius:8,padding:"7px 9px",margin:"2px 0 8px"}}>
-          <div style={{fontSize:11.5,color:"#ef4444",fontWeight:700,marginBottom:5}}>{"⚠ "+nAct+" activité"+(nAct>1?"s":"")+" déjà posée"+(nAct>1?"s":"")+" sur ces dates (gardes, tour et absences comprises) — la désactivation ne les efface pas, elles resteraient sous les hachures."}</div>
-          {onClear&&<button onClick={()=>onClear(rSel.du,rSel.au)}
-            style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #ef4444",background:"rgba(239,68,68,.10)",color:"#ef4444",fontWeight:800,cursor:"pointer"}}>🧹 Retirer ses activités sur ces dates</button>}
+        {nAct&&nAct.n>0&&<div style={{border:"1px solid #ef4444",background:"rgba(239,68,68,.07)",borderRadius:8,padding:"7px 9px",margin:"2px 0 8px"}}>
+          <div style={{fontSize:11.5,color:"#ef4444",fontWeight:700,marginBottom:5}}>{"⚠ "+nAct.n+" activité"+(nAct.n>1?"s":"")+" déjà posée"+(nAct.n>1?"s":"")+" sur ces dates (gardes, tour et absences comprises)"+(nAct.ver?" · "+nAct.ver+" sous journées verrouillées (conservées)":"")+(nAct.arc?" · "+nAct.arc+" en période archivée (intouchable"+(nAct.arc>1?"s":"")+" d'ici)":"")+" — la désactivation ne les efface pas, elles resteraient sous les hachures."}</div>
+          {onClear&&(nAct.ret>0
+            ?<button onClick={()=>onClear(rSel.du,rSel.au)}
+              style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #ef4444",background:"rgba(239,68,68,.10)",color:"#ef4444",fontWeight:800,cursor:"pointer"}}>{"🧹 Retirer ses "+nAct.ret+" activité"+(nAct.ret>1?"s":"")+" retirable"+(nAct.ret>1?"s":"")}</button>
+            :<div style={{fontSize:10.5,color:"var(--txt3)",fontWeight:700}}>🧹 Rien d'atteignable ici : tout est sous journées verrouillées ou en archive.</div>)}
         </div>}
         <div style={{fontSize:10.5,color:"var(--txt3)",margin:"6px 0 10px"}}>Pendant ses dates : le planning type le saute et ses cases sont indisponibles. Sa fiche et son planning type sont conservés — il redevient disponible le jour de son retour.</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -6418,7 +6421,7 @@ function DJEquipe({mData,setMData,countActs,onClear,prisInit,intCfg}){
   const sig=sems.map(s=>s.deb+(djPourvu(djTrouve(mData,s))?"1":"0")).join(",");
   const cnt=useMemo(()=>{
     const o={};
-    sems.forEach(s=>{o[s.deb]=(countActs&&!djPourvu(djTrouve(mData,s)))?countActs(s.deb,s.fin):0;});
+    sems.forEach(s=>{o[s.deb]=(countActs&&!djPourvu(djTrouve(mData,s)))?countActs(s.deb,s.fin):null;});   /* v10.124 : objet détaillé */
     return o;
   },[sig]);
   const maj=(s,patch)=>setMData(p=>{
@@ -6444,7 +6447,7 @@ function DJEquipe({mData,setMData,countActs,onClear,prisInit,intCfg}){
         const plein=djPourvu(x);
         const ini=djInit(x);
         const dbl=plein&&ini&&(prisInit||[]).indexOf(ini)>=0;
-        const n=cnt[s.deb]||0;
+        const n=cnt[s.deb]||null;
         return(
           <div key={s.deb} style={{border:"1px solid "+(enCours?"#8b5cf6":"var(--border)"),borderRadius:8,padding:"7px 9px",marginBottom:6,background:enCours?"rgba(139,92,246,.07)":"var(--bg3)",opacity:passe?.72:1}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
@@ -6462,10 +6465,12 @@ function DJEquipe({mData,setMData,countActs,onClear,prisInit,intCfg}){
             {plein&&!String(x.init||"").trim()&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"Initiales déduites du nom : "+(ini||"—")}</div>}
             {dbl&&<div style={{fontSize:10.5,color:"#b45309",fontWeight:700,marginTop:4}}>{"⚠ Les initiales "+ini+" sont déjà portées par un autre membre de l'équipe : les deux se ressembleront dans les tableaux."}</div>}
             {!plein&&<div style={{fontSize:10.5,color:"var(--txt3)",marginTop:4}}>Aucun nom : sur ces dates la colonne sera masquée et les cases verrouillées. Saisissez le nom AVANT d'appliquer le planning type, sinon il sautera ces mois.</div>}
-            {n>0&&<div style={{border:"1px solid #ef4444",background:"rgba(239,68,68,.07)",borderRadius:8,padding:"6px 8px",marginTop:5}}>
-              <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginBottom:onClear?4:0}}>{"⚠ "+n+" activité"+(n>1?"s":"")+" déjà posée"+(n>1?"s":"")+" sur ces dates (gardes, tour et absences comprises). Sans nom, elles restent enregistrées sous les cases verrouillées."}</div>
-              {onClear&&<button type="button" onClick={()=>onClear(s.deb,s.fin)}
-                style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #ef4444",background:"rgba(239,68,68,.10)",color:"#ef4444",fontWeight:800,cursor:"pointer"}}>🧹 Retirer ces activités</button>}
+            {n&&n.n>0&&<div style={{border:"1px solid #ef4444",background:"rgba(239,68,68,.07)",borderRadius:8,padding:"6px 8px",marginTop:5}}>
+              <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginBottom:onClear?4:0}}>{"⚠ "+n.n+" activité"+(n.n>1?"s":"")+" déjà posée"+(n.n>1?"s":"")+" sur ces dates (gardes, tour et absences comprises)"+(n.ver?" · "+n.ver+" sous journées verrouillées (conservées)":"")+(n.arc?" · "+n.arc+" en période archivée (intouchable"+(n.arc>1?"s":"")+" d'ici)":"")+". Sans nom, elles restent enregistrées sous les cases verrouillées."}</div>
+              {onClear&&(n.ret>0
+                ?<button type="button" onClick={()=>onClear(s.deb,s.fin)}
+                  style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #ef4444",background:"rgba(239,68,68,.10)",color:"#ef4444",fontWeight:800,cursor:"pointer"}}>{"🧹 Retirer les "+n.ret+" activité"+(n.ret>1?"s":"")+" retirable"+(n.ret>1?"s":"")}</button>
+                :<div style={{fontSize:10.5,color:"var(--txt3)",fontWeight:700}}>🧹 Rien d'atteignable ici : tout est sous journées verrouillées ou en archive.</div>)}
             </div>}
           </div>
         );
@@ -9707,6 +9712,7 @@ function CardioPlanning(){
         const p=wk.split("-").map(Number);
         const t=new Date(p[0],p[1],p[2]).getTime();
         if(isNaN(t))return;
+        if(vBloque(vRef,p[0],p[1],p[2]))return;   /* v10.124 : une semaine de tour entamée ou passée ne part pas — même règle que les cases (v10.117). Déverrouiller les journées passées l'autorise. */
         const fin=t+6*86400000;
         if(fin<fromT||t>toT)return;
         const w={...(next[wk]||{})};
@@ -9788,15 +9794,27 @@ function CardioPlanning(){
      voit donc AUSSI le tour synthétisé et les gardes ; le nettoyage appelle
      clearPeriodActs ET removeTourPeriod, car le tour ne vit pas dans le planning. */
   const offCount=useCallback((medId,du,au)=>{
+    /* v10.124 : le compteur dit aussi ce que le balai PEUT retirer. Quatre paniers :
+       n = tout ce qui se lit ; ret = retirable (planning vivant, jour non verrouillé,
+       ou semaine de tour non entamée) ; ver = sous journées verrouillées, conservé ;
+       arc = en période archivée, intouchable d'ici. Mêmes règles que offClear. */
     const a=String(du).split("-").map(Number),b=String(au).split("-").map(Number);
     const fin=new Date(b[0],b[1]-1,b[2]);
-    let n=0;
+    const r={n:0,ret:0,ver:0,arc:0};
     for(const c=new Date(a[0],a[1]-1,a[2]);c<=fin;c.setDate(c.getDate()+1)){
       const y2=c.getFullYear(),m2=c.getMonth(),d2=c.getDate();
-      ["M","AM","JOUR","N"].forEach(sl=>{n+=getEntries(medId,y2,m2,d2,sl).filter(e=>e&&e.acteId&&!e._blocked).length;});
+      ["M","AM","JOUR","N"].forEach(sl=>{
+        const k=sk(y2,m2,d2,sl);
+        getEntries(medId,y2,m2,d2,sl).filter(e=>e&&e.acteId&&!e._blocked).forEach(e=>{
+          r.n++;
+          if((plan[k]||{})[medId]){if(vBloque(vRef,y2,m2,d2))r.ver++;else r.ret++;}
+          else if((archPlan[k]||{})[medId])r.arc++;
+          else{const mo=getMon(y2,m2,d2);if(vBloque(vRef,mo.getFullYear(),mo.getMonth(),mo.getDate()))r.ver++;else r.ret++;}
+        });
+      });
     }
-    return n;
-  },[getEntries]);
+    return r;
+  },[getEntries,plan,archPlan]);
   const offClear=useCallback((medId,du,au)=>{
     clearPeriodActs({medId:medId,dateFrom:du,dateTo:au,keepAbs:false,keepGardes:false});
     removeTourPeriod(medId,du,au);
