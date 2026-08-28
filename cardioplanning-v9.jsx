@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.128 — 28/08/2026";
+const APP_VERSION="v10.129 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -662,7 +662,6 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
     return days;
   },[viewPeriod,allDays,year,month,showFull,PCFG.len,PCFG.startM]);
   const printDays=printWk?effectiveDays.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):effectiveDays;
-  const getGardeMed=(d)=>getGardeMed2(year,month,d);
   const getGardeMed2=(y2,m2,d2)=>{
     const dw2=dow(y2,m2,d2);
     const gardeSlot=(dw2===6||dw2===0)?"JOUR":"N";
@@ -673,7 +672,6 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
     return null;
   };
   const [gardeSwapOpen,setGardeSwapOpen]=React.useState(false);
-  const gSlotOf=(y2,m2,d2)=>{const dw2=dow(y2,m2,d2);return (dw2===6||dw2===0)?"JOUR":"N";};
   const isAbsOn=(mid,y2,m2,d2)=>{
     const sls=isWE(y2,m2,d2)?["JOUR"]:["M","AM"];
     return sls.some(sl=>getEntries(mid,y2,m2,d2,sl).some(e=>ABS_IDS.includes(e.acteId)));
@@ -1253,7 +1251,6 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
     });
     return M;
   },[ideActive,wdays,rows,medecins,actes,getEntries,intCfg]);
-  const ideCell=(row,d,sl,ry,rm)=>ideActive?(ideMap[row.label+"|"+ry+"-"+rm+"-"+d+"|"+sl]||0):0;
   const setIdeDefV=(dw3,sl,v)=>{if(setIdeCfg)setIdeCfg(p=>{const q={...(p||{})};q.def={...(q.def||{})};q.def[dw3+"|"+sl]=v;return q;});};
   const setIdeOvV=(y3,m3,d3,sl,v)=>{if(setIdeCfg)setIdeCfg(p=>{const q={...(p||{})};q.ov={...(q.ov||{})};const k=sk(y3,m3,d3,sl);if(v===null)delete q.ov[k];else q.ov[k]=v;return q;});};
   const idePill=(y3,m3,d3,sl)=>{
@@ -1727,20 +1724,6 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
     return medecins.find(function(m){var e=getEntry(m.id,gy2,gm2,d,gardeSlot);return e&&e.acteId==="GARDE";});
   }
 
-  function renderGardeCell(d,gy,gm){
-    var rgy=gy||year, rgm=(gm!==undefined)?gm:month;
-    var we=isWE(rgy,rgm,d);
-    var gMed=getGardeMed2(rgy,rgm,d);
-    return(
-      <td key={"g"+d+rgy+rgm} style={{...S.td,...(we?S.tdWE:{}),padding:2,cursor:isEdit?"pointer":"default"}}
-        onClick={isEdit?()=>setPickerDay({d,y:rgy,m:rgm}):undefined}>
-        {gMed?(<div style={{display:"flex",alignItems:"center",gap:3,margin:"1px",padding:"1px 3px",borderRadius:4,background:"#1a0000",border:"1px solid #f8514944"}}>
-          <div style={{width:24,height:24,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{gMed.init}</div>
-          <span style={{fontSize:9,fontWeight:700,color:gMed.color}}>{gMed.prenom} {gMed.nom}</span>
-        </div>):null}
-      </td>
-    );
-  }
 
   const wdays=printWk?gvEffDays.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):gvEffDays; // keep full objects
 
@@ -3363,7 +3346,6 @@ function AbsModal({medecins,onApply,onRemove,onClose,initMedId=null,initDate=nul
   const [df,setDf]=useState(defDate);
   const [dt,setDt]=useState(defDate);
   const [slots,setSlots]=useState(["M","AM"]);
-  const tog=sl=>setSlots(p=>p.includes(sl)?p.filter(x=>x!==sl):[...p,sl]);
   const canApply=medId&&df&&dt&&df<=dt;
   return(
     <>
@@ -3436,7 +3418,6 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
   /* v10.128 : verrou des semaines passées (jugées sur leur vendredi, vSemBloque) */
   const wLock=(wk)=>!!vRef&&vSemBloque(vRef,wk);
   const wChk=(wk)=>{if(!vRef)return true;if(vSemBloque(vRef,wk)){if(vToast)vToast(false);return false;}if(vSemAvertit(vRef,wk)&&vToast)vToast(true);return true;};
-  const tmCountPeriod=(medId)=>weeksT.reduce((n,w)=>{const wm2=tourMed[w.key]||{HC:[],USIC:[]};return((wm2.HC||[]).includes(medId)||(wm2.USIC||[]).includes(medId))?n+1:n;},0);
   const isBlockedInWeek=(medId,wk2)=>{
     const[wy2,wm2,wd2]=wk2.split("-").map(Number);
     const _mo=medecins.find(m=>String(m.id)===String(medId));   /* v10.41 */
@@ -4629,8 +4610,6 @@ function ReportsView(p){
   const doneInfo=(o)=>{const v=repDone[doneK(o)];if(!v)return null;return (typeof v==="object")?v:{by:"",at:""};};
   const toggleDone=(o)=>vChk(o)&&setRep(c=>{const k=doneK(o);if(c.done[k])delete c.done[k];else c.done[k]={by:whoNow(),at:jourMois()};});
   const setReport=(o,dest,note)=>vChk(o,dest)&&setRep(c=>{c.to[lostK(o)]={d:dk3(dest.y,dest.m,dest.d),sl:dest.sl,n:note||""};});
-  const clrReport=(o)=>setRep(c=>{delete c.to[lostK(o)];});
-  const setRepNote=(o,txt)=>setRep(c=>{const k=lostK(o);if(c.to[k])c.to[k]={...c.to[k],n:txt};});
   const [repModal,setRepModal]=React.useState(null);
   const [repStep,setRepStep]=React.useState(null);/* 2e temps : combien de patients, quelle salle */
   const [showG3,setShowG3]=React.useState(false);/* 3e groupe de la modale, replie par defaut */
@@ -6751,7 +6730,6 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const retire=(c)=>{setEntry(mid,y,m,d,c.sl,null);};
   const crenLbl=sam?"Samedi matin":(cren==="M"?"Matin":cren==="AM"?"Après-midi":"Journée");
   const cycleCren=()=>{if(sam)return;setCren(c=>c==="M"?"AM":c==="AM"?"J":"M");};
-  const slotsDuCren=()=>cren==="J"?["M","AM"]:[cren];
   const poseCren=(acteId,salle)=>{
     const ent=()=>salle?{acteId:acteId,salle:salle}:{acteId:acteId};
     if(sam){setEntry(mid,y,m,d,"M",ent());toast("Posé — samedi matin");onClose();return;}
@@ -8745,35 +8723,8 @@ function CardioPlanning(){
      quelqu'un d'autre n'apparait dans aucun des deux crans : elle est donc laissee
      telle quelle au lieu d'etre ecrasee par un etat perime. ── */
   const memeVal=(a,b)=>histStr(a===undefined?null:a)===histStr(b===undefined?null:b);
-  /* un niveau de cles (notes, astreinte, tour, planning type, donnees de Reports) */
-  const deltaObj=(av,ap,cur)=>{
-    const A=av||{},B=ap||{},out={...(cur||{})};
-    const cles={};Object.keys(A).forEach(k=>cles[k]=1);Object.keys(B).forEach(k=>cles[k]=1);
-    Object.keys(cles).forEach(k=>{
-      if(memeVal(A[k],B[k]))return;                 /* l'action n'a pas touche a cette cle */
-      if(B[k]===undefined)delete out[k];else out[k]=B[k];
-    });
-    return out;
-  };
-  /* le planning a DEUX niveaux : demi-journee, puis medecin — deux personnes
-     peuvent modifier la meme demi-journee sur des lignes differentes */
-  const deltaPlan=(av,ap,cur)=>{
-    const A=av||{},B=ap||{},out={...(cur||{})};
-    const cles={};Object.keys(A).forEach(k=>cles[k]=1);Object.keys(B).forEach(k=>cles[k]=1);
-    Object.keys(cles).forEach(k=>{
-      const a2=A[k]||{},b2=B[k]||{};
-      if(memeVal(a2,b2))return;
-      const c2={...(out[k]||{})};const ids={};
-      Object.keys(a2).forEach(x=>ids[x]=1);Object.keys(b2).forEach(x=>ids[x]=1);
-      Object.keys(ids).forEach(x=>{
-        if(cellKey(a2[x])===cellKey(b2[x]))return;
-        if(b2[x]===undefined)delete c2[x];else c2[x]=b2[x];
-      });
-      if(Object.keys(c2).length===0)delete out[k];else out[k]=c2;
-    });
-    return out;
-  };
-  /* ── v10.77 : un cran retient la LISTE des cases qu'il a changees. Le retour
+  /* v10.129 : deltaObj/deltaPlan retirés — sans appelant depuis la v10.77 (un cran retient la liste des cases) */
+      /* ── v10.77 : un cran retient la LISTE des cases qu'il a changees. Le retour
      arriere ne touche que celles-la : ce qu'un collegue a pose entre-temps n'est
      jamais dans la liste, donc jamais defait. ── */
   const delObj=(A,B)=>{
@@ -9798,33 +9749,6 @@ function CardioPlanning(){
     toast("Activités effacées sur la période","info");
   },[]);
 
-  const clearPlanningType=useCallback((medId=null)=>{
-    setPlan(p=>{
-      let next={...p};
-      allDays.forEach(d=>{
-        if(isWE(year,month,d))return;
-        ["M","AM"].forEach(sl=>{
-          const k=sk(year,month,d,sl);
-          if(!next[k])return;
-          const newSlot={...next[k]};
-          if(medId!==null){
-            // Clear only for this med (except ABSENCE/GARDE/REPOS)
-            const ex=newSlot[medId];
-            if(!cellHasAny(ex,["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"])) delete newSlot[medId];
-          } else {
-            // Clear all meds (except ABSENCE/GARDE/REPOS)
-            Object.keys(newSlot).forEach(mid=>{
-              const ex=newSlot[mid];
-              if(!cellHasAny(ex,["ABSENCE","FORM","FORMATION","GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"])) delete newSlot[mid];
-            });
-          }
-          next={...next,[k]:newSlot};
-        });
-      });
-      return next;
-    });
-    toast(medId?`Planning effacé pour ${(medecins.find(m=>m.id===medId)||{nom:"?"}).nom}`:`Planning effacé pour ${MOIS[month]}`,"info");
-  },[allDays,year,month,medecins]);
 
   /* v10.42 : garde-fou de la désactivation. Le compte lit par getEntries — il
      voit donc AUSSI le tour synthétisé et les gardes ; le nettoyage appelle
@@ -9874,12 +9798,7 @@ function CardioPlanning(){
     return ws;
   },[year,month,allDays]);
 
-  const isAbsentInWeek=useCallback((medId,wk)=>{
-    const[wy,wm2,wd]=wk.split("-").map(Number);
-    return[0,1,2,3,4].some(i=>{const dt=new Date(wy,wm2,wd+i);return["M","AM","JOUR"].some(sl=>cellHasAny((plan[sk(dt.getFullYear(),dt.getMonth(),dt.getDate(),sl)]||{})[medId],ABS_IDS));});
-  },[plan]);
 
-  const tmCount=medId=>Object.values(tourMed).reduce((n,w)=>((w.HC||[]).includes(medId)||(w.USIC||[]).includes(medId))?n+1:n,0);
   const getPeriodStart=(y,m)=>{const p=perStart(y,m);return{sy:p.sy,sm:p.sm};};
   const prevM=()=>{
     const{sm,sy}=getPeriodStart(year,month);
