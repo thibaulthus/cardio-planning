@@ -1,9 +1,9 @@
-/* CardioPlanning — service worker (v9.10)
+/* CardioPlanning — service worker (v10.135)
    Page : réseau d'abord (toujours la dernière version quand il y a du réseau),
           cache en secours (l'app s'ouvre hors ligne).
    Bibliothèques CDN : cache d'abord (URL versionnées, jamais périmées).
    Données Firestore : jamais mises en cache ici — c'est le cache interne du SDK qui s'en charge. */
-var CACHE = "cardioplanning-v9-10";
+var CACHE = "cardioplanning-v10-135";   /* v10.135 : nouveau nom = les vieilles entrées (dont une v9.22) sont effacées */
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
@@ -31,12 +31,12 @@ self.addEventListener("fetch", function (e) {
     e.respondWith(
       fetch(req).then(function (res) {
         var copy = res.clone();
-        caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        /* v10.135 : la page est rangée sous UNE clé, toujours la dernière chargée — quelle que
+           soit l'adresse demandée (avec ou sans « index.html », avec ou sans paramètres). */
+        caches.open(CACHE).then(function (c) { c.put("index.html", copy); });
         return res;
       }).catch(function () {
-        return caches.match(req).then(function (m) {
-          return m || caches.match("./index.html") || caches.match("index.html");
-        });
+        return caches.match("index.html");
       })
     );
     return;
