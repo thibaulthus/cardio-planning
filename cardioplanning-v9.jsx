@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.126 — 27/08/2026";
+const APP_VERSION="v10.128 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -2947,6 +2947,7 @@ function RestoreModal({med,backups,y,m,d,onDiff,onGo,onClose}){
         <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,borderBottom:"1px solid var(--border)",background:"#f0fdf4",color:"#166534",fontWeight:700}}>＋ {bilan.nAdd} activité{bilan.nAdd>1?"s":""} remise{bilan.nAdd>1?"s":""}</div>
         <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,borderBottom:"1px solid var(--border)",background:"#fee2e2",color:"#991b1b",fontWeight:700}}>－ {bilan.nDel} case{bilan.nDel>1?"s":""} supprimée{bilan.nDel>1?"s":""}</div>
         <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,background:"var(--bg2)",color:"var(--txt3)"}}>＝ {bilan.nSame} déjà identique{bilan.nSame>1?"s":""}</div>
+        {bilan.nLock>0&&<div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,background:"var(--bg2)",color:"#b45309",fontWeight:700}}>🔒 {bilan.nLock} sous journée verrouillée — ignorée{bilan.nLock>1?"s":""}</div>}
       </div>
       {(bilan.nAdd>0||bilan.nDel>0)&&<div style={{marginTop:8}}>
         {bilan.detA.length>0&&<><div style={{fontSize:9.5,fontWeight:800,color:"#166534",textTransform:"uppercase"}}>Remises</div>
@@ -3420,7 +3421,7 @@ function AbsModal({medecins,onApply,onRemove,onClose,initMedId=null,initDate=nul
 /* ════════════════════════════════════════════════════════════
    MAIN APP
 ════════════════════════════════════════════════════════════ */
-function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast}){
+function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast}){
   const _psT=perStart(tourYear,tourMonth);
   const perT={pi:_psT.sm,startY:_psT.sy,startM:_psT.sm};
   const perKeyT=perT.startY+"_"+perT.startM;
@@ -3432,6 +3433,9 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
      partaient du 1er lundi >= 1er du mois et s'arretaient au dernier jour du dernier
      mois — juste tant qu'aucune extension ne deplacait une borne. */
   const weeksT=perWeeksList(perT.startY,perT.startM);
+  /* v10.128 : verrou des semaines passées (jugées sur leur vendredi, vSemBloque) */
+  const wLock=(wk)=>!!vRef&&vSemBloque(vRef,wk);
+  const wChk=(wk)=>{if(!vRef)return true;if(vSemBloque(vRef,wk)){if(vToast)vToast(false);return false;}if(vSemAvertit(vRef,wk)&&vToast)vToast(true);return true;};
   const tmCountPeriod=(medId)=>weeksT.reduce((n,w)=>{const wm2=tourMed[w.key]||{HC:[],USIC:[]};return((wm2.HC||[]).includes(medId)||(wm2.USIC||[]).includes(medId))?n+1:n;},0);
   const isBlockedInWeek=(medId,wk2)=>{
     const[wy2,wm2,wd2]=wk2.split("-").map(Number);
@@ -3475,6 +3479,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
   const runSwap=()=>{
     const uSrc=unitOf(swapSrcMed,swapSrcKey),uDst=unitOf(swapDstMed,swapDstKey);
     if(!uSrc||!uDst)return;
+    if(!wChk(swapSrcKey)||!wChk(swapDstKey))return;   /* v10.128 */
     // 1. Échange dans tourMed
     setTourMed(p=>{
       const n={...p};
@@ -3633,6 +3638,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     setCfgWeeks(recalcWeeks(n));
   };
   const runAutoRepartition=()=>{
+    /* v10.128 : la répartition réécrit TOUTE la période — refusée dès que sa première semaine est passée */
+    if(weeksT.length&&!wChk(weeksT[0].key))return;
     // ═══ Pré-vérification de faisabilité des contraintes ═══
     const seniors=medecins.filter(m=>m.role==="medecin"&&(m.statut||"senior")!=="junior");
     const totCoro=seniors.filter(m=>m.surSpec==="coro").length;
@@ -3916,6 +3923,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
           {isEdit&&<button onClick={openAutoModal} title="Répartition automatique" style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>⚙️ Répartition auto</button>}
           {isEdit&&<button onClick={()=>{
+            if(weeksT.length&&!wChk(weeksT[0].key))return;   /* v10.128 */
             if(!window.confirm("Supprimer TOUTES les attributions du tour sur la période affichée ?"))return;
             if(!window.confirm("Confirmez-vous la suppression définitive ? (récupérable via le bouton Annuler ↶)"))return;
             setTourMed(p=>{const n={...p};weeksT.forEach(w=>{delete n[w.key];});return n;});
@@ -4000,7 +4008,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                     const on=(wm[unit]||[]).includes(m.id);
                     const blocked=isBlockedInWeek(m.id,w.key);
                     const inOther=(wm[unit==="HC"?"USIC":"HC"]||[]).includes(m.id);
-                    const dis=blocked||inOther;
+                    const dis=blocked||inOther||wLock(w.key);
                     const avoidW=!!((tourAvoid||{})[w.key]||{})[m.id];
                     const wishW=!!((tourWish||{})[w.key]||{})[m.id];
                     return(
@@ -4008,7 +4016,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                         style={{padding:"4px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:62,overflow:"hidden",
                           background:on?({coro:"rgba(118,165,175,.82)",pace:"rgba(227,179,65,.82)",eep:"rgba(139,92,246,.82)",ett:"rgba(236,72,153,.82)"}[m.surSpec]||"rgba(56,139,253,.82)"):"var(--bg2)",color:on?"#fff":"var(--txt2)",fontWeight:on?800:600,opacity:dis?.3:1,
                            outline:on?"2px solid "+(SPEC_COLORS[m.surSpec]||"#388bfd"):m.surSpec&&!blocked?"2px solid "+(SPEC_COLORS[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
-                        onClick={()=>{if(dis||!isEdit)return;
+                        onClick={()=>{if(dis||!isEdit)return;if(!wChk(w.key))return;
                         const wasOn=on;
                         setTourMed(p=>{const cur={...(p[w.key]||{HC:[],USIC:[]})};const l=cur[unit]||[];if(!wasOn&&l.length>=2){toast("Maximum 2 médecins par unité","info");return p;}cur[unit]=wasOn?l.filter(x=>x!==m.id):[...l,m.id];return{...p,[w.key]:cur};});
                         if(!wasOn){
@@ -4020,7 +4028,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                         }}}>
                         <div style={{fontWeight:800,fontSize:11,lineHeight:1.15}} title={avoidW?"Préfère ne pas tourner cette semaine":wishW?"Souhaite tourner cette semaine":""}>{m.init}{avoidW?" 🚫":wishW?" ⭐":""}</div>
                         <div style={{fontSize:8.5,color:blocked?"inherit":m.surSpec&&!on?(SPEC_COLORS[m.surSpec]):"inherit"}}>
-                          {blocked?"indispo":inOther?"≠":""}
+                          {blocked?"indispo":inOther?"≠":wLock(w.key)?"🔒":""}
                         </div>
                       </button>
                     );
@@ -4084,6 +4092,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
               const sameWeek=swapSrcKey===swapDstKey;
               // Bloquants
               const blocks=[];
+              if(wLock(swapSrcKey))blocks.push("La semaine du "+lS+" est passée — verrouillée.");if(!sameWeek&&wLock(swapDstKey))blocks.push("La semaine du "+lD+" est passée — verrouillée.");
               if(!sameWeek&&unitOf(swapSrcMed,swapDstKey))blocks.push(mS.init+" est déjà de tour la semaine du "+lD+".");
               if(!sameWeek&&unitOf(swapDstMed,swapSrcKey))blocks.push(mD.init+" est déjà de tour la semaine du "+lS+".");
               // Avertissements
@@ -4501,13 +4510,13 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche."]}),
+  HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
-  HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait."]}),
+  HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait. Depuis la v10.128, les journées verrouillées de la plage choisie sont sautées, comme pour toute opération de période — le bilan les compte à part (🔒), et le message final les rappelle."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les périodes passées si elle monte."]}),
   HT({children:"💻 Copie sur mon ordinateur"}),
@@ -4595,6 +4604,18 @@ function ReportsView(p){
   const medSel=medSelRaw||{id:"__aucun__",init:"",nom:"",prenom:""};
   const mid=medSel.id;
   const editable=isEdit||(accessMode==="medecinEdit"&&editMedId===mid)||p.adminReports===true;
+  /* v10.128 : verrou des journées passées — sa règle du 28/08 : « on n'échange pas
+     une consultation déjà passée ». Jugé JOUR PAR JOUR sur la date touchée (la
+     demi-journée perdue comme la destination). Les jours et semaines passés sont
+     grisés et exclus des destinations proposées ; l'écriture reste barrée derrière,
+     avec le message habituel. vRef/vToast viennent de CardioPlanning. */
+  const vB=(o)=>!!p.vRef&&vBloque(p.vRef,o.y,o.m,o.d);
+  const vA=(o)=>!!p.vRef&&vAvertit(p.vRef,o.y,o.m,o.d);
+  const vChk=function(){const os=Array.prototype.slice.call(arguments).filter(Boolean);
+    if(os.some(vB)){if(p.vToast)p.vToast(false);return false;}
+    if(os.some(vA)&&p.vToast)p.vToast(true);return true;};
+  const editOK=(o)=>editable&&!vB(o);
+  const vTick=p.vRef?(p.vRef.current.deb+(p.vRef.current.passe?"+":"-")):"";
   const dk3=(y,m,d)=>y+"-"+m+"-"+d;
   /* ── v9.14 : registre des reports (persisté, partagé avec les secrétaires) ── */
   const repAll=(p.csRep&&p.csRep[mid])||{};
@@ -4606,8 +4627,8 @@ function ReportsView(p){
      et retient QUI l'a fait. Les anciennes coches par semaine deviennent inertes. */
   const doneK=(o)=>dk3(o.y,o.m,o.d)+"|"+o.sl;
   const doneInfo=(o)=>{const v=repDone[doneK(o)];if(!v)return null;return (typeof v==="object")?v:{by:"",at:""};};
-  const toggleDone=(o)=>setRep(c=>{const k=doneK(o);if(c.done[k])delete c.done[k];else c.done[k]={by:whoNow(),at:jourMois()};});
-  const setReport=(o,dest,note)=>setRep(c=>{c.to[lostK(o)]={d:dk3(dest.y,dest.m,dest.d),sl:dest.sl,n:note||""};});
+  const toggleDone=(o)=>vChk(o)&&setRep(c=>{const k=doneK(o);if(c.done[k])delete c.done[k];else c.done[k]={by:whoNow(),at:jourMois()};});
+  const setReport=(o,dest,note)=>vChk(o,dest)&&setRep(c=>{c.to[lostK(o)]={d:dk3(dest.y,dest.m,dest.d),sl:dest.sl,n:note||""};});
   const clrReport=(o)=>setRep(c=>{delete c.to[lostK(o)];});
   const setRepNote=(o,txt)=>setRep(c=>{const k=lostK(o);if(c.to[k])c.to[k]={...c.to[k],n:txt};});
   const [repModal,setRepModal]=React.useState(null);
@@ -4659,6 +4680,10 @@ function ReportsView(p){
   const isBl=(y,m,d)=>!!bl[dk3(y,m,d)];
   const setBlDays=(list,on)=>{
     if(!editable)return;
+    if(p.vRef){const ok=list.filter(o=>!vB(o));   /* v10.128 : jours verrouillés sautés */
+      if(ok.length<list.length){if(p.vToast)p.vToast(false);if(!ok.length)return;}
+      else if(list.some(vA)&&p.vToast)p.vToast(true);
+      list=ok;}
     setCsBlanches(prev=>{const cur=Object.assign({},prev[mid]||{});
       list.forEach(o=>{const k=dk3(o.y,o.m,o.d);if(on)cur[k]=true;else delete cur[k];});
       return Object.assign({},prev,{[mid]:cur});});
@@ -4728,28 +4753,28 @@ function ReportsView(p){
   const resteOf=(L)=>{const t=totOf(L);if(t===null)return null;return Math.max(0,t-placeOf(L)-attOf(L));};
   const incomplet=(L)=>{const r=resteOf(L);return r!==null&&r>0;};
   const vide={tot:null,att:0,n:"",parts:[]};
-  const setTot=(L,v)=>setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;
+  const setTot=(L,v)=>vChk(L)&&setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;
     c.to[k]={...cur,tot:(v===""||v===null)?null:Math.max(0,parseInt(v,10)||0)};});
-  const addPart=(L,q)=>setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;
+  const addPart=(L,q)=>vChk(L,dkParse(q.d))&&setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;
     c.to[k]={...cur,parts:(cur.parts||[]).concat([q])};});
-  const delPart=(L,i)=>setRep(c=>{const k=lostK(L),cur=c.to[k];if(!cur)return;
+  const delPart=(L,i)=>vChk(L)&&setRep(c=>{const k=lostK(L),cur=c.to[k];if(!cur)return;
     const ps=(cur.parts||[]).slice();ps.splice(i,1);
     if(ps.length===0&&cur.tot===null&&!cur.att&&!cur.n)delete c.to[k];else c.to[k]={...cur,parts:ps};});
-  const setAtt=(L,v)=>setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;c.to[k]={...cur,att:Math.max(0,v)};});
-  const setRepNote2=(L,txt)=>setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;c.to[k]={...cur,n:txt};});
+  const setAtt=(L,v)=>vChk(L)&&setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;c.to[k]={...cur,att:Math.max(0,v)};});
+  const setRepNote2=(L,txt)=>vChk(L)&&setRep(c=>{const k=lostK(L),cur=c.to[k]||vide;c.to[k]={...cur,n:txt};});
   const txtPat=(nb)=>nb===null?"":(", "+enLet(nb)+" patient"+(nb>1?"s":""));
   /* Poser sur une semaine blanche : la consultation existe deja, elle n'attend que
      ses patients — aucune salle a choisir, et elle reprend tout ce qui reste. */
-  const poseBlanche=(L,dest)=>{const a2=acteOf(L.acte),t=totOf(L),nb=(t===null)?null:resteOf(L);
+  const poseBlanche=(L,dest)=>{if(!vChk(L,dest))return;const a2=acteOf(L.acte),t=totOf(L),nb=(t===null)?null:resteOf(L);
     addPart(L,{d:dk3(dest.y,dest.m,dest.d),sl:dest.sl,n:nb,salle:null,cree:false});
     addNote(dest,"Report du "+fmtD(L)+" "+L.sl+txtPat(nb)+(a2?" ("+(a2.short||a2.label)+")":""));};
   /* Poser sur un creneau de tour ou un autre jour : la consultation est CREEE dans le
      planning, avec sa salle, et ne reprend qu'une part des patients. */
-  const poseCree=(L,dest,nb,salle)=>{const a2=acteOf(L.acte);
+  const poseCree=(L,dest,nb,salle)=>{if(!vChk(L,dest))return;const a2=acteOf(L.acte);
     if(p.addEntry)p.addEntry(mid,dest.y,dest.m,dest.d,dest.sl,{acteId:L.acte,salle:salle||null});
     addPart(L,{d:dk3(dest.y,dest.m,dest.d),sl:dest.sl,n:nb,salle:salle||null,cree:true});
     addNote(dest,"Report du "+fmtD(L)+" "+L.sl+txtPat(nb)+(a2?" ("+(a2.short||a2.label)+")":""));};
-  const annulPart=(L,i)=>{const q=partsOf(L)[i];if(!q)return;const D=dkParse(q.d);
+  const annulPart=(L,i)=>{const q=partsOf(L)[i];if(!q)return;const D=dkParse(q.d);if(!vChk(L,D))return;
     if(q.cree&&p.removeEntry)p.removeEntry(mid,D.y,D.m,D.d,q.sl,L.acte);
     addNote({y:D.y,m:D.m,d:D.d,sl:q.sl},"Report annulé"
       +(q.cree?", consultation retirée du planning":", demi-journée redevenue libre"));
@@ -4780,6 +4805,7 @@ function ReportsView(p){
     });
     /* Semaines blanches d'accueil */
     const recvWeeks=weeks.filter(w=>{
+      if(vB(w.days[w.days.length-1]))return false;   /* v10.128 : une blanche passée n'accueille rien */
       const wm=tourMed[w.key]||{};if((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid))return false;
       if(lostByWeek[w.key])return false;
       return habList.some(hb=>{const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===hb.dw);
@@ -4858,7 +4884,7 @@ function ReportsView(p){
     const offByWk={};offs.forEach(o=>{const wk=wkOf(o.y,o.m,o.d);const b=(offByWk[wk]=offByWk[wk]||{});(b[o.dw]=b[o.dw]||[]).push(o.sl);});
     const offWeeks=weeks.filter(w=>offByWk[w.key]).map(w=>({key:w.key,days:w.days,slots:offByWk[w.key]}));
     return {weekPairs,weekItems,offWeeks};
-  },[days,weeks,bl,tourMed,planningType,myActs.join(","),mid]);
+  },[days,weeks,bl,tourMed,planningType,myActs.join(","),mid,vTick]);
   /* ── v10.24 : ce qui atterrit sur chaque demi-journee blanche, DEDUIT de l'etat
      courant (report valide, ou simple proposition). Se met donc a jour tout seul
      s'il repartit les deux consultations d'une semaine sur des semaines differentes. */
@@ -4890,7 +4916,7 @@ function ReportsView(p){
   const hasFreeRoom=(yy,mm,dd,ss)=>{const occ=occSalles(yy,mm,dd,ss);return myActesOff.some(a=>freeFor(a,occ).length>0);};
   const dayOf=(w,dw)=>w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===dw);
   const poseFree=(a,salle,lost)=>{
-    const F=freeModal;if(!F||!p.addEntry)return;
+    const F=freeModal;if(!F||!p.addEntry)return;if(!vChk(F,lost))return;
     p.addEntry(mid,F.y,F.m,F.d,F.sl,{acteId:a.id,salle:salle||null});
     if(lost&&p.setNotes)p.setNotes(pn=>{const nn={...pn};nn[nk(mid,F.y,F.m,F.d,F.sl)]="Report de la "+(a.short||a.label)+" du "+fmtD(lost)+" "+lost.sl;return nn;});
     if(lost)setReport(lost,{y:F.y,m:F.m,d:F.d,sl:F.sl},"posé depuis les salles libres");
@@ -4963,9 +4989,9 @@ function ReportsView(p){
               if(!o)return RE("td",{key:dw,style:{padding:"2px"}});
               const st=cellSt(o,dw);
               return RE("td",{key:dw,onClick:()=>{if(!st.fer)setBlDays([o],!st.blanche);},
-                title:st.fer?"Férié":(st.blanche?"Blanche — cliquer pour retirer":"Cliquer pour marquer blanche"),
-                style:{padding:"4px 2px",textAlign:"center",fontSize:10,fontWeight:800,
-                  cursor:st.fer||!editable?"default":"pointer",
+                title:st.fer?"Férié":vB(o)?"🔒 Journée passée":(st.blanche?"Blanche — cliquer pour retirer":"Cliquer pour marquer blanche"),
+                style:{padding:"4px 2px",textAlign:"center",fontSize:10,fontWeight:800,opacity:vB(o)?.4:1,
+                  cursor:st.fer||!editable||vB(o)?"default":"pointer",
                   background:st.fer?"var(--bg2)":st.blanche?"rgba(245,158,11,.25)":st.tour?"rgba(29,78,216,.12)":"transparent",
                   color:st.fer?"var(--txt3)":st.absD?"#ef4444":"var(--txt)",
                   border:"1px solid var(--border2)",borderRadius:4}},
@@ -5003,7 +5029,7 @@ function ReportsView(p){
         return RE("label",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,
           cursor:editable?"pointer":"default",border:"1px solid "+(inf?"rgba(22,163,74,.45)":"rgba(245,158,11,.55)"),
           background:inf?"rgba(22,163,74,.09)":"rgba(245,158,11,.10)",borderRadius:11,padding:"1px 9px 1px 6px"}},
-          RE("input",{type:"checkbox",checked:!!inf,disabled:!editable,onChange:()=>toggleDone(o),
+          RE("input",{type:"checkbox",checked:!!inf,disabled:!editOK(o),onChange:()=>toggleDone(o),
             style:{width:13,height:13,margin:0,cursor:editable?"pointer":"default"}}),
           RE("span",{style:{fontWeight:800,color:inf?"#16a34a":"#b45309"}},
             inf?("rouvert par "+(inf.by||"?")+(inf.at?" — "+inf.at:"")):"à rouvrir"));
@@ -5014,7 +5040,7 @@ function ReportsView(p){
         color:tot===null?"var(--txt3)":"var(--txt2)",background:tot===null?"var(--th)":"rgba(124,58,237,.09)",
         borderRadius:9,padding:"1px 7px"}},
         "👥",
-        RE("input",{value:tot===null?"":String(tot),placeholder:"—",readOnly:!editable,
+        RE("input",{value:tot===null?"":String(tot),placeholder:"—",readOnly:!editOK(L),
           title:"Laissez vide si toute la consultation part d'un bloc ; un nombre signifie que vous la divisez",
           onChange:e=>setTot(L,e.target.value.replace(/[^0-9]/g,"")),
           style:{width:30,textAlign:"center",fontSize:10.5,fontWeight:800,fontFamily:"inherit",color:"var(--txt)",
@@ -5027,11 +5053,12 @@ function ReportsView(p){
             RE("span",{style:{display:"block",height:"100%",width:pc+"%",background:reste>0?"#f59e0b":"#16a34a"}})),
           RE("span",{style:{color:reste>0?"#ef4444":"#16a34a"}},
             reste>0?(enLet(reste)+" à placer"):(enLet(pl)+" placé"+(pl>1?"s":""))));};
-      const noteInp=(L)=>RE("input",{value:(repOf(L)||{}).n||"",placeholder:"note…",readOnly:!editable,
+      const noteInp=(L)=>RE("input",{value:(repOf(L)||{}).n||"",placeholder:"note…",readOnly:!editOK(L),
         onChange:e=>setRepNote2(L,e.target.value),
         style:{fontSize:10,padding:"1px 5px",borderRadius:4,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",width:140}});
       const cmtTag=()=>RE("span",{style:{fontSize:10,color:"#16a34a",background:"rgba(22,163,74,.09)",borderRadius:4,padding:"1px 6px"}},"💬 commentaire écrit dans la case");
       const lostLine=(L,k,prop)=>{
+        const editable=editOK(L);   /* v10.128 : masque l'édition d'une demi-journée passée */
         const a2=acteOf(L.acte),ps=partsOf(L),tot=totOf(L),att=attOf(L),reste=resteOf(L);
         const divise=tot!==null,rows=[];
         rows.push(RE("div",{key:"h",style:{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",padding:"2px 0"}},
@@ -5124,6 +5151,7 @@ function ReportsView(p){
                 RE("div",{style:{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}},
                   RE("span",{style:{fontWeight:800,color:it.kind==="rien"?"var(--txt3)":"var(--txt)"}},"Semaine du "+f.d+" "+MOIS[f.m].slice(0,4)),
                   it.kind==="ok"&&badge("tour","rgba(29,78,216,.12)","#1d4ed8"),
+                  vB(it.days[it.days.length-1])&&badge("🔒 semaine passée","rgba(127,127,127,.15)","var(--txt3)"),
                   (it.kind==="report"||it.kind==="norep")&&badge(it.why,it.why==="tour"?"rgba(29,78,216,.12)":"rgba(239,68,68,.12)",it.why==="tour"?"#1d4ed8":"#ef4444"),
                   nInc>0&&badge("⚠ report incomplet","#ef4444","#fff"),
                   it.kind==="recv"&&badge(it.dates.length>=nHab?"blanche":"blanche partielle","rgba(245,158,11,.2)","#b45309"),
@@ -5132,7 +5160,7 @@ function ReportsView(p){
                     "semaine blanche libre la plus proche : "+it.to.days[0].d+" "+MOIS[it.to.days[0].m].slice(0,4)),
                   it.kind==="report"&&ecBadge(it.ec),
                   it.kind==="norep"&&RE("span",{style:{color:"#ef4444",fontWeight:800}},"aucune semaine blanche à moins d'un mois"),
-                  it.kind==="norep"&&editable&&RE("button",{onClick:()=>setWeekModal({it}),
+                  it.kind==="norep"&&editable&&!vB(it.days[it.days.length-1])&&RE("button",{onClick:()=>setWeekModal({it}),
                     style:{fontSize:11,padding:"3px 9px",borderRadius:6,cursor:"pointer",fontWeight:800,
                       border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed"}},"⇄ Chercher une autre semaine blanche"),
                   it.kind==="ok"&&RE("span",{style:{fontWeight:800,color:"#16a34a"}},"✓ semaine blanche — pas de report nécessaire"),
@@ -5171,10 +5199,10 @@ function ReportsView(p){
                         o?sls.map(s2=>{
                           const ok=hasFreeRoom(o.y,o.m,o.d,s2);
                           return RE("span",{key:s2,
-                            onClick:(ok&&editable)?()=>{setFreeStep(null);setFreeModal({y:o.y,m:o.m,d:o.d,sl:s2,slots:[s2]});}:undefined,
+                            onClick:(ok&&editable&&!vB(o))?()=>{setFreeStep(null);setFreeModal({y:o.y,m:o.m,d:o.d,sl:s2,slots:[s2]});}:undefined,
                             title:ok?undefined:"off, mais aucune salle libre ce créneau",
                             style:{display:"inline-block",minWidth:22,margin:"1px 2px",padding:"1px 5px",borderRadius:5,fontSize:10,fontWeight:800,
-                              cursor:(ok&&editable)?"pointer":"default",
+                              cursor:(ok&&editable&&!vB(o))?"pointer":"default",
                               border:ok?"1.5px solid #2da44e":"1.5px dashed #b6bec7",
                               background:ok?"rgba(22,163,74,.16)":"repeating-linear-gradient(45deg,rgba(140,150,160,.18),rgba(140,150,160,.18) 3px,transparent 3px,transparent 6px)",
                               color:ok?"#16a34a":"var(--txt3)"}},s2);
@@ -5202,6 +5230,7 @@ function ReportsView(p){
         const dw=new Date(x.y,x.m,x.d).getDay();
         if(dw===0||dw===6||isFerie(x.y,x.m,x.d))return;
         if(x.y===L.y&&x.m===L.m&&x.d===L.d)return;
+        if(vB(x))return;   /* v10.128 */
         const tour=inTour(x.y,x.m,x.d),blanche=isBl(x.y,x.m,x.d);
         const ec=Math.round((new Date(x.y,x.m,x.d)-src)/86400000);
         ["M","AM"].forEach(sl=>{
@@ -5345,7 +5374,7 @@ function ReportsView(p){
     /* ── v10.25 : le bouton violet ouvre le choix des semaines, il ne decide plus ── */
     weekModal&&(()=>{
       const it=weekModal.it,src=new Date(it.lost[0].y,it.lost[0].m,it.lost[0].d);
-      const cands=weeks.filter(w=>w.key!==it.wk&&it.lost.every(L=>{
+      const cands=weeks.filter(w=>w.key!==it.wk&&!vB(w.days[w.days.length-1])&&it.lost.every(L=>{
           const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===L.dw);
           return o&&isBl(o.y,o.m,o.d)&&!isFerie(o.y,o.m,o.d)&&slotFreeCS(o.y,o.m,o.d,L.sl);}))
         .map(w=>{const o0=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===it.lost[0].dw);
@@ -7516,6 +7545,13 @@ function verrouDebut(){
    changement de mode, sous peine de casser toutes les mémoïsations en aval. */
 function vBloque(r,y,m,d){return dKey(y,m,d)<r.current.deb&&!r.current.passe;}
 function vAvertit(r,y,m,d){return dKey(y,m,d)<r.current.deb&&r.current.passe;}
+/* v10.128 : verrou du TOUR — une semaine (clé = son lundi) est close quand son
+   VENDREDI est passé. Sa règle du 28/08 : « laisse jusqu'au vendredi, cela
+   m'évitera de rester bloqué » — le tour se pense du lundi au vendredi, jamais
+   d'écriture le week-end, et la semaine en cours reste ouverte jusqu'au
+   vendredi soir. Même paire que vBloque/vAvertit, même ref. */
+function vSemBloque(r,wk){var q=String(wk).split("-").map(Number);var f=new Date(q[0],q[1],q[2]+4);return vBloque(r,f.getFullYear(),f.getMonth(),f.getDate());}
+function vSemAvertit(r,wk){var q=String(wk).split("-").map(Number);var f=new Date(q[0],q[1],q[2]+4);return vAvertit(r,f.getFullYear(),f.getMonth(),f.getDate());}
 
 function CardioPlanning(){
   const today=new Date();
@@ -8192,7 +8228,7 @@ function CardioPlanning(){
       const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
       /* calcul synchrone sur l'état courant : setPlan ne s'exécute pas immédiatement */
       const cles={};Object.keys(old).forEach(k=>cles[k]=1);Object.keys(plan).forEach(k=>cles[k]=1);
-      const maj={};const pairs=[];let n=0;
+      const maj={};const pairs=[];let n=0,nLock=0,vWarn=false;   /* v10.128 */
       Object.keys(cles).forEach(k=>{
         const parts=k.split("|");if(parts.length<2)return;
         /* v10.4 : la clé s'écrit « 2026-08-10 » — mois EN CLAIR, donc 1-based. Je le
@@ -8203,17 +8239,20 @@ function CardioPlanning(){
         if(t<fromT||t>toT)return;
         const av=(old[k]||{})[medId], mt=(plan[k]||{})[medId];
         if(cellKey(av)===cellKey(mt))return;
+        if(vBloque(vRef,yy,mm-1,dd)){nLock++;return;}   /* v10.128 : jour verrouillé — sauté */
+        if(vAvertit(vRef,yy,mm-1,dd))vWarn=true;
         const dm={...(plan[k]||{})};
         if(av===undefined||av===null||cellEs(av).length===0)delete dm[medId];
         else dm[medId]=av;
         maj[k]=dm;pairs.push([["planV2",k],dm]);n++;
       });
-      if(n===0){toast("Rien à restaurer — déjà identique","info");return 0;}
+      if(n===0){if(nLock)vToast(false);else toast("Rien à restaurer — déjà identique","info");return 0;}
       setPlan(p=>{const next={...p};Object.keys(maj).forEach(k=>{next[k]=maj[k];});return next;});
       if(updatePaths){
         for(let i2=0;i2<pairs.length;i2+=400)await updatePaths(PLANNING_DOC,pairs.slice(i2,i2+400));
       }
-      toast(n+" case"+(n>1?"s":"")+" restaurée"+(n>1?"s":""),"info");
+      toast(n+" case"+(n>1?"s":"")+" restaurée"+(n>1?"s":"")+(nLock?" · "+nLock+" sous journée verrouillée ignorée"+(nLock>1?"s":""):""),"info");
+      if(vWarn)vToast(true);
       return n;
     }catch(e){console.log("restore ciblee:",e);toast("Échec de la restauration","warn");return 0;}
   },[plan]);
@@ -8625,7 +8664,8 @@ function CardioPlanning(){
        Une période entièrement passée reste « close » ; à l'intérieur de la
        période en cours, c'est la JOURNÉE qui est passée. */
     const quoi=vRef.current.arch?"🗄 Période archivée":vRef.current.clos?"🔒 Période close":"🔒 Journée passée";
-    setNotif({msg:passe?("⚠ "+quoi.slice(2)+" — modification enregistrée quand même"):(vRef.current.arch?quoi+" — modification impossible (désarchivage dans Paramètres)":vRef.current.ed?quoi+" — modification impossible (déverrouillage dans Paramètres)":quoi+" — modification impossible"),type:passe?"warn":"lock"});
+    const nu=vRef.current.arch?"Période archivée":vRef.current.clos?"Période close":"Journée passée";
+    setNotif({msg:passe?("⚠ "+nu+" — modification enregistrée quand même"):(vRef.current.arch?quoi+" — modification impossible (désarchivage dans Paramètres)":vRef.current.ed?quoi+" — modification impossible (déverrouillage dans Paramètres)":quoi+" — modification impossible"),type:passe?"warn":"lock"});
     clearTimeout(notifTRef.current);notifTRef.current=setTimeout(()=>setNotif(null),3500);
   },[]);
   // ─── Undo/Redo history (edit mode) ───
@@ -9594,57 +9634,7 @@ function CardioPlanning(){
     setPtModal(null);
   };
 
-  const applyPlanningType=useCallback(()=>{
-    setPlan(p=>{
-      let next={...p};
-      allDays.forEach(d=>{
-        if(isWE(year,month,d))return;
-        const dw=dow(year,month,d);
-        const wk=wKey(year,month,d),wm=tourMed[wk]||{HC:[],USIC:[]};
-        const allTm=[...(wm.HC||[]),...(wm.USIC||[])];
-        medecins.forEach(med=>{
-          if(allTm.includes(med.id))return;
-          const pt=planningType[med.id];if(!pt||!pt[dw])return;
-          ["M","AM"].forEach(sl=>{
-            const k=sk(year,month,d,sl),ex=(next[k]||{})[med.id];
-            if(cellHasAny(ex,PROT_TOUR))return;
-            const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null,c1x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
-            if(!next[k])next[k]={};
-            next[k]={...next[k],[med.id]:ptCell(acteId,salle,a2x,s2x,a3x,s3x,c1x)};
-          });
-        });
-      });
-      return next;
-    });
-    toast("Planning type appliqué","info");
-  },[allDays,year,month,medecins,planningType,tourMed]);
-
-  /* ── applyPlanningType for one med ── */
-  const applyPlanningTypeMed=useCallback((medId)=>{
-    const med=medecins.find(m=>m.id===medId);
-    if(!med)return;
-    setPlan(p=>{
-      let next={...p};
-      allDays.forEach(d=>{
-        if(isWE(year,month,d))return;
-        const dw=dow(year,month,d);
-        const wk=wKey(year,month,d),wm=tourMed[wk]||{HC:[],USIC:[]};
-        const allTm=[...(wm.HC||[]),...(wm.USIC||[])];
-        if(allTm.includes(medId))return;
-        const pt=planningType[medId];if(!pt||!pt[dw])return;
-        ["M","AM"].forEach(sl=>{
-          const k=sk(year,month,d,sl),ex=(next[k]||{})[medId];
-          if(cellHasAny(ex,PROT_TOUR))return;
-          const [acteId,salle,a2x=null,s2x=null,a3x=null,s3x=null,c1x=null]=(pt[dw][sl])||[null,null];if(!acteId)return;
-          if(!next[k])next[k]={};
-          next[k]={...next[k],[medId]:ptCell(acteId,salle,a2x,s2x,a3x,s3x,c1x)};
-        });
-      });
-      return next;
-    });
-    toast(`PT appliqué pour ${med.nom}`,"info");
-  },[allDays,year,month,medecins,planningType,tourMed]);
-
+/* v10.128 : applyPlanningType et applyPlanningTypeMed retirés — sans appelant depuis applyPTFlex (v10.118) */
   /* ── clearPlanningType (global or individual) ── */
   /* v9.92 : traduit « du 10 matin au 14 après-midi » en la liste des demi-journées à
      traiter jour par jour. Les jours du milieu sont toujours entiers ; seules les deux
@@ -9727,7 +9717,7 @@ function CardioPlanning(){
       const cles={};
       Object.keys(old).forEach(k=>cles[k]=1);
       Object.keys(plan).forEach(k=>cles[k]=1);
-      let nAdd=0,nDel=0,nSame=0;const parA={},parD={};
+      let nAdd=0,nDel=0,nSame=0,nLock=0;const parA={},parD={};
       Object.keys(cles).forEach(k=>{
         const parts=k.split("|");if(parts.length<2)return;
         /* v10.4 : la clé s'écrit « 2026-08-10 » — mois EN CLAIR, donc 1-based. Je le
@@ -9738,12 +9728,13 @@ function CardioPlanning(){
         if(t<fromT||t>toT)return;
         const av=(old[k]||{})[medId], mt=(plan[k]||{})[medId];
         if(cellKey(av)===cellKey(mt)){if(mt!==undefined)nSame++;return;}
+        if(vBloque(vRef,yy,mm-1,dd)){nLock++;return;}   /* v10.128 */
         cellEs(av).forEach(e=>{if(e&&e.acteId){nAdd++;parA[e.acteId]=(parA[e.acteId]||0)+1;}});
         cellEs(mt).forEach(e=>{if(e&&e.acteId){nDel++;parD[e.acteId]=(parD[e.acteId]||0)+1;}});
       });
       const det=o=>Object.keys(o).map(x=>{const a=acteById(x);return{lab:(a&&(a.short||a.label))||x,n:o[x]};})
         .sort((x,y)=>y.n-x.n||String(x.lab).localeCompare(String(y.lab)));
-      return {nAdd,nDel,nSame,detA:det(parA),detD:det(parD)};
+      return {nAdd,nDel,nSame,nLock,detA:det(parA),detD:det(parD)};
     }catch(e){console.log("diff:",e);return null;}
   },[plan,acteById]);
 
@@ -10115,7 +10106,7 @@ function CardioPlanning(){
   const _titlePeriod=MOIS[_per.sm]+" — "+MOIS[_pem]+" "+(_per.sy!==_pey?_per.sy+"/"+_pey:_pey);
   /* v10.29 : un SEUL jeu de props par ecran, utilise par l'onglet d'origine ET par la
      tuile de Construire (qui n'y change que l'annee, le mois et noNav). */
-  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),darkMode,setDarkMode,planningType,setPlan,allDays,toast};
+  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast};
   const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
@@ -10529,7 +10520,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast}/></div>}
+      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
       {tab==="internes"&&<InternesView intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
@@ -10920,10 +10911,6 @@ header::-webkit-scrollbar { display: none; }
           <div data-noskip="1"><SetQuick items={psetItems} replies={psetFold} onTout={psetTout}/></div>
           <h2 style={{...S.mTit,marginBottom:16}}>⚙️ Paramètres <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2>
 
-          <div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#3fb950",fontSize:13,marginBottom:6}}>👁 Lecture seule<div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
-            <div style={{fontSize:11,color:"var(--txt3)"}}>Partagez l'URL directement. Sans PIN, le planning est consultable mais non modifiable.</div>
-          </div>
 
                     {isEdit&&<div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>🔐 Code PIN éditeur</div>
@@ -11241,16 +11228,6 @@ header::-webkit-scrollbar { display: none; }
                 style={{marginTop:8,width:"100%",padding:"9px",borderRadius:8,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer",fontSize:13}}>➕ Créer une salle</button>
               <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>Les salles créées ici restent disponibles même si aucune activité ne les utilise. Renommer propage aux activités et au planning.</div>
             </div>
-            <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🌓 Thème</div>
-              <div style={{display:"flex",gap:6}}>
-                <button onClick={()=>{try{localStorage.removeItem("cp6_theme");}catch(e){};const mm=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");setDarkModeRaw(!!(mm&&mm.matches));}}
-                  style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>📱 Auto (téléphone)</button>
-                <button onClick={()=>setDarkMode(false)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:!darkMode?"var(--nav-act)":"var(--bg2)",color:!darkMode?"var(--nav-act-c)":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>☀️ Jour</button>
-                <button onClick={()=>setDarkMode(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:darkMode?"var(--nav-act)":"var(--bg2)",color:darkMode?"var(--nav-act-c)":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>🌓 Nuit</button>
-              </div>
-              <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil (le bouton 🌓 des onglets fait pareil).</div>
-            </div>
 
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
@@ -11536,18 +11513,15 @@ header::-webkit-scrollbar { display: none; }
                 </div>}
               </div>);
             })()}
-          </div>
-
-          <div style={S.card}>
-            <div style={{fontWeight:700,color:"var(--txt2)",fontSize:13,marginBottom:6}}>☁️ Synchronisation Firebase</div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:10,height:10,borderRadius:"50%",flexShrink:0,background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}/>
-              <span style={{fontSize:12,color:"var(--txt2)"}}>
-                {fbStatus==="ok"?"Connecté — données sauvegardées automatiquement":
-                 fbStatus==="error"?"Erreur de connexion — vérifiez votre réseau":
-                 fbStatus==="offline"?"Mode local — sans sauvegarde automatique":
-                 "Connexion en cours..."}
-              </span>
+            <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🌓 Thème</div>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>{try{localStorage.removeItem("cp6_theme");}catch(e){};const mm=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");setDarkModeRaw(!!(mm&&mm.matches));}}
+                  style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>📱 Auto (téléphone)</button>
+                <button onClick={()=>setDarkMode(false)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:!darkMode?"var(--nav-act)":"var(--bg2)",color:!darkMode?"var(--nav-act-c)":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>☀️ Jour</button>
+                <button onClick={()=>setDarkMode(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:darkMode?"var(--nav-act)":"var(--bg2)",color:darkMode?"var(--nav-act-c)":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>🌓 Nuit</button>
+              </div>
+              <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil (le bouton 🌓 des onglets fait pareil).</div>
             </div>
           </div>
         </div>
