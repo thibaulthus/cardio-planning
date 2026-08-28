@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.130 — 28/08/2026";
+const APP_VERSION="v10.131 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4508,7 +4508,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-    HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, encart 🎯 Colonne du médecin connecté. En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
+    HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
@@ -10935,6 +10935,15 @@ header::-webkit-scrollbar { display: none; }
               </div>}
           </div>}
 
+          {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.131 : sa propre carte */}
+            <div style={{fontWeight:700,color:"#7c3aed",fontSize:13,marginBottom:6}}>🎯 Colonne du médecin connecté</div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas.</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              {medecins.filter(m=>(m.role||"medecin")==="medecin"||m.role==="attache").map(m=>{const on=(colSelf.off||[]).map(String).indexOf(String(m.id))<0;
+                return <button key={m.id} onClick={()=>setColSelf(c=>{const l=((c||{}).off||[]).map(String);const i2=l.indexOf(String(m.id));if(i2>=0)l.splice(i2,1);else l.push(String(m.id));return {...(c||{}),off:l};})}
+                  style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:"pointer",border:on?"2px dashed #7c3aed":"1px solid var(--border)",background:on?"rgba(124,58,237,.10)":"var(--bg3)",color:on?"#6d28d9":"var(--txt3)"}}>{m.init}</button>;})}
+            </div>
+          </div>}
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>📆 Période d'affichage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>Tous les onglets affichent le planning par blocs de cette durée, alignés sur le mois de départ.</div>
@@ -11282,15 +11291,6 @@ header::-webkit-scrollbar { display: none; }
               </div>
             </div>}
             </div>
-            {isEdit&&<div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>{/* v10.130 */}
-                <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🎯 Colonne du médecin connecté</div>
-                <div style={{fontSize:10,color:"var(--txt2)",marginBottom:6}}>À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas.</div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                  {medecins.filter(m=>(m.role||"medecin")==="medecin"||m.role==="attache").map(m=>{const on=(colSelf.off||[]).map(String).indexOf(String(m.id))<0;
-                    return <button key={m.id} onClick={()=>setColSelf(c=>{const l=((c||{}).off||[]).map(String);const i2=l.indexOf(String(m.id));if(i2>=0)l.splice(i2,1);else l.push(String(m.id));return {...(c||{}),off:l};})}
-                      style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:"pointer",border:on?"2px dashed #7c3aed":"1px solid var(--border)",background:on?"rgba(124,58,237,.10)":"var(--bg3)",color:on?"#6d28d9":"var(--txt3)"}}>{m.init}</button>;})}
-                </div>
-              </div>}
             {isEdit&&<div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
                 <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🔓 Journées passées et périodes closes</div>
                 <div style={{fontSize:10,color:"var(--txt2)",marginBottom:6}}>Tout ce qui précède le premier jour de la période en cours est en <b>lecture seule, pour tout le monde</b> — vous compris. Vous pouvez lever le verrou le temps d'une correction : il se remet en place tout seul au prochain chargement de l'application, et rien n'est enregistré.</div>
