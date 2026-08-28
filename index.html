@@ -140,7 +140,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.133 — 28/08/2026";
+var APP_VERSION = "v10.134 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -7965,6 +7965,10 @@ function CardioPlanning() {
     var _spc = useState({}), specColors = _spc[0], setSpecColors = _spc[1];
     var _colO = useState({}), colOrder = _colO[0], setColOrder = _colO[1];
     var _colS = useState({}), colSelf = _colS[0], setColSelf = _colS[1]; /* v10.130 : {off:[ids]} — tuiles éteintes dans Paramètres */
+    /* v10.134 : la pipette de couleur d'iOS envoie un événement à chaque mouvement du doigt — des
+       dizaines par seconde, chacun déclenchait un enregistrement Firebase et l'application plantait.
+       La couleur est tamponnée et validée après 400 ms sans changement. */
+    var _lisT = useState(null), lisTmp = _lisT[0], setLisTmp = _lisT[1]; var lisTmr = useRef(null);
     var _colM = useState(null), colModal = _colM[0], setColModal = _colM[1];
     /* v9.40 : impression */
     var _pw2 = useState(null), printWk = _pw2[0], setPrintWk = _pw2[1];
@@ -12233,10 +12237,10 @@ function CardioPlanning() {
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas."),
                     React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 8, fontSize: 11, color: "var(--txt2)" } }, /* v10.133 */
                         React.createElement("span", null, "Couleur et transparence du pointillé :"),
-                        React.createElement("input", { type: "color", value: colSelf.col || "#7c3aed", onChange: function (e) { var v = e.target.value; setColSelf(function (c) { return __assign(__assign({}, (c || {})), { col: v }); }); }, title: "Couleur du pointillé", style: { width: 34, height: 24, padding: 0, border: "1px solid var(--border)", borderRadius: 6, background: "none", cursor: "pointer" } }),
+                        React.createElement("input", { type: "color", value: lisTmp !== null ? lisTmp : (colSelf.col || "#7c3aed"), onChange: function (e) { var v = e.target.value; setLisTmp(v); clearTimeout(lisTmr.current); lisTmr.current = setTimeout(function () { setColSelf(function (c) { return __assign(__assign({}, (c || {})), { col: v }); }); setLisTmp(null); }, 400); }, title: "Couleur du pointillé", style: { width: 34, height: 24, padding: 0, border: "1px solid var(--border)", borderRadius: 6, background: "none", cursor: "pointer" } }),
                         React.createElement("input", { type: "range", min: "10", max: "100", step: "5", value: Math.round((colSelf.op === undefined ? 1 : colSelf.op) * 100), onChange: function (e) { var v = Number(e.target.value) / 100; setColSelf(function (c) { return __assign(__assign({}, (c || {})), { op: v }); }); }, title: "Transparence du pointillé", style: { width: 120 } }),
                         React.createElement("span", { style: { fontWeight: 700, minWidth: 34 } }, Math.round((colSelf.op === undefined ? 1 : colSelf.op) * 100) + " %"),
-                        React.createElement("span", { style: __assign({ display: "inline-block", width: 46, height: 22, borderRadius: 4, background: "var(--bg2)" }, lisCur), title: "Aperçu" }),
+                        React.createElement("span", { style: __assign({ display: "inline-block", width: 46, height: 22, borderRadius: 4, background: "var(--bg2)" }, (lisTmp !== null ? lisStyle(lisTmp, colSelf.op === undefined ? 1 : colSelf.op) : lisCur)), title: "Aperçu" }),
                         React.createElement("button", { onClick: function () { return setColSelf(function (c) { var n = __assign({}, (c || {})); delete n.col; delete n.op; return n; }); }, style: { fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", cursor: "pointer" } }, "↩ défaut")),
                     React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, medecins.filter(function (m) { return (m.role || "medecin") === "medecin" || m.role === "attache"; }).map(function (m) {
                         var on = (colSelf.off || []).map(String).indexOf(String(m.id)) < 0;

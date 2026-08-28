@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.133 — 28/08/2026";
+const APP_VERSION="v10.134 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -7575,6 +7575,10 @@ function CardioPlanning(){
   const [specColors,setSpecColors]=useState({});
   const [colOrder,setColOrder]=useState({});
   const [colSelf,setColSelf]=useState({});   /* v10.130 : {off:[ids]} — tuiles éteintes dans Paramètres */
+  /* v10.134 : la pipette de couleur d'iOS envoie un événement à chaque mouvement du doigt — des
+     dizaines par seconde, chacun déclenchait un enregistrement Firebase et l'application plantait.
+     La couleur est tamponnée et validée après 400 ms sans changement. */
+  const [lisTmp,setLisTmp]=useState(null);const lisTmr=useRef(null);
   const [colModal,setColModal]=useState(null);
   /* ── v9.40 : impression ── */
   const [printWk,setPrintWk]=useState(null);
@@ -10965,10 +10969,10 @@ header::-webkit-scrollbar { display: none; }
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas.</div>
             <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:8,fontSize:11,color:"var(--txt2)"}}>{/* v10.133 */}
               <span>Couleur et transparence du pointillé :</span>
-              <input type="color" value={colSelf.col||"#7c3aed"} onChange={e=>{const v=e.target.value;setColSelf(c=>({...(c||{}),col:v}));}} title="Couleur du pointillé" style={{width:34,height:24,padding:0,border:"1px solid var(--border)",borderRadius:6,background:"none",cursor:"pointer"}}/>
+              <input type="color" value={lisTmp!==null?lisTmp:(colSelf.col||"#7c3aed")} onChange={e=>{const v=e.target.value;setLisTmp(v);clearTimeout(lisTmr.current);lisTmr.current=setTimeout(()=>{setColSelf(c=>({...(c||{}),col:v}));setLisTmp(null);},400);}} title="Couleur du pointillé" style={{width:34,height:24,padding:0,border:"1px solid var(--border)",borderRadius:6,background:"none",cursor:"pointer"}}/>
               <input type="range" min="10" max="100" step="5" value={Math.round((colSelf.op===undefined?1:colSelf.op)*100)} onChange={e=>{const v=Number(e.target.value)/100;setColSelf(c=>({...(c||{}),op:v}));}} title="Transparence du pointillé" style={{width:120}}/>
               <span style={{fontWeight:700,minWidth:34}}>{Math.round((colSelf.op===undefined?1:colSelf.op)*100)+" %"}</span>
-              <span style={{display:"inline-block",width:46,height:22,borderRadius:4,background:"var(--bg2)",...lisCur}} title="Aperçu"></span>
+              <span style={{display:"inline-block",width:46,height:22,borderRadius:4,background:"var(--bg2)",...(lisTmp!==null?lisStyle(lisTmp,colSelf.op===undefined?1:colSelf.op):lisCur)}} title="Aperçu"></span>
               <button onClick={()=>setColSelf(c=>{const n={...(c||{})};delete n.col;delete n.op;return n;})} style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",cursor:"pointer"}}>↩ défaut</button>
             </div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
