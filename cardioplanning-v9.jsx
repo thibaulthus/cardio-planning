@@ -4,9 +4,17 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 // In production (Netlify): Firebase syncs automatically
 const db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseDB : null;
 const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", "main") : null;
-const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? window.firebaseSetDoc : null;
+/* v10.135 : garde-fou de version. Le 28/08, après un plantage, le cache a resservi une
+   v9.22 — une copie de juillet qui aurait écrit avec ses règles d'alors, sans verrou du
+   passé. Désormais la version la plus récente inscrit son numéro dans Firebase (appVer) ;
+   une copie plus ancienne qui le lit passe en LECTURE SEULE : setDoc et updatePaths
+   deviennent muets, un bandeau rouge invite à mettre à jour. */
+var VER_STALE={on:false,serveur:"",toast:null};
+function verNum(v){var m=String(v||"").match(/(\d+)\.(\d+)/);return m?parseInt(m[1],10)*1000+parseInt(m[2],10):0;}
+function verMuet(){if(VER_STALE.toast)VER_STALE.toast("⛔ Version périmée — modification NON enregistrée. Mettez l'application à jour.","warn");return Promise.resolve();}
+const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(){return VER_STALE.on?verMuet():window.firebaseSetDoc.apply(null,arguments);} : null;
 const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? window.firebaseOnSnapshot : null;
-const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? window.firebaseUpdatePaths : null;
+const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(){return VER_STALE.on?verMuet():window.firebaseUpdatePaths.apply(null,arguments);} : null;
 
 /* ════ FÉRIÉS ════ */
 function getFeries(y){
@@ -26,7 +34,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.134 — 28/08/2026";
+const APP_VERSION="v10.135 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4514,7 +4522,8 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-      HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
+        HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
+  HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
   HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
@@ -7604,6 +7613,8 @@ function CardioPlanning(){
   const validatePins=()=>{const v=pinsTry;const okEd=medecins.some(m=>((m.niveau)||"basic")==="editeur"&&(medPins[String(m.id)]||"").length>=3&&medPins[String(m.id)]===v);if(v===editPin||okEd){setShowPins(true);setPinsAsk(false);setPinsTry("");}else toast("PIN incorrect","warn");};
   /* ── v9.10 : mode hors ligne (lecture seule) ── */
   const [netOff,setNetOff]=useState(()=>typeof navigator!=="undefined"&&navigator.onLine===false);
+  const [stale,setStale]=useState(false);   /* v10.135 : cette copie est dépassée par le serveur */
+  useEffect(()=>{VER_STALE.toast=(m,t)=>toast(m,t);});   /* sans dépendance : toast naît plus bas dans le composant */
   useEffect(()=>{
     const on=()=>setNetOff(false),off=()=>setNetOff(true);
     window.addEventListener("online",on);window.addEventListener("offline",off);
@@ -7984,6 +7995,12 @@ function CardioPlanning(){
         if(snap.exists){
           const data0=snap.data();
           const data=data0;
+          /* v10.135 : garde-fou de version — lu sur chaque message. Un numéro plus grand que le
+             mien : je suis périmé. Plus petit ou absent (et message venu du serveur, pas du cache) :
+             j'inscris le mien — la copie la plus récente fait foi. */
+          {const sv=verNum(data.appVer),mv=verNum(APP_VERSION),srv=snap.metadata&&snap.metadata.fromCache===false;
+            if(sv>mv){if(!VER_STALE.on){VER_STALE.on=true;VER_STALE.serveur=String(data.appVer);setStale(true);}}
+            else if(sv<mv&&srv&&window.firebaseSetDoc)Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).catch(e=>console.log("appVer:",e));}
           /* ── plan V2 (objet) : toujours appliqué, modifications locales en attente ré-appliquées jusqu'à confirmation ── */
           if(data.planV2){
             const incoming=data.planV2;
@@ -10085,6 +10102,12 @@ function CardioPlanning(){
   const iconsFold=(tous)=>narrow?<React.Fragment>{btnFull}{btnMore}</React.Fragment>:tous;
   const trayFold=(repli)=>narrow&&moreOpen?<div style={{display:"flex",gap:6,justifyContent:"flex-end",marginBottom:8}}>{repli}</div>:null;
   const filtLbl=planFilter.length?planFilter.map(id=>(medecins.find(m=>m.id===id)||{}).init).filter(Boolean).join(", "):"Tous";
+  /* v10.135 : outils du bandeau « version périmée » */
+  const majForcee=async()=>{try{if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()));}
+    if(window.caches){const ks=await window.caches.keys();await Promise.all(ks.map(k=>window.caches.delete(k)));}}catch(e){}
+    window.location.reload();};
+  const verRetablir=()=>{if(!window.confirm("Déclarer CETTE version ("+APP_VERSION+") comme version en service ?\n\nÀ n'utiliser qu'après un retour volontaire à une version antérieure : toutes les copies plus récentes passeront à leur tour en lecture seule."))return;
+    if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
   const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast};
   const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
@@ -10171,6 +10194,13 @@ header::-webkit-scrollbar { display: none; }
         borderColor:notif.type==="warn"?"#f59e0b":notif.type==="lock"?"#a78bfa":"#4ade80",
         borderWidth:notif.type==="ok"?1.5:2.5,
         color:notif.type==="warn"?"#b45309":notif.type==="lock"?"#6d28d9":"var(--txt)"}}>{notif.msg}{notif.act&&<button onClick={e=>{e.stopPropagation();const c=notif.act.cells;setNotif(null);hlVoir(c);}} style={{marginLeft:10,padding:"3px 10px",borderRadius:6,border:"1.5px solid #e3b341",background:"rgba(227,179,65,.12)",color:"#b45309",fontWeight:800,fontSize:12,cursor:"pointer"}}>Voir{notif.act.n>1?" ("+notif.act.n+")":""}</button>}</div>}
+      {stale&&<div style={{position:"fixed",top:0,left:0,right:0,zIndex:3000,background:"#b91c1c",color:"#fff",padding:"10px 12px",fontSize:12,fontWeight:700,textAlign:"center",boxShadow:"0 2px 10px rgba(0,0,0,.35)"}}>{/* v10.135 */}
+        <div>⛔ Version périmée — {VER_STALE.serveur} est en service. Cette copie est en lecture seule.</div>
+        <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:6,flexWrap:"wrap"}}>
+          <button onClick={majForcee} style={{fontSize:12,fontWeight:800,padding:"6px 14px",borderRadius:8,border:"none",background:"#fff",color:"#b91c1c",cursor:"pointer"}}>🔄 Mettre à jour maintenant</button>
+          {isEdit&&<button onClick={verRetablir} style={{fontSize:11,fontWeight:700,padding:"6px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.6)",background:"none",color:"#fff",cursor:"pointer"}}>Rétablir cette version</button>}
+        </div>
+      </div>}
       {netOff&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
         📴 Hors ligne — dernier planning reçu · lecture seule
       </div>}
