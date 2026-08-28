@@ -26,7 +26,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.132 — 28/08/2026";
+const APP_VERSION="v10.133 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -633,7 +633,7 @@ function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v}
    parfait, ordinateur muet, et clic droit intact puisqu'il ne les consulte pas. */
 let _gvLpF=false,_gvLpT=null;
 
-function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null}){
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS}){
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
      disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
      partie → la case du jour est hachurée et verrouillée, et la personne
@@ -773,7 +773,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
             <th style={{...S.thFix,position:"sticky",top:0,left:C0,zIndex:40,minWidth:C1}}>Sl</th>
             {showGarde&&<th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#93c47d"}}>Garde</th>}
             {intGarde&&<th title="Garde des internes (lecture seule)" style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#1d4ed8"}}>🎓 Int.</th>}
-            {meds.map(m=><th key={m.id} data-col={m.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20,...(String(m.id)===String(selfId)?LIS:{})}} title={`Dr. ${m.prenom} ${m.nom}`}>
+            {meds.map(m=><th key={m.id} data-col={m.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20,...(String(m.id)===String(selfId)?lis:{})}} title={`Dr. ${m.prenom} ${m.nom}`}>
               <div style={{...S.avT,background:m.color,margin:"0 auto"}}>{m.init}</div>
             </th>)}
           </tr>
@@ -832,7 +832,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   const pf=prefFor?prefFor(med.id,ey,em,d):null;
                   const prefBg=pf&&pf.tour?(pf.tour==="wish"?"rgba(56,139,253,.20)":"rgba(248,81,73,.18)"):null;
                   return <td key={med.id} title={offC?("Indisponible — désactivé "+medOffL(med).map(r=>"du "+offFr(r.du)+" au "+offFr(r.au)).join(", ")):((issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined)}
-                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(prefBg?{background:prefBg}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),...(offC?{background:"repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)",opacity:.55,cursor:"default"}:{}),...(HL.on[sk(ey,em,d,sl)+"|"+med.id]?{outline:"3px solid #e3b341",outlineOffset:-3}:{}),display:"table-cell",verticalAlign:"middle",position:"relative",...(String(med.id)===String(selfId)?LIS:{})}}
+                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(prefBg?{background:prefBg}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),...(offC?{background:"repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)",opacity:.55,cursor:"default"}:{}),...(HL.on[sk(ey,em,d,sl)+"|"+med.id]?{outline:"3px solid #e3b341",outlineOffset:-3}:{}),display:"table-cell",verticalAlign:"middle",position:"relative",...(String(med.id)===String(selfId)?lis:{})}}
                     onContextMenu={onCellHistory?e=>{e.preventDefault();onCellHistory(med.id,ey,em,d,sl);}:undefined}
                     onTouchStart={onCellHistory?()=>{_gvLpF=false;clearTimeout(_gvLpT);_gvLpT=setTimeout(()=>{_gvLpF=true;onCellHistory(med.id,ey,em,d,sl);},600);}:undefined}
                     onTouchEnd={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
@@ -881,6 +881,10 @@ const SCROLL_MEM={jour:null,pos:{},x:{},centre:false};
    centrage unique à l'ouverture (centre) sur la colonne du médecin connecté.
    Même durée de vie que le reste : la session. Le pointillé LIS marque sa colonne. */
 const LIS={borderLeft:"2px dashed #7c3aed",borderRight:"2px dashed #7c3aed"};
+/* v10.133 : le pointillé se règle dans Paramètres (carte 🎯) — couleur et transparence.
+   lisStyle(hex, op) fabrique le style ; LIS reste la valeur par défaut. */
+function lisRgba(hex,op){var h=String(hex||"#7c3aed").replace("#","");if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var n=parseInt(h,16);if(isNaN(n))n=0x7c3aed;var a=op===undefined||op===null?1:Math.max(.1,Math.min(1,Number(op)));return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
+function lisStyle(hex,op){var c=lisRgba(hex,op);return {borderLeft:"2px dashed "+c,borderRight:"2px dashed "+c};}
 /* v10.49 : demi-journées off (onglet Reports) — participation des salles.
    `offOuv` vit sur la fiche de salle ; non renseigné = par défaut les salles où
    une consultation (CS_CHL / CS_CHB) peut se dérouler — son précochage. */
@@ -4511,7 +4515,7 @@ const HELP_SECTIONS=[
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
       HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
-  HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
+  HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
@@ -7194,7 +7198,7 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
         <button onClick={()=>setSemIdx(Math.min(sems.length-1,semI+1))} disabled={semI<0||semI>=sems.length-1} style={{...S.arr,opacity:(semI<0||semI>=sems.length-1)?.35:1}} title="Semestre suivant">›</button>
       </div>
       <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
-        {sem&&<Chp bg="rgba(56,139,253,.12)" c="#1d4ed8">{intFmtD(sem.deb)+" → "+intFmtD(sem.fin)}</Chp>}
+        {/* v10.133 : la pastille « date → date » est retirée — les dates sont dans la grille */}
         <button onClick={()=>setStatsOpen(true)} title="Statistiques" style={{...S.arr,fontSize:13,width:30}}>📊</button>
         <button onClick={()=>setJaugeOn(v=>!v)} title="Jauge HC/USIC" style={{...S.arr,fontSize:13,width:30,color:jaugeOn?"#1d4ed8":"var(--txt2)",border:`1px solid ${jaugeOn?"#1d4ed8":"var(--border)"}`}}>🚦</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Tout le semestre"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
@@ -8894,7 +8898,7 @@ function CardioPlanning(){
   /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
   const hideTabs=accessMode==="interneEdit"?["construire","tourmedical","garde","astreinte","reports","attache","plantype","equipe","activites","stats","partage"]
     :accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte","construire"]
-    :isMedEdit?["activites","equipe","partage"].concat(isInterEdit&&!isAttEdit?[]:["construire"])
+    :isMedEdit?["activites","equipe","partage"].concat(isInterEdit&&!isAttEdit?[]:["construire"]).concat(isInterEdit?[]:["stats"])   /* v10.133 : Stats n'est rendu que pour l'éditeur et le niveau intermédiaire — l'onglet était proposé vide aux autres (trouvé par le contrôle 18) */
     :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage","construire"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
@@ -10063,6 +10067,7 @@ function CardioPlanning(){
      le pointillé, seulement si sa tuile est allumée dans Paramètres. */
   const selfMedId=accessMode==="medecinEdit"&&editMedId!=null?editMedId:null;
   const selfLis=selfMedId!==null&&(colSelf.off||[]).map(String).indexOf(String(selfMedId))<0?selfMedId:null;
+  const lisCur=lisStyle(colSelf.col||"#7c3aed",colSelf.op===undefined?1:colSelf.op);   /* v10.133 */
   /* v10.132 : bandeaux du Planning et des Attachés (sa capture iPhone du 28/08) — sous 760 px,
      les icônes impression / clair-sombre / préférences se replient sous ⋯ et ressortent
      dans un plateau qui se referme au geste suivant ; le bouton « ce jour / toute la période »
@@ -10311,7 +10316,7 @@ header::-webkit-scrollbar { display: none; }
               {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             </div>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay} memX="planning" selfId={selfLis} centreId={selfMedId}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur}/>}
         </div>
       )}
 
@@ -10393,7 +10398,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnFull}</React.Fragment>)}</div>
           </div>
           {trayFold(<React.Fragment>{btnPrint}{btnDark}</React.Fragment>)}
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay} memX="attache" selfId={selfLis} centreId={selfMedId}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur}/>}
         </div>
       )}
 
@@ -10958,10 +10963,18 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.131 : sa propre carte */}
             <div style={{fontWeight:700,color:"#7c3aed",fontSize:13,marginBottom:6}}>🎯 Colonne du médecin connecté</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas.</div>
+            <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:8,fontSize:11,color:"var(--txt2)"}}>{/* v10.133 */}
+              <span>Couleur et transparence du pointillé :</span>
+              <input type="color" value={colSelf.col||"#7c3aed"} onChange={e=>{const v=e.target.value;setColSelf(c=>({...(c||{}),col:v}));}} title="Couleur du pointillé" style={{width:34,height:24,padding:0,border:"1px solid var(--border)",borderRadius:6,background:"none",cursor:"pointer"}}/>
+              <input type="range" min="10" max="100" step="5" value={Math.round((colSelf.op===undefined?1:colSelf.op)*100)} onChange={e=>{const v=Number(e.target.value)/100;setColSelf(c=>({...(c||{}),op:v}));}} title="Transparence du pointillé" style={{width:120}}/>
+              <span style={{fontWeight:700,minWidth:34}}>{Math.round((colSelf.op===undefined?1:colSelf.op)*100)+" %"}</span>
+              <span style={{display:"inline-block",width:46,height:22,borderRadius:4,background:"var(--bg2)",...lisCur}} title="Aperçu"></span>
+              <button onClick={()=>setColSelf(c=>{const n={...(c||{})};delete n.col;delete n.op;return n;})} style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",cursor:"pointer"}}>↩ défaut</button>
+            </div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
               {medecins.filter(m=>(m.role||"medecin")==="medecin"||m.role==="attache").map(m=>{const on=(colSelf.off||[]).map(String).indexOf(String(m.id))<0;
                 return <button key={m.id} onClick={()=>setColSelf(c=>{const l=((c||{}).off||[]).map(String);const i2=l.indexOf(String(m.id));if(i2>=0)l.splice(i2,1);else l.push(String(m.id));return {...(c||{}),off:l};})}
-                  style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:"pointer",border:on?"2px dashed #7c3aed":"1px solid var(--border)",background:on?"rgba(124,58,237,.10)":"var(--bg3)",color:on?"#6d28d9":"var(--txt3)"}}>{m.init}</button>;})}
+                  style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:"pointer",border:on?"2px dashed "+lisRgba(colSelf.col,colSelf.op):"1px solid var(--border)",background:on?lisRgba(colSelf.col,.10):"var(--bg3)",color:on?lisRgba(colSelf.col,1):"var(--txt3)"}}>{m.init}</button>;})}
             </div>
           </div>}
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
