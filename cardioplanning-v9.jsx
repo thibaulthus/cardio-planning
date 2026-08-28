@@ -34,7 +34,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.135 — 28/08/2026";
+const APP_VERSION="v10.136 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4522,7 +4522,8 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-        HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
+          HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. L'ordre des cartes est désormais le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
+  HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
   HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
   HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."]}),
@@ -6645,7 +6646,7 @@ function InternesTile({intCfg,setIntCfg,actes=[],pins=[]}){
   const maj=(patch)=>setIntCfg(p=>({...p,...patch}));
   const inp=(k,def)=><input type="number" min={0} max={9} value={intCfg[k]===undefined?def:intCfg[k]} onChange={e=>{const o={};o[k]=num(e.target.value);maj(o);}} style={{...S.fi,width:52,textAlign:"center"}}/>;
   return <div style={{...S.card,marginBottom:10}}>
-    <div style={{fontWeight:700,fontSize:13,color:"var(--txt)",marginBottom:8}}>🎓 Internes</div>
+    <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:8}}>🎓 Internes</div>
     <label style={{display:"flex",alignItems:"center",gap:9,fontSize:12.5,fontWeight:700,marginBottom:4,cursor:"pointer"}}>
       <input type="checkbox" checked={intCfg.show===true} onChange={e=>maj({show:e.target.checked})} style={{width:15,height:15}}/>
       Afficher l'onglet Internes
@@ -10917,17 +10918,15 @@ header::-webkit-scrollbar { display: none; }
 
 
                     {isEdit&&<div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>🔐 Code PIN éditeur</div>
+            <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>🔐 Codes PIN et droits</div>{/* v10.136 : les quatre cartes PIN réunies en une, par sections */}
+            <div style={{fontWeight:700,fontSize:12,color:"var(--txt)",marginBottom:6}}>Code PIN éditeur</div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               <input type="password" id="pinOld" placeholder="Ancien PIN" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
               <input type="password" id="pinN1" placeholder="Nouveau PIN (min 4 car.)" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
               <input type="password" id="pinN2" placeholder="Confirmer le nouveau PIN" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
               <button style={S.btnP} onClick={()=>{const o=document.getElementById("pinOld").value;const a=document.getElementById("pinN1").value;const b=document.getElementById("pinN2").value;if(o!==editPin){toast("Ancien PIN incorrect","warn");}else if(a.length<4){toast("Min 4 car.","warn");}else if(a!==b){toast("Les deux nouveaux PIN ne correspondent pas","warn");}else{setEditPin(a);["pinOld","pinN1","pinN2"].forEach(x=>{document.getElementById(x).value="";});toast("PIN mis à jour");}}}>Changer le PIN</button>
             </div>
-          </div>}
-
-          {isEdit&&<div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#7c3aed",fontSize:13,marginBottom:6}}>🗝 Rôles secrétaires et cadres</div>
+            <div style={{fontWeight:700,fontSize:12,color:"var(--txt)",margin:"12px 0 6px",paddingTop:10,borderTop:"1px solid var(--border)"}}>🗝 Rôles secrétaires et cadres</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>PIN secrétaires (partagé) : à la connexion, chaque personne saisit son prénom (mémorisé sur son appareil). Le rôle peut poser, modifier et retirer les activités cochées « ✏️ secrétaires » sur la ligne de n'importe quel médecin.</div>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <input type="password" id="nap" placeholder={adminPin?"PIN défini — nouveau PIN":"Définir le PIN"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
@@ -10953,10 +10952,7 @@ header::-webkit-scrollbar { display: none; }
               </React.Fragment>
             ))}
             <div style={{fontSize:9,color:"var(--txt3)"}}>⚙ Se gère dans l'onglet Activités (cases « ✏️ secrétaires » et « ✏️ cadres » de chaque activité).</div>
-          </div>}
-
-          {isEdit&&<div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔐 Niveaux de droits des médecins</div>
+            <div style={{fontWeight:700,fontSize:12,color:"var(--txt)",margin:"12px 0 6px",paddingTop:10,borderTop:"1px solid var(--border)"}}>Niveaux de droits des médecins</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Se règle dans chaque fiche ✏️ de l'onglet Équipe. Le niveau s'applique quand la personne se connecte avec son PIN personnel.<br/><b>Intermédiaire</b> : planning de tous les médecins, gardes et échanges, semaines de tour, planning type, attachés — sans Paramètres, Équipe ni Activités.</div>
             {["editeur","inter","basic"].map(lv=>{
               const list=medecins.filter(m=>((m.niveau)||"basic")===lv);
@@ -10971,10 +10967,7 @@ header::-webkit-scrollbar { display: none; }
               </div>;
             })}
             <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>⚠ = pas encore de PIN personnel : le niveau ne s'appliquera qu'une fois le code défini.</div>
-          </div>}
-
-          {isEdit&&<div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>👁 Récupération des codes PIN</div>
+            <div style={{fontWeight:700,fontSize:12,color:"var(--txt)",margin:"12px 0 6px",paddingTop:10,borderTop:"1px solid var(--border)"}}>👁 Récupération des codes PIN</div>
             {!showPins
               ?(!pinsAsk
                 ?<button style={S.btnP} onClick={()=>{setPinsTry("");setPinsAsk(true);}}>Afficher tous les codes</button>
@@ -10995,7 +10988,7 @@ header::-webkit-scrollbar { display: none; }
           </div>}
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.131 : sa propre carte */}
-            <div style={{fontWeight:700,color:"#7c3aed",fontSize:13,marginBottom:6}}>🎯 Colonne du médecin connecté</div>
+            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🎯 Colonne du médecin connecté</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas.</div>
             <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:8,fontSize:11,color:"var(--txt2)"}}>{/* v10.133 */}
               <span>Couleur et transparence du pointillé :</span>
@@ -11012,7 +11005,7 @@ header::-webkit-scrollbar { display: none; }
             </div>
           </div>}
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>📆 Période d'affichage</div>
+            <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>📆 Période d'affichage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>Tous les onglets affichent le planning par blocs de cette durée, alignés sur le mois de départ.</div>
             <div style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"center"}}>
               <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--txt)"}}>
@@ -11034,7 +11027,7 @@ header::-webkit-scrollbar { display: none; }
           </div>}
 
           {isEdit&&<div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#a371f7",fontSize:13,marginBottom:6}}>🔄 Tour médical — minimums par surspécialité</div>
+            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔄 Tour médical — minimums par surspécialité</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>Séniors devant rester disponibles chaque semaine (hors tour, hors absents). L'algorithme vise l'<b>idéal</b> et ne descend au <b>minimum</b> que si aucune solution n'existe.</div>
             <table style={{borderCollapse:"collapse"}}>
               <thead>
@@ -11082,7 +11075,7 @@ header::-webkit-scrollbar { display: none; }
 
           <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]}/>
           <div style={{...S.card,marginBottom:10}}>
-            <div style={{fontWeight:700,color:"#f59e0b",fontSize:13,marginBottom:6}}>🔔 Notifications aux secrétaires</div>
+            <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>🔔 Notifications aux secrétaires</div>
             <div>
               <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Cochez les activités à suivre : dès qu'une période est diffusée (tuile 8 de Construire), chaque ajout ou retrait de ces activités pour un médecin titulaire crée une ligne dans l'onglet 🔔 Notifications. Une ligne dont la date est passée s'efface d'elle-même.</div>
               {["tous","CHL","CHB"].map(site3=>{
@@ -11110,7 +11103,7 @@ header::-webkit-scrollbar { display: none; }
           <div style={{...S.card,marginBottom:10}}>
             {/* Vacances scolaires */}
             <div style={{...S.card,marginBottom:10}}>
-              <div style={{fontWeight:700,fontSize:13,color:"var(--txt)",marginBottom:8}}>🏖 Vacances scolaires</div>
+              <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:8}}>🏖 Vacances scolaires</div>
               <div style={{fontSize:12,color:"var(--txt2)",marginBottom:10}}>
                 Saisies ici, elles grisent les jours concernés dans tous les onglets. Elles ne sont plus téléchargées :
                 une donnée qui arrive après l'affichage rendrait les bornes de période changeantes.
@@ -11208,15 +11201,15 @@ header::-webkit-scrollbar { display: none; }
             </div>
 
             <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🏥 Salles</div>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--txt)",marginBottom:6}}>🏥 Salles</div>
               {["CHL","CHB","ANGIO","PLATEAU"].map(site2=>{
                 const list=salleReg.filter(s=>Array.isArray(s.s)?s.s.indexOf(site2)>=0:s.s===site2);
                 const lbl={CHL:"CHL",CHB:"CHB",ANGIO:"PT Angio",PLATEAU:"PT Cardio"}[site2];
                 return <div key={site2} style={{marginBottom:6}}>
-                  <div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",marginBottom:3}}>{lbl}</div>
+                  <div style={{fontSize:11,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",marginBottom:3}}>{lbl}</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                     {list.map(s=>(
-                      <span key={s.n} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,fontWeight:700,padding:"3px 7px",borderRadius:12,border:salleEdit===s.n?"1.5px solid #388bfd":"1px solid var(--border)",background:"var(--bg)",color:"var(--txt)"}}>
+                      <span key={s.n} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,padding:"3px 7px",borderRadius:12,border:salleEdit===s.n?"1.5px solid #388bfd":"1px solid var(--border)",background:"var(--bg)",color:"var(--txt)"}}>
                         <span onClick={()=>{setMData({...s,_origN:s.n});setModal("salleCfg");}} style={{cursor:"pointer",textDecoration:"underline dotted",padding:"2px 2px"}}>{s.n}</span>
                         <button onClick={()=>{
                             if(!window.confirm("Supprimer la salle "+s.n+" du registre ?\n(Elle sera aussi retirée des activités ; les cases déjà posées gardent leur salle.)"))return;
@@ -11225,7 +11218,7 @@ header::-webkit-scrollbar { display: none; }
                           }} style={{border:"none",background:"none",cursor:"pointer",fontSize:13,padding:"0 3px",color:"#dc2626",fontWeight:900}}>×</button>
                       </span>
                     ))}
-                    {list.length===0&&<span style={{fontSize:9,color:"var(--txt3)"}}>—</span>}
+                    {list.length===0&&<span style={{fontSize:11,color:"var(--txt3)"}}>—</span>}
                   </div>
                 </div>;
               })}
@@ -11233,21 +11226,21 @@ header::-webkit-scrollbar { display: none; }
                 const inSalle=actes.filter(a=>(a.salles||[]).includes(salleEdit));
                 return(
                 <div style={{marginTop:6,marginBottom:6,padding:8,borderRadius:7,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.05)"}}>
-                  <div style={{fontSize:10,fontWeight:800,color:"#388bfd",marginBottom:5}}>Activités possibles dans {salleEdit} <span style={{color:"var(--txt3)",fontWeight:600}}>({inSalle.length})</span></div>
+                  <div style={{fontSize:11,fontWeight:800,color:"#388bfd",marginBottom:5}}>Activités possibles dans {salleEdit} <span style={{color:"var(--txt3)",fontWeight:600}}>({inSalle.length})</span></div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                     {actes.filter(a=>a.hasSalle&&!a.isSystem).map(a=>{
                       const on=(a.salles||[]).includes(salleEdit);
                       return <button key={a.id} type="button"
                         onClick={()=>setActes(p=>p.map(x=>x.id!==a.id?x:{...x,salles:on?(x.salles||[]).filter(s2=>s2!==salleEdit):(x.salles||[]).concat([salleEdit])}))}
-                        style={{fontSize:10,padding:"3px 8px",borderRadius:12,cursor:"pointer",fontWeight:700,border:on?"1.5px solid "+a.color:"1px solid var(--border)",background:on?a.color+"26":"var(--bg2)",color:on?"var(--txt)":"var(--txt3)"}}>{a.short}</button>;
+                        style={{fontSize:11,padding:"3px 8px",borderRadius:12,cursor:"pointer",fontWeight:700,border:on?"1.5px solid "+a.color:"1px solid var(--border)",background:on?a.color+"26":"var(--bg2)",color:on?"var(--txt)":"var(--txt3)"}}>{a.short}</button>;
                     })}
                   </div>
-                  <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>Un clic ajoute/retire la salle de l'activité — c'est la même donnée que les pastilles de l'éditeur d'activité.</div>
+                  <div style={{fontSize:11,color:"var(--txt3)",marginTop:4}}>Un clic ajoute/retire la salle de l'activité — c'est la même donnée que les pastilles de l'éditeur d'activité.</div>
                 </div>);
               })()}
                             <button onClick={()=>{setMData({n:"",s:"CHL",_new:true});setModal("salleCfg");}}
                 style={{marginTop:8,width:"100%",padding:"9px",borderRadius:8,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer",fontSize:13}}>➕ Créer une salle</button>
-              <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>Les salles créées ici restent disponibles même si aucune activité ne les utilise. Renommer propage aux activités et au planning.</div>
+              <div style={{fontSize:11,color:"var(--txt3)",marginTop:4}}>Les salles créées ici restent disponibles même si aucune activité ne les utilise. Renommer propage aux activités et au planning.</div>
             </div>
 
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>

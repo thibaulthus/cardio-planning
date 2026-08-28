@@ -148,7 +148,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.135 — 28/08/2026";
+var APP_VERSION = "v10.136 — 28/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4745,7 +4745,8 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-        HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
+          HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. L'ordre des cartes est désormais le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
+  HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
   HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
   HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."]}),
@@ -6923,18 +6924,19 @@ function InternesEquipe({ intCfg, setIntCfg, isEdit }) {
         isEdit && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 6 } }, "\u2611 devant un interne : il est propos\u00E9 dans les modales des salles (CHL, CHB, PT Cardio, PT Angio) et les activit\u00E9s \u00E0 salle lui sont propos\u00E9es dans l'onglet Internes. D\u00E9coch\u00E9 : il n'appara\u00EEt pas dans ces listes \u2014 ce qui lui a d\u00E9j\u00E0 \u00E9t\u00E9 pos\u00E9 reste en place et retirable."),
         isEdit && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 6 } }, "Prise de fonction propos\u00E9e : le 2 mai et le 2 novembre, report\u00E9e au lundi suivant quand elle tombe un vendredi, samedi ou dimanche. Les dates restent modifiables ci-dessus."));
 }
-function InternesTile({ intCfg, setIntCfg, actes = [], pins = [] }) {
-    const num = (v) => Math.max(0, Math.min(9, parseInt(v || "0", 10) || 0));
-    const maj = (patch) => setIntCfg(p => (Object.assign(Object.assign({}, p), patch)));
-    const inp = (k, def) => React.createElement("input", { type: "number", min: 0, max: 9, value: intCfg[k] === undefined ? def : intCfg[k], onChange: e => { const o = {}; o[k] = num(e.target.value); maj(o); }, style: Object.assign(Object.assign({}, S.fi), { width: 52, textAlign: "center" }) });
-    return React.createElement("div", { style: Object.assign(Object.assign({}, S.card), { marginBottom: 10 }) },
-        React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "var(--txt)", marginBottom: 8 } }, "\uD83C\uDF93 Internes"),
+function InternesTile(_a) {
+    var intCfg = _a.intCfg, setIntCfg = _a.setIntCfg, _b = _a.actes, actes = _b === void 0 ? [] : _b, _c = _a.pins, pins = _c === void 0 ? [] : _c;
+    var num = function (v) { return Math.max(0, Math.min(9, parseInt(v || "0", 10) || 0)); };
+    var maj = function (patch) { return setIntCfg(function (p) { return (__assign(__assign({}, p), patch)); }); };
+    var inp = function (k, def) { return React.createElement("input", { type: "number", min: 0, max: 9, value: intCfg[k] === undefined ? def : intCfg[k], onChange: function (e) { var o = {}; o[k] = num(e.target.value); maj(o); }, style: __assign(__assign({}, S.fi), { width: 52, textAlign: "center" }) }); };
+    return React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+        React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 8 } }, "\uD83C\uDF93 Internes"),
         React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, fontWeight: 700, marginBottom: 4, cursor: "pointer" } },
-            React.createElement("input", { type: "checkbox", checked: intCfg.show === true, onChange: e => maj({ show: e.target.checked }), style: { width: 15, height: 15 } }),
+            React.createElement("input", { type: "checkbox", checked: intCfg.show === true, onChange: function (e) { return maj({ show: e.target.checked }); }, style: { width: 15, height: 15 } }),
             "Afficher l'onglet Internes"),
         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", margin: "0 0 10px 24px" } }, "D\u00E9coch\u00E9 : l'onglet dispara\u00EEt de la barre. Aucune donn\u00E9e n'est perdue, les fiches restent dans \u00C9quipe."),
         React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, fontWeight: 700, marginBottom: 10, cursor: "pointer" } },
-            React.createElement("input", { type: "checkbox", checked: intCfg.jaugeDef !== false, onChange: e => maj({ jaugeDef: e.target.checked }), style: { width: 15, height: 15 } }),
+            React.createElement("input", { type: "checkbox", checked: intCfg.jaugeDef !== false, onChange: function (e) { return maj({ jaugeDef: e.target.checked }); }, style: { width: 15, height: 15 } }),
             "Jauge visible par d\u00E9faut dans l'onglet"),
         React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 6 } },
             React.createElement("span", null, "Semaine : alerte si moins de"),
@@ -6951,9 +6953,9 @@ function InternesTile({ intCfg, setIntCfg, actes = [], pins = [] }) {
             React.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "var(--txt)", marginBottom: 3 } }, "\uD83D\uDD11 Code des internes"),
             React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 7 } }, "Un seul code, partag\u00E9 par tous les internes. \u00C0 la connexion, il ouvre l'onglet Internes et demande un pr\u00E9nom (pour savoir qui modifie quoi). Les onglets Planning, CHL, CHB, PT Cardio, PT Angio et Aide restent consultables, sans modification possible."),
             React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
-                React.createElement("input", { type: "password", id: "nintp", placeholder: intCfg.pin ? "Code défini — nouveau code" : "Définir le code", style: Object.assign(Object.assign({}, S.fi), { flex: 1, minWidth: 150, textAlign: "center", letterSpacing: 4 }) }),
-                React.createElement("button", { style: S.btnP, onClick: () => {
-                        const v = (document.getElementById("nintp").value || "").trim();
+                React.createElement("input", { type: "password", id: "nintp", placeholder: intCfg.pin ? "Code défini — nouveau code" : "Définir le code", style: __assign(__assign({}, S.fi), { flex: 1, minWidth: 150, textAlign: "center", letterSpacing: 4 }) }),
+                React.createElement("button", { style: S.btnP, onClick: function () {
+                        var v = (document.getElementById("nintp").value || "").trim();
                         if (v.length < 4) {
                             toast("Min 4 car.", "warn");
                             return;
@@ -6962,24 +6964,24 @@ function InternesTile({ intCfg, setIntCfg, actes = [], pins = [] }) {
                             toast("Ce code est déjà utilisé par un autre rôle", "warn");
                             return;
                         }
-                        setIntCfg(p => (Object.assign(Object.assign({}, p), { pin: v })));
+                        setIntCfg(function (p) { return (__assign(__assign({}, p), { pin: v })); });
                         document.getElementById("nintp").value = "";
                         toast("Code des internes mis à jour");
                     } }, "OK"),
-                intCfg.pin && React.createElement("button", { style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 11 }), onClick: () => { setIntCfg(p => (Object.assign(Object.assign({}, p), { pin: "" }))); toast("Code des internes supprimé — l'accès est fermé"); } }, "Supprimer")),
+                intCfg.pin && React.createElement("button", { style: __assign(__assign({}, S.icnBtn), { fontSize: 11 }), onClick: function () { setIntCfg(function (p) { return (__assign(__assign({}, p), { pin: "" })); }); toast("Code des internes supprimé — l'accès est fermé"); } }, "Supprimer")),
             React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 5 } }, intCfg.pin ? ("Code actuel : " + intCfg.pin) : "Aucun code : les internes ne peuvent pas se connecter.")),
-        (() => {
-            const off = intCfg.statsOff || [];
-            const cols = [{ id: "TOUR_HC", short: "HC", color: "#388bfd" }, { id: "TOUR_USIC", short: "USIC", color: "#4285f4" }]
-                .concat(actes.filter(a => a.interneOk === true && !a.isSystem && !a.hasSalle && ABS_IDS.indexOf(a.id) < 0).map(a => ({ id: a.id, short: a.short || a.label, color: a.color })));
-            const bascule = (id) => maj({ statsOff: off.indexOf(id) >= 0 ? off.filter(x => x !== id) : off.concat([id]) });
+        (function () {
+            var off = intCfg.statsOff || [];
+            var cols = [{ id: "TOUR_HC", short: "HC", color: "#388bfd" }, { id: "TOUR_USIC", short: "USIC", color: "#4285f4" }]
+                .concat(actes.filter(function (a) { return a.interneOk === true && !a.isSystem && !a.hasSalle && ABS_IDS.indexOf(a.id) < 0; }).map(function (a) { return ({ id: a.id, short: a.short || a.label, color: a.color }); }));
+            var bascule = function (id) { return maj({ statsOff: off.indexOf(id) >= 0 ? off.filter(function (x) { return x !== id; }) : off.concat([id]) }); };
             return React.createElement("div", { style: { marginTop: 10, paddingTop: 9, borderTop: "1px solid var(--border)" } },
                 React.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "var(--txt)", marginBottom: 3 } }, "Colonnes des statistiques \uD83D\uDCCA"),
                 React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 7 } }, "D\u00E9coch\u00E9e : la colonne dispara\u00EEt du tableau de statistiques de l'onglet Internes \u2014 rien d'autre ne change. Les gardes restent toujours affich\u00E9es ; les activit\u00E9s disponibles pour les internes se r\u00E8glent dans l'onglet Activit\u00E9s (coche \uD83C\uDF93)."),
-                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "5px 16px" } }, cols.map(t => React.createElement("label", { key: t.id, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: "var(--txt)", cursor: "pointer" } },
-                    React.createElement("input", { type: "checkbox", checked: off.indexOf(t.id) < 0, onChange: () => bascule(t.id), style: { width: 13, height: 13 } }),
+                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "5px 16px" } }, cols.map(function (t) { return React.createElement("label", { key: t.id, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: "var(--txt)", cursor: "pointer" } },
+                    React.createElement("input", { type: "checkbox", checked: off.indexOf(t.id) < 0, onChange: function () { return bascule(t.id); }, style: { width: 13, height: 13 } }),
                     React.createElement("span", { style: { width: 9, height: 9, borderRadius: 3, background: t.color, display: "inline-block", flexShrink: 0 } }),
-                    t.short))));
+                    t.short); })));
         })());
 }
 /* ── v10.58 (v10.57 revue) : LOT 2 après son test : la grille prend la MISE EN PAGE DU
@@ -7002,26 +7004,26 @@ catch (e) {
 function intActesTuiles(actes, sam, self) {
     /* v10.68 : ce que l'onglet propose se règle UNIQUEMENT par la coche 🎓 de
        l'onglet Activités — le réglage de Paramètres ne concerne que les stats. */
-    const hc = { id: "TOUR_HC", short: "HC", label: sam ? "Samedi matin" : "Tour HC", color: "#388bfd" };
+    var hc = { id: "TOUR_HC", short: "HC", label: sam ? "Samedi matin" : "Tour HC", color: "#388bfd" };
     if (sam)
         return [hc, { id: "ABSENCE", short: "ABS", label: "Absence / Congé", color: "#e06666" }, { id: "FORMATION", short: "FMC", label: "Formation", color: "#a3e635" }, { id: "REPOS_GARDE", short: "RG", label: "Repos de garde", color: "#ffe599" }];
     /* v10.69, lot 5 : self = un interne connecte avec le PIN interne — il ne voit
        que les activites cochees « posable par eux » (interneSelf). */
-    const perso = actes.filter(a => a.interneOk === true && !a.isSystem && !a.hasSalle && ABS_IDS.indexOf(a.id) < 0 && (!self || a.interneSelf === true)).map(a => ({ id: a.id, short: a.short || a.label, label: a.label, color: a.color }));
+    var perso = actes.filter(function (a) { return a.interneOk === true && !a.isSystem && !a.hasSalle && ABS_IDS.indexOf(a.id) < 0 && (!self || a.interneSelf === true); }).map(function (a) { return ({ id: a.id, short: a.short || a.label, label: a.label, color: a.color }); });
     return [hc, { id: "TOUR_USIC", short: "USIC", label: "Tour USIC", color: "#4285f4" }].concat(perso)
         .concat([{ id: "ABSENCE", short: "ABS", label: "Absence / Congé", color: "#e06666" }, { id: "FORMATION", short: "FMC", label: "Formation", color: "#a3e635" }, { id: "REPOS_GARDE", short: "RG", label: "Repos de garde", color: "#ffe599" }]);
 }
 function intJourBloque(getEntries, mid, y, m, d) {
-    return getEntries(mid, y, m, d, "JOUR").some(e => e && e.acteId && (ABS_IDS.indexOf(e.acteId) >= 0 || e.acteId === "REPOS_GARDE"));
+    return getEntries(mid, y, m, d, "JOUR").some(function (e) { return e && e.acteId && (ABS_IDS.indexOf(e.acteId) >= 0 || e.acteId === "REPOS_GARDE"); });
 }
 function intSlotProtege(getEntries, mid, y, m, d, sl) {
     if (intJourBloque(getEntries, mid, y, m, d))
         return true;
-    return getEntries(mid, y, m, d, sl).some(e => e && (e._blocked || (e.acteId && (ABS_IDS.indexOf(e.acteId) >= 0 || e.acteId === "REPOS_GARDE"))));
+    return getEntries(mid, y, m, d, sl).some(function (e) { return e && (e._blocked || (e.acteId && (ABS_IDS.indexOf(e.acteId) >= 0 || e.acteId === "REPOS_GARDE"))); });
 }
 function intGardeVeille(getEntries, mid, y, m, d) {
-    const v = intDecal(intISO2(y, m, d), -1).split("-").map(Number);
-    return ["N", "JOUR"].some(sl => getEntries(mid, v[0], v[1] - 1, v[2], sl).some(e => e && e.acteId === "GARDE"));
+    var v = intDecal(intISO2(y, m, d), -1).split("-").map(Number);
+    return ["N", "JOUR"].some(function (sl) { return getEntries(mid, v[0], v[1] - 1, v[2], sl).some(function (e) { return e && e.acteId === "GARDE"; }); });
 }
 function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getEntries, setEntry, canSalle = false, salleReg = [], intSelf = false }) {
     const [cren, setCren] = useState(slot0 === "AM" ? "AM" : "M");
@@ -12151,7 +12153,8 @@ function CardioPlanning() {
                     "\u2699\uFE0F Param\u00E8tres ",
                     React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
                 isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD10 Code PIN \u00E9diteur"),
+                    React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD10 Codes PIN et droits"),
+                    React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "var(--txt)", marginBottom: 6 } }, "Code PIN \u00E9diteur"),
                     React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
                         React.createElement("input", { type: "password", id: "pinOld", placeholder: "Ancien PIN", style: __assign(__assign({}, S.fi), { textAlign: "center", letterSpacing: 4 }) }),
                         React.createElement("input", { type: "password", id: "pinN1", placeholder: "Nouveau PIN (min 4 car.)", style: __assign(__assign({}, S.fi), { textAlign: "center", letterSpacing: 4 }) }),
@@ -12168,11 +12171,223 @@ function CardioPlanning() {
                             else {
                                 setEditPin(a);
                                 ["pinOld", "pinN1", "pinN2"].forEach(function (x) { document.getElementById(x).value = ""; });
-                                toast("PIN mis \u00E0 jour");
-                            } } }, "Changer le PIN"))),
+                                toast("PIN mis à jour");
+                            } } }, "Changer le PIN")),
+                    React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "var(--txt)", margin: "12px 0 6px", paddingTop: 10, borderTop: "1px solid var(--border)" } }, "\uD83D\uDDDD R\u00F4les secr\u00E9taires et cadres"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "PIN secr\u00E9taires (partag\u00E9) : \u00E0 la connexion, chaque personne saisit son pr\u00E9nom (m\u00E9moris\u00E9 sur son appareil). Le r\u00F4le peut poser, modifier et retirer les activit\u00E9s coch\u00E9es \u00AB \u270F\uFE0F secr\u00E9taires \u00BB sur la ligne de n'importe quel m\u00E9decin."),
+                    React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } },
+                        React.createElement("input", { type: "password", id: "nap", placeholder: adminPin ? "PIN défini — nouveau PIN" : "Définir le PIN", style: __assign(__assign({}, S.fi), { flex: 1, textAlign: "center", letterSpacing: 4 }) }),
+                        React.createElement("button", { style: S.btnP, onClick: function () { var v = document.getElementById("nap").value; if (v.length >= 4) {
+                                setAdminPin(v);
+                                toast("PIN administratif mis à jour");
+                            }
+                            else
+                                toast("Min 4 car.", "warn"); } }, "OK")),
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "2px 0 4px" } }, "PIN cadre : suit sa propre coche \u00AB \u270F\uFE0F cadres \u00BB sur chaque activit\u00E9, plus la gestion du planning IDE (PT cardio) et les d\u00E9parts diff\u00E9r\u00E9s."),
+                    React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } },
+                        React.createElement("input", { type: "password", id: "ncp", placeholder: cadrePin ? "PIN cadre défini — nouveau PIN" : "Définir le PIN cadre", style: __assign(__assign({}, S.fi), { flex: 1, textAlign: "center", letterSpacing: 4 }) }),
+                        React.createElement("button", { style: S.btnP, onClick: function () { var v = document.getElementById("ncp").value; if (v.length >= 4) {
+                                if (v === adminPin || v === editPin) {
+                                    toast("Ce PIN est déjà utilisé par un autre rôle", "warn");
+                                    return;
+                                }
+                                setCadrePin(v);
+                                toast("PIN cadre mis à jour");
+                            }
+                            else
+                                toast("Min 4 car.", "warn"); } }, "OK")),
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 } },
+                        React.createElement("label", { style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--txt2)", cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: adminEnabled, onChange: function (e) { return setAdminEnabled(e.target.checked); }, style: { width: 14, height: 14 } }),
+                            "R\u00F4le activ\u00E9 (d\u00E9cocher suspend l'acc\u00E8s sans changer le PIN)"),
+                        React.createElement("label", { style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--txt2)", cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: adminCanReports, onChange: function (e) { return setAdminCanReports(e.target.checked); }, style: { width: 14, height: 14 } }),
+                            "Peut remplir les semaines blanches (onglet Reports)"),
+                        React.createElement("label", { style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--txt2)", cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: adminCanNotes, onChange: function (e) { return setAdminCanNotes(e.target.checked); }, style: { width: 14, height: 14 } }),
+                            "Peut ajouter des notes \uD83D\uDCDD sur les cases")),
+                    [["Activités ouvertes aux secrétaires", "adminOk", "secrétaires"], ["Activités ouvertes aux cadres", "cadreOk", "cadres"]].map(function (_a) {
+                        var tit = _a[0], key = _a[1], rl = _a[2];
+                        return (React.createElement(React.Fragment, { key: key },
+                            React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 4 } }, tit),
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 } },
+                                actes.filter(function (a) { return a[key] === true; }).map(function (a) { return React.createElement("span", { key: a.id, style: { padding: "1px 7px", borderRadius: 5, fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: a.color, color: "#111" } }, a.short); }),
+                                actes.filter(function (a) { return a[key] === true; }).length === 0 && React.createElement("span", { style: { fontSize: 11, color: "#b45309", fontWeight: 700 } },
+                                    "aucune \u2014 cochez \u00AB \u270F\uFE0F ",
+                                    rl,
+                                    " \u00BB sur les activit\u00E9s concern\u00E9es"))));
+                    }),
+                    React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "\u2699 Se g\u00E8re dans l'onglet Activit\u00E9s (cases \u00AB \u270F\uFE0F secr\u00E9taires \u00BB et \u00AB \u270F\uFE0F cadres \u00BB de chaque activit\u00E9)."),
+                    React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "var(--txt)", margin: "12px 0 6px", paddingTop: 10, borderTop: "1px solid var(--border)" } }, "Niveaux de droits des m\u00E9decins"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } },
+                        "Se r\u00E8gle dans chaque fiche \u270F\uFE0F de l'onglet \u00C9quipe. Le niveau s'applique quand la personne se connecte avec son PIN personnel.",
+                        React.createElement("br", null),
+                        React.createElement("b", null, "Interm\u00E9diaire"),
+                        " : planning de tous les m\u00E9decins, gardes et \u00E9changes, semaines de tour, planning type, attach\u00E9s \u2014 sans Param\u00E8tres, \u00C9quipe ni Activit\u00E9s."),
+                    ["editeur", "inter", "basic"].map(function (lv) {
+                        var list = medecins.filter(function (m) { return ((m.niveau) || "basic") === lv; });
+                        if (list.length === 0)
+                            return null;
+                        var lab = lv === "editeur" ? "Éditeur" : lv === "inter" ? "Intermédiaire" : "Basique";
+                        var col = lv === "editeur" ? "#dc2626" : lv === "inter" ? "#b45309" : "var(--txt3)";
+                        return React.createElement("div", { key: lv, style: { marginBottom: 5 } },
+                            React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: col, textTransform: "uppercase", letterSpacing: .4, marginBottom: 2 } }, lab),
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, list.map(function (m) { return React.createElement("span", { key: m.id, style: { padding: "1px 7px", borderRadius: 5, fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: "var(--bg2)", border: "1px solid var(--border)", color: "var(--txt2)" } },
+                                m.init,
+                                (medPins[String(m.id)] || "").length >= 3 ? "" : " ⚠"); })));
+                    }),
+                    React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "\u26A0 = pas encore de PIN personnel : le niveau ne s'appliquera qu'une fois le code d\u00E9fini."),
+                    React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "var(--txt)", margin: "12px 0 6px", paddingTop: 10, borderTop: "1px solid var(--border)" } }, "\uD83D\uDC41 R\u00E9cup\u00E9ration des codes PIN"),
+                    !showPins
+                        ? (!pinsAsk
+                            ? React.createElement("button", { style: S.btnP, onClick: function () { setPinsTry(""); setPinsAsk(true); } }, "Afficher tous les codes")
+                            : React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
+                                React.createElement("input", { autoFocus: true, type: "password", value: pinsTry, onChange: function (e) { return setPinsTry(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter")
+                                        validatePins(); }, placeholder: "PIN \u00E9diteur", style: __assign(__assign({}, S.fi), { width: 140, textAlign: "center", letterSpacing: 4 }) }),
+                                React.createElement("button", { style: S.btnP, onClick: function () { return validatePins(); } }, "Valider"),
+                                React.createElement("button", { style: { fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer" }, onClick: function () { setPinsAsk(false); setPinsTry(""); } }, "Annuler")))
+                        : React.createElement("div", null,
+                            React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", lineHeight: 1.9 } },
+                                React.createElement("div", null,
+                                    React.createElement("b", null, "\u00C9diteur :"),
+                                    " ",
+                                    React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, editPin)),
+                                React.createElement("div", null,
+                                    React.createElement("b", null, "Administratif :"),
+                                    " ",
+                                    React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, adminPin || "— non défini —")),
+                                Object.entries(medPins).filter(function (_a) {
+                                    var p2 = _a[1];
+                                    return p2 && p2.length >= 3;
+                                }).map(function (_a) {
+                                    var mid2 = _a[0], p2 = _a[1];
+                                    var m2 = medecins.find(function (x) { return String(x.id) === String(mid2); });
+                                    return React.createElement("div", { key: mid2 },
+                                        React.createElement("b", null,
+                                            m2 ? m2.init : mid2,
+                                            " :"),
+                                        " ",
+                                        React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, p2));
+                                }),
+                                Object.entries(medPins).filter(function (_a) {
+                                    var p2 = _a[1];
+                                    return p2 && p2.length >= 3;
+                                }).length === 0 && React.createElement("div", { style: { color: "var(--txt3)" } }, "Aucun PIN m\u00E9decin d\u00E9fini.")),
+                            React.createElement("button", { style: __assign(__assign({}, S.qBtn), { marginTop: 8 }), onClick: function () { return setShowPins(false); } }, "Masquer"))),
+                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83C\uDFAF Colonne du m\u00E9decin connect\u00E9"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "\u00C0 l'ouverture avec son PIN, chacun arrive centr\u00E9 sur sa colonne (Planning pour un m\u00E9decin, Attach\u00E9s pour un attach\u00E9). Une tuile allum\u00E9e ajoute un pointill\u00E9 violet sur sa colonne, pour la retrouver apr\u00E8s avoir fait d\u00E9filer ; \u00E9teignez la tuile de qui ne le souhaite pas."),
+                    React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 8, fontSize: 11, color: "var(--txt2)" } },
+                        React.createElement("span", null, "Couleur et transparence du pointill\u00E9 :"),
+                        React.createElement("input", { type: "color", value: lisTmp !== null ? lisTmp : (colSelf.col || "#7c3aed"), onChange: function (e) { var v = e.target.value; setLisTmp(v); clearTimeout(lisTmr.current); lisTmr.current = setTimeout(function () { setColSelf(function (c) { return (__assign(__assign({}, (c || {})), { col: v })); }); setLisTmp(null); }, 400); }, title: "Couleur du pointill\u00E9", style: { width: 34, height: 24, padding: 0, border: "1px solid var(--border)", borderRadius: 6, background: "none", cursor: "pointer" } }),
+                        React.createElement("input", { type: "range", min: "10", max: "100", step: "5", value: Math.round((colSelf.op === undefined ? 1 : colSelf.op) * 100), onChange: function (e) { var v = Number(e.target.value) / 100; setColSelf(function (c) { return (__assign(__assign({}, (c || {})), { op: v })); }); }, title: "Transparence du pointill\u00E9", style: { width: 120 } }),
+                        React.createElement("span", { style: { fontWeight: 700, minWidth: 34 } }, Math.round((colSelf.op === undefined ? 1 : colSelf.op) * 100) + " %"),
+                        React.createElement("span", { style: __assign({ display: "inline-block", width: 46, height: 22, borderRadius: 4, background: "var(--bg2)" }, (lisTmp !== null ? lisStyle(lisTmp, colSelf.op === undefined ? 1 : colSelf.op) : lisCur)), title: "Aper\u00E7u" }),
+                        React.createElement("button", { onClick: function () { return setColSelf(function (c) { var n = __assign({}, (c || {})); delete n.col; delete n.op; return n; }); }, style: { fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", cursor: "pointer" } }, "\u21A9 d\u00E9faut")),
+                    React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, medecins.filter(function (m) { return (m.role || "medecin") === "medecin" || m.role === "attache"; }).map(function (m) {
+                        var on = (colSelf.off || []).map(String).indexOf(String(m.id)) < 0;
+                        return React.createElement("button", { key: m.id, onClick: function () { return setColSelf(function (c) { var l = ((c || {}).off || []).map(String); var i2 = l.indexOf(String(m.id)); if (i2 >= 0)
+                                l.splice(i2, 1);
+                            else
+                                l.push(String(m.id)); return __assign(__assign({}, (c || {})), { off: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: "pointer", border: on ? "2px dashed " + lisRgba(colSelf.col, colSelf.op) : "1px solid var(--border)", background: on ? lisRgba(colSelf.col, .10) : "var(--bg3)", color: on ? lisRgba(colSelf.col, 1) : "var(--txt3)" } }, m.init);
+                    }))),
+                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCC6 P\u00E9riode d'affichage"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Tous les onglets affichent le planning par blocs de cette dur\u00E9e, align\u00E9s sur le mois de d\u00E9part."),
+                    React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" } },
+                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
+                            "Dur\u00E9e",
+                            React.createElement("select", { value: periodCfg.len, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { len: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, [1, 2, 3, 4, 6, 12].map(function (v) { return React.createElement("option", { key: v, value: v },
+                                v,
+                                " mois"); }))),
+                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
+                            "Mois de d\u00E9part",
+                            React.createElement("select", { value: periodCfg.startM, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { startM: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, MOIS.map(function (mn, mi) { return React.createElement("option", { key: mi, value: mi }, mn); })))),
+                    React.createElement("div", { style: { marginTop: 8, fontSize: 10, color: "var(--txt3)" } },
+                        "Actuellement : blocs de ",
+                        periodCfg.len,
+                        " mois \u00E0 partir de ",
+                        MOIS[periodCfg.startM],
+                        " (ex. ",
+                        MOIS[periodCfg.startM],
+                        " \u2014 ",
+                        MOIS[(periodCfg.startM + periodCfg.len - 1) % 12],
+                        ").")),
+                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD04 Tour m\u00E9dical \u2014 minimums par sursp\u00E9cialit\u00E9"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } },
+                        "S\u00E9niors devant rester disponibles chaque semaine (hors tour, hors absents). L'algorithme vise l'",
+                        React.createElement("b", null, "id\u00E9al"),
+                        " et ne descend au ",
+                        React.createElement("b", null, "minimum"),
+                        " que si aucune solution n'existe."),
+                    React.createElement("table", { style: { borderCollapse: "collapse" } },
+                        React.createElement("thead", null,
+                            React.createElement("tr", null,
+                                React.createElement("th", { style: { textAlign: "left", padding: "3px 10px 3px 0", fontSize: 10, color: "var(--txt3)" } }),
+                                [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
+                                    var k = _a[0], lb = _a[1];
+                                    return React.createElement("th", { key: k, style: { padding: "3px 8px", fontSize: 11, color: "var(--txt2)", fontWeight: 700 } }, lb);
+                                }))),
+                        React.createElement("tbody", null,
+                            React.createElement("tr", null,
+                                React.createElement("td", { style: { padding: "3px 10px 3px 0", fontSize: 11, color: "var(--txt2)", fontWeight: 600 } }, "Id\u00E9al"),
+                                ["coro", "pace", "eep", "ett"].map(function (k) { return React.createElement("td", { key: k, style: { padding: "3px 8px", textAlign: "center" } },
+                                    React.createElement("input", { type: "number", min: 0, max: 9, value: tourMins[k], onChange: function (e) { return setTourMins(function (p) {
+                                            var _a;
+                                            return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
+                                        }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); })),
+                            React.createElement("tr", null,
+                                React.createElement("td", { style: { padding: "3px 10px 3px 0", fontSize: 11, color: "var(--txt2)", fontWeight: 600 } }, "Minimum"),
+                                ["coro", "pace", "eep", "ett"].map(function (k) { return React.createElement("td", { key: k, style: { padding: "3px 8px", textAlign: "center" } },
+                                    React.createElement("input", { type: "number", min: 0, max: 9, value: tourMinsHard[k], onChange: function (e) { return setTourMinsHard(function (p) {
+                                            var _a;
+                                            return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
+                                        }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); })))),
+                    React.createElement("div", { style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" } },
+                        React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", fontWeight: 700, marginBottom: 6 } }, "\uD83C\uDFA8 Couleurs des sursp\u00E9cialit\u00E9s"),
+                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" } }, SPEC_LIST.map(function (_a) {
+                            var k2 = _a[0], lb2 = _a[1];
+                            var cur = (specColors && specColors[k2]) || SPEC_COLORS_DEF[k2];
+                            return (React.createElement("div", { key: k2, style: { display: "flex", alignItems: "center", gap: 5 } },
+                                React.createElement("input", { type: "color", value: cur, onChange: function (e) { var v = e.target.value; setSpecColors(function (p) {
+                                        var _a;
+                                        return (__assign(__assign({}, p), (_a = {}, _a[k2] = v, _a)));
+                                    }); }, style: { width: 30, height: 26, padding: 0, border: "1px solid var(--border)", borderRadius: 5, background: "transparent", cursor: "pointer" } }),
+                                React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: cur } }, lb2)));
+                        })),
+                        React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 5 } }, "Utilis\u00E9es dans la distribution du tour (tuile 2 de Construire) pour la sursp\u00E9cialit\u00E9 de chaque praticien et le d\u00E9compte des disponibles."))),
                 React.createElement(InternesTile, { intCfg: intCfg, setIntCfg: setIntCfg, actes: actes, pins: [editPin, adminPin, cadrePin] }),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                        React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "var(--txt)", marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
+                    React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD14 Notifications aux secr\u00E9taires"),
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Cochez les activit\u00E9s \u00E0 suivre : d\u00E8s qu'une p\u00E9riode est diffus\u00E9e (tuile 8 de Construire), chaque ajout ou retrait de ces activit\u00E9s pour un m\u00E9decin titulaire cr\u00E9e une ligne dans l'onglet \uD83D\uDD14 Notifications. Une ligne dont la date est pass\u00E9e s'efface d'elle-m\u00EAme."),
+                        ["tous", "CHL", "CHB"].map(function (site3) {
+                            var lst = actes.filter(function (a) { return a && !a.isSystem && SECR_EXCL.indexOf(a.id) < 0 && (a.site || "tous") === site3; });
+                            if (!lst.length)
+                                return null;
+                            return React.createElement("div", { key: site3, style: { marginBottom: 8 } },
+                                React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 } }, site3 === "tous" ? "Toutes" : site3),
+                                React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, lst.map(function (a) {
+                                    var on = (secrCfg.acts || []).indexOf(a.id) >= 0;
+                                    return React.createElement("button", { key: a.id, disabled: !isEdit, onClick: function () { return setSecrCfg(function (c) { var l = (c.acts || []).slice(); var i2 = l.indexOf(a.id); if (i2 >= 0)
+                                            l.splice(i2, 1);
+                                        else
+                                            l.push(a.id); return __assign(__assign({}, c), { acts: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (on ? "#f59e0b" : "var(--border)"), background: on ? "rgba(245,158,11,.13)" : "var(--bg3)", color: on ? "#b45309" : "var(--txt2)" } }, (on ? "✓ " : "") + (a.short || a.label));
+                                })));
+                        }),
+                        React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 } }, "Attach\u00E9s suivis"),
+                        React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 } }, medecins.filter(function (m) { return (m.role || "") === "attache"; }).map(function (m) {
+                            var on = (secrCfg.atts || []).indexOf(m.id) >= 0;
+                            return React.createElement("button", { key: m.id, disabled: !isEdit, onClick: function () { return setSecrCfg(function (c) { var l = (c.atts || []).slice(); var i2 = l.indexOf(m.id); if (i2 >= 0)
+                                    l.splice(i2, 1);
+                                else
+                                    l.push(m.id); return __assign(__assign({}, c), { atts: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (on ? "#f59e0b" : "var(--border)"), background: on ? "rgba(245,158,11,.13)" : "var(--bg3)", color: on ? "#b45309" : "var(--txt2)" } }, (on ? "✓ " : "") + m.init);
+                        })),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Tous les titulaires sont suivis d'office ; un attach\u00E9 ne l'est que s'il est coch\u00E9 ici."))),
+                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                        React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
                         React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, "Saisies ici, elles grisent les jours concern\u00E9s dans tous les onglets. Elles ne sont plus t\u00E9l\u00E9charg\u00E9es : une donn\u00E9e qui arrive apr\u00E8s l'affichage rendrait les bornes de p\u00E9riode changeantes."),
                         (function () {
                             var der = vacs.filter(function (v) { return v.d2; }).map(function (v) { return v.d2; }).sort().slice(-1)[0] || null;
@@ -12253,187 +12468,30 @@ function CardioPlanning() {
                                     vacTerminee(an) && React.createElement("span", { style: { fontWeight: 600, color: "var(--txt3)" } }, " \u2014 termin\u00E9e")),
                                 vacOuvert(vacOuv, an) &&
                                     React.createElement("div", { style: { border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" } },
-                                    React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
-                                        React.createElement("tbody", null, lignes.map(function (_a, i9) {
-                                            var v = _a.v, idx = _a.idx;
-                                            return (React.createElement("tr", { key: idx },
-                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)", width: 88, fontWeight: 700 } }, v.nom),
-                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)" } },
-                                                    React.createElement("input", { type: "date", value: v.d1 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d1: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
-                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)" } },
-                                                    React.createElement("input", { type: "date", value: v.d2 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d2: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
-                                                isEdit && React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)", width: 22 } },
-                                                    React.createElement("span", { title: "Supprimer la ligne " + v.nom + " — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées", onClick: function () { if (window.confirm("Supprimer « " + v.nom + " " + v.an + " » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))
-                                                            setVacs(function (l) { return l.filter(function (x, i) { return i !== idx; }); }); }, style: { color: "#dc2626", cursor: "pointer", fontWeight: 800 } }, "\u2715"))));
-                                        }))))));
+                                        React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
+                                            React.createElement("tbody", null, lignes.map(function (_a, i9) {
+                                                var v = _a.v, idx = _a.idx;
+                                                return (React.createElement("tr", { key: idx },
+                                                    React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)", width: 88, fontWeight: 700 } }, v.nom),
+                                                    React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)" } },
+                                                        React.createElement("input", { type: "date", value: v.d1 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d1: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
+                                                    React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)" } },
+                                                        React.createElement("input", { type: "date", value: v.d2 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d2: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
+                                                    isEdit && React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)", width: 22 } },
+                                                        React.createElement("span", { title: "Supprimer la ligne " + v.nom + " — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées", onClick: function () { if (window.confirm("Supprimer « " + v.nom + " " + v.an + " » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))
+                                                                setVacs(function (l) { return l.filter(function (x, i) { return i !== idx; }); }); }, style: { color: "#dc2626", cursor: "pointer", fontWeight: 800 } }, "\u2715"))));
+                                            }))))));
                         }),
                         vacs.length === 0 && React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt3)" } }, "Aucune vacance saisie.")),
-                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) }, /* v10.131 : sa propre carte */
-                    React.createElement("div", { style: { fontWeight: 700, color: "#7c3aed", fontSize: 13, marginBottom: 6 } }, "🎯 Colonne du médecin connecté"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas."),
-                    React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 8, fontSize: 11, color: "var(--txt2)" } }, /* v10.133 */
-                        React.createElement("span", null, "Couleur et transparence du pointillé :"),
-                        React.createElement("input", { type: "color", value: lisTmp !== null ? lisTmp : (colSelf.col || "#7c3aed"), onChange: function (e) { var v = e.target.value; setLisTmp(v); clearTimeout(lisTmr.current); lisTmr.current = setTimeout(function () { setColSelf(function (c) { return __assign(__assign({}, (c || {})), { col: v }); }); setLisTmp(null); }, 400); }, title: "Couleur du pointillé", style: { width: 34, height: 24, padding: 0, border: "1px solid var(--border)", borderRadius: 6, background: "none", cursor: "pointer" } }),
-                        React.createElement("input", { type: "range", min: "10", max: "100", step: "5", value: Math.round((colSelf.op === undefined ? 1 : colSelf.op) * 100), onChange: function (e) { var v = Number(e.target.value) / 100; setColSelf(function (c) { return __assign(__assign({}, (c || {})), { op: v }); }); }, title: "Transparence du pointillé", style: { width: 120 } }),
-                        React.createElement("span", { style: { fontWeight: 700, minWidth: 34 } }, Math.round((colSelf.op === undefined ? 1 : colSelf.op) * 100) + " %"),
-                        React.createElement("span", { style: __assign({ display: "inline-block", width: 46, height: 22, borderRadius: 4, background: "var(--bg2)" }, (lisTmp !== null ? lisStyle(lisTmp, colSelf.op === undefined ? 1 : colSelf.op) : lisCur)), title: "Aperçu" }),
-                        React.createElement("button", { onClick: function () { return setColSelf(function (c) { var n = __assign({}, (c || {})); delete n.col; delete n.op; return n; }); }, style: { fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", cursor: "pointer" } }, "↩ défaut")),
-                    React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, medecins.filter(function (m) { return (m.role || "medecin") === "medecin" || m.role === "attache"; }).map(function (m) {
-                        var on = (colSelf.off || []).map(String).indexOf(String(m.id)) < 0;
-                        return React.createElement("button", { key: m.id, onClick: function () { return setColSelf(function (c) { var l = ((c || {}).off || []).map(String); var i2 = l.indexOf(String(m.id)); if (i2 >= 0) l.splice(i2, 1); else l.push(String(m.id)); return __assign(__assign({}, (c || {})), { off: l }); }); },
-                            style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: "pointer", border: on ? "2px dashed " + lisRgba(colSelf.col, colSelf.op) : "1px solid var(--border)", background: on ? lisRgba(colSelf.col, .10) : "var(--bg3)", color: on ? lisRgba(colSelf.col, 1) : "var(--txt3)" } }, m.init);
-                    }))),
-                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCC6 P\u00E9riode d'affichage"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Tous les onglets affichent le planning par blocs de cette dur\u00E9e, align\u00E9s sur le mois de d\u00E9part."),
-                    React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" } },
-                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
-                            "Dur\u00E9e",
-                            React.createElement("select", { value: periodCfg.len, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { len: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, [1, 2, 3, 4, 6, 12].map(function (v) { return React.createElement("option", { key: v, value: v },
-                                v,
-                                " mois"); }))),
-                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--txt)" } },
-                            "Mois de d\u00E9part",
-                            React.createElement("select", { value: periodCfg.startM, onChange: function (e) { return setPeriodCfg(function (p) { return (__assign(__assign({}, p), { startM: parseInt(e.target.value) })); }); }, style: { padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13 } }, MOIS.map(function (mn, mi) { return React.createElement("option", { key: mi, value: mi }, mn); })))),
-                    React.createElement("div", { style: { marginTop: 8, fontSize: 10, color: "var(--txt3)" } },
-                        "Actuellement : blocs de ",
-                        periodCfg.len,
-                        " mois \u00E0 partir de ",
-                        MOIS[periodCfg.startM],
-                        " (ex. ",
-                        MOIS[periodCfg.startM],
-                        " \u2014 ",
-                        MOIS[(periodCfg.startM + periodCfg.len - 1) % 12],
-                        ").")),
-                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDC41 R\u00E9cup\u00E9ration des codes PIN"),
-                    !showPins
-                        ? (!pinsAsk
-                            ? React.createElement("button", { style: S.btnP, onClick: function () { setPinsTry(""); setPinsAsk(true); } }, "Afficher tous les codes")
-                            : React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
-                                React.createElement("input", { autoFocus: true, type: "password", value: pinsTry, onChange: function (e) { return setPinsTry(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") validatePins(); }, placeholder: "PIN éditeur", style: __assign(__assign({}, S.fi), { width: 140, textAlign: "center", letterSpacing: 4 }) }),
-                                React.createElement("button", { style: S.btnP, onClick: function () { validatePins(); } }, "Valider"),
-                                React.createElement("button", { style: { fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer" }, onClick: function () { setPinsAsk(false); setPinsTry(""); } }, "Annuler")))
-                        : React.createElement("div", null,
-                            React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", lineHeight: 1.9 } },
-                                React.createElement("div", null, React.createElement("b", null, "\u00C9diteur : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, editPin)),
-                                React.createElement("div", null, React.createElement("b", null, "Administratif : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, adminPin || "\u2014 non d\u00E9fini \u2014")),
-                                Object.entries(medPins).filter(function (_p) { return _p[1] && _p[1].length >= 3; }).map(function (_p) { var m2 = medecins.find(function (x) { return String(x.id) === String(_p[0]); }); return React.createElement("div", { key: _p[0] }, React.createElement("b", null, (m2 ? m2.init : _p[0]) + " : "), React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, _p[1])); }),
-                                Object.entries(medPins).filter(function (_p) { return _p[1] && _p[1].length >= 3; }).length === 0 && React.createElement("div", { style: { color: "var(--txt3)" } }, "Aucun PIN m\u00E9decin d\u00E9fini.")),
-                            React.createElement("button", { style: __assign(__assign({}, S.qBtn), { marginTop: 8 }), onClick: function () { return setShowPins(false); } }, "Masquer"))),
-                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#7c3aed", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDDDD R\u00F4les secr\u00E9taires et cadres"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "PIN secr\u00E9taires (partag\u00E9) : \u00E0 la connexion, chaque personne saisit son pr\u00E9nom (m\u00E9moris\u00E9 sur son appareil). Le r\u00F4le peut poser, modifier et retirer les activit\u00E9s coch\u00E9es \u00AB \u270F\uFE0F secr\u00E9taires \u00BB sur la ligne de n'importe quel m\u00E9decin."),
-                    React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } },
-                        React.createElement("input", { type: "password", id: "nap", placeholder: adminPin ? "PIN d\u00E9fini \u2014 nouveau PIN" : "D\u00E9finir le PIN", style: __assign(__assign({}, S.fi), { flex: 1, textAlign: "center", letterSpacing: 4 }) }),
-                        React.createElement("button", { style: S.btnP, onClick: function () { var v = document.getElementById("nap").value; if (v.length >= 4) {
-                                setAdminPin(v);
-                                toast("PIN administratif mis \u00E0 jour");
-                            }
-                            else
-                                toast("Min 4 car.", "warn"); } }, "OK")),
-                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "2px 0 4px" } }, "PIN cadre : suit sa propre coche \u00AB \u270F\uFE0F cadres \u00BB sur chaque activit\u00E9, plus la gestion du planning IDE (PT cardio) et les d\u00E9parts diff\u00E9r\u00E9s."),
-                    React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } },
-                        React.createElement("input", { type: "password", id: "ncp", placeholder: cadrePin ? "PIN cadre d\u00E9fini \u2014 nouveau PIN" : "D\u00E9finir le PIN cadre", style: __assign(__assign({}, S.fi), { flex: 1, textAlign: "center", letterSpacing: 4 }) }),
-                        React.createElement("button", { style: S.btnP, onClick: function () { var v = document.getElementById("ncp").value; if (v.length >= 4) {
-                                if (v === adminPin || v === editPin) { toast("Ce PIN est d\u00E9j\u00E0 utilis\u00E9 par un autre r\u00F4le", "warn"); return; }
-                                setCadrePin(v);
-                                toast("PIN cadre mis \u00E0 jour");
-                            }
-                            else
-                                toast("Min 4 car.", "warn"); } }, "OK")),
-                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 } },
-                        React.createElement("label", { style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--txt2)", cursor: "pointer" } },
-                            React.createElement("input", { type: "checkbox", checked: adminEnabled, onChange: function (e) { return setAdminEnabled(e.target.checked); }, style: { width: 14, height: 14 } }),
-                            "R\u00F4le activ\u00E9 (d\u00E9cocher suspend l'acc\u00E8s sans changer le PIN)"),
-                        React.createElement("label", { style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--txt2)", cursor: "pointer" } },
-                            React.createElement("input", { type: "checkbox", checked: adminCanReports, onChange: function (e) { return setAdminCanReports(e.target.checked); }, style: { width: 14, height: 14 } }),
-                            "Peut remplir les semaines blanches (onglet Reports)"),
-                        React.createElement("label", { style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--txt2)", cursor: "pointer" } },
-                            React.createElement("input", { type: "checkbox", checked: adminCanNotes, onChange: function (e) { return setAdminCanNotes(e.target.checked); }, style: { width: 14, height: 14 } }),
-                            "Peut ajouter des notes \uD83D\uDCDD sur les cases")),
-                    React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 4 } }, "Activit\u00E9s ouvertes aux secr\u00E9taires"),
-                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 } },
-                        actes.filter(function (a) { return a.adminOk === true; }).map(function (a) { return React.createElement("span", { key: a.id, style: { padding: "1px 7px", borderRadius: 5, fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: a.color, color: "#111" } }, a.short); }),
-                        actes.filter(function (a) { return a.adminOk === true; }).length === 0 && React.createElement("span", { style: { fontSize: 11, color: "#b45309", fontWeight: 700 } }, "aucune \u2014 cochez \u00AB \u270F\uFE0F secr\u00E9taires \u00BB sur les activit\u00E9s concern\u00E9es")),
-                    React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 4 } }, "Activit\u00E9s ouvertes aux cadres"),
-                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 } },
-                        actes.filter(function (a) { return a.cadreOk === true; }).map(function (a) { return React.createElement("span", { key: a.id, style: { padding: "1px 7px", borderRadius: 5, fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: a.color, color: "#111" } }, a.short); }),
-                        actes.filter(function (a) { return a.cadreOk === true; }).length === 0 && React.createElement("span", { style: { fontSize: 11, color: "#b45309", fontWeight: 700 } }, "aucune \u2014 cochez \u00AB \u270F\uFE0F cadres \u00BB sur les activit\u00E9s concern\u00E9es")),
-                    React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)" } }, "\u2699 Se g\u00E8re dans l'onglet Activit\u00E9s (cases \u00AB \u270F\uFE0F secr\u00E9taires \u00BB et \u00AB \u270F\uFE0F cadres \u00BB de chaque activit\u00E9).")),
-                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD10 Niveaux de droits des m\u00E9decins"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } },
-                        "Se r\u00E8gle dans chaque fiche \u270F\uFE0F de l'onglet \u00C9quipe. Le niveau s'applique quand la personne se connecte avec son PIN personnel.",
-                        React.createElement("br", null),
-                        React.createElement("b", null, "Interm\u00E9diaire"),
-                        " : planning de tous les m\u00E9decins, gardes et \u00E9changes, semaines de tour, planning type, attach\u00E9s \u2014 sans Param\u00E8tres, \u00C9quipe ni Activit\u00E9s."),
-                    ["editeur", "inter", "basic"].map(function (lv) {
-                        var list = medecins.filter(function (m) { return ((m.niveau) || "basic") === lv; });
-                        if (list.length === 0)
-                            return null;
-                        var lab = lv === "editeur" ? "\u00C9diteur" : lv === "inter" ? "Interm\u00E9diaire" : "Basique";
-                        var col = lv === "editeur" ? "#dc2626" : lv === "inter" ? "#b45309" : "var(--txt3)";
-                        return React.createElement("div", { key: lv, style: { marginBottom: 5 } },
-                            React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: col, textTransform: "uppercase", letterSpacing: .4, marginBottom: 2 } }, lab),
-                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, list.map(function (m) { return React.createElement("span", { key: m.id, style: { padding: "1px 7px", borderRadius: 5, fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: "var(--bg2)", border: "1px solid var(--border)", color: "var(--txt2)" } }, m.init + ((medPins[String(m.id)] || "").length >= 3 ? "" : " \u26A0")); })));
-                    }),
-                    React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "\u26A0 = pas encore de PIN personnel : le niveau ne s'appliquera qu'une fois le code d\u00E9fini.")),
-                isEdit && React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#a371f7", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD04 Tour m\u00E9dical \u2014 minimums par sursp\u00E9cialit\u00E9"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } },
-                        "S\u00E9niors devant rester disponibles chaque semaine (hors tour, hors absents). L'algorithme vise l'",
-                        React.createElement("b", null, "id\u00E9al"),
-                        " et ne descend au ",
-                        React.createElement("b", null, "minimum"),
-                        " que si aucune solution n'existe."),
-                    React.createElement("table", { style: { borderCollapse: "collapse" } },
-                        React.createElement("thead", null,
-                            React.createElement("tr", null,
-                                React.createElement("th", { style: { textAlign: "left", padding: "3px 10px 3px 0", fontSize: 10, color: "var(--txt3)" } }),
-                                [["coro", "Coro"], ["pace", "Pace"], ["eep", "EEP"], ["ett", "ETT"]].map(function (_a) {
-                                    var k = _a[0], lb = _a[1];
-                                    return React.createElement("th", { key: k, style: { padding: "3px 8px", fontSize: 11, color: "var(--txt2)", fontWeight: 700 } }, lb);
-                                }))),
-                        React.createElement("tbody", null,
-                            React.createElement("tr", null,
-                                React.createElement("td", { style: { padding: "3px 10px 3px 0", fontSize: 11, color: "var(--txt2)", fontWeight: 600 } }, "Id\u00E9al"),
-                                ["coro", "pace", "eep", "ett"].map(function (k) { return React.createElement("td", { key: k, style: { padding: "3px 8px", textAlign: "center" } },
-                                    React.createElement("input", { type: "number", min: 0, max: 9, value: tourMins[k], onChange: function (e) { return setTourMins(function (p) {
-                                            var _a;
-                                            return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
-                                        }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); })),
-                            React.createElement("tr", null,
-                                React.createElement("td", { style: { padding: "3px 10px 3px 0", fontSize: 11, color: "var(--txt2)", fontWeight: 600 } }, "Minimum"),
-                                ["coro", "pace", "eep", "ett"].map(function (k) { return React.createElement("td", { key: k, style: { padding: "3px 8px", textAlign: "center" } },
-                                    React.createElement("input", { type: "number", min: 0, max: 9, value: tourMinsHard[k], onChange: function (e) { return setTourMinsHard(function (p) {
-                                            var _a;
-                                            return (__assign(__assign({}, p), (_a = {}, _a[k] = Math.max(0, parseInt(e.target.value) || 0), _a)));
-                                        }); }, style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 13, textAlign: "center" } })); })))),
-                    React.createElement("div", { style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" } },
-                        React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", fontWeight: 700, marginBottom: 6 } }, "\uD83C\uDFA8 Couleurs des sursp\u00E9cialit\u00E9s"),
-                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" } },
-                            SPEC_LIST.map(function (_a) {
-                                var k2 = _a[0], lb2 = _a[1];
-                                var cur = (specColors && specColors[k2]) || SPEC_COLORS_DEF[k2];
-                                return (React.createElement("div", { key: k2, style: { display: "flex", alignItems: "center", gap: 5 } },
-                                    React.createElement("input", { type: "color", value: cur, onChange: function (e) { var v = e.target.value; setSpecColors(function (p) {
-                                            var _a;
-                                            return (__assign(__assign({}, p), (_a = {}, _a[k2] = v, _a)));
-                                        }); }, style: { width: 30, height: 26, padding: 0, border: "1px solid var(--border)", borderRadius: 5, background: "transparent", cursor: "pointer" } }),
-                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: cur } }, lb2)));
-                            })),
-                        React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 5 } }, "Utilis\u00E9es dans la distribution du tour (tuile 2 de Construire) pour la sursp\u00E9cialit\u00E9 de chaque praticien et le d\u00E9compte des disponibles."))),
-
-                React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDFE5 Salles"),
+                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "var(--txt)", marginBottom: 6 } }, "\uD83C\uDFE5 Salles"),
                         ["CHL", "CHB", "ANGIO", "PLATEAU"].map(function (site2) {
                             var list = salleReg.filter(function (s) { return Array.isArray(s.s) ? s.s.indexOf(site2) >= 0 : s.s === site2; });
                             var lbl = { CHL: "CHL", CHB: "CHB", ANGIO: "PT Angio", PLATEAU: "PT Cardio" }[site2];
                             return React.createElement("div", { key: site2, style: { marginBottom: 6 } },
-                                React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, lbl),
+                                React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, lbl),
                                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
-                                    list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: salleEdit === s.n ? "1.5px solid #388bfd" : "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
+                                    list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: salleEdit === s.n ? "1.5px solid #388bfd" : "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
                                         React.createElement("span", { onClick: function () { setMData(__assign(__assign({}, s), { _origN: s.n })); setModal("salleCfg"); }, style: { cursor: "pointer", textDecoration: "underline dotted", padding: "2px 2px" } }, s.n),
                                         React.createElement("button", { onClick: function () {
                                                 if (!window.confirm("Supprimer la salle " + s.n + " du registre ?\n(Elle sera aussi retirée des activités ; les cases déjà posées gardent leur salle.)"))
@@ -12441,12 +12499,12 @@ function CardioPlanning() {
                                                 setSalleReg(function (p) { return p.filter(function (x) { return x.n !== s.n; }); });
                                                 setActes(function (p) { return p.map(function (a) { return (__assign(__assign({}, a), { salles: (a.salles || []).filter(function (sx) { return sx !== s.n; }) })); }); });
                                             }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 13, padding: "0 3px", color: "#dc2626", fontWeight: 900 } }, "\u00D7"))); }),
-                                    list.length === 0 && React.createElement("span", { style: { fontSize: 9, color: "var(--txt3)" } }, "\u2014")));
+                                    list.length === 0 && React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "\u2014")));
                         }),
                         salleEdit && (function () {
                             var inSalle = actes.filter(function (a) { return (a.salles || []).includes(salleEdit); });
                             return (React.createElement("div", { style: { marginTop: 6, marginBottom: 6, padding: 8, borderRadius: 7, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.05)" } },
-                                React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#388bfd", marginBottom: 5 } },
+                                React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#388bfd", marginBottom: 5 } },
                                     "Activit\u00E9s possibles dans ",
                                     salleEdit,
                                     " ",
@@ -12456,37 +12514,15 @@ function CardioPlanning() {
                                         ")")),
                                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, actes.filter(function (a) { return a.hasSalle && !a.isSystem; }).map(function (a) {
                                     var on = (a.salles || []).includes(salleEdit);
-                                    return React.createElement("button", { key: a.id, type: "button", onClick: function () { return setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== salleEdit; }) : (x.salles || []).concat([salleEdit]) }); }); }); }, style: { fontSize: 10, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
+                                    return React.createElement("button", { key: a.id, type: "button", onClick: function () { return setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== salleEdit; }) : (x.salles || []).concat([salleEdit]) }); }); }); }, style: { fontSize: 11, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
                                 })),
-                                React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Un clic ajoute/retire la salle de l'activit\u00E9 \u2014 c'est la m\u00EAme donn\u00E9e que les pastilles de l'\u00E9diteur d'activit\u00E9.")));
+                                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 4 } }, "Un clic ajoute/retire la salle de l'activit\u00E9 \u2014 c'est la m\u00EAme donn\u00E9e que les pastilles de l'\u00E9diteur d'activit\u00E9.")));
                         })(),
                         React.createElement("button", { onClick: function () { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
-                        React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
-                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                React.createElement("div", { style: { fontWeight: 700, color: "#f59e0b", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD14 Notifications aux secr\u00E9taires"),
-                React.createElement("div", null,
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Cochez les activit\u00E9s \u00E0 suivre : d\u00E8s qu'une p\u00E9riode est diffus\u00E9e (tuile 8 de Construire), chaque ajout ou retrait de ces activit\u00E9s pour un m\u00E9decin titulaire cr\u00E9e une ligne dans l'onglet \uD83D\uDD14 Notifications. Une ligne dont la date est pass\u00E9e s'efface d'elle-m\u00EAme."),
-                    ["tous", "CHL", "CHB"].map(function (site3) {
-                        var lst = actes.filter(function (a) { return a && !a.isSystem && SECR_EXCL.indexOf(a.id) < 0 && (a.site || "tous") === site3; });
-                        if (!lst.length)
-                            return null;
-                        return React.createElement("div", { key: site3, style: { marginBottom: 8 } },
-                            React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 } }, site3 === "tous" ? "Toutes" : site3),
-                            React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, lst.map(function (a) {
-                                var on = (secrCfg.acts || []).indexOf(a.id) >= 0;
-                                return React.createElement("button", { key: a.id, disabled: !isEdit, onClick: function () { return setSecrCfg(function (c) { var l = (c.acts || []).slice(); var i2 = l.indexOf(a.id); if (i2 >= 0)
-                                        l.splice(i2, 1);
-                                    else
-                                        l.push(a.id); return __assign(__assign({}, c), { acts: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (on ? "#f59e0b" : "var(--border)"), background: on ? "rgba(245,158,11,.13)" : "var(--bg3)", color: on ? "#b45309" : "var(--txt2)" } }, (on ? "✓ " : "") + (a.short || a.label));
-                            })));
-                    }),
-                    React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 } }, "Attach\u00E9s suivis"),
-                    React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 } }, /* v10.121 */ medecins.filter(function (m) { return (m.role || "") === "attache"; }).map(function (m) { var on = (secrCfg.atts || []).indexOf(m.id) >= 0; return React.createElement("button", { key: m.id, disabled: !isEdit, onClick: function () { return setSecrCfg(function (c) { var l = (c.atts || []).slice(); var i2 = l.indexOf(m.id); if (i2 >= 0) l.splice(i2, 1); else l.push(m.id); return __assign(__assign({}, c), { atts: l }); }); }, style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: isEdit ? "pointer" : "default", border: "1px solid " + (on ? "#f59e0b" : "var(--border)"), background: on ? "rgba(245,158,11,.13)" : "var(--bg3)", color: on ? "#b45309" : "var(--txt2)" } }, (on ? "\u2713 " : "") + m.init); })),
-                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Tous les titulaires sont suivis d'office ; un attach\u00E9 ne l'est que s'il est coch\u00E9 ici."))),
-                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde & archivage"),
-                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois."),
-                docSize !== null && (function () {
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "Tout ce qui prot\u00E8ge vos donn\u00E9es, regroup\u00E9 ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois."),
+                    docSize !== null && (function () {
                         var LIMIT = 1048576;
                         var pct = Math.min(100, Math.round(docSize / LIMIT * 100));
                         var col = pct < 60 ? "#16a34a" : pct < 85 ? "#f59e0b" : "#dc2626";
@@ -12501,12 +12537,17 @@ function CardioPlanning() {
                                     "%)")),
                             React.createElement("div", { style: { height: 8, borderRadius: 4, background: "var(--border2)", overflow: "hidden" } },
                                 React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 4 } })),
-                            docDet && (function () { /* v10.101 : le détail du poids, par famille de données */
+                            docDet && (function () {
                                 var EQ = "Équipe & internes", AC = "Activités & salles", TO = "Tour médical", SO = "Souhaits ⭐🚫", AS = "Astreinte", RE = "Reports";
-                                var FAMN = {planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2: EQ,medecinsV2Order: EQ,medecins: EQ,intCfg: EQ,medPins: EQ,actesV2: AC,actesV2Order: AC,actes: AC,salleReg: AC,tourMed: TO,tourDerog: TO,tourMins: TO,tourMinsHard: TO,tourCfg: TO,tourReport: TO,tourWish: SO,tourAvoid: SO,gardeWish: SO,gardeAvoid: SO,astreinte: AS,astReport: AS,notes:"Notes",build:"Construire",csRep: RE,csBlanches: RE,csActsSel: RE,csActsGlobal: RE,journal:"Journal"};
-                                var g = {}; Object.keys(docDet).forEach(function (k) { var f = FAMN[k] || "Réglages divers"; g[f] = (g[f] || 0) + docDet[k]; });
-                                var rows = Object.keys(g).map(function (f) { return { f: f, b: g[f] }; }).sort(function (a, b) { return b.b - a.b; });
-                                return React.createElement("div", { style: { marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 } }, rows.map(function (r) { return React.createElement("span", { key: r.f, style: { fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 9, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--txt2)" } }, r.f + " " + (r.b < 1024 ? "<1" : (r.b / 1024).toFixed(r.b < 10240 ? 1 : 0)) + " Ko"); }));
+                                var FAMN = { planV2: "Cases du planning", plan: "Cases (ancien format)", planningTypeV2: "Planning type", planningType: "Planning type", medecinsV2: EQ, medecinsV2Order: EQ, medecins: EQ, intCfg: EQ, medPins: EQ, actesV2: AC, actesV2Order: AC, actes: AC, salleReg: AC, tourMed: TO, tourDerog: TO, tourMins: TO, tourMinsHard: TO, tourCfg: TO, tourReport: TO, tourWish: SO, tourAvoid: SO, gardeWish: SO, gardeAvoid: SO, astreinte: AS, astReport: AS, notes: "Notes", build: "Construire", csRep: RE, csBlanches: RE, csActsSel: RE, csActsGlobal: RE, journal: "Journal" };
+                                var g = {};
+                                Object.keys(docDet).forEach(function (k) { var f = FAMN[k] || "Réglages divers"; g[f] = (g[f] || 0) + docDet[k]; });
+                                var rows = Object.keys(g).map(function (f) { return ({ f: f, b: g[f] }); }).sort(function (a, b) { return b.b - a.b; });
+                                return React.createElement("div", { style: { marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 } }, rows.map(function (r) { return React.createElement("span", { key: r.f, style: { fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 9, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--txt2)" } },
+                                    r.f,
+                                    " ",
+                                    r.b < 1024 ? "<1" : (r.b / 1024).toFixed(r.b < 10240 ? 1 : 0),
+                                    " Ko"); }));
                             })(),
                             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } },
                                 "Limite Firebase : 1 Mo par document. ",
@@ -12532,20 +12573,29 @@ function CardioPlanning() {
                         React.createElement("button", { style: __assign({}, S.qBtn), onClick: function () { return makeBackup(true); } }, "\uD83D\uDCBE Sauvegarder maintenant")),
                     isEdit && React.createElement(ExportCard, { per: expPer, setPer: setExpPer, source: expSrc, setSource: setExpSrc, backups: backupList, seuil: expSeuil, setSeuil: setExpSeuil, dernier: expLast, onExport: doExport, occupe: expBusy }),
                     React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "📂 Importer"),
-                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 6 } }, "📂 Importer relit un fichier de données (.json) et remet tout en place."),
-                    React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-                        isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#7c3aed" }), onClick: function () {
-                                /* v10.103 : champ attaché au document + confirmation dans la page (voir jsx) */
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDCC2 Importer"),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 6 } }, "\uD83D\uDCC2 Importer relit un fichier de donn\u00E9es (.json) et remet tout en place."),
+                        React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, isEdit && React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#7c3aed" }), onClick: function () {
+                                /* v10.103 : champ ATTACHÉ au document (sinon Safari iOS peut le jeter avant
+                                   son onchange) et confirmation rendue DANS la page (confirm() peut être
+                                   muet en mode écran d'accueil : il répond non sans s'afficher). */
                                 var input = document.createElement("input");
                                 input.type = "file";
                                 input.accept = ".json";
-                                input.style.position = "fixed"; input.style.left = "-9999px"; input.style.top = "0";
+                                input.style.position = "fixed";
+                                input.style.left = "-9999px";
+                                input.style.top = "0";
                                 document.body.appendChild(input);
-                                var fini = function () { try { document.body.removeChild(input); } catch (e2) { } };
+                                var fini = function () { try {
+                                    document.body.removeChild(input);
+                                }
+                                catch (e2) { } };
                                 input.onchange = function (e) {
                                     var file = e.target.files[0];
-                                    if (!file) { fini(); return; }
+                                    if (!file) {
+                                        fini();
+                                        return;
+                                    }
                                     var reader = new FileReader();
                                     reader.onload = function (ev) {
                                         fini();
@@ -12565,270 +12615,317 @@ function CardioPlanning() {
                                 };
                                 input.click();
                             } }, "\uD83D\uDCC2 Importer")),
-                    impWait && React.createElement("div", { style: { marginTop: 8, padding: 10, borderRadius: 8, border: "1px solid #f87171", background: "var(--bg2)" } },
-                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, marginBottom: 6 } }, "Restaurer la sauvegarde du " + impWait.ds + " ?"),
-                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "Toutes les données actuelles seront remplacées par celles du fichier."),
-                        React.createElement("div", { style: { display: "flex", gap: 8 } },
-                            React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#dc2626" }), onClick: function () {
-                                    var data = impWait.data;
-                                    if (data.plan)
-                                        setPlan(data.plan);
-                                    if (data.tourMed)
-                                        setTourMed(data.tourMed);
-                                    if (data.planningType)
-                                        setPlanningType(data.planningType);
-                                    if (data.notes)
-                                        setNotes(data.notes);
-                                    if (data.medecins)
-                                        setMedecins(data.medecins);
-                                    if (data.actes)
-                                        setActes(data.actes);
-                                    if (data.tourDerog)
-                                        setTourDerog(data.tourDerog);
-                                    if (data.salleReg)
-                                        setSalleReg(data.salleReg);
-                                    setImpWait(null);
-                                    toast("Sauvegarde restaurée");
-                                } }, "\u21A9 Restaurer"),
-                            React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "var(--bg3)", color: "var(--txt2)" }), onClick: function () { return setImpWait(null); } }, "\u2715 Annuler")))),
-                isEdit && React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDD13 Journ\u00E9es pass\u00E9es et p\u00E9riodes closes"),
-        React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 6 } },
-            "Tout ce qui pr\u00E9c\u00E8de le premier jour de la p\u00E9riode en cours est en ",
-            React.createElement("b", null, "lecture seule, pour tout le monde"),
-            " \u2014 vous compris. Vous pouvez lever le verrou le temps d'une correction : il se remet en place tout seul au prochain chargement de l'application, et rien n'est enregistr\u00E9."),
-        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 7, fontSize: 11, fontWeight: 700, color: vUnlock ? "#b45309" : "var(--txt2)", cursor: "pointer" } },
-            React.createElement("input", { type: "checkbox", checked: vUnlock, onChange: e => { const v = e.target.checked; setVUnlock(v); toast(v ? "⚠ Journées passées déverrouillées jusqu'au rechargement" : "🔒 Journées passées de nouveau verrouillées", v ? "warn" : "info"); } }),
-            "Autoriser la modification des journ\u00E9es pass\u00E9es"),
-        vUnlock && React.createElement("div", { style: { marginTop: 6, fontSize: 10, color: "#b45309", padding: "4px 7px", borderRadius: 6, border: "1px solid #f59e0b", background: "rgba(245,158,11,.10)" } }, "\u26A0 Verrou lev\u00E9 sur cet appareil et pour cette session seulement. Chaque modification faite sur une p\u00E9riode close vous sera signal\u00E9e.")),
-                isEdit && (() => {
-    const vDeb = verrouDebut();
-    /* « archivable » = période ENTIÈREMENT CLOSE — la même borne que le verrou,
-       quelle que soit la période affichée (durcissement v10.110). */
-    const perCmp = (a, b) => { const x = a.split("-"), y2 = b.split("-"); return (+x[0] - +y2[0]) || (+x[1] - +y2[1]); };
-    const perLib = (pid) => { const a = pid.split("-"); return perLibelle(+a[0], +a[1]); };
-    const perSet = {};
-    Object.keys(plan).forEach(k => { const pid = arPerClair(k); if (pid)
-        perSet[pid] = 1; });
-    const persInPlan = Object.keys(perSet).filter(pid => {
-        const a = pid.split("-");
-        const l = perDaysList(+a[0], +a[1]);
-        return l.length > 0 && dKey(l[l.length - 1].y, l[l.length - 1].m, l[l.length - 1].d) < vDeb;
-    }).sort(perCmp);
-    const anx = arDecoupe({ tourMed, tourDerog, notes, tourWish, tourAvoid, gardeWish, gardeAvoid, astreinte, secrNotif, build, csRep, csBlanches }, persInPlan);
-    /* v10.111 : archivage période par période (sa demande) — la même mécanique,
-       paramétrée par la liste. Le découpage est recalculé AU CLIC pour être
-       annoncé dans la confirmation avant le moindre retrait. */
-    const archiverPers = async (list) => {
-        const libs = list.map(perLib);
-        const anxL = arDecoupe({ tourMed, tourDerog, notes, tourWish, tourAvoid, gardeWish, gardeAvoid, astreinte, secrNotif, build, csRep, csBlanches }, list);
-        /* v10.125 : semestres d'internes clos et noms de juniors — copiés dans
-           l'annexe de chaque période recouverte AVANT leur retrait (v10.88), et donc
-           aussi dans le fichier téléchargé. Même borne que le retrait. */
-        const lpd0=perDaysList(+list[list.length-1].split("-")[0],+list[list.length-1].split("-")[1]);
-        const lastMkA=arPad(lpd0[lpd0.length-1].y,lpd0[lpd0.length-1].m);
-        const xtra=arSemsDjs(intCfg,medecins,list,lastMkA);
-        Object.keys(xtra).forEach(pid=>{anxL.parts[pid]=Object.assign({},anxL.parts[pid]||{},xtra[pid]);});
-        if (!window.confirm("Archiver " + (list.length > 1 ? "les " + list.length + " périodes closes" : "la période close") + " (" + libs.join(", ") + ") ?"
-            + (anxL.n > 0 ? "\n\nPartent aussi : " + anxL.lib + "." : "")
-            + "\n\nLes semestres entièrement archivés seront copiés dans l'archive puis retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))
-            return;
-        const okB = await makeBackup(true);
-        if (!okB && !window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))
-            return;
-        const byPer = {};
-        Object.keys(plan).forEach(k => { const pid = arPerClair(k); if (pid && list.indexOf(pid) >= 0) {
-            (byPer[pid] = byPer[pid] || {})[k] = plan[k];
-        } });
-        try {
-            for (const pid of list) {
-                const ref = window.firebaseDB.collection("archives").doc("per-" + pid);
-                const prev = (await ref.get()).data() || {};
-                const merged = Object.assign({}, prev.plan ? JSON.parse(prev.plan) : {}, byPer[pid] || {});
-                /* les annexes de la période rejoignent le document d'archive, FUSIONNÉES
-                   avec ce qui s'y trouvait déjà (une période corrigée après déverrouillage
-                   peut être archivée en deux fois). */
-                const pAnx = prev.annex ? JSON.parse(prev.annex) : {};
-                const nAnx = anxL.parts[pid] || {};
-                const mAnx = Object.assign({}, pAnx);
-                Object.keys(nAnx).forEach(ch => { mAnx[ch] = arFusion(ch, nAnx[ch], pAnx[ch] || {}); });
-                await ref.set({ plan: JSON.stringify(merged), annex: JSON.stringify(mAnx), _ts: Date.now() });
-            }
-        }
-        catch (e) {
-            toast("Échec de la copie en archive — RIEN n'a été retiré", "warn");
-            return;
-        }
-        /* v10.112 : LES RETRAITS D'ABORD, LE TÉLÉCHARGEMENT EN DERNIER. Sur iPhone,
-           le téléchargement met la page en arrière-plan et iOS gèle réseau et
-           minuteries (leçon v10.106) : en v10.110/111 les suppressions, envoyées
-           par la synchronisation APRÈS le clic, ne partaient jamais — les cases
-           ressuscitaient au rechargement et la liste des périodes archivées restait
-           vide. Les retraits sont donc écrits et CONFIRMÉS ici, avant tout
-           téléchargement ; la synchronisation ne fera ensuite que les reconstater
-           (supprimer un champ déjà absent est sans effet). */
-        const delPairs = [];
-        Object.keys(byPer).forEach(pid => Object.keys(byPer[pid]).forEach(k => delPairs.push([["planV2", k], "__DELETE__"])));
-        try {
-            if (PLANNING_DOC && updatePaths)
-                for (let i2 = 0; i2 < delPairs.length; i2 += 200)
-                    await updatePaths(PLANNING_DOC, delPairs.slice(i2, i2 + 200));
-        }
-        catch (e) {
-            toast("Échec du retrait des cases — les archives sont écrites, les données actives n'ont pas bougé. Réessayez.", "warn");
-            return;
-        }
-        secrMuteRef.current = Date.now(); /* v10.115 : l'archivage n'est pas une modification à reporter */
-        setPlan(p => { const n2 = {}; Object.keys(p).forEach(k => { const pid = arPerClair(k); if (!pid || list.indexOf(pid) < 0)
-            n2[k] = p[k]; }); return n2; });
-        /* retrait des annexes. Toujours par UPDATER et par période, jamais en
-           reposant la valeur calculée au rendu — le serveur a pu livrer des
-           modifications entre l'affichage et le clic (leçon v10.3). */
-        const okP = (pid) => !!pid && list.indexOf(pid) >= 0;
-        setTourMed(o => arPurge(o, arPerTechSem, okP));
-        setTourDerog(o => arPurge(o, arPerClair, okP));
-        setNotes(o => arPurge(o, arPerNote, okP));
-        setTourWish(o => arPurge(o, arPerTechSem, okP));
-        setTourAvoid(o => arPurge(o, arPerTechSem, okP));
-        setGardeWish(o => arPurge(o, arPerClair, okP));
-        setGardeAvoid(o => arPurge(o, arPerClair, okP));
-        setAstreinte(o => arPurge(o, arPerAst, okP)); /* v10.125 */
-        setSecrNotif(o => arPurge(o, arPerSecr, okP)); /* v10.115 */
-        setBuild(o => arPurge(o, arPerPeriode, okP));
-        setCsBlanches(o => arPurgeMed(o, null, okP));
-        setCsRep(o => arPurgeMed(o, ["done", "to"], okP));
-        list.forEach(pid => { archFetched.current[pid] = true; });
-        /* v10.88, sa consigne : « je ne peux pas rester avec une liste qui
-           continue ». Un semestre dont la FIN est dans les périodes archivées
-           disparaît, avec ses internes et les noms de juniors qui y sont
-           rattachés. Le dernier mois de la dernière période donne la borne. */
-        const lpd = perDaysList(+list[list.length - 1].split("-")[0], +list[list.length - 1].split("-")[1]);
-        const lastMk = arPad(lpd[lpd.length - 1].y, lpd[lpd.length - 1].m);
-        setMedecins(l2 => l2.map(m2 => { const g = djPurgeMed(m2, intCfg, lastMk); return g ? Object.assign(Object.assign({}, m2), { dj: g }) : m2; }));
-        setIntCfg(p3 => (Object.assign(Object.assign({}, p3), { sems: (((p3 && p3.sems) || []).filter(s3 => String(s3.fin || "").slice(0, 7) > lastMk)) })));
-        setArchPlan(p2 => { const add = {}; Object.keys(byPer).forEach(pid => Object.assign(add, byPer[pid])); return Object.assign(Object.assign({}, p2), add); });
-        /* les annexes RELUES rejoignent le cache de consultation tout de suite,
-           sinon le tour et les notes de la période disparaîtraient jusqu'au rechargement */
-        setArchAnx(p2 => {
-            const o = Object.assign({}, p2);
-            Object.keys(anxL.parts).forEach(pid => {
-                const A = anxL.parts[pid];
-                AR_LU.concat(AR_XTRA).forEach(ch => { if (A[ch])
-                    o[ch] = arFusion(ch, A[ch], o[ch] || {}); });
-            });
-            return o;
-        });
-        await refreshArchList(); /* v10.112 : pastilles et badge à jour AVANT le téléchargement */
-        toast("Archivage terminé : " + (list.length > 1 ? list.length + " périodes copiées puis retirées" : "1 période copiée puis retirée") + " des données actives", "info");
-        /* le fichier part en dernier, une fois les écritures critiques confirmées ;
-           le court délai laisse aussi partir l'enregistrement des annexes */
-        const blob = new Blob([JSON.stringify({ version: "arch-per-1", plan: byPer, annexes: anxL.parts }, null, 1)], { type: "application/json" });
-        const a2 = document.createElement("a");
-        a2.href = URL.createObjectURL(blob);
-        a2.download = "archive-cardio-" + list[0] + "_" + list[list.length - 1] + ".json";
-        setTimeout(() => { a2.click(); }, 800);
-    };
-    return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDDC4 Archivage"),
-        persInPlan.length === 0
-            ? React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Aucune p\u00E9riode close dans les donn\u00E9es actives \u2014 rien \u00E0 archiver pour l'instant.")
-            : React.createElement("div", null,
-                React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 5 } },
-                    "L'archivage copie dans Firebase les cases de la p\u00E9riode ",
-                    React.createElement("b", null, "et ses donn\u00E9es dat\u00E9es"),
-                    " (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), t\u00E9l\u00E9charge un fichier sur cet appareil (\u00E0 conserver : c'est votre copie hors Firebase), puis les retire des donn\u00E9es actives. Le planning, le tour, les notes, l'astreinte et les internes restent consultables en naviguant vers la p\u00E9riode (lecture)."),
-                anx.n > 0 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 5, padding: "4px 7px", borderRadius: 6, border: "1px dashed var(--border)" } },
-                    "Donn\u00E9es dat\u00E9es qui partiraient : ",
-                    anx.lib,
-                    ". Une semaine suit sa p\u00E9riode, celle de son dimanche."),
-                persInPlan.map(pid => (React.createElement("div", { key: pid, style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 5 } },
-                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt)" } }, perLib(pid)),
-                    React.createElement("button", { onClick: () => archiverPers([pid]), style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDDC4 Archiver")))),
-                persInPlan.length > 1 && React.createElement("button", { onClick: () => archiverPers(persInPlan), style: { marginTop: 2, fontSize: 11, padding: "4px 14px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.18)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } },
-                    "\uD83D\uDDC4 Tout archiver (",
-                    persInPlan.length,
-                    " p\u00E9riodes)")),
-        archivedList.length > 0 && React.createElement("div", { style: { marginTop: 8, paddingTop: 7, borderTop: "1px dashed var(--border)" } },
-            React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } },
-                "P\u00E9riodes archiv\u00E9es (",
-                archivedList.length,
-                ") :"),
-            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, archivedList.map(pid => (React.createElement("span", { key: pid, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: "1px solid #7c3aed", background: "rgba(124,58,237,.07)", color: "#7c3aed" } },
-                "\uD83D\uDDC4 ",
-                perLib(pid),
-                React.createElement("button", { title: "D\u00E9sarchiver : remettre cette p\u00E9riode dans les donn\u00E9es actives", onClick: async () => {
-                        if (!window.confirm("Désarchiver la période " + perLib(pid) + " ? Elle sera remise dans les données actives, cases ET données datées (les valeurs actives existantes sont conservées en cas de doublon)."))
-                            return;
-                        try {
-                            const ref = window.firebaseDB.collection("archives").doc("per-" + pid);
-                            const d2 = (await ref.get()).data();
-                            if (!d2 || !d2.plan) {
-                                toast("Archive introuvable", "warn");
-                                return;
-                            }
-                            const frag = JSON.parse(d2.plan);
-                            secrMuteRef.current = Date.now(); /* v10.115 : le désarchivage non plus */
-                            setPlan(p => (Object.assign(Object.assign({}, frag), p)));
-                            /* le désarchivage est SYMÉTRIQUE — les annexes reviennent aussi */
-                            if (d2.annex) {
-                                try {
-                                    const an = JSON.parse(d2.annex) || {};
-                                    if (an.tourMed)
-                                        setTourMed(c => arFusion("tourMed", c, an.tourMed));
-                                    if (an.tourDerog)
-                                        setTourDerog(c => arFusion("tourDerog", c, an.tourDerog));
-                                    if (an.notes)
-                                        setNotes(c => arFusion("notes", c, an.notes));
-                                    if (an.tourWish)
-                                        setTourWish(c => arFusion("tourWish", c, an.tourWish));
-                                    if (an.tourAvoid)
-                                        setTourAvoid(c => arFusion("tourAvoid", c, an.tourAvoid));
-                                    if (an.gardeWish)
-                                        setGardeWish(c => arFusion("gardeWish", c, an.gardeWish));
-                                    if (an.gardeAvoid)
-                                        setGardeAvoid(c => arFusion("gardeAvoid", c, an.gardeAvoid));
-                                    if (an.secrNotif)
-                                        setSecrNotif(c => arFusion("secrNotif", c, an.secrNotif));
-                                    if (an.build)
-                                        setBuild(c => arFusion("build", c, an.build));
-                                    if (an.csRep)
-                                        setCsRep(c => arFusion("csRep", c, an.csRep));
-                                    if (an.csBlanches)
-                                        setCsBlanches(c => arFusion("csBlanches", c, an.csBlanches));
-                                    if (an.astreinte)
-                                        setAstreinte(c => arFusion("astreinte", c, an.astreinte));
-                                    /* v10.125 : les structures reviennent aussi — sans doublon d'id */
-                                    if (an.sems)
-                                        setIntCfg(p => { const cur = ((p && p.sems) || []); const have = {}; cur.forEach(s => { have[String(s.id || s.deb)] = 1; }); const add = Object.keys(an.sems).map(k => an.sems[k]).filter(s => s && !have[String(s.id || s.deb)]); return add.length ? Object.assign({}, p, { sems: cur.concat(add) }) : p; });
-                                    if (an.djs)
-                                        setMedecins(l2 => l2.map(m2 => { const add0 = []; Object.keys(an.djs).forEach(k => { const c = an.djs[k]; if (c && String(c.mid) === String(m2.id)) add0.push(c.e); }); if (!add0.length) return m2; const l = djL(m2); const have = {}; l.forEach(x => { have[String(x.sem || x.deb)] = 1; }); const add = add0.filter(x => x && !have[String(x.sem || x.deb)]); return add.length ? Object.assign({}, m2, { dj: l.concat(add) }) : m2; }));
+                        impWait && React.createElement("div", { style: { marginTop: 8, padding: 10, borderRadius: 8, border: "1px solid #f87171", background: "var(--bg2)" } },
+                            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, marginBottom: 6 } },
+                                "Restaurer la sauvegarde du ",
+                                impWait.ds,
+                                " ?"),
+                            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "Toutes les donn\u00E9es actuelles seront remplac\u00E9es par celles du fichier."),
+                            React.createElement("div", { style: { display: "flex", gap: 8 } },
+                                React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "#dc2626" }), onClick: function () {
+                                        var data = impWait.data;
+                                        if (data.plan)
+                                            setPlan(data.plan);
+                                        if (data.tourMed)
+                                            setTourMed(data.tourMed);
+                                        if (data.planningType)
+                                            setPlanningType(data.planningType);
+                                        if (data.notes)
+                                            setNotes(data.notes);
+                                        if (data.medecins)
+                                            setMedecins(data.medecins);
+                                        if (data.actes)
+                                            setActes(data.actes);
+                                        if (data.tourDerog)
+                                            setTourDerog(data.tourDerog);
+                                        if (data.salleReg)
+                                            setSalleReg(data.salleReg);
+                                        setImpWait(null);
+                                        toast("Sauvegarde restaurée");
+                                    } }, "\u21A9 Restaurer"),
+                                React.createElement("button", { style: __assign(__assign({}, S.btnP), { background: "var(--bg3)", color: "var(--txt2)" }), onClick: function () { return setImpWait(null); } }, "\u2715 Annuler")))),
+                    isEdit && React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDD13 Journ\u00E9es pass\u00E9es et p\u00E9riodes closes"),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 6 } },
+                            "Tout ce qui pr\u00E9c\u00E8de le premier jour de la p\u00E9riode en cours est en ",
+                            React.createElement("b", null, "lecture seule, pour tout le monde"),
+                            " \u2014 vous compris. Vous pouvez lever le verrou le temps d'une correction : il se remet en place tout seul au prochain chargement de l'application, et rien n'est enregistr\u00E9."),
+                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 7, fontSize: 11, fontWeight: 700, color: vUnlock ? "#b45309" : "var(--txt2)", cursor: "pointer" } },
+                            React.createElement("input", { type: "checkbox", checked: vUnlock, onChange: function (e) { var v = e.target.checked; setVUnlock(v); toast(v ? "⚠ Journées passées déverrouillées jusqu'au rechargement" : "🔒 Journées passées de nouveau verrouillées", v ? "warn" : "info"); } }),
+                            "Autoriser la modification des journ\u00E9es pass\u00E9es"),
+                        vUnlock && React.createElement("div", { style: { marginTop: 6, fontSize: 10, color: "#b45309", padding: "4px 7px", borderRadius: 6, border: "1px solid #f59e0b", background: "rgba(245,158,11,.10)" } }, "\u26A0 Verrou lev\u00E9 sur cet appareil et pour cette session seulement. Chaque modification faite sur une p\u00E9riode close vous sera signal\u00E9e.")),
+                    isEdit && (function () {
+                        var vDeb = verrouDebut();
+                        /* « archivable » = période ENTIÈREMENT CLOSE — la même borne que le verrou,
+                           quelle que soit la période affichée (durcissement v10.110). */
+                        var perCmp = function (a, b) { var x = a.split("-"), y2 = b.split("-"); return (+x[0] - +y2[0]) || (+x[1] - +y2[1]); };
+                        var perLib = function (pid) { var a = pid.split("-"); return perLibelle(+a[0], +a[1]); };
+                        var perSet = {};
+                        Object.keys(plan).forEach(function (k) { var pid = arPerClair(k); if (pid)
+                            perSet[pid] = 1; });
+                        var persInPlan = Object.keys(perSet).filter(function (pid) {
+                            var a = pid.split("-");
+                            var l = perDaysList(+a[0], +a[1]);
+                            return l.length > 0 && dKey(l[l.length - 1].y, l[l.length - 1].m, l[l.length - 1].d) < vDeb;
+                        }).sort(perCmp);
+                        var anx = arDecoupe({ tourMed: tourMed, tourDerog: tourDerog, notes: notes, tourWish: tourWish, tourAvoid: tourAvoid, gardeWish: gardeWish, gardeAvoid: gardeAvoid, astreinte: astreinte, secrNotif: secrNotif, build: build, csRep: csRep, csBlanches: csBlanches }, persInPlan);
+                        /* v10.111 : archivage période par période (sa demande) — la même mécanique,
+                           paramétrée par la liste. Le découpage est recalculé AU CLIC pour être
+                           annoncé dans la confirmation avant le moindre retrait. */
+                        var archiverPers = function (list) { return __awaiter(_this, void 0, void 0, function () {
+                            var libs, anxL, lpd0, lastMkA, xtra, okB, byPer, _loop_17, _i, list_2, pid, e_17, delPairs, i2, e_18, okP, lpd, lastMk, blob, a2;
+                            return __generator(this, function (_a) {
+                                switch (_a.label) {
+                                    case 0:
+                                        libs = list.map(perLib);
+                                        anxL = arDecoupe({ tourMed: tourMed, tourDerog: tourDerog, notes: notes, tourWish: tourWish, tourAvoid: tourAvoid, gardeWish: gardeWish, gardeAvoid: gardeAvoid, astreinte: astreinte, secrNotif: secrNotif, build: build, csRep: csRep, csBlanches: csBlanches }, list);
+                                        lpd0 = perDaysList(+list[list.length - 1].split("-")[0], +list[list.length - 1].split("-")[1]);
+                                        lastMkA = arPad(lpd0[lpd0.length - 1].y, lpd0[lpd0.length - 1].m);
+                                        xtra = arSemsDjs(intCfg, medecins, list, lastMkA);
+                                        Object.keys(xtra).forEach(function (pid) { anxL.parts[pid] = Object.assign({}, anxL.parts[pid] || {}, xtra[pid]); });
+                                        if (!window.confirm("Archiver " + (list.length > 1 ? "les " + list.length + " périodes closes" : "la période close") + " (" + libs.join(", ") + ") ?"
+                                            + (anxL.n > 0 ? "\n\nPartent aussi : " + anxL.lib + "." : "")
+                                            + "\n\nLes semestres entièrement archivés seront copiés dans l'archive puis retirés de l'onglet Équipe : internes et noms de Docteurs Juniors de ces semestres."))
+                                            return [2 /*return*/];
+                                        return [4 /*yield*/, makeBackup(true)];
+                                    case 1:
+                                        okB = _a.sent();
+                                        if (!okB && !window.confirm("⚠ La sauvegarde de sécurité a échoué. Continuer quand même ?"))
+                                            return [2 /*return*/];
+                                        byPer = {};
+                                        Object.keys(plan).forEach(function (k) { var pid = arPerClair(k); if (pid && list.indexOf(pid) >= 0) {
+                                            (byPer[pid] = byPer[pid] || {})[k] = plan[k];
+                                        } });
+                                        _a.label = 2;
+                                    case 2:
+                                        _a.trys.push([2, 7, , 8]);
+                                        _loop_17 = function (pid) {
+                                            var ref, prev, merged, pAnx, nAnx, mAnx;
+                                            return __generator(this, function (_b) {
+                                                switch (_b.label) {
+                                                    case 0:
+                                                        ref = window.firebaseDB.collection("archives").doc("per-" + pid);
+                                                        return [4 /*yield*/, ref.get()];
+                                                    case 1:
+                                                        prev = (_b.sent()).data() || {};
+                                                        merged = Object.assign({}, prev.plan ? JSON.parse(prev.plan) : {}, byPer[pid] || {});
+                                                        pAnx = prev.annex ? JSON.parse(prev.annex) : {};
+                                                        nAnx = anxL.parts[pid] || {};
+                                                        mAnx = Object.assign({}, pAnx);
+                                                        Object.keys(nAnx).forEach(function (ch) { mAnx[ch] = arFusion(ch, nAnx[ch], pAnx[ch] || {}); });
+                                                        return [4 /*yield*/, ref.set({ plan: JSON.stringify(merged), annex: JSON.stringify(mAnx), _ts: Date.now() })];
+                                                    case 2:
+                                                        _b.sent();
+                                                        return [2 /*return*/];
+                                                }
+                                            });
+                                        };
+                                        _i = 0, list_2 = list;
+                                        _a.label = 3;
+                                    case 3:
+                                        if (!(_i < list_2.length)) return [3 /*break*/, 6];
+                                        pid = list_2[_i];
+                                        return [5 /*yield**/, _loop_17(pid)];
+                                    case 4:
+                                        _a.sent();
+                                        _a.label = 5;
+                                    case 5:
+                                        _i++;
+                                        return [3 /*break*/, 3];
+                                    case 6: return [3 /*break*/, 8];
+                                    case 7:
+                                        e_17 = _a.sent();
+                                        toast("Échec de la copie en archive — RIEN n'a été retiré", "warn");
+                                        return [2 /*return*/];
+                                    case 8:
+                                        delPairs = [];
+                                        Object.keys(byPer).forEach(function (pid) { return Object.keys(byPer[pid]).forEach(function (k) { return delPairs.push([["planV2", k], "__DELETE__"]); }); });
+                                        _a.label = 9;
+                                    case 9:
+                                        _a.trys.push([9, 14, , 15]);
+                                        if (!(PLANNING_DOC && updatePaths)) return [3 /*break*/, 13];
+                                        i2 = 0;
+                                        _a.label = 10;
+                                    case 10:
+                                        if (!(i2 < delPairs.length)) return [3 /*break*/, 13];
+                                        return [4 /*yield*/, updatePaths(PLANNING_DOC, delPairs.slice(i2, i2 + 200))];
+                                    case 11:
+                                        _a.sent();
+                                        _a.label = 12;
+                                    case 12:
+                                        i2 += 200;
+                                        return [3 /*break*/, 10];
+                                    case 13: return [3 /*break*/, 15];
+                                    case 14:
+                                        e_18 = _a.sent();
+                                        toast("Échec du retrait des cases — les archives sont écrites, les données actives n'ont pas bougé. Réessayez.", "warn");
+                                        return [2 /*return*/];
+                                    case 15:
+                                        secrMuteRef.current = Date.now(); /* v10.115 : l'archivage n'est pas une modification à reporter */
+                                        setPlan(function (p) { var n2 = {}; Object.keys(p).forEach(function (k) { var pid = arPerClair(k); if (!pid || list.indexOf(pid) < 0)
+                                            n2[k] = p[k]; }); return n2; });
+                                        okP = function (pid) { return !!pid && list.indexOf(pid) >= 0; };
+                                        setTourMed(function (o) { return arPurge(o, arPerTechSem, okP); });
+                                        setTourDerog(function (o) { return arPurge(o, arPerClair, okP); });
+                                        setNotes(function (o) { return arPurge(o, arPerNote, okP); });
+                                        setTourWish(function (o) { return arPurge(o, arPerTechSem, okP); });
+                                        setTourAvoid(function (o) { return arPurge(o, arPerTechSem, okP); });
+                                        setGardeWish(function (o) { return arPurge(o, arPerClair, okP); });
+                                        setGardeAvoid(function (o) { return arPurge(o, arPerClair, okP); });
+                                        setAstreinte(function (o) { return arPurge(o, arPerAst, okP); }); /* v10.125 */
+                                        setSecrNotif(function (o) { return arPurge(o, arPerSecr, okP); }); /* v10.115 */
+                                        setBuild(function (o) { return arPurge(o, arPerPeriode, okP); });
+                                        setCsBlanches(function (o) { return arPurgeMed(o, null, okP); });
+                                        setCsRep(function (o) { return arPurgeMed(o, ["done", "to"], okP); });
+                                        list.forEach(function (pid) { archFetched.current[pid] = true; });
+                                        lpd = perDaysList(+list[list.length - 1].split("-")[0], +list[list.length - 1].split("-")[1]);
+                                        lastMk = arPad(lpd[lpd.length - 1].y, lpd[lpd.length - 1].m);
+                                        setMedecins(function (l2) { return l2.map(function (m2) { var g = djPurgeMed(m2, intCfg, lastMk); return g ? __assign(__assign({}, m2), { dj: g }) : m2; }); });
+                                        setIntCfg(function (p3) { return (__assign(__assign({}, p3), { sems: (((p3 && p3.sems) || []).filter(function (s3) { return String(s3.fin || "").slice(0, 7) > lastMk; })) })); });
+                                        setArchPlan(function (p2) { var add = {}; Object.keys(byPer).forEach(function (pid) { return Object.assign(add, byPer[pid]); }); return __assign(__assign({}, p2), add); });
+                                        /* les annexes RELUES rejoignent le cache de consultation tout de suite,
+                                           sinon le tour et les notes de la période disparaîtraient jusqu'au rechargement */
+                                        setArchAnx(function (p2) {
+                                            var o = __assign({}, p2);
+                                            Object.keys(anxL.parts).forEach(function (pid) {
+                                                var A = anxL.parts[pid];
+                                                AR_LU.concat(AR_XTRA).forEach(function (ch) { if (A[ch])
+                                                    o[ch] = arFusion(ch, A[ch], o[ch] || {}); });
+                                            });
+                                            return o;
+                                        });
+                                        return [4 /*yield*/, refreshArchList()];
+                                    case 16:
+                                        _a.sent(); /* v10.112 : pastilles et badge à jour AVANT le téléchargement */
+                                        toast("Archivage terminé : " + (list.length > 1 ? list.length + " périodes copiées puis retirées" : "1 période copiée puis retirée") + " des données actives", "info");
+                                        blob = new Blob([JSON.stringify({ version: "arch-per-1", plan: byPer, annexes: anxL.parts }, null, 1)], { type: "application/json" });
+                                        a2 = document.createElement("a");
+                                        a2.href = URL.createObjectURL(blob);
+                                        a2.download = "archive-cardio-" + list[0] + "_" + list[list.length - 1] + ".json";
+                                        setTimeout(function () { a2.click(); }, 800);
+                                        return [2 /*return*/];
                                 }
-                                catch (e3) { }
-                            }
-                            setArchPlan(p => { const n2 = {}; Object.keys(p).forEach(k => { if (arPerClair(k) !== pid)
-                                n2[k] = p[k]; }); return n2; });
-                            const okP2 = (p2) => p2 === pid;
-                            setArchAnx(p => ({ tourMed: arPurge(p.tourMed, arPerTechSem, okP2), tourDerog: arPurge(p.tourDerog, arPerClair, okP2), notes: arPurge(p.notes, arPerNote, okP2) }));
-                            delete archFetched.current[pid];
-                            await ref.delete();
-                            await refreshArchList();
-                            toast("Période " + perLib(pid) + " désarchivée — de retour dans les données actives", "info");
-                        }
-                        catch (e) {
-                            toast("Échec du désarchivage", "warn");
-                        }
-                    }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 10, padding: 0, color: "#16a34a", fontWeight: 900 } }, "\u21A9"))))))));
-})()),
-                React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                            });
+                        }); };
+                        return (React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
+                            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83D\uDDC4 Archivage"),
+                            persInPlan.length === 0
+                                ? React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Aucune p\u00E9riode close dans les donn\u00E9es actives \u2014 rien \u00E0 archiver pour l'instant.")
+                                : React.createElement("div", null,
+                                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt2)", marginBottom: 5 } },
+                                        "L'archivage copie dans Firebase les cases de la p\u00E9riode ",
+                                        React.createElement("b", null, "et ses donn\u00E9es dat\u00E9es"),
+                                        " (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), t\u00E9l\u00E9charge un fichier sur cet appareil (\u00E0 conserver : c'est votre copie hors Firebase), puis les retire des donn\u00E9es actives. Le planning, le tour, les notes, l'astreinte et les internes restent consultables en naviguant vers la p\u00E9riode (lecture)."),
+                                    anx.n > 0 && React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 5, padding: "4px 7px", borderRadius: 6, border: "1px dashed var(--border)" } },
+                                        "Donn\u00E9es dat\u00E9es qui partiraient : ",
+                                        anx.lib,
+                                        ". Une semaine suit sa p\u00E9riode, celle de son dimanche."),
+                                    persInPlan.map(function (pid) { return (React.createElement("div", { key: pid, style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 5 } },
+                                        React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt)" } }, perLib(pid)),
+                                        React.createElement("button", { onClick: function () { return archiverPers([pid]); }, style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDDC4 Archiver"))); }),
+                                    persInPlan.length > 1 && React.createElement("button", { onClick: function () { return archiverPers(persInPlan); }, style: { marginTop: 2, fontSize: 11, padding: "4px 14px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.18)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } },
+                                        "\uD83D\uDDC4 Tout archiver (",
+                                        persInPlan.length,
+                                        " p\u00E9riodes)")),
+                            archivedList.length > 0 && React.createElement("div", { style: { marginTop: 8, paddingTop: 7, borderTop: "1px dashed var(--border)" } },
+                                React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "var(--txt2)", marginBottom: 4 } },
+                                    "P\u00E9riodes archiv\u00E9es (",
+                                    archivedList.length,
+                                    ") :"),
+                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, archivedList.map(function (pid) { return (React.createElement("span", { key: pid, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: "1px solid #7c3aed", background: "rgba(124,58,237,.07)", color: "#7c3aed" } },
+                                    "\uD83D\uDDC4 ",
+                                    perLib(pid),
+                                    React.createElement("button", { title: "D\u00E9sarchiver : remettre cette p\u00E9riode dans les donn\u00E9es actives", onClick: function () { return __awaiter(_this, void 0, void 0, function () {
+                                            var ref, d2, frag_2, an_2, okP2_1, e_19;
+                                            return __generator(this, function (_a) {
+                                                switch (_a.label) {
+                                                    case 0:
+                                                        if (!window.confirm("Désarchiver la période " + perLib(pid) + " ? Elle sera remise dans les données actives, cases ET données datées (les valeurs actives existantes sont conservées en cas de doublon)."))
+                                                            return [2 /*return*/];
+                                                        _a.label = 1;
+                                                    case 1:
+                                                        _a.trys.push([1, 5, , 6]);
+                                                        ref = window.firebaseDB.collection("archives").doc("per-" + pid);
+                                                        return [4 /*yield*/, ref.get()];
+                                                    case 2:
+                                                        d2 = (_a.sent()).data();
+                                                        if (!d2 || !d2.plan) {
+                                                            toast("Archive introuvable", "warn");
+                                                            return [2 /*return*/];
+                                                        }
+                                                        frag_2 = JSON.parse(d2.plan);
+                                                        secrMuteRef.current = Date.now(); /* v10.115 : le désarchivage non plus */
+                                                        setPlan(function (p) { return (__assign(__assign({}, frag_2), p)); });
+                                                        /* le désarchivage est SYMÉTRIQUE — les annexes reviennent aussi */
+                                                        if (d2.annex) {
+                                                            try {
+                                                                an_2 = JSON.parse(d2.annex) || {};
+                                                                if (an_2.tourMed)
+                                                                    setTourMed(function (c) { return arFusion("tourMed", c, an_2.tourMed); });
+                                                                if (an_2.tourDerog)
+                                                                    setTourDerog(function (c) { return arFusion("tourDerog", c, an_2.tourDerog); });
+                                                                if (an_2.notes)
+                                                                    setNotes(function (c) { return arFusion("notes", c, an_2.notes); });
+                                                                if (an_2.tourWish)
+                                                                    setTourWish(function (c) { return arFusion("tourWish", c, an_2.tourWish); });
+                                                                if (an_2.tourAvoid)
+                                                                    setTourAvoid(function (c) { return arFusion("tourAvoid", c, an_2.tourAvoid); });
+                                                                if (an_2.gardeWish)
+                                                                    setGardeWish(function (c) { return arFusion("gardeWish", c, an_2.gardeWish); });
+                                                                if (an_2.gardeAvoid)
+                                                                    setGardeAvoid(function (c) { return arFusion("gardeAvoid", c, an_2.gardeAvoid); });
+                                                                if (an_2.secrNotif)
+                                                                    setSecrNotif(function (c) { return arFusion("secrNotif", c, an_2.secrNotif); });
+                                                                if (an_2.build)
+                                                                    setBuild(function (c) { return arFusion("build", c, an_2.build); });
+                                                                if (an_2.csRep)
+                                                                    setCsRep(function (c) { return arFusion("csRep", c, an_2.csRep); });
+                                                                if (an_2.csBlanches)
+                                                                    setCsBlanches(function (c) { return arFusion("csBlanches", c, an_2.csBlanches); });
+                                                                if (an_2.astreinte)
+                                                                    setAstreinte(function (c) { return arFusion("astreinte", c, an_2.astreinte); });
+                                                                /* v10.125 : les structures reviennent aussi — sans doublon d'id */
+                                                                if (an_2.sems)
+                                                                    setIntCfg(function (p) { var cur = ((p && p.sems) || []); var have = {}; cur.forEach(function (s) { have[String(s.id || s.deb)] = 1; }); var add = Object.keys(an_2.sems).map(function (k) { return an_2.sems[k]; }).filter(function (s) { return s && !have[String(s.id || s.deb)]; }); return add.length ? Object.assign({}, p, { sems: cur.concat(add) }) : p; });
+                                                                if (an_2.djs)
+                                                                    setMedecins(function (l2) { return l2.map(function (m2) { var add0 = []; Object.keys(an_2.djs).forEach(function (k) { var c = an_2.djs[k]; if (c && String(c.mid) === String(m2.id))
+                                                                        add0.push(c.e); }); if (!add0.length)
+                                                                        return m2; var l = djL(m2); var have = {}; l.forEach(function (x) { have[String(x.sem || x.deb)] = 1; }); var add = add0.filter(function (x) { return x && !have[String(x.sem || x.deb)]; }); return add.length ? Object.assign({}, m2, { dj: l.concat(add) }) : m2; }); });
+                                                            }
+                                                            catch (e3) { }
+                                                        }
+                                                        setArchPlan(function (p) { var n2 = {}; Object.keys(p).forEach(function (k) { if (arPerClair(k) !== pid)
+                                                            n2[k] = p[k]; }); return n2; });
+                                                        okP2_1 = function (p2) { return p2 === pid; };
+                                                        setArchAnx(function (p) { return ({ tourMed: arPurge(p.tourMed, arPerTechSem, okP2_1), tourDerog: arPurge(p.tourDerog, arPerClair, okP2_1), notes: arPurge(p.notes, arPerNote, okP2_1) }); });
+                                                        delete archFetched.current[pid];
+                                                        return [4 /*yield*/, ref.delete()];
+                                                    case 3:
+                                                        _a.sent();
+                                                        return [4 /*yield*/, refreshArchList()];
+                                                    case 4:
+                                                        _a.sent();
+                                                        toast("Période " + perLib(pid) + " désarchivée — de retour dans les données actives", "info");
+                                                        return [3 /*break*/, 6];
+                                                    case 5:
+                                                        e_19 = _a.sent();
+                                                        toast("Échec du désarchivage", "warn");
+                                                        return [3 /*break*/, 6];
+                                                    case 6: return [2 /*return*/];
+                                                }
+                                            });
+                                        }); }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 10, padding: 0, color: "#16a34a", fontWeight: 900 } }, "\u21A9"))); })))));
+                    })(),
+                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
                         React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDF13 Th\u00E8me"),
                         React.createElement("div", { style: { display: "flex", gap: 6 } },
                             React.createElement("button", { onClick: function () { try {
                                     localStorage.removeItem("cp6_theme");
                                 }
-                                catch (e) { } ; var mm = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)"); setDarkModeRaw(!!(mm && mm.matches)); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCF1 Auto (t\u00e9l\u00e9phone)"),
+                                catch (e) { } ; var mm = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)"); setDarkModeRaw(!!(mm && mm.matches)); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCF1 Auto (t\u00E9l\u00E9phone)"),
                             React.createElement("button", { onClick: function () { return setDarkMode(false); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: !darkMode ? "var(--nav-act)" : "var(--bg2)", color: !darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\u2600\uFE0F Jour"),
                             React.createElement("button", { onClick: function () { return setDarkMode(true); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: darkMode ? "var(--nav-act)" : "var(--bg2)", color: darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\uD83C\uDF13 Nuit")),
-                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit le r\u00e9glage clair/sombre du t\u00e9l\u00e9phone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix m\u00e9moris\u00e9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil)."))))),
+                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit le r\u00E9glage clair/sombre du t\u00E9l\u00E9phone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix m\u00E9moris\u00E9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil).")))))),
         bkPreview && (function () {
             var ts = bkPreview.ts, b = bkPreview.b, cc = bkPreview.c, added = bkPreview.added, removed = bkPreview.removed, changed = bkPreview.changed;
             var months = Object.keys(b.byMonth || {}).concat(Object.keys(cc.byMonth || {})).filter(function (v, i, arr) { return arr.indexOf(v) === i; }).sort();
