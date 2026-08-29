@@ -46,7 +46,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.146 — 29/08/2026";
+const APP_VERSION="v10.147 — 29/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4529,7 +4529,7 @@ const HELP_SECTIONS=[
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde. Même suivi de colonne que le Planning, partagé avec lui."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
-  HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase, boîte des signalements 🐞. Les encarts arrivent repliés : cliquez un titre pour l\'ouvrir, « Tout déplier » en haut."]}),
+  HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase, boîte des signalements 🐞, verrous du passé et de l'avenir 🚧. Les encarts arrivent repliés : cliquez un titre pour l\'ouvrir, « Tout déplier » en haut."]}),
   HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}),
   HTab({t:"📥 Reports",children:["outil individuel et facultatif : cochez vos semaines blanches, puis un tableau chronologique signale les semaines de tour reportées sur vos blanches (dates habituelles), celles sans report possible, celles déjà blanches, et les dates fermées à réouvrir ; suivi des offs par semaine. Les activités concernées se cochent « 📥 à reporter » dans l'onglet Activités. Export CSV."]}))},
 
@@ -4569,7 +4569,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Périodes à venir : l'état de chaque période et, au besoin, une dérogation par profil."]}),
+  HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre."]}),
   HP({children:[HE("b",null,"Garde int., aller-retour")," (v10.145) : éteindre 🎓 Garde int. ramène le cadre là où il était avant de l'allumer — à condition qu'on n'ait rien fait entre-temps. Un défilement, un changement d'onglet ou de période, et le cadre reste où il est."]}),
   HP({children:[HE("b",null,"Pointillé « moi » fermé")," (v10.144) : le pointillé violet de sa propre colonne ferme désormais son cadre, en haut sur l'initiale et en bas sur la dernière ligne, comme le cadre plein de la colonne suivie."]}),
   HP({children:[HE("b",null,"Plus de zoom intempestif sur iPhone")," (v10.143) : toucher un champ de saisie (PIN, note, filtre, fenêtre 🐞…) faisait grossir la page, qui restait ainsi ensuite — Safari agrandit tout champ dont le texte fait moins de 16 px. Sur téléphone, les champs font désormais 16 px : plus de zoom. Le pincement pour agrandir la grille reste possible ; si votre page est déjà zoomée, un pincement la remet à sa taille."]}),
@@ -4666,9 +4666,9 @@ const FUT_ETATS={fermee:["⛔ Fermée","#6b7280","personne, sauf l'éditeur"],ph
 function FuturBox(p){
   const RE=React.createElement;
   const pers=p.pers||[];
-  return RE("div",{style:Object.assign({},S.card,{marginBottom:10})},
-    RE("div",{style:{fontWeight:700,color:"#b45309",fontSize:13,marginBottom:6}},"🚧 Périodes à venir"),
-    RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.5}},"Tout ce qui suit la période en cours est fermé à tous sauf vous. Ouvrir la demande de congés (Construire, tuile 1) ouvre congés, FMC et préférences à chacun ; la refermer referme tout pendant que vous construisez ; diffuser (tuile 8) ouvre tout. L'état se lit dans Construire, rien à régler ici — sauf pour déroger : cocher un profil lui ouvre toute la période, quel que soit son état."),
+  return RE("div",{style:{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}},
+    RE("div",{style:{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}},"🚧 Périodes à venir"),
+    RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.5}},"Tout ce qui suit la période en cours est fermé à tous sauf vous. Ouvrir la demande de congés (Construire, tuile 1) ouvre congés, FMC et préférences à chacun ; la refermer referme tout pendant que vous construisez ; diffuser (tuile 8) ouvre tout. L'état se lit dans Construire, rien à régler ici — sauf pour déroger : cocher un profil lui ouvre toute la période, quel que soit son état, avec ses droits habituels — un intermédiaire, une secrétaire ou un cadre y modifie donc les lignes des autres comme en période en cours."),
     pers.map(x=>{const e=FUT_ETATS[x.etat]||FUT_ETATS.fermee;return RE("div",{key:x.key,style:{border:"1px solid var(--border)",borderRadius:8,padding:"6px 8px",marginBottom:6}},
       RE("div",{style:{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}},
         RE("span",{style:{fontSize:12,fontWeight:800,color:"var(--txt)",flex:1}},x.lib),
@@ -4717,7 +4717,7 @@ function SignalBox(p){
   const [ouvert,setOuvert]=React.useState(null);
   const items=p.items||[];const nouv=items.filter(s=>!s.traite).length;
   return RE("div",{style:Object.assign({},S.card,{marginBottom:10})},
-    RE("div",{style:{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}},"🐞 Signalements"+(nouv?" — "+nouv+" à traiter":"")),
+    RE("div",{style:{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}},"🐞 Signalements"+(nouv?" — "+nouv+" à traiter":"")),
     RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.5}},"Ce que vos collègues ont signalé depuis le bouton 🐞 (onglet Aide, ou ⋯ dans Planning et Attachés). Chaque ticket porte la version, l'onglet, la période, le mode, l'appareil et le journal de la page ; « Copier » donne un texte prêt à coller."),
     RE("button",{onClick:p.onRefresh,style:Object.assign({},S.icnBtn,{marginBottom:8})},"↻ Actualiser"),
     items.length===0&&RE("div",{style:{fontSize:11,color:"var(--txt3)"}},"Aucun signalement."),
@@ -11556,16 +11556,6 @@ header::-webkit-scrollbar { display: none; }
               </div>
             </div>}
             </div>
-            {isEdit&&<div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🔓 Journées passées et périodes closes</div>
-                <div style={{fontSize:10,color:"var(--txt2)",marginBottom:6}}>Tout ce qui précède le premier jour de la période en cours est en <b>lecture seule, pour tout le monde</b> — vous compris. Vous pouvez lever le verrou le temps d'une correction : il se remet en place tout seul au prochain chargement de l'application, et rien n'est enregistré.</div>
-                <label style={{display:"flex",alignItems:"center",gap:7,fontSize:11,fontWeight:700,color:vUnlock?"#b45309":"var(--txt2)",cursor:"pointer"}}>
-                  <input type="checkbox" checked={vUnlock} onChange={e=>{const v=e.target.checked;setVUnlock(v);toast(v?"⚠ Journées passées déverrouillées jusqu'au rechargement":"🔒 Journées passées de nouveau verrouillées",v?"warn":"info");}}/>
-                  Autoriser la modification des journées passées
-                </label>
-                {vUnlock&&<div style={{marginTop:6,fontSize:10,color:"#b45309",padding:"4px 7px",borderRadius:6,border:"1px solid #f59e0b",background:"rgba(245,158,11,.10)"}}>⚠ Verrou levé sur cet appareil et pour cette session seulement. Chaque modification faite sur une période close vous sera signalée.</div>}
-              </div>}
-            {isEdit&&<FuturBox pers={futPers} onDerog={futDerog}/>}{/* v10.146 */}
             {isEdit&&(()=>{
               const vDeb=verrouDebut();
               /* « archivable » = période ENTIÈREMENT CLOSE — la même borne que le verrou,
@@ -11734,6 +11724,20 @@ header::-webkit-scrollbar { display: none; }
               </div>);
             })()}
           </div>
+          {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.147 : Verrous, carte à part */}
+            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🚧 Verrous</div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>Ce qui est en lecture seule, et pour qui : le passé (journées passées, périodes closes) et les périodes à venir.</div>
+            {isEdit&&<div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>🔓 Journées passées et périodes closes</div>
+                <div style={{fontSize:10,color:"var(--txt2)",marginBottom:6}}>Tout ce qui précède le premier jour de la période en cours est en <b>lecture seule, pour tout le monde</b> — vous compris. Vous pouvez lever le verrou le temps d'une correction : il se remet en place tout seul au prochain chargement de l'application, et rien n'est enregistré.</div>
+                <label style={{display:"flex",alignItems:"center",gap:7,fontSize:11,fontWeight:700,color:vUnlock?"#b45309":"var(--txt2)",cursor:"pointer"}}>
+                  <input type="checkbox" checked={vUnlock} onChange={e=>{const v=e.target.checked;setVUnlock(v);toast(v?"⚠ Journées passées déverrouillées jusqu'au rechargement":"🔒 Journées passées de nouveau verrouillées",v?"warn":"info");}}/>
+                  Autoriser la modification des journées passées
+                </label>
+                {vUnlock&&<div style={{marginTop:6,fontSize:10,color:"#b45309",padding:"4px 7px",borderRadius:6,border:"1px solid #f59e0b",background:"rgba(245,158,11,.10)"}}>⚠ Verrou levé sur cet appareil et pour cette session seulement. Chaque modification faite sur une période close vous sera signalée.</div>}
+              </div>}
+            {isEdit&&<FuturBox pers={futPers} onDerog={futDerog}/>}{/* v10.146 */}
+          </div>}
           {isEdit&&<SignalBox items={sigList} toast={toast} onRefresh={refreshSig} onTraite={sigTraite} onDel={sigDel}/>}{/* v10.142 */}
 
         </div>
