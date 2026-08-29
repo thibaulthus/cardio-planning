@@ -34,7 +34,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.138 — 29/08/2026";
+const APP_VERSION="v10.139 — 29/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4536,7 +4536,7 @@ const HELP_SECTIONS=[
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
             HP({children:[HE("b",null,"Bornes de navigation")," (v10.138) : les flèches ‹ › ne remontent pas avant la plus ancienne archive (à défaut deux ans en arrière) et ne vont pas au-delà de six périodes — deux ans — devant la période en cours ; un message le dit à la borne. Cela vaut pour tous les onglets qui naviguent par période : Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Planning type, Tour, Reports, Construire, Astreinte, Stats et l'export. Les Internes naviguent par semestre, entre les semestres déclarés. Naviguer ne crée aucune donnée ; la borne évite qu'une case posée par erreur très loin dans le futur ne pèse sans que personne ne la voie. La carte Poids affiche aussi le poids des archives, rangées dans leur propre collection et donc hors de la jauge du document actif."]}),
-  HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles, Sauvegarde & archivage et Thème sont quatre cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Dans Thème, le mode choisi est en surbrillance et une ligne dit ce qui est en vigueur — le bouton 🌓 des onglets mémorise un choix Jour ou Nuit sur l'appareil, ce qui désactive Auto jusqu'à ce qu'on le rechoisisse ici. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
+  HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles, Sauvegarde & archivage et Thème sont quatre cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Dans Thème, le mode choisi est en surbrillance et une ligne dit ce qui est en vigueur — le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto avec un message à chaque appui (v10.139), donc chacun peut revenir au suivi du téléphone sans Paramètres ; à la reprise de l'application en veille, le réglage du téléphone est relu. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
   HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
   HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
   HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
@@ -7689,7 +7689,20 @@ function CardioPlanning(){
   });
   /* v10.137 : themeSel = ce que l'utilisateur a choisi (auto / light / dark), pour l'afficher */
   const [themeSel,setThemeSel]=useState(()=>{try{const v=localStorage.getItem("cp6_theme");return v==="dark"?"dark":v==="light"?"light":"auto";}catch(e){return "auto";}});
-  const setDarkMode=(fn)=>{setDarkModeRaw(prev=>{const nv=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("cp6_theme",nv?"dark":"light");}catch(e){}setThemeSel(nv?"dark":"light");return nv;});};
+  /* v10.139 : themeApply pose le mode choisi (auto / light / dark) : mémoire sur l'appareil (effacée en
+     auto), état d'affichage, et un toast qui dit ce qui est en vigueur. Le bouton 🌓 des onglets — le seul
+     réglage accessible à ceux qui n'ont pas Paramètres — TOURNE désormais Auto → Jour → Nuit → Auto :
+     tout le monde peut revenir au suivi du téléphone. Les boutons Jour/Nuit de Paramètres posent en direct. */
+  const themeSys=()=>{try{return !!(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);}catch(e){return false;}};
+  const themeApply=(sel,silencieux)=>{try{if(sel==="auto")localStorage.removeItem("cp6_theme");else localStorage.setItem("cp6_theme",sel);}catch(e){}
+    const dark=sel==="auto"?themeSys():sel==="dark";setThemeSel(sel);setDarkModeRaw(dark);
+    if(!silencieux)toast(sel==="auto"?"📱 Auto — suit le téléphone ("+(dark?"sombre":"clair")+")":sel==="dark"?"🌙 Nuit — mémorisé sur cet appareil":"☀️ Jour — mémorisé sur cet appareil","info");};
+  const setDarkMode=(fn)=>{if(typeof fn==="function"){themeApply(themeSel==="auto"?"light":themeSel==="light"?"dark":"auto");return;}themeApply(fn?"dark":"light");};
+  /* v10.139 : sur téléphone, l'application installée en veille ne reçoit pas toujours le changement
+     clair/sombre ; à la reprise on relit le réglage (seulement en auto). */
+  useEffect(()=>{const re=()=>{try{if(localStorage.getItem("cp6_theme"))return;}catch(e){}setDarkModeRaw(themeSys());};
+    document.addEventListener("visibilitychange",re);window.addEventListener("pageshow",re);window.addEventListener("focus",re);
+    return ()=>{document.removeEventListener("visibilitychange",re);window.removeEventListener("pageshow",re);window.removeEventListener("focus",re);};},[]);
   useEffect(()=>{
     if(!window.matchMedia)return;
     const mq=window.matchMedia("(prefers-color-scheme: dark)");
@@ -11552,13 +11565,13 @@ header::-webkit-scrollbar { display: none; }
           <div style={{...S.card,marginBottom:10}}>{/* v10.137 : Thème, carte à part */}
               <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🌓 Thème</div>
               <div style={{display:"flex",gap:6}}>
-                <button onClick={()=>{try{localStorage.removeItem("cp6_theme");}catch(e){};setThemeSel("auto");const mm=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");setDarkModeRaw(!!(mm&&mm.matches));}}
+                <button onClick={()=>themeApply("auto")}
                   style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid "+(themeSel==="auto"?"#7c3aed":"var(--border)"),background:themeSel==="auto"?"rgba(124,58,237,.10)":"var(--bg2)",color:themeSel==="auto"?"#7c3aed":"var(--txt2)",fontWeight:800,cursor:"pointer"}}>📱 Auto (téléphone)</button>
                 <button onClick={()=>setDarkMode(false)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid "+(themeSel==="light"?"#7c3aed":"var(--border)"),background:themeSel==="light"?"rgba(124,58,237,.10)":"var(--bg2)",color:themeSel==="light"?"#7c3aed":"var(--txt2)",fontWeight:800,cursor:"pointer"}}>☀️ Jour</button>
                 <button onClick={()=>setDarkMode(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid "+(themeSel==="dark"?"#7c3aed":"var(--border)"),background:themeSel==="dark"?"rgba(124,58,237,.10)":"var(--bg2)",color:themeSel==="dark"?"#7c3aed":"var(--txt2)",fontWeight:800,cursor:"pointer"}}>🌓 Nuit</button>
               </div>
               <div style={{fontSize:11,color:"var(--txt)",marginTop:6,fontWeight:700}}>{"Mode en vigueur : "+(themeSel==="auto"?"Auto → "+(darkMode?"sombre":"clair")+" (réglage du téléphone)":themeSel==="dark"?"Nuit, mémorisé sur cet appareil":"Jour, mémorisé sur cet appareil")}</div>
-              <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil (le bouton 🌓 des onglets fait pareil).</div>
+              <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil. Le bouton 🌓 des onglets, accessible à tous, tourne Auto → Jour → Nuit → Auto et affiche le mode retenu.</div>
             </div>
 
         </div>
