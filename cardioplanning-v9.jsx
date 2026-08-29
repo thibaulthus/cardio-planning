@@ -20,7 +20,10 @@ const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths 
    erreurs non rattrapées, promesses rejetées, et les changements d'onglet. 40 entrées, 300 caractères
    chacune, rien n'est envoyé nulle part : elles ne partent qu'avec un signalement 🐞. */
 var JOURNAL=[];
-function jlog(niv,args){try{var t=new Date(),p=function(n){return ("0"+n).slice(-2);};var s=Array.prototype.map.call(args,function(a){if(a&&a.stack)return String(a.stack).split("\n").slice(0,3).join(" | ");if(a&&typeof a==="object"){try{return JSON.stringify(a);}catch(e){return String(a);}}return String(a);}).join(" ");JOURNAL.push(p(t.getHours())+":"+p(t.getMinutes())+":"+p(t.getSeconds())+" "+niv+" "+s.replace(/\s+/g," ").slice(0,300));if(JOURNAL.length>40)JOURNAL.shift();}catch(e){}}
+/* v10.148 : le journal survit au redémarrage — une page blanche emporte sa console, pas ce fichier. La session
+   précédente est relue au chargement (JOURNAL_PREC) et jointe au prochain signalement, marquée comme telle. */
+var JOURNAL_PREC=(function(){try{var v=JSON.parse(localStorage.getItem("cp6_journal")||"[]");return Array.isArray(v)?v.slice(-40):[];}catch(e){return [];}})();
+function jlog(niv,args){try{var t=new Date(),p=function(n){return ("0"+n).slice(-2);};var s=Array.prototype.map.call(args,function(a){if(a&&a.stack)return String(a.stack).split("\n").slice(0,3).join(" | ");if(a&&typeof a==="object"){try{return JSON.stringify(a);}catch(e){return String(a);}}return String(a);}).join(" ");JOURNAL.push(p(t.getHours())+":"+p(t.getMinutes())+":"+p(t.getSeconds())+" "+niv+" "+s.replace(/\s+/g," ").slice(0,300));if(JOURNAL.length>40)JOURNAL.shift();try{localStorage.setItem("cp6_journal",JSON.stringify(JOURNAL));}catch(e2){}}catch(e){}}
 (function(){if(typeof window==="undefined"||window.__jlogOn)return;window.__jlogOn=true;
   var ce=console.error.bind(console),cw=console.warn.bind(console);
   console.error=function(){jlog("ERREUR",arguments);ce.apply(null,arguments);};
@@ -46,7 +49,8 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.147 — 29/08/2026";
+const APP_VERSION="v10.148 — 29/08/2026";
+jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4569,6 +4573,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
   HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre."]}),
   HP({children:[HE("b",null,"Garde int., aller-retour")," (v10.145) : éteindre 🎓 Garde int. ramène le cadre là où il était avant de l'allumer — à condition qu'on n'ait rien fait entre-temps. Un défilement, un changement d'onglet ou de période, et le cadre reste où il est."]}),
   HP({children:[HE("b",null,"Pointillé « moi » fermé")," (v10.144) : le pointillé violet de sa propre colonne ferme désormais son cadre, en haut sur l'initiale et en bas sur la dernière ligne, comme le cadre plein de la colonne suivie."]}),
@@ -4660,6 +4665,26 @@ function HelpView(){
       hOpen[s.id]&&HE("div",{style:{padding:"2px 14px 13px"}},s.body()))));
 }
 
+/* ════ v10.148 : GARDE-FOU DE RENDU — plus de page blanche. Une erreur pendant le dessin arrive ici :
+   elle est journalisée (donc jointe au prochain 🐞 après redémarrage) et un écran sobre la montre,
+   avec Recharger et Copier le rapport. */
+function CpGarde(p){React.Component.call(this,p);this.state={err:null};}   /* écrit sans « class » : tsc et index.html doivent rester identiques */
+CpGarde.prototype=Object.create(React.Component.prototype);CpGarde.prototype.constructor=CpGarde;
+CpGarde.getDerivedStateFromError=function(e){return {err:e};};
+CpGarde.prototype.componentDidCatch=function(e,info){jlog("PLANTAGE RENDU",[(e&&e.message)||String(e),info&&info.componentStack?String(info.componentStack).trim().split("\n").slice(0,3).join(" | "):""]);};
+CpGarde.prototype.render=function(){
+  if(!this.state.err)return this.props.children;
+  var RE=React.createElement,e=this.state.err;
+  var rapport=["🐞 Plantage CardioPlanning — "+sigDate(Date.now()),"Version : "+APP_VERSION,"Erreur : "+((e&&e.message)||String(e)),(e&&e.stack?String(e.stack).split("\n").slice(0,4).join("\n"):""),"—","Journal :"].concat(JOURNAL).join("\n");
+  return RE("div",{style:{padding:"24px 18px",maxWidth:520,margin:"0 auto",fontFamily:"'Sora',sans-serif",color:"var(--txt,#e6edf3)"}},
+    RE("div",{style:{fontSize:16,fontWeight:800,marginBottom:8}},"⚠️ L'application a rencontré une erreur"),
+    RE("div",{style:{fontSize:12,lineHeight:1.6,marginBottom:12}},"Rien n'est perdu : vos données sont dans Firebase. Rechargez la page ; si cela se reproduit, copiez le rapport et envoyez un 🐞 après le rechargement — il emportera ce plantage."),
+    RE("pre",{style:{fontSize:10,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",padding:8,borderRadius:8,border:"1px solid var(--border,#444)",background:"var(--bg2,#1b2230)",maxHeight:220,overflow:"auto",marginBottom:12}},rapport),
+    RE("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},
+      RE("button",{onClick:function(){window.location.reload();},style:{padding:"8px 14px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontWeight:700,cursor:"pointer"}},"↻ Recharger"),
+      RE("button",{onClick:function(){sigCopier(rapport,null);},style:{padding:"8px 14px",borderRadius:8,border:"1px solid var(--border,#444)",background:"transparent",color:"inherit",fontWeight:700,cursor:"pointer"}},"📋 Copier le rapport")));
+};
+
 /* ════ v10.146 : PÉRIODES À VENIR — carte de Paramètres, composant partagé jsx/html ════ */
 const FUT_PROFILS=[["inter","intermédiaires"],["basic","basiques"],["admin","secrétaires et cadres"],["att","attachés et IDE"]];
 const FUT_ETATS={fermee:["⛔ Fermée","#6b7280","personne, sauf l'éditeur"],phase1:["🏖️ Congés ouverts","#0e7490","congés, FMC et préférences, chacun pour soi"],constr:["🚧 En construction","#b45309","personne, sauf l'éditeur"],dif:["📢 Diffusée","#16a34a","tout le monde, comme la période en cours"]};
@@ -4690,7 +4715,7 @@ function sigLignes(s){var c=s.ctx||{};return [
   "Mode : "+(c.mode||"?")+" · "+(c.reseau||"?")+" · "+(c.theme||"?"),
   "Version : "+(c.version||"?")+" · "+(c.appareil||"?"),
   "Navigateur : "+(c.navigateur||"?")];}
-function sigTexte(s){var j=s.journal||[];return ["🐞 Signalement CardioPlanning — "+sigDate(s.ts)+" — "+(s.auteur||"?")].concat(sigLignes(s),["—",s.texte||"","—","Journal de la page ("+j.length+" ligne"+(j.length>1?"s":"")+") :"],j.length?j:["(vide)"]).join("\n");}
+function sigTexte(s){var j=s.journal||[],q=s.prec||[];return ["🐞 Signalement CardioPlanning — "+sigDate(s.ts)+" — "+(s.auteur||"?")].concat(sigLignes(s),["—",s.texte||"","—","Journal de la page ("+j.length+" ligne"+(j.length>1?"s":"")+") :"],j.length?j:["(vide)"],q.length?["—","Session précédente ("+q.length+" ligne"+(q.length>1?"s":"")+", avant le dernier redémarrage) :"].concat(q):[]).join("\n");}
 function sigCopier(txt,toast){var fin=function(ok){if(toast)toast(ok?"Signalement copié":"Copie impossible — sélectionnez le texte à la main",ok?"ok":"warn");};
   try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){fin(true);},function(){fin(false);});return;}}catch(e){}
   try{var ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();var ok=document.execCommand("copy");document.body.removeChild(ta);fin(ok);}catch(e2){fin(false);}}
@@ -4708,7 +4733,7 @@ function SignalModal(p){
     RE("div",{style:{fontSize:10,color:"var(--txt3)",margin:"10px 0 3px",fontWeight:700,textTransform:"uppercase",letterSpacing:.4}},"Joint au signalement"),
     RE("div",{style:{fontSize:10,color:"var(--txt2)",fontFamily:"'JetBrains Mono',monospace",background:"var(--bg2)",borderRadius:6,padding:"6px 8px",lineHeight:1.5,wordBreak:"break-word"}},
       sigLignes({ctx:p.ctx}).map((l,i)=>RE("div",{key:i},l)),
-      RE("div",null,"Journal de la page : "+nJ+" ligne"+(nJ>1?"s":""))),
+      RE("div",null,"Journal de la page : "+nJ+" ligne"+(nJ>1?"s":"")+((p.prec||[]).length?" · session précédente : "+(p.prec||[]).length:""))),
     p.netOff&&RE("div",{style:{fontSize:11,color:"#dc2626",fontWeight:700,marginTop:8}},"Hors ligne — l'envoi n'est possible qu'avec du réseau. Réessayez plus tard."),
     RE("button",{disabled:!peut,onClick:envoyer,style:Object.assign({},S.btnP,{width:"100%",marginTop:10,opacity:peut?1:.5,cursor:peut?"pointer":"default"})},envoi?"Envoi…":"Envoyer")));
 }
@@ -8388,7 +8413,7 @@ function CardioPlanning(){
   const [archBytes,setArchBytes]=useState(0);   /* v10.138 : poids des archives (collection à part) */
   /* v10.142 : signalements — lus à l'ouverture (badge sur l'onglet Paramètres) et à chaque visite de Paramètres */
   const [sigList,setSigList]=useState([]);
-  const refreshSig=useCallback(async()=>{try{const snap=await window.firebaseDB.collection("signalements").get();const l=[];snap.forEach(d2=>{const x=d2.data()||{};l.push({id:d2.id,ts:x.ts||0,auteur:x.auteur,texte:x.texte,ctx:x.ctx||{},journal:x.journal||[],traite:!!x.traite});});l.sort((a,b)=>b.ts-a.ts);setSigList(l);}catch(e){}},[]);
+  const refreshSig=useCallback(async()=>{try{const snap=await window.firebaseDB.collection("signalements").get();const l=[];snap.forEach(d2=>{const x=d2.data()||{};l.push({id:d2.id,ts:x.ts||0,auteur:x.auteur,texte:x.texte,ctx:x.ctx||{},journal:x.journal||[],prec:x.prec||[],traite:!!x.traite});});l.sort((a,b)=>b.ts-a.ts);setSigList(l);}catch(e){}},[]);
   useEffect(()=>{refreshSig();},[refreshSig]);
   useEffect(()=>{if(tab==="partage")refreshSig();},[tab,refreshSig]);
   const sigTraite=async(id,v)=>{try{await window.firebaseDB.collection("signalements").doc(id).set({traite:!!v},{merge:true});toast(v?"Signalement traité":"Signalement rouvert");}catch(e){toast("Échec de l'enregistrement","warn");}refreshSig();};
@@ -10289,7 +10314,7 @@ function CardioPlanning(){
       mode:(accessMode==="edit"?"éditeur":accessMode==="medecinEdit"?"médecin "+(authorRef.current||"?"):accessMode==="adminEdit"?"administratif "+(authorRef.current||"?"):accessMode==="interneEdit"?"interne "+(authorRef.current||"?"):"consultation")+(VER_STALE.on?" — version périmée":""),
       appareil:(narrow?"téléphone":"ordinateur")+" "+window.innerWidth+"×"+window.innerHeight+(inst?", installée sur l'écran d'accueil":", dans le navigateur"),
       reseau:(netOff||navigator.onLine===false)?"hors ligne":"en ligne",theme:darkMode?"nuit":"jour",navigateur:String(navigator.userAgent||"?").slice(0,200)};};
-  const sigEnvoyer=async(texte)=>{const ts=Date.now();await window.firebaseDB.collection("signalements").doc("s"+ts).set({ts,auteur:authorRef.current||"?",texte:String(texte||"").slice(0,2000),ctx:sigCtx(),journal:JOURNAL.slice(),traite:false});toast("Signalement envoyé — merci");refreshSig();};
+  const sigEnvoyer=async(texte)=>{const ts=Date.now();await window.firebaseDB.collection("signalements").doc("s"+ts).set({ts,auteur:authorRef.current||"?",texte:String(texte||"").slice(0,2000),ctx:sigCtx(),journal:JOURNAL.slice(),prec:JOURNAL_PREC.slice(),traite:false});toast("Signalement envoyé — merci");refreshSig();};
   const sigNouv=isEdit?sigList.filter(s=>!s.traite).length:0;
   /* v10.132 : bandeaux du Planning et des Attachés (sa capture iPhone du 28/08) — sous 760 px,
      les icônes impression / clair-sombre / préférences se replient sous ⋯ et ressortent
@@ -12570,7 +12595,7 @@ header::-webkit-scrollbar { display: none; }
           <div style={{fontSize:9,color:"var(--txt3)",marginTop:8,lineHeight:1.45}}>Les colonnes se déduisent des activités : la salle indiquée sur chaque fiche d'activité décide de la colonne où elle apparaît. Modifier une salle dans l'onglet Activités déplace donc la colonne ici.</div>
         </div>
       </div>}
-      {modal==="signal"&&<SignalModal auteur={authorRef.current} ctx={sigCtx()} journal={JOURNAL} netOff={netOff||navigator.onLine===false} onClose={()=>setModal(null)} onSend={async(t)=>{try{await sigEnvoyer(t);setModal(null);}catch(e){toast("Échec de l'envoi — réessayez","warn");throw e;}}}/>}{/* v10.142 */}
+      {modal==="signal"&&<SignalModal auteur={authorRef.current} ctx={sigCtx()} journal={JOURNAL} prec={JOURNAL_PREC} netOff={netOff||navigator.onLine===false} onClose={()=>setModal(null)} onSend={async(t)=>{try{await sigEnvoyer(t);setModal(null);}catch(e){toast("Échec de l'envoi — réessayez","warn");throw e;}}}/>}{/* v10.142 */}
       {modal==="print"&&(()=>{
         const TABN={planning:"📅 Planning équipe",chl:"🏥 CHL",chb:"🏥 CHB",plateau:"❤️ PT Cardio",angio:"🔬 PT Angio",garde:"🌙 Gardes",attache:"👔 Attachés",astreinte:"📞 Astreinte"};
         const isG=tab==="garde"||tab==="astreinte";
