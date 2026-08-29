@@ -16,6 +16,18 @@ const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function
 const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? window.firebaseOnSnapshot : null;
 const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(){return VER_STALE.on?verMuet():window.firebaseUpdatePaths.apply(null,arguments);} : null;
 
+/* v10.142 : JOURNAL DE BORD — l'équivalent de la console (F12) gardé en mémoire : erreurs, avertissements,
+   erreurs non rattrapées, promesses rejetées, et les changements d'onglet. 40 entrées, 300 caractères
+   chacune, rien n'est envoyé nulle part : elles ne partent qu'avec un signalement 🐞. */
+var JOURNAL=[];
+function jlog(niv,args){try{var t=new Date(),p=function(n){return ("0"+n).slice(-2);};var s=Array.prototype.map.call(args,function(a){if(a&&a.stack)return String(a.stack).split("\n").slice(0,3).join(" | ");if(a&&typeof a==="object"){try{return JSON.stringify(a);}catch(e){return String(a);}}return String(a);}).join(" ");JOURNAL.push(p(t.getHours())+":"+p(t.getMinutes())+":"+p(t.getSeconds())+" "+niv+" "+s.replace(/\s+/g," ").slice(0,300));if(JOURNAL.length>40)JOURNAL.shift();}catch(e){}}
+(function(){if(typeof window==="undefined"||window.__jlogOn)return;window.__jlogOn=true;
+  var ce=console.error.bind(console),cw=console.warn.bind(console);
+  console.error=function(){jlog("ERREUR",arguments);ce.apply(null,arguments);};
+  console.warn=function(){jlog("AVERT.",arguments);cw.apply(null,arguments);};
+  window.addEventListener("error",function(e){jlog("PLANTAGE",[(e&&e.message)||"?",(e&&e.filename?String(e.filename).split("/").pop()+":"+e.lineno:"")]);});
+  window.addEventListener("unhandledrejection",function(e){jlog("PROMESSE",[e&&e.reason&&e.reason.message||(e&&e.reason)||"?"]);});})();
+
 /* ════ FÉRIÉS ════ */
 function getFeries(y){
   const f=new Set(),add=(m,d)=>f.add(`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`);
@@ -34,7 +46,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.141 — 29/08/2026";
+const APP_VERSION="v10.142 — 29/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4456,6 +4468,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"Vos préférences de tour")," : même bouton, dans la même fenêtre — la préférence porte alors sur la ",HE("b",null,"semaine entière")," (⭐ je souhaite tourner, 🚫 pas cette semaine)."]}),
   HP({children:["• ",HE("b",null,"Les revoir, les retirer")," : le bouton ",HBtn({kind:"ghost",children:"⭐"})," de la barre du Planning colore les cases concernées — bande bleue « je souhaite tourner », bande rouge « je préfère éviter », ⭐ ou 🚫 sur les jours de garde — avec sa légende au-dessus du tableau. Dans la fenêtre de la case, la ligne de préférence se clique pour la retirer."]}),
   HP({children:["• ",HE("b",null,"Vos propres activités")," : modifier le contenu de vos cases (activité, salle, note)."]}),
+  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞 (Aide, ou ⋯ dans Planning et Attachés) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
@@ -4513,7 +4526,7 @@ const HELP_SECTIONS=[
   HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde. Même suivi de colonne que le Planning, partagé avec lui."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
-  HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase. Les encarts arrivent repliés : cliquez un titre pour l\'ouvrir, « Tout déplier » en haut."]}),
+  HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase, boîte des signalements 🐞. Les encarts arrivent repliés : cliquez un titre pour l\'ouvrir, « Tout déplier » en haut."]}),
   HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV."]}),
   HTab({t:"📥 Reports",children:["outil individuel et facultatif : cochez vos semaines blanches, puis un tableau chronologique signale les semaines de tour reportées sur vos blanches (dates habituelles), celles sans report possible, celles déjà blanches, et les dates fermées à réouvrir ; suivi des offs par semaine. Les activités concernées se cochent « 📥 à reporter » dans l'onglet Activités. Export CSV."]}))},
 
@@ -4553,6 +4566,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Signaler un problème")," (v10.142) : le bouton 🐞 — dans l'onglet Aide, et dans Planning et Attachés (à côté de 🌓, ou sous ⋯ sur téléphone) — ouvre une petite fenêtre : on décrit ce qui s'est passé, on appuie sur Envoyer, c'est tout. Version, onglet, période, jour regardé, mode d'accès, appareil, navigateur, état du réseau et journal de la page (les erreurs et avertissements de la console, avec les derniers changements d'onglet) partent avec, automatiquement — jamais le PIN, jamais d'image. L'envoi demande du réseau. L'éditeur retrouve les tickets dans Paramètres, carte 🐞 Signalements (un badge rouge sur l'onglet compte ceux à traiter) : ▸ déroule le détail, Copier donne un texte prêt à coller, ✓ Traité le classe."]}),
   HP({children:[HE("b",null,"Colonne suivie")," (v10.140) : dans Planning et Attachés, l'éditeur et les médecins de niveau intermédiaire peuvent appuyer sur l'initiale en tête d'une colonne pour la suivre : cadre plein de la couleur du médecin, anneau autour de son initiale, teinte légère sur ses cases vides, et les autres colonnes s'estompent à 40 %. Un second appui relâche, une autre initiale déplace le suivi ; une seule colonne à la fois, conservée le temps de la session, d'un onglet et d'une période à l'autre — elle cohabite avec le pointillé violet de sa propre colonne. Sur téléphone, la colonne suivie vient se centrer à l'écran. Le bouton 🎓 Garde int. ramène le cadre tout à gauche pour montrer la colonne 🎓 Int., sans changer ni le jour regardé ni la hauteur (v10.141). La carte 🌓 Thème de Paramètres est retirée : c'est un réglage par appareil, que le bouton 🌓 des onglets couvre (voir 📱 Installer sur votre téléphone)."]}),
             HP({children:[HE("b",null,"Bornes de navigation")," (v10.138) : les flèches ‹ › ne remontent pas avant la plus ancienne archive (à défaut deux ans en arrière) et ne vont pas au-delà de six périodes — deux ans — devant la période en cours ; un message le dit à la borne. Cela vaut pour tous les onglets qui naviguent par période : Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Planning type, Tour, Reports, Construire, Astreinte, Stats et l'export. Les Internes naviguent par semestre, entre les semestres déclarés. Naviguer ne crée aucune donnée ; la borne évite qu'une case posée par erreur très loin dans le futur ne pèse sans que personne ne la voie. La carte Poids affiche aussi le poids des archives, rangées dans leur propre collection et donc hors de la jauge du document actif."]}),
   HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles et Sauvegarde & archivage sont trois cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto avec un message à chaque appui (v10.139), donc chacun choisit son mode sans Paramètres ; à la reprise de l'application en veille, le réglage du téléphone est relu. La carte Thème de Paramètres, devenue redondante, est retirée en v10.140. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
@@ -4636,6 +4650,61 @@ function HelpView(){
         HE("span",{style:{flex:1,fontSize:13,fontWeight:800,color:"var(--txt)"}},s.title),
         HE("span",{style:{fontSize:11,color:"var(--txt3)",transform:hOpen[s.id]?"rotate(180deg)":"none",transition:"transform .18s"}},"▼")),
       hOpen[s.id]&&HE("div",{style:{padding:"2px 14px 13px"}},s.body()))));
+}
+
+/* ════ v10.142 : SIGNALEMENT IN-APP — composants partagés jsx/html, React.createElement pur ════
+   Un bouton 🐞, pour tous : une description libre, et tout le reste joint automatiquement (version, onglet,
+   période, jour regardé, mode, appareil, navigateur, réseau, thème, journal de bord). Les tickets vont dans
+   une collection Firestore à part (« signalements », hors jauge) ; l'éditeur les lit dans Paramètres. */
+function sigDate(ts){var d=new Date(ts||0),p=function(n){return ("0"+n).slice(-2);};return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes());}
+function sigLignes(s){var c=s.ctx||{};return [
+  "Onglet : "+(c.onglet||"?")+" · Période : "+(c.periode||"?")+" · Jour regardé : "+(c.jour||"—"),
+  "Mode : "+(c.mode||"?")+" · "+(c.reseau||"?")+" · "+(c.theme||"?"),
+  "Version : "+(c.version||"?")+" · "+(c.appareil||"?"),
+  "Navigateur : "+(c.navigateur||"?")];}
+function sigTexte(s){var j=s.journal||[];return ["🐞 Signalement CardioPlanning — "+sigDate(s.ts)+" — "+(s.auteur||"?")].concat(sigLignes(s),["—",s.texte||"","—","Journal de la page ("+j.length+" ligne"+(j.length>1?"s":"")+") :"],j.length?j:["(vide)"]).join("\n");}
+function sigCopier(txt,toast){var fin=function(ok){if(toast)toast(ok?"Signalement copié":"Copie impossible — sélectionnez le texte à la main",ok?"ok":"warn");};
+  try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){fin(true);},function(){fin(false);});return;}}catch(e){}
+  try{var ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();var ok=document.execCommand("copy");document.body.removeChild(ta);fin(ok);}catch(e2){fin(false);}}
+function SignalModal(p){
+  const RE=React.createElement;
+  const [texte,setTexte]=React.useState("");
+  const [envoi,setEnvoi]=React.useState(false);
+  const nJ=(p.journal||[]).length;
+  const peut=texte.trim().length>0&&!p.netOff&&!envoi;
+  const envoyer=()=>{if(!peut)return;setEnvoi(true);Promise.resolve().then(()=>p.onSend(texte.trim())).catch(()=>{}).then(()=>setEnvoi(false));};
+  return RE(Ov,{onClose:p.onClose},RE("div",{style:{minWidth:280}},
+    RE("div",{style:S.mHd},RE("div",{style:S.mTit2},"🐞 Signaler un problème"),RE("button",{onClick:p.onClose,style:S.xBtn},"×")),
+    RE("div",{style:{fontSize:11,color:"var(--txt2)",marginBottom:8,lineHeight:1.5}},"Dites ce que vous vouliez faire et ce qui est arrivé à la place. Tout le reste est joint automatiquement."),
+    RE("textarea",{value:texte,onChange:e=>setTexte(e.target.value),rows:4,placeholder:"Par exemple : en posant une garde le 12, la case est restée vide…",style:Object.assign({},S.fi,{width:"100%",resize:"vertical",fontFamily:"inherit",boxSizing:"border-box"})}),
+    RE("div",{style:{fontSize:10,color:"var(--txt3)",margin:"10px 0 3px",fontWeight:700,textTransform:"uppercase",letterSpacing:.4}},"Joint au signalement"),
+    RE("div",{style:{fontSize:10,color:"var(--txt2)",fontFamily:"'JetBrains Mono',monospace",background:"var(--bg2)",borderRadius:6,padding:"6px 8px",lineHeight:1.5,wordBreak:"break-word"}},
+      sigLignes({ctx:p.ctx}).map((l,i)=>RE("div",{key:i},l)),
+      RE("div",null,"Journal de la page : "+nJ+" ligne"+(nJ>1?"s":""))),
+    p.netOff&&RE("div",{style:{fontSize:11,color:"#dc2626",fontWeight:700,marginTop:8}},"Hors ligne — l'envoi n'est possible qu'avec du réseau. Réessayez plus tard."),
+    RE("button",{disabled:!peut,onClick:envoyer,style:Object.assign({},S.btnP,{width:"100%",marginTop:10,opacity:peut?1:.5,cursor:peut?"pointer":"default"})},envoi?"Envoi…":"Envoyer")));
+}
+function SignalBox(p){
+  const RE=React.createElement;
+  const [ouvert,setOuvert]=React.useState(null);
+  const items=p.items||[];const nouv=items.filter(s=>!s.traite).length;
+  return RE("div",{style:Object.assign({},S.card,{marginBottom:10})},
+    RE("div",{style:{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}},"🐞 Signalements"+(nouv?" — "+nouv+" à traiter":"")),
+    RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.5}},"Ce que vos collègues ont signalé depuis le bouton 🐞 (onglet Aide, ou ⋯ dans Planning et Attachés). Chaque ticket porte la version, l'onglet, la période, le mode, l'appareil et le journal de la page ; « Copier » donne un texte prêt à coller."),
+    RE("button",{onClick:p.onRefresh,style:Object.assign({},S.icnBtn,{marginBottom:8})},"↻ Actualiser"),
+    items.length===0&&RE("div",{style:{fontSize:11,color:"var(--txt3)"}},"Aucun signalement."),
+    items.map(s=>RE("div",{key:s.id,style:{border:"1px solid var(--border)",borderRadius:8,padding:"6px 8px",marginBottom:6,opacity:s.traite?.6:1}},
+      RE("div",{style:{display:"flex",gap:6,alignItems:"center",cursor:"pointer"},onClick:()=>setOuvert(ouvert===s.id?null:s.id)},
+        RE("span",{style:{fontSize:10,color:"var(--txt3)"}},ouvert===s.id?"▾":"▸"),
+        RE("span",{style:{fontSize:11,fontWeight:s.traite?400:800,color:"var(--txt)",flex:1}},sigDate(s.ts)+" · "+(s.auteur||"?")+" · "+((s.ctx||{}).onglet||"?")),
+        s.traite&&RE("span",{style:{fontSize:10,color:"#16a34a",fontWeight:700}},"✓ traité")),
+      RE("div",{style:{fontSize:12,color:"var(--txt)",marginTop:3,whiteSpace:"pre-wrap"}},s.texte),
+      ouvert===s.id&&RE("div",null,
+        RE("pre",{style:{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"var(--bg2)",borderRadius:6,padding:6,maxHeight:200,overflow:"auto",whiteSpace:"pre-wrap",margin:"6px 0"}},sigTexte(s)),
+        RE("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+          RE("button",{style:S.icnBtn,onClick:()=>sigCopier(sigTexte(s),p.toast)},"📋 Copier"),
+          RE("button",{style:S.icnBtn,onClick:()=>p.onTraite(s.id,!s.traite)},s.traite?"↩ Rouvrir":"✓ Traité"),
+          RE("button",{style:S.qBtn,onClick:()=>{if(window.confirm("Supprimer ce signalement ?"))p.onDel(s.id);}},"🗑 Supprimer"))))));
 }
 
 /* ════ REPORTS (v9.2) — aide au report de consultations, composant partagé jsx/html ════ */
@@ -7686,6 +7755,7 @@ function CardioPlanning(){
   useEffect(()=>{setMoreOpen(false);setFiltOpen(false);},[tab]);
   const pageMem=useRef({});
   const goTab=useCallback((next)=>{
+    jlog("ONGLET",[next]);   /* v10.142 */
     setTab(cur=>{
       if(cur===next)return cur;
       /* v10.31 : Construire rejoint Paramètres — on retrouve l'endroit où on était.
@@ -8272,6 +8342,13 @@ function CardioPlanning(){
   const [impWait,setImpWait]=useState(null);  /* v10.103 : fichier d'import lu, en attente de confirmation dans la page */
   const [archivedList,setArchivedList]=useState([]);
   const [archBytes,setArchBytes]=useState(0);   /* v10.138 : poids des archives (collection à part) */
+  /* v10.142 : signalements — lus à l'ouverture (badge sur l'onglet Paramètres) et à chaque visite de Paramètres */
+  const [sigList,setSigList]=useState([]);
+  const refreshSig=useCallback(async()=>{try{const snap=await window.firebaseDB.collection("signalements").get();const l=[];snap.forEach(d2=>{const x=d2.data()||{};l.push({id:d2.id,ts:x.ts||0,auteur:x.auteur,texte:x.texte,ctx:x.ctx||{},journal:x.journal||[],traite:!!x.traite});});l.sort((a,b)=>b.ts-a.ts);setSigList(l);}catch(e){}},[]);
+  useEffect(()=>{refreshSig();},[refreshSig]);
+  useEffect(()=>{if(tab==="partage")refreshSig();},[tab,refreshSig]);
+  const sigTraite=async(id,v)=>{try{await window.firebaseDB.collection("signalements").doc(id).set({traite:!!v},{merge:true});toast(v?"Signalement traité":"Signalement rouvert");}catch(e){toast("Échec de l'enregistrement","warn");}refreshSig();};
+  const sigDel=async(id)=>{try{await window.firebaseDB.collection("signalements").doc(id).delete();toast("Signalement supprimé");}catch(e){toast("Échec de la suppression","warn");}refreshSig();};
   const refreshArchList=useCallback(async()=>{
     try{
       const snap=await window.firebaseDB.collection("archives").get();
@@ -10148,6 +10225,15 @@ function CardioPlanning(){
   const canSuivi=isEdit||isInterEdit;
   const suiviCur=canSuivi?suiviId:null;
   const suiviTap=canSuivi?(id=>setSuiviId(s=>s!==null&&String(s)===String(id)?null:id)):null;
+  /* v10.142 : signalement — le contexte joint, l'envoi (collection à part, hors jauge), le badge Paramètres */
+  const sigCtx=()=>{const ps=perStart(year,month);const jr=SCROLL_MEM.jour?String(SCROLL_MEM.jour).split("-"):null;let inst=false;try{inst=!!(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;}catch(e){}
+    const lib=(orderedTabs.find(x=>x[0]===tab)||[])[1]||tab;
+    return {version:APP_VERSION,onglet:lib,periode:perLibelle(ps.sy,ps.sm),jour:jr&&jr.length===3?(("0"+jr[2]).slice(-2)+"/"+("0"+(+jr[1]+1)).slice(-2)+"/"+jr[0]):"—",
+      mode:(accessMode==="edit"?"éditeur":accessMode==="medecinEdit"?"médecin "+(authorRef.current||"?"):accessMode==="adminEdit"?"administratif "+(authorRef.current||"?"):accessMode==="interneEdit"?"interne "+(authorRef.current||"?"):"consultation")+(VER_STALE.on?" — version périmée":""),
+      appareil:(narrow?"téléphone":"ordinateur")+" "+window.innerWidth+"×"+window.innerHeight+(inst?", installée sur l'écran d'accueil":", dans le navigateur"),
+      reseau:(netOff||navigator.onLine===false)?"hors ligne":"en ligne",theme:darkMode?"nuit":"jour",navigateur:String(navigator.userAgent||"?").slice(0,200)};};
+  const sigEnvoyer=async(texte)=>{const ts=Date.now();await window.firebaseDB.collection("signalements").doc("s"+ts).set({ts,auteur:authorRef.current||"?",texte:String(texte||"").slice(0,2000),ctx:sigCtx(),journal:JOURNAL.slice(),traite:false});toast("Signalement envoyé — merci");refreshSig();};
+  const sigNouv=isEdit?sigList.filter(s=>!s.traite).length:0;
   /* v10.132 : bandeaux du Planning et des Attachés (sa capture iPhone du 28/08) — sous 760 px,
      les icônes impression / clair-sombre / préférences se replient sous ⋯ et ressortent
      dans un plateau qui se referme au geste suivant ; le bouton « ce jour / toute la période »
@@ -10155,6 +10241,7 @@ function CardioPlanning(){
      Garde int. reste à côté. Sur ordinateur, rien ne bouge. Les mêmes boutons servent aux deux onglets. */
   const btnPrint=<button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>;
   const btnDark=<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>;
+  const btnSig=<button onClick={()=>setModal("signal")} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button>;   /* v10.142 */
   const btnFull=<button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>;
   const btnPref=canPref?<button onClick={()=>setPrefOn(v=>!v)} title="Afficher les préférences de tour et de garde" style={{...S.arr,fontSize:14,width:30,color:prefOn?"var(--today-c)":"var(--txt2)",border:`1px solid ${prefOn?"var(--today-c)":"var(--border)"}`}}>⭐</button>:null;
   const btnMore=<button data-keep="1" onClick={()=>setMoreOpen(v=>!v)} title="Autres outils" style={{...S.arr,fontSize:15,width:30,color:moreOpen?"var(--today-c)":"var(--txt2)",border:`1px solid ${moreOpen?"var(--today-c)":"var(--border)"}`}}>⋯</button>;
@@ -10307,7 +10394,7 @@ header::-webkit-scrollbar { display: none; }
               onDragOver={e=>{e.preventDefault();}}
               onDrop={e=>{ e.preventDefault(); if(dragTab&&dragTab!==v){ setTabOrder(p=>{ const a=[...p],fi=a.indexOf(dragTab),ti=a.indexOf(v); a.splice(fi,1); a.splice(ti,0,dragTab); return a; }); } setDragTab(null); }}
               onClick={()=>goTab(v)}
-              style={{...S.nb,...(tab===v?S.nba:{}),cursor:"grab",userSelect:"none"}}>{l}</button>
+              style={{...S.nb,...(tab===v?S.nba:{}),cursor:"grab",userSelect:"none"}}>{l}{v==="partage"&&sigNouv>0&&<span style={{marginLeft:4,background:"#dc2626",color:"#fff",borderRadius:9,padding:"0 5px",fontSize:9,fontWeight:800}}>{sigNouv}</span>}</button>
           ))}
         </nav>
       </header>
@@ -10390,10 +10477,10 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={nextM} style={S.arr}>›</button>
             </div>
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-              {iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnFull}{btnPref}</React.Fragment>)}
+              {iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}{btnPref}</React.Fragment>)}
             </div>
           </div>
-          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnPref}</React.Fragment>)}
+          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnPref}</React.Fragment>)}
           {prefOn&&<div style={{display:"flex",flexWrap:"wrap",gap:"4px 10px",alignItems:"center",marginBottom:8,fontSize:10,color:"var(--txt3)"}}>
             <span style={{fontWeight:700,textTransform:"uppercase"}}>Préférences :</span>
             <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"rgba(56,139,253,.20)",border:"1px solid #388bfd"}}></span>souhaite tourner</span>
@@ -10488,9 +10575,9 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<IssuePanel iss={attIssues} open={plIssOpen} setOpen={setPlIssOpen} onGo={goIssue}/>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}><button onClick={prevM} style={S.arr}>‹</button><h2 style={S.mTit}>{"👔 Attachés — "+(MOIS[perStart(year,month).sm]+" — "+MOIS[(perStart(year,month).sm+PCFG.len-1)%12]+" "+perStart(year,month).sy)}</h2><button onClick={nextM} style={S.arr}>›</button></div>
-            <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnFull}</React.Fragment>)}</div>
+            <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}</React.Fragment>)}</div>
           </div>
-          {trayFold(<React.Fragment>{btnPrint}{btnDark}</React.Fragment>)}
+          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}</React.Fragment>)}
           {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
@@ -10586,7 +10673,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
       {tab==="internes"&&<InternesView intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
-      {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
+      {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
         const astToday=new Date();
@@ -11588,6 +11675,7 @@ header::-webkit-scrollbar { display: none; }
               </div>);
             })()}
           </div>
+          {isEdit&&<SignalBox items={sigList} toast={toast} onRefresh={refreshSig} onTraite={sigTraite} onDel={sigDel}/>}{/* v10.142 */}
 
         </div>
       )}
@@ -12419,6 +12507,7 @@ header::-webkit-scrollbar { display: none; }
           <div style={{fontSize:9,color:"var(--txt3)",marginTop:8,lineHeight:1.45}}>Les colonnes se déduisent des activités : la salle indiquée sur chaque fiche d'activité décide de la colonne où elle apparaît. Modifier une salle dans l'onglet Activités déplace donc la colonne ici.</div>
         </div>
       </div>}
+      {modal==="signal"&&<SignalModal auteur={authorRef.current} ctx={sigCtx()} journal={JOURNAL} netOff={netOff||navigator.onLine===false} onClose={()=>setModal(null)} onSend={async(t)=>{try{await sigEnvoyer(t);setModal(null);}catch(e){toast("Échec de l'envoi — réessayez","warn");throw e;}}}/>}{/* v10.142 */}
       {modal==="print"&&(()=>{
         const TABN={planning:"📅 Planning équipe",chl:"🏥 CHL",chb:"🏥 CHB",plateau:"❤️ PT Cardio",angio:"🔬 PT Angio",garde:"🌙 Gardes",attache:"👔 Attachés",astreinte:"📞 Astreinte"};
         const isG=tab==="garde"||tab==="astreinte";
