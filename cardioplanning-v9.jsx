@@ -34,7 +34,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.139 — 29/08/2026";
+const APP_VERSION="v10.140 — 29/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -654,7 +654,7 @@ function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v}
    parfait, ordinateur muet, et clic droit intact puisqu'il ne les consulte pas. */
 let _gvLpF=false,_gvLpT=null;
 
-function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS}){
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null}){
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
      disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
      partie → la case du jour est hachurée et verrouillée, et la personne
@@ -794,9 +794,10 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
             <th style={{...S.thFix,position:"sticky",top:0,left:C0,zIndex:40,minWidth:C1}}>Sl</th>
             {showGarde&&<th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#93c47d"}}>Garde</th>}
             {intGarde&&<th title="Garde des internes (lecture seule)" style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:CG,borderRight:"2px solid var(--border)",fontSize:9,color:"#1d4ed8"}}>🎓 Int.</th>}
-            {meds.map(m=><th key={m.id} data-col={m.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20,...(String(m.id)===String(selfId)?lis:{})}} title={`Dr. ${m.prenom} ${m.nom}`}>
-              <div style={{...S.avT,background:m.color,margin:"0 auto"}}>{m.init}</div>
-            </th>)}
+            {meds.map(m=>{const sv=suiviId!==null&&String(m.id)===String(suiviId);   /* v10.140 : colonne suivie */
+              return <th key={m.id} data-col={m.id} onClick={onSuivi?e=>{onSuivi(m.id);if(!sv)gvCentrer(e.currentTarget);}:undefined} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20,...(String(m.id)===String(selfId)?lis:{}),...(onSuivi?{cursor:"pointer"}:{}),...(sv?{boxShadow:"inset 3px 0 0 "+m.color+", inset -3px 0 0 "+m.color+", inset 0 3px 0 "+m.color}:{})}} title={(onSuivi?(sv?"Relâcher le suivi — ":"Suivre cette colonne — "):"")+`Dr. ${m.prenom} ${m.nom}`}>
+              <div style={{...S.avT,background:m.color,margin:"0 auto",...(sv?{boxShadow:"0 0 0 2px var(--bg), 0 0 0 4px "+m.color}:{}),...(suiviId!==null&&!sv?{opacity:.4}:{})}}>{m.init}</div>
+            </th>;})}
           </tr>
         </thead>
         <tbody>
@@ -852,8 +853,14 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   /* v10.81 : preferences de tour (bande lun-ven) et de garde (icone du jour) */
                   const pf=prefFor?prefFor(med.id,ey,em,d):null;
                   const prefBg=pf&&pf.tour?(pf.tour==="wish"?"rgba(56,139,253,.20)":"rgba(248,81,73,.18)"):null;
+                  /* v10.140 : colonne suivie — cadre plein 3 px à la couleur du médecin (bas sur la dernière ligne),
+                     teinte légère sur les cases vides (le vert d'astreinte, les hachures et les préférences gardent la
+                     priorité), les autres colonnes à 40 %. */
+                  const sv=suiviId!==null&&String(med.id)===String(suiviId);
+                  const svSh=sv?"inset 3px 0 0 "+med.color+", inset -3px 0 0 "+med.color+(di===printDays.length-1&&si===slots.length-1?", inset 0 -3px 0 "+med.color:""):null;
+                  const svTint=sv&&!es.length&&!bl&&!offC&&!isAst&&!prefBg?lisRgba(med.color,.14):null;
                   return <td key={med.id} title={offC?("Indisponible — désactivé "+medOffL(med).map(r=>"du "+offFr(r.du)+" au "+offFr(r.au)).join(", ")):((issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined)}
-                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(prefBg?{background:prefBg}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),...(offC?{background:"repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)",opacity:.55,cursor:"default"}:{}),...(HL.on[sk(ey,em,d,sl)+"|"+med.id]?{outline:"3px solid #e3b341",outlineOffset:-3}:{}),display:"table-cell",verticalAlign:"middle",position:"relative",...(String(med.id)===String(selfId)?lis:{})}}
+                    style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(prefBg?{background:prefBg}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),...(offC?{background:"repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)",opacity:.55,cursor:"default"}:{}),...(HL.on[sk(ey,em,d,sl)+"|"+med.id]?{outline:"3px solid #e3b341",outlineOffset:-3}:{}),display:"table-cell",verticalAlign:"middle",position:"relative",...(String(med.id)===String(selfId)?lis:{}),...(svTint?{background:svTint}:{}),...(svSh?{boxShadow:(isAst?astSh+", ":"")+svSh}:{}),...(suiviId!==null&&!sv?{opacity:.4}:{})}}
                     onContextMenu={onCellHistory?e=>{e.preventDefault();onCellHistory(med.id,ey,em,d,sl);}:undefined}
                     onTouchStart={onCellHistory?()=>{_gvLpF=false;clearTimeout(_gvLpT);_gvLpT=setTimeout(()=>{_gvLpF=true;onCellHistory(med.id,ey,em,d,sl);},600);}:undefined}
                     onTouchEnd={onCellHistory?()=>clearTimeout(_gvLpT):undefined}
@@ -906,6 +913,13 @@ const LIS={borderLeft:"2px dashed #7c3aed",borderRight:"2px dashed #7c3aed"};
    lisStyle(hex, op) fabrique le style ; LIS reste la valeur par défaut. */
 function lisRgba(hex,op){var h=String(hex||"#7c3aed").replace("#","");if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var n=parseInt(h,16);if(isNaN(n))n=0x7c3aed;var a=op===undefined||op===null?1:Math.max(.1,Math.min(1,Number(op)));return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
 function lisStyle(hex,op){var c=lisRgba(hex,op);return {borderLeft:"2px dashed "+c,borderRight:"2px dashed "+c};}
+/* v10.140 : colonne suivie (Planning / Attachés). gvCadre : le cadre défilant qui contient un
+   élément de la grille (le div de TableScroll). gvCentrer : amène la colonne touchée au centre du
+   cadre — sur téléphone la grille déborde ; sur ordinateur, quand tout tient, rien ne bouge.
+   gvJour : amène une ligne de jour en haut du cadre (bouton Garde int.) — sans elle, le haut. */
+function gvCadre(n){var el=n?n.parentElement:null;while(el&&el!==document.body){var cs=window.getComputedStyle(el);if(/auto|scroll/.test(cs.overflowY)||/auto|scroll/.test(cs.overflowX))return el;el=el.parentElement;}return null;}
+function gvCentrer(th){var el=gvCadre(th);if(!el||el.scrollWidth<=el.clientWidth+1)return;var r=th.getBoundingClientRect(),R=el.getBoundingClientRect();var x=Math.max(0,el.scrollLeft+(r.left+r.width/2)-(R.left+R.width/2));try{el.scrollTo({left:x,behavior:"smooth"});}catch(e){el.scrollLeft=x;}}
+function gvJour(key){var rows=document.querySelectorAll("[data-day]");if(!rows.length)return;var el=gvCadre(rows[0]);if(!el)return;var t=key?document.querySelector('[data-day="'+key+'"]'):null;var y=t?Math.max(0,t.offsetTop-el.offsetTop):0;try{el.scrollTo({top:y,behavior:"smooth"});}catch(e){el.scrollTop=y;}}
 /* v10.49 : demi-journées off (onglet Reports) — participation des salles.
    `offOuv` vit sur la fiche de salle ; non renseigné = par défaut les salles où
    une consultation (CS_CHL / CS_CHB) peut se dérouler — son précochage. */
@@ -4444,6 +4458,7 @@ const HELP_SECTIONS=[
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
   HP({children:[HE("b",null,"iPhone / iPad (Safari)")," : ouvrez le planning dans Safari, touchez le bouton Partager (le carré avec une flèche vers le haut), faites défiler et choisissez ",HE("b",null,"« Sur l'écran d'accueil »"),", puis Ajouter. L'icône CardioPlanning apparaît et s'ouvre en plein écran, comme une vraie application."]}),
   HP({children:[HE("b",null,"Android (Chrome)")," : ouvrez le planning dans Chrome, menu ⋮ en haut à droite, puis ",HE("b",null,"« Ajouter à l'écran d'accueil »")," (ou « Installer l'application » si Chrome le propose) et validez."]}),
+  HP({children:[HE("b",null,"🌓 Clair ou sombre")," : le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto et affiche le mode retenu. Auto suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil) ; Jour et Nuit sont mémorisés sur cet appareil seulement — chacun règle le sien, rien n'est partagé."]}),
   HP({last:true,children:["Dans les deux cas, l'icône ouvre toujours la dernière version : c'est le site lui-même, aucune mise à jour manuelle à faire. Astuce : refaites simplement l'ajout si vous changez de téléphone."]}))},
 
 {id:"construire",icon:"🧱",title:"Construire — créer le planning pas à pas",body:()=>HE("div",null,
@@ -4485,14 +4500,14 @@ const HELP_SECTIONS=[
   HP({children:["La case patients ",HE("b",null,"vide"),", c'est toute la consultation qui part d'un bloc ; un ",HE("b",null,"nombre"),", c'est vous qui divisez. Les ",HE("b",null,"après-midis des semaines de tour")," peuvent reprendre une partie des patients — jamais le matin — et la part posée crée alors réellement la consultation dans le planning, avec choix de salle. Le reste peut partir « ↪ en liste d'attente », gérée par les secrétaires. Un badge « ⚠ report incomplet » reste affiché tant que le compte n'est pas à zéro."]}),
   HP({last:true,children:["En bas, « ",HE("b",null,"Demi-journées off par semaine")," » montre les créneaux libres hors semaines de tour : de quoi ouvrir une consultation, une fois tous les reports traités (export CSV). Les flèches ↶↷ couvrent aussi les reports, y compris pour les administratifs."]}))},
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
-  HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible."]}),
+  HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible. Éditeur et intermédiaires : un appui sur l'initiale en tête de colonne la suit (cadre à la couleur du médecin, autres colonnes estompées) ; un second appui relâche."]}),
   HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip. Les anciens onglets Tour et Gardes vivent ici, entiers, dans les tuiles 2 et 3."]}),
   HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour. Le bouton ↔ règle l'",HE("b",null,"ordre des colonnes"),", de gauche à droite, site par site (↩ Ordre par défaut pour revenir en arrière)."]}),
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
   HTab({t:"🎓 Internes",children:["le planning des internes, par semestre de 6 mois : demi-journées, colonne de garde, jauge et statistiques. Onglet facultatif, activé dans Paramètres."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
   HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et sa fenêtre d'application — appliquer ou retirer, par mois ou par semaines. Les semaines entièrement passées ne s'affichent plus ; nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée."]}),
-  HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde."]}),
+  HTab({t:"👔 Attachés",children:["planning des attachés et IDE — sans colonne de garde. Même suivi de colonne que le Planning, partagé avec lui."]}),
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
   HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase. Les encarts arrivent repliés : cliquez un titre pour l\'ouvrir, « Tout déplier » en haut."]}),
@@ -4535,8 +4550,9 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Colonne suivie")," (v10.140) : dans Planning et Attachés, l'éditeur et les médecins de niveau intermédiaire peuvent appuyer sur l'initiale en tête d'une colonne pour la suivre : cadre plein de la couleur du médecin, anneau autour de son initiale, teinte légère sur ses cases vides, et les autres colonnes s'estompent à 40 %. Un second appui relâche, une autre initiale déplace le suivi ; une seule colonne à la fois, conservée le temps de la session, d'un onglet et d'une période à l'autre — elle cohabite avec le pointillé violet de sa propre colonne. Sur téléphone, la colonne suivie vient se centrer à l'écran. Le bouton 🎓 Garde int. amène désormais le cadre sur la ligne d'aujourd'hui (ou le début de la période s'il est ailleurs), sans changer sa hauteur. La carte 🌓 Thème de Paramètres est retirée : c'est un réglage par appareil, que le bouton 🌓 des onglets couvre (voir 📱 Installer sur votre téléphone)."]}),
             HP({children:[HE("b",null,"Bornes de navigation")," (v10.138) : les flèches ‹ › ne remontent pas avant la plus ancienne archive (à défaut deux ans en arrière) et ne vont pas au-delà de six périodes — deux ans — devant la période en cours ; un message le dit à la borne. Cela vaut pour tous les onglets qui naviguent par période : Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Planning type, Tour, Reports, Construire, Astreinte, Stats et l'export. Les Internes naviguent par semestre, entre les semestres déclarés. Naviguer ne crée aucune donnée ; la borne évite qu'une case posée par erreur très loin dans le futur ne pèse sans que personne ne la voie. La carte Poids affiche aussi le poids des archives, rangées dans leur propre collection et donc hors de la jauge du document actif."]}),
-  HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles, Sauvegarde & archivage et Thème sont quatre cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Dans Thème, le mode choisi est en surbrillance et une ligne dit ce qui est en vigueur — le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto avec un message à chaque appui (v10.139), donc chacun peut revenir au suivi du téléphone sans Paramètres ; à la reprise de l'application en veille, le réglage du téléphone est relu. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
+  HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles et Sauvegarde & archivage sont trois cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto avec un message à chaque appui (v10.139), donc chacun choisit son mode sans Paramètres ; à la reprise de l'application en veille, le réglage du téléphone est relu. La carte Thème de Paramètres, devenue redondante, est retirée en v10.140. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
   HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
   HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
   HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
@@ -7595,6 +7611,7 @@ function CardioPlanning(){
   const [intCfg,setIntCfg]=useState({sems:[],show:false,jaugeDef:true,sHC:2,sUS:2,sSam:1}); // v10.54 internes
   const [prefOn,setPrefOn]=useState(false);   // v10.81 : coloration des preferences — session seulement
   const [intGardeOn,setIntGardeOn]=useState(false); // v10.61 lot 3b : colonne garde int. du Planning — session seulement, cachée en nominal
+  const [suiviId,setSuiviId]=useState(null);   /* v10.140 : colonne suivie (Planning / Attachés) — session seulement, un médecin à la fois */
   const [ptOrder,setPtOrder]=useState([]);
   const [specColors,setSpecColors]=useState({});
   const [colOrder,setColOrder]=useState({});
@@ -10122,6 +10139,12 @@ function CardioPlanning(){
   const selfMedId=accessMode==="medecinEdit"&&editMedId!=null?editMedId:null;
   const selfLis=selfMedId!==null&&(colSelf.off||[]).map(String).indexOf(String(selfMedId))<0?selfMedId:null;
   const lisCur=lisStyle(colSelf.col||"#7c3aed",colSelf.op===undefined?1:colSelf.op);   /* v10.133 */
+  /* v10.140 : colonne suivie — éditeur et niveau intermédiaire seulement. Un appui sur l'initiale suit ce
+     médecin, un second le relâche, une autre initiale déplace le suivi ; une seule colonne, conservée le temps
+     de la session, d'un onglet à l'autre (Planning / Attachés) et d'une période à l'autre. */
+  const canSuivi=isEdit||isInterEdit;
+  const suiviCur=canSuivi?suiviId:null;
+  const suiviTap=canSuivi?(id=>setSuiviId(s=>s!==null&&String(s)===String(id)?null:id)):null;
   /* v10.132 : bandeaux du Planning et des Attachés (sa capture iPhone du 28/08) — sous 760 px,
      les icônes impression / clair-sombre / préférences se replient sous ⋯ et ressortent
      dans un plateau qui se referme au geste suivant ; le bouton « ce jour / toute la période »
@@ -10377,13 +10400,13 @@ header::-webkit-scrollbar { display: none; }
           </div>}
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8,alignItems:"center",position:"relative"}}>
             <button data-keep="1" onClick={()=>setFiltOpen(v=>!v)} title="Choisir les médecins affichés" style={{fontSize:11,padding:"3px 11px",borderRadius:8,border:"1.5px solid "+(planFilter.length?"#1d4ed8":"var(--border)"),background:planFilter.length?"rgba(29,78,216,.10)":"var(--bg2)",color:planFilter.length?"#1d4ed8":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>{"🔍 Filtre : "+filtLbl+" ▾"}</button>
-            {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>setIntGardeOn(v=>!v)} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
+            {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>{const nv=!intGardeOn;setIntGardeOn(nv);if(nv){const t=new Date();setTimeout(()=>gvJour(t.getFullYear()+"-"+t.getMonth()+"-"+t.getDate()),60);}}} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
             {filtOpen&&<div data-keep="1" style={{position:"absolute",top:"100%",left:0,zIndex:60,marginTop:4,padding:8,borderRadius:10,border:"1px solid var(--border)",background:"var(--bg)",boxShadow:"0 6px 18px rgba(0,0,0,.18)",display:"flex",flexWrap:"wrap",gap:4,maxWidth:"min(92vw,520px)"}}>
               <button onClick={()=>setPlanFilter([])} style={{padding:"2px 8px",borderRadius:10,border:"1px solid var(--border)",background:planFilter.length===0?"#1d4ed8":"var(--bg2)",color:planFilter.length===0?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:600}}>Tous</button>
               {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             </div>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -10465,7 +10488,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnFull}</React.Fragment>)}</div>
           </div>
           {trayFold(<React.Fragment>{btnPrint}{btnDark}</React.Fragment>)}
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -11562,17 +11585,6 @@ header::-webkit-scrollbar { display: none; }
               </div>);
             })()}
           </div>
-          <div style={{...S.card,marginBottom:10}}>{/* v10.137 : Thème, carte à part */}
-              <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🌓 Thème</div>
-              <div style={{display:"flex",gap:6}}>
-                <button onClick={()=>themeApply("auto")}
-                  style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid "+(themeSel==="auto"?"#7c3aed":"var(--border)"),background:themeSel==="auto"?"rgba(124,58,237,.10)":"var(--bg2)",color:themeSel==="auto"?"#7c3aed":"var(--txt2)",fontWeight:800,cursor:"pointer"}}>📱 Auto (téléphone)</button>
-                <button onClick={()=>setDarkMode(false)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid "+(themeSel==="light"?"#7c3aed":"var(--border)"),background:themeSel==="light"?"rgba(124,58,237,.10)":"var(--bg2)",color:themeSel==="light"?"#7c3aed":"var(--txt2)",fontWeight:800,cursor:"pointer"}}>☀️ Jour</button>
-                <button onClick={()=>setDarkMode(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1.5px solid "+(themeSel==="dark"?"#7c3aed":"var(--border)"),background:themeSel==="dark"?"rgba(124,58,237,.10)":"var(--bg2)",color:themeSel==="dark"?"#7c3aed":"var(--txt2)",fontWeight:800,cursor:"pointer"}}>🌓 Nuit</button>
-              </div>
-              <div style={{fontSize:11,color:"var(--txt)",marginTop:6,fontWeight:700}}>{"Mode en vigueur : "+(themeSel==="auto"?"Auto → "+(darkMode?"sombre":"clair")+" (réglage du téléphone)":themeSel==="dark"?"Nuit, mémorisé sur cet appareil":"Jour, mémorisé sur cet appareil")}</div>
-              <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Auto : suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix mémorisé sur cet appareil. Le bouton 🌓 des onglets, accessible à tous, tourne Auto → Jour → Nuit → Auto et affiche le mode retenu.</div>
-            </div>
 
         </div>
       )}
