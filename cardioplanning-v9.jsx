@@ -34,7 +34,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.137 — 29/08/2026";
+const APP_VERSION="v10.138 — 29/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -59,6 +59,19 @@ function perStart(y,m){
 }
 function perNext(sy,sm){const t=sm+PCFG.len;return{sy:t>11?sy+1:sy,sm:t%12};}
 function perPrev(sy,sm){const t=sm-PCFG.len;return{sy:t<0?sy-1:sy,sm:(t+12)%12};}
+/* v10.138 : bornes de navigation. Naviguer ne crée rien, mais une case posée par erreur
+   très loin dans le futur pèserait sans que personne ne la voie. Passé : la plus ancienne
+   archive (à défaut deux ans en arrière) ; futur : PER_LIM.av périodes devant la période en
+   cours (6 = deux ans). perPrevB/perNextB rendent null à la borne, avec un toast. */
+var PER_LIM={min:null,av:6,toast:null};
+function perIdx(sy,sm){return sy*12+sm;}
+function perOk(sy,sm,av){var t=new Date(),c=perStart(t.getFullYear(),t.getMonth()),i=perIdx(sy,sm),n=av===undefined?PER_LIM.av:av;
+  var mn=PER_LIM.min?perIdx(PER_LIM.min.sy,PER_LIM.min.sm):perIdx(c.sy,c.sm)-PCFG.len*6;
+  if(i<mn){if(PER_LIM.toast)PER_LIM.toast(PER_LIM.min?"⛔ Rien avant la plus ancienne archive":"⛔ Rien avant deux ans en arrière","warn");return false;}
+  if(i>perIdx(c.sy,c.sm)+PCFG.len*n){if(PER_LIM.toast)PER_LIM.toast("⛔ Limite : "+n+" périodes devant la période en cours","warn");return false;}
+  return true;}
+function perPrevB(sy,sm,av){var p=perPrev(sy,sm);return perOk(p.sy,p.sm,av)?p:null;}
+function perNextB(sy,sm,av){var p=perNext(sy,sm);return perOk(p.sy,p.sm,av)?p:null;}
 // ── Règle "semaines complètes" : la période s'étend jusqu'au dimanche qui clôt la dernière semaine,
 //    puis inclut le lundi suivant s'il est férié (ex. 1er novembre). La période suivante démarre le lendemain.
 function perEnd(sy,sm){
@@ -3440,8 +3453,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
   const perKeyT=perT.startY+"_"+perT.startM;
   const savedCfg=(tourCfg||{})[perKeyT]||null;
   const perLabelT=MOIS[perT.startM]+" — "+MOIS[(perT.startM+PCFG.len-1)%12];
-  const prevPeriodT=()=>{const p=perPrev(perT.startY,perT.startM);setTourMonth(p.sm);setTourYear(p.sy);};
-  const nextPeriodT=()=>{const p=perNext(perT.startY,perT.startM);setTourMonth(p.sm);setTourYear(p.sy);};
+  const prevPeriodT=()=>{const p=perPrevB(perT.startY,perT.startM);if(!p)return;setTourMonth(p.sm);setTourYear(p.sy);};
+  const nextPeriodT=()=>{const p=perNextB(perT.startY,perT.startM);if(!p)return;setTourMonth(p.sm);setTourYear(p.sy);};
   /* v10.109 : les semaines viennent des BORNES REELLES de la periode. Avant, elles
      partaient du 1er lundi >= 1er du mois et s'arretaient au dernier jour du dernier
      mois — juste tant qu'aucune extension ne deplacait une borne. */
@@ -4247,8 +4260,8 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
   const _ps=perStart(statsYear,statsMonth);
   const per={startY:_ps.sy,startM:_ps.sm};
   const perLabelS=MOIS[per.startM]+" — "+MOIS[(per.startM+PCFG.len-1)%12];
-  const prevP=()=>{const p=perPrev(per.startY,per.startM);setStatsMonth(p.sm);setStatsYear(p.sy);};
-  const nextP=()=>{const p=perNext(per.startY,per.startM);setStatsMonth(p.sm);setStatsYear(p.sy);};
+  const prevP=()=>{const p=perPrevB(per.startY,per.startM);if(!p)return;setStatsMonth(p.sm);setStatsYear(p.sy);};
+  const nextP=()=>{const p=perNextB(per.startY,per.startM);if(!p)return;setStatsMonth(p.sm);setStatsYear(p.sy);};
 
   // Build all days in period
   const days=perDaysList(per.startY,per.startM);
@@ -4522,7 +4535,8 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-          HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles, Sauvegarde & archivage et Thème sont quatre cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Dans Thème, le mode choisi est en surbrillance et une ligne dit ce qui est en vigueur — le bouton 🌓 des onglets mémorise un choix Jour ou Nuit sur l'appareil, ce qui désactive Auto jusqu'à ce qu'on le rechoisisse ici. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
+            HP({children:[HE("b",null,"Bornes de navigation")," (v10.138) : les flèches ‹ › ne remontent pas avant la plus ancienne archive (à défaut deux ans en arrière) et ne vont pas au-delà de six périodes — deux ans — devant la période en cours ; un message le dit à la borne. Cela vaut pour tous les onglets qui naviguent par période : Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Planning type, Tour, Reports, Construire, Astreinte, Stats et l'export. Les Internes naviguent par semestre, entre les semestres déclarés. Naviguer ne crée aucune donnée ; la borne évite qu'une case posée par erreur très loin dans le futur ne pèse sans que personne ne la voie. La carte Poids affiche aussi le poids des archives, rangées dans leur propre collection et donc hors de la jauge du document actif."]}),
+  HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles, Sauvegarde & archivage et Thème sont quatre cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Dans Thème, le mode choisi est en surbrillance et une ligne dit ce qui est en vigueur — le bouton 🌓 des onglets mémorise un choix Jour ou Nuit sur l'appareil, ce qui désactive Auto jusqu'à ce qu'on le rechoisisse ici. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
   HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
   HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
   HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
@@ -4966,9 +4980,9 @@ function ReportsView(p){
         :RE("select",{value:selId||"",onChange:e=>setSelId(parseInt(e.target.value)),style:{padding:"5px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:12,fontWeight:700}},
           medsCS.map(m=>RE("option",{key:m.id,value:m.id},"Dr. "+m.prenom+" "+m.nom))),
       RE("span",{style:{display:"inline-flex",alignItems:"center",gap:4,marginLeft:"auto"}},
-        RE("button",{onClick:()=>setRepPer(pp=>perPrev(pp.sy,pp.sm)),style:{fontSize:12,padding:"3px 9px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontWeight:800}},"◀"),
+        RE("button",{onClick:()=>setRepPer(pp=>perPrevB(pp.sy,pp.sm)||pp),style:{fontSize:12,padding:"3px 9px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontWeight:800}},"◀"),
         RE("span",{style:{fontSize:12,fontWeight:800,color:"#1d4ed8",minWidth:150,textAlign:"center"}},perLbl),
-        RE("button",{onClick:()=>setRepPer(pp=>perNext(pp.sy,pp.sm)),style:{fontSize:12,padding:"3px 9px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontWeight:800}},"▶"))),
+        RE("button",{onClick:()=>setRepPer(pp=>perNextB(pp.sy,pp.sm)||pp),style:{fontSize:12,padding:"3px 9px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontWeight:800}},"▶"))),
     RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:12,lineHeight:1.6}},
       "Outil individuel et facultatif : cochez vos jours/semaines sans consultation (« blanches ») laissés par votre secrétaire dans le logiciel métier, l'application propose ensuite les reports les plus adaptés."),
     editable&&RE("div",{style:{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}},
@@ -5787,9 +5801,9 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     <div>
       <div style={{...S.bar,position:"sticky",top:HDR_H,zIndex:60,background:"var(--bg)",paddingTop:6,paddingBottom:6,marginBottom:0,minHeight:BUILD_BAR_H}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <button onClick={()=>allerA(perPrev(bPer.sy,bPer.sm))} style={S.arr}>‹</button>
+          <button onClick={()=>{const p=perPrevB(bPer.sy,bPer.sm);if(p)allerA(p);}} style={S.arr}>‹</button>
           <h2 style={S.mTit}>{"🏗️ Construire — "+perLbl}</h2>
-          <button onClick={()=>allerA(perNext(bPer.sy,bPer.sm))} style={S.arr}>›</button>
+          <button onClick={()=>{const p=perNextB(bPer.sy,bPer.sm);if(p)allerA(p);}} style={S.arr}>›</button>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
           <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
@@ -6053,9 +6067,9 @@ function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,
       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un fichier gardé chez vous, indépendant de l'application et de sa synchronisation. Le tableau ne couvre que la période choisie ci-dessous : il sert à rediffuser le planning. Les données brutes contiennent l'intégralité des données, toutes périodes confondues : elles servent à tout remettre en place via 📂 Importer.</div>
 
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
-        <button onClick={()=>setPer(perPrev(per.sy,per.sm))} style={S.arr}>‹</button>
+        <button onClick={()=>setPer(perPrevB(per.sy,per.sm)||per)} style={S.arr}>‹</button>
         <span style={{fontSize:12,fontWeight:800,color:"var(--txt)",minWidth:190,textAlign:"center"}}>{lbl}</span>
-        <button onClick={()=>setPer(perNext(per.sy,per.sm))} style={S.arr}>›</button>
+        <button onClick={()=>setPer(perNextB(per.sy,per.sm)||per)} style={S.arr}>›</button>
       </div>
 
       <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>À partir de</div>
@@ -7615,7 +7629,7 @@ function CardioPlanning(){
   /* ── v9.10 : mode hors ligne (lecture seule) ── */
   const [netOff,setNetOff]=useState(()=>typeof navigator!=="undefined"&&navigator.onLine===false);
   const [stale,setStale]=useState(false);   /* v10.135 : cette copie est dépassée par le serveur */
-  useEffect(()=>{VER_STALE.toast=(m,t)=>toast(m,t);});   /* sans dépendance : toast naît plus bas dans le composant */
+  useEffect(()=>{VER_STALE.toast=(m,t)=>toast(m,t);PER_LIM.toast=(m,t)=>toast(m,t);});   /* sans dépendance : toast naît plus bas dans le composant */
   useEffect(()=>{
     const on=()=>setNetOff(false),off=()=>setNetOff(true);
     window.addEventListener("online",on);window.addEventListener("offline",off);
@@ -8224,11 +8238,14 @@ function CardioPlanning(){
   const [docDet,setDocDet]=useState(null);   /* v10.101 : poids par champ, pour le détail de la jauge */
   const [impWait,setImpWait]=useState(null);  /* v10.103 : fichier d'import lu, en attente de confirmation dans la page */
   const [archivedList,setArchivedList]=useState([]);
+  const [archBytes,setArchBytes]=useState(0);   /* v10.138 : poids des archives (collection à part) */
   const refreshArchList=useCallback(async()=>{
     try{
       const snap=await window.firebaseDB.collection("archives").get();
-      const ids=[];snap.forEach(d2=>{if(d2.id&&d2.id.indexOf("per-")===0)ids.push(d2.id.slice(4));});
-      ids.sort((a,b)=>{const x=a.split("-"),y2=b.split("-");return (+x[0]-+y2[0])||(+x[1]-+y2[1]);});setArchivedList(ids);return ids;
+      const ids=[];let octets=0;snap.forEach(d2=>{if(d2.id&&d2.id.indexOf("per-")===0){ids.push(d2.id.slice(4));try{octets+=new Blob([JSON.stringify(d2.data()||{})]).size;}catch(e){}}});
+      ids.sort((a,b)=>{const x=a.split("-"),y2=b.split("-");return (+x[0]-+y2[0])||(+x[1]-+y2[1]);});setArchivedList(ids);
+      /* v10.138 : la plus ancienne archive borne la navigation ; le poids total sert à la jauge */
+      PER_LIM.min=ids.length?{sy:+ids[0].split("-")[0],sm:+ids[0].split("-")[1]}:null;setArchBytes(octets);return ids;
     }catch(e){return [];}
   },[]);
   useEffect(()=>{refreshArchList();},[refreshArchList]); /* v10.111 : le badge « période archivée » a besoin de la liste dès l'ouverture */
@@ -9863,12 +9880,12 @@ function CardioPlanning(){
   const getPeriodStart=(y,m)=>{const p=perStart(y,m);return{sy:p.sy,sm:p.sm};};
   const prevM=()=>{
     const{sm,sy}=getPeriodStart(year,month);
-    const p=perPrev(sy,sm);
+    const p=perPrevB(sy,sm);if(!p)return;
     setYearMonth(p.sy,p.sm);
   };
   const nextM=()=>{
     const{sm,sy}=getPeriodStart(year,month);
-    const p=perNext(sy,sm);
+    const p=perNextB(sy,sm);if(!p)return;
     setYearMonth(p.sy,p.sm);
   };
   const [daySwapSpan,setDaySwapSpan]=useState("J");
@@ -10544,8 +10561,8 @@ header::-webkit-scrollbar { display: none; }
         };
         const JOURS_C=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
         const {sy,sm}=perStart(astYear,astMonth);
-        const prevAst=()=>{const p=perPrev(sy,sm);setAstYear(p.sy);setAstMonth(p.sm);};
-        const nextAst=()=>{const p=perNext(sy,sm);setAstYear(p.sy);setAstMonth(p.sm);};
+        const prevAst=()=>{const p=perPrevB(sy,sm);if(!p)return;setAstYear(p.sy);setAstMonth(p.sm);};
+        const nextAst=()=>{const p=perNextB(sy,sm);if(!p)return;setAstYear(p.sy);setAstMonth(p.sm);};
         const allDays4M=perDaysList(sy,sm);
         /* v9.49 : liste d'affichage seule — les statistiques et le retrait de période
            continuent de porter sur toute la période, quelle que soit l'impression. */
@@ -10553,8 +10570,8 @@ header::-webkit-scrollbar { display: none; }
         const stats={};
         astMeds.forEach(m=>{stats[String(m.id)]=0;});
         allDays4M.forEach(({y,m,d})=>{const mid=astForDay2(y,m,d);if(mid&&stats[mid]!==undefined)stats[mid]++;});
-        const prevP=()=>{const p=perPrev(sy,sm);setAstYear(p.sy);setAstMonth(p.sm);};
-        const nextP=()=>{const p=perNext(sy,sm);setAstYear(p.sy);setAstMonth(p.sm);};
+        const prevP=()=>{const p=perPrevB(sy,sm);if(!p)return;setAstYear(p.sy);setAstMonth(p.sm);};
+        const nextP=()=>{const p=perNextB(sy,sm);if(!p)return;setAstYear(p.sy);setAstMonth(p.sm);};
         const pLabel=MOIS[sm]+" — "+MOIS[(sm+PCFG.len-1)%12]+" "+sy;
         // ── Répartition automatique des astreintes (semaines complètes lun→dim) ──
         const astMondays=(()=>{
@@ -11269,6 +11286,7 @@ header::-webkit-scrollbar { display: none; }
                     {rows.map(r=><span key={r.f} style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:9,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)"}}>{r.f} {r.b<1024?"<1":(r.b/1024).toFixed(r.b<10240?1:0)} Ko</span>)}
                   </div>;
                 })()}
+                <div style={{fontSize:11,color:"var(--txt2)",marginTop:6,fontWeight:700}}>{"🗄 Archives : "+(archBytes>=1024?(archBytes/1024).toFixed(0)+" Ko":archBytes+" o")+" — "+archivedList.length+" période"+(archivedList.length>1?"s":"")+", dans leur propre collection, hors de cette jauge."}</div>{/* v10.138 */}
                 <div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>Limite Firebase : 1 Mo par document. {pct<60?"Large marge.":pct<85?"À surveiller — un archivage des anciens mois sera à prévoir.":"⚠ Proche de la limite : archivez les anciens mois rapidement."}</div>
               </div>);
             })()}
