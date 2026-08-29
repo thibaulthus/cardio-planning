@@ -148,7 +148,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.136 — 28/08/2026";
+var APP_VERSION = "v10.137 — 29/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4745,7 +4745,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-          HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. L'ordre des cartes est désormais le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
+          HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles, Sauvegarde & archivage et Thème sont quatre cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Dans Thème, le mode choisi est en surbrillance et une ligne dit ce qui est en vigueur — le bouton 🌓 des onglets mémorise un choix Jour ou Nuit sur l'appareil, ce qui désactive Auto jusqu'à ce qu'on le rechoisisse ici. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
   HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
   HP({children:[HE("b",null,"Bandeaux allégés sur téléphone")," (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."]}),
   HP({children:[HE("b",null,"La colonne du médecin connecté")," (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."]}),
@@ -6930,7 +6930,7 @@ function InternesTile(_a) {
     var maj = function (patch) { return setIntCfg(function (p) { return (__assign(__assign({}, p), patch)); }); };
     var inp = function (k, def) { return React.createElement("input", { type: "number", min: 0, max: 9, value: intCfg[k] === undefined ? def : intCfg[k], onChange: function (e) { var o = {}; o[k] = num(e.target.value); maj(o); }, style: __assign(__assign({}, S.fi), { width: 52, textAlign: "center" }) }); };
     return React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-        React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 8 } }, "\uD83C\uDF93 Internes"),
+        React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 8 } }, "\uD83C\uDF93 Internes"),
         React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, fontWeight: 700, marginBottom: 4, cursor: "pointer" } },
             React.createElement("input", { type: "checkbox", checked: intCfg.show === true, onChange: function (e) { return maj({ show: e.target.checked }); }, style: { width: 15, height: 15 } }),
             "Afficher l'onglet Internes"),
@@ -8074,10 +8074,12 @@ function CardioPlanning() {
             return false;
         }
     }), darkMode = _j[0], setDarkModeRaw = _j[1];
+    /* v10.137 : themeSel = ce que l'utilisateur a choisi (auto / light / dark), pour l'afficher */
+    var _thS = useState(function () { try { var v = localStorage.getItem("cp6_theme"); return v === "dark" ? "dark" : v === "light" ? "light" : "auto"; } catch (e) { return "auto"; } }), themeSel = _thS[0], setThemeSel = _thS[1];
     var setDarkMode = function (fn) { setDarkModeRaw(function (prev) { var nv = typeof fn === "function" ? fn(prev) : fn; try {
         localStorage.setItem("cp6_theme", nv ? "dark" : "light");
     }
-    catch (e) { } return nv; }); };
+    catch (e) { } setThemeSel(nv ? "dark" : "light"); return nv; }); };
     useEffect(function () {
         if (!window.matchMedia)
             return;
@@ -12359,7 +12361,7 @@ function CardioPlanning() {
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 5 } }, "Utilis\u00E9es dans la distribution du tour (tuile 2 de Construire) pour la sursp\u00E9cialit\u00E9 de chaque praticien et le d\u00E9compte des disponibles."))),
                 React.createElement(InternesTile, { intCfg: intCfg, setIntCfg: setIntCfg, actes: actes, pins: [editPin, adminPin, cadrePin] }),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD14 Notifications aux secr\u00E9taires"),
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD14 Notifications aux secr\u00E9taires"),
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Cochez les activit\u00E9s \u00E0 suivre : d\u00E8s qu'une p\u00E9riode est diffus\u00E9e (tuile 8 de Construire), chaque ajout ou retrait de ces activit\u00E9s pour un m\u00E9decin titulaire cr\u00E9e une ligne dans l'onglet \uD83D\uDD14 Notifications. Une ligne dont la date est pass\u00E9e s'efface d'elle-m\u00EAme."),
                         ["tous", "CHL", "CHB"].map(function (site3) {
@@ -12386,141 +12388,141 @@ function CardioPlanning() {
                         })),
                         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)" } }, "Tous les titulaires sont suivis d'office ; un attach\u00E9 ne l'est que s'il est coch\u00E9 ici."))),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                    React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
-                        React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
-                        React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, "Saisies ici, elles grisent les jours concern\u00E9s dans tous les onglets. Elles ne sont plus t\u00E9l\u00E9charg\u00E9es : une donn\u00E9e qui arrive apr\u00E8s l'affichage rendrait les bornes de p\u00E9riode changeantes."),
-                        (function () {
-                            var der = vacs.filter(function (v) { return v.d2; }).map(function (v) { return v.d2; }).sort().slice(-1)[0] || null;
-                            var proche = der ? ((new Date(der + "T00:00:00") - new Date()) / 86400000) < 183 : true;
-                            if (!proche)
-                                return null;
-                            return React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "9px 11px", fontSize: 12, color: "#78350f", marginBottom: 10 } }, der ? React.createElement(React.Fragment, null,
-                                "Vos dates couvrent jusqu'au ",
-                                React.createElement("b", null, fmtLong(der)),
-                                ". Au-del\u00E0, l'application ne conna\u00EEt plus les vacances \u2014 pensez \u00E0 saisir l'ann\u00E9e suivante.")
-                                : React.createElement(React.Fragment, null, "Aucune date saisie. La r\u00E8gle d'extension et le gris\u00E9 des vacances sont sans effet tant que la liste est vide."));
-                        })(),
-                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, fontWeight: 700, marginBottom: 10, cursor: "pointer" } },
-                            React.createElement("input", { type: "checkbox", checked: vacRule, onChange: function (e) { return setVacRule(e.target.checked); }, style: { width: 15, height: 15 } }),
-                            "\u00C9tendre la p\u00E9riode jusqu'\u00E0 la fin des vacances"),
-                        React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt2)", marginBottom: 10, lineHeight: 1.5 } }, "Quand la fin d'une p\u00E9riode tombe au milieu de vacances, elle est repouss\u00E9e \u00E0 leur dernier jour et la p\u00E9riode suivante d\u00E9marre le lendemain. Limit\u00E9 \u00E0 3 semaines, pour que les grandes vacances n'absorbent pas ao\u00FBt."),
-                        (function () {
-                            var p0 = perStart(year, month);
-                            var out = [];
-                            var cy = p0.sy, cm = p0.sm;
-                            for (var i = 0; i < 3; i++) {
-                                var pv = perPrev(cy, cm);
-                                var a = new Date(perEnd(pv.sy, pv.sm));
-                                a.setDate(a.getDate() + 1);
-                                var b = perEnd(cy, cm);
-                                out.push(React.createElement("div", { key: i, style: { marginBottom: 5 } },
-                                    React.createElement("b", null,
-                                        MOIS[cm],
-                                        " ",
-                                        cy),
-                                    " \u2014 du ",
-                                    fmtLongD(a),
-                                    " au ",
-                                    fmtLongD(b)));
-                                var nx = perNext(cy, cm);
-                                cy = nx.sy;
-                                cm = nx.sm;
-                            }
-                            return React.createElement("div", { style: { background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 11px", fontSize: 11.5, marginBottom: 12 } },
-                                React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 5 } }, "Aper\u00E7u"),
-                                out);
-                        })(),
-                        isEdit && React.createElement(React.Fragment, null,
-                            React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
-                                React.createElement("button", { onClick: function () { return setModal("vacColler"); }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "6px 11px", fontSize: 11.5, fontWeight: 800 }) }, "\uD83D\uDCCB Coller un calendrier"),
-                                React.createElement("a", { href: "https://www.education.gouv.fr/calendrier-scolaire", target: "_blank", rel: "noopener", style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "6px 11px", fontSize: 11.5, fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" }) }, "\uD83D\uDD17 Calendrier officiel"),
-                                React.createElement("button", { onClick: function () {
-                                        var an = vacAnSuivante(vacs);
-                                        setVacs(function (v) { return v.concat(VAC_NOMS.map(function (n2) { return ({ an: an, nom: n2, d1: "", d2: "" }); })); });
-                                    }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "6px 11px", fontSize: 11.5, fontWeight: 800 }) },
-                                    "+ Ann\u00E9e ",
-                                    vacAnSuivante(vacs)))),
-                        isEdit && vacGroupes(vacs).some(function (_a) {
-                            var an = _a[0];
-                            return vacTerminee(an);
-                        }) &&
-                            React.createElement("button", { onClick: function () {
-                                    var fin = vacGroupes(vacs).filter(function (_a) {
-                                        var an = _a[0];
-                                        return vacTerminee(an);
-                                    }).map(function (_a) {
-                                        var an = _a[0];
-                                        return an;
-                                    });
-                                    if (window.confirm("Supprimer " + fin.length + " année(s) scolaire(s) terminée(s) ?\n\n" + fin.join(", ") + "\n\nLes activités du planning ne sont pas touchées ; seules les bornes des périodes déjà écoulées peuvent se décaler de quelques jours."))
-                                        setVacs(function (l) { return l.filter(function (v) { return !vacTerminee(v.an); }); });
-                                }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "5px 10px", fontSize: 11, fontWeight: 800, marginBottom: 10 }) }, "\uD83D\uDDD1 Supprimer les ann\u00E9es termin\u00E9es"),
-                        vacGroupes(vacs).map(function (_a) {
-                            var an = _a[0], lignes = _a[1];
-                            return (React.createElement("div", { key: an, style: { marginBottom: 12 } },
-                                React.createElement("div", { onClick: function () { return setVacOuv(function (o) {
-                                        var _a;
-                                        return (__assign(__assign({}, o), (_a = {}, _a[an] = !vacOuvert(o, an), _a)));
-                                    }); }, style: { fontSize: 11, fontWeight: 800, color: "var(--txt2)", marginBottom: 4, cursor: "pointer", userSelect: "none" } },
-                                    vacOuvert(vacOuv, an) ? "▾" : "▸",
-                                    " Ann\u00E9e scolaire ",
-                                    an,
-                                    vacTerminee(an) && React.createElement("span", { style: { fontWeight: 600, color: "var(--txt3)" } }, " \u2014 termin\u00E9e")),
-                                vacOuvert(vacOuv, an) &&
-                                    React.createElement("div", { style: { border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" } },
-                                        React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
-                                            React.createElement("tbody", null, lignes.map(function (_a, i9) {
-                                                var v = _a.v, idx = _a.idx;
-                                                return (React.createElement("tr", { key: idx },
-                                                    React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)", width: 88, fontWeight: 700 } }, v.nom),
-                                                    React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)" } },
-                                                        React.createElement("input", { type: "date", value: v.d1 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d1: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
-                                                    React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)" } },
-                                                        React.createElement("input", { type: "date", value: v.d2 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d2: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
-                                                    isEdit && React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)", width: 22 } },
-                                                        React.createElement("span", { title: "Supprimer la ligne " + v.nom + " — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées", onClick: function () { if (window.confirm("Supprimer « " + v.nom + " " + v.an + " » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))
-                                                                setVacs(function (l) { return l.filter(function (x, i) { return i !== idx; }); }); }, style: { color: "#dc2626", cursor: "pointer", fontWeight: 800 } }, "\u2715"))));
-                                            }))))));
-                        }),
-                        vacs.length === 0 && React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt3)" } }, "Aucune vacance saisie.")),
-                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                        React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "var(--txt)", marginBottom: 6 } }, "\uD83C\uDFE5 Salles"),
-                        ["CHL", "CHB", "ANGIO", "PLATEAU"].map(function (site2) {
-                            var list = salleReg.filter(function (s) { return Array.isArray(s.s) ? s.s.indexOf(site2) >= 0 : s.s === site2; });
-                            var lbl = { CHL: "CHL", CHB: "CHB", ANGIO: "PT Angio", PLATEAU: "PT Cardio" }[site2];
-                            return React.createElement("div", { key: site2, style: { marginBottom: 6 } },
-                                React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, lbl),
-                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
-                                    list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: salleEdit === s.n ? "1.5px solid #388bfd" : "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
-                                        React.createElement("span", { onClick: function () { setMData(__assign(__assign({}, s), { _origN: s.n })); setModal("salleCfg"); }, style: { cursor: "pointer", textDecoration: "underline dotted", padding: "2px 2px" } }, s.n),
-                                        React.createElement("button", { onClick: function () {
-                                                if (!window.confirm("Supprimer la salle " + s.n + " du registre ?\n(Elle sera aussi retirée des activités ; les cases déjà posées gardent leur salle.)"))
-                                                    return;
-                                                setSalleReg(function (p) { return p.filter(function (x) { return x.n !== s.n; }); });
-                                                setActes(function (p) { return p.map(function (a) { return (__assign(__assign({}, a), { salles: (a.salles || []).filter(function (sx) { return sx !== s.n; }) })); }); });
-                                            }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 13, padding: "0 3px", color: "#dc2626", fontWeight: 900 } }, "\u00D7"))); }),
-                                    list.length === 0 && React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "\u2014")));
-                        }),
-                        salleEdit && (function () {
-                            var inSalle = actes.filter(function (a) { return (a.salles || []).includes(salleEdit); });
-                            return (React.createElement("div", { style: { marginTop: 6, marginBottom: 6, padding: 8, borderRadius: 7, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.05)" } },
-                                React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#388bfd", marginBottom: 5 } },
-                                    "Activit\u00E9s possibles dans ",
-                                    salleEdit,
+                    React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 8 } }, "\uD83C\uDFD6 Vacances scolaires"),
+                    React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, "Saisies ici, elles grisent les jours concern\u00E9s dans tous les onglets. Elles ne sont plus t\u00E9l\u00E9charg\u00E9es : une donn\u00E9e qui arrive apr\u00E8s l'affichage rendrait les bornes de p\u00E9riode changeantes."),
+                    (function () {
+                        var der = vacs.filter(function (v) { return v.d2; }).map(function (v) { return v.d2; }).sort().slice(-1)[0] || null;
+                        var proche = der ? ((new Date(der + "T00:00:00") - new Date()) / 86400000) < 183 : true;
+                        if (!proche)
+                            return null;
+                        return React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "9px 11px", fontSize: 12, color: "#78350f", marginBottom: 10 } }, der ? React.createElement(React.Fragment, null,
+                            "Vos dates couvrent jusqu'au ",
+                            React.createElement("b", null, fmtLong(der)),
+                            ". Au-del\u00E0, l'application ne conna\u00EEt plus les vacances \u2014 pensez \u00E0 saisir l'ann\u00E9e suivante.")
+                            : React.createElement(React.Fragment, null, "Aucune date saisie. La r\u00E8gle d'extension et le gris\u00E9 des vacances sont sans effet tant que la liste est vide."));
+                    })(),
+                    React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, fontWeight: 700, marginBottom: 10, cursor: "pointer" } },
+                        React.createElement("input", { type: "checkbox", checked: vacRule, onChange: function (e) { return setVacRule(e.target.checked); }, style: { width: 15, height: 15 } }),
+                        "\u00C9tendre la p\u00E9riode jusqu'\u00E0 la fin des vacances"),
+                    React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt2)", marginBottom: 10, lineHeight: 1.5 } }, "Quand la fin d'une p\u00E9riode tombe au milieu de vacances, elle est repouss\u00E9e \u00E0 leur dernier jour et la p\u00E9riode suivante d\u00E9marre le lendemain. Limit\u00E9 \u00E0 3 semaines, pour que les grandes vacances n'absorbent pas ao\u00FBt."),
+                    (function () {
+                        var p0 = perStart(year, month);
+                        var out = [];
+                        var cy = p0.sy, cm = p0.sm;
+                        for (var i = 0; i < 3; i++) {
+                            var pv = perPrev(cy, cm);
+                            var a = new Date(perEnd(pv.sy, pv.sm));
+                            a.setDate(a.getDate() + 1);
+                            var b = perEnd(cy, cm);
+                            out.push(React.createElement("div", { key: i, style: { marginBottom: 5 } },
+                                React.createElement("b", null,
+                                    MOIS[cm],
                                     " ",
-                                    React.createElement("span", { style: { color: "var(--txt3)", fontWeight: 600 } },
-                                        "(",
-                                        inSalle.length,
-                                        ")")),
-                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, actes.filter(function (a) { return a.hasSalle && !a.isSystem; }).map(function (a) {
-                                    var on = (a.salles || []).includes(salleEdit);
-                                    return React.createElement("button", { key: a.id, type: "button", onClick: function () { return setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== salleEdit; }) : (x.salles || []).concat([salleEdit]) }); }); }); }, style: { fontSize: 11, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
-                                })),
-                                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 4 } }, "Un clic ajoute/retire la salle de l'activit\u00E9 \u2014 c'est la m\u00EAme donn\u00E9e que les pastilles de l'\u00E9diteur d'activit\u00E9.")));
-                        })(),
-                        React.createElement("button", { onClick: function () { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
-                        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
-                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde & archivage"),
+                                    cy),
+                                " \u2014 du ",
+                                fmtLongD(a),
+                                " au ",
+                                fmtLongD(b)));
+                            var nx = perNext(cy, cm);
+                            cy = nx.sy;
+                            cm = nx.sm;
+                        }
+                        return React.createElement("div", { style: { background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 11px", fontSize: 11.5, marginBottom: 12 } },
+                            React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 5 } }, "Aper\u00E7u"),
+                            out);
+                    })(),
+                    isEdit && React.createElement(React.Fragment, null,
+                        React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
+                            React.createElement("button", { onClick: function () { return setModal("vacColler"); }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "6px 11px", fontSize: 11.5, fontWeight: 800 }) }, "\uD83D\uDCCB Coller un calendrier"),
+                            React.createElement("a", { href: "https://www.education.gouv.fr/calendrier-scolaire", target: "_blank", rel: "noopener", style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "6px 11px", fontSize: 11.5, fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" }) }, "\uD83D\uDD17 Calendrier officiel"),
+                            React.createElement("button", { onClick: function () {
+                                    var an = vacAnSuivante(vacs);
+                                    setVacs(function (v) { return v.concat(VAC_NOMS.map(function (n2) { return ({ an: an, nom: n2, d1: "", d2: "" }); })); });
+                                }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "6px 11px", fontSize: 11.5, fontWeight: 800 }) },
+                                "+ Ann\u00E9e ",
+                                vacAnSuivante(vacs)))),
+                    isEdit && vacGroupes(vacs).some(function (_a) {
+                        var an = _a[0];
+                        return vacTerminee(an);
+                    }) &&
+                        React.createElement("button", { onClick: function () {
+                                var fin = vacGroupes(vacs).filter(function (_a) {
+                                    var an = _a[0];
+                                    return vacTerminee(an);
+                                }).map(function (_a) {
+                                    var an = _a[0];
+                                    return an;
+                                });
+                                if (window.confirm("Supprimer " + fin.length + " année(s) scolaire(s) terminée(s) ?\n\n" + fin.join(", ") + "\n\nLes activités du planning ne sont pas touchées ; seules les bornes des périodes déjà écoulées peuvent se décaler de quelques jours."))
+                                    setVacs(function (l) { return l.filter(function (v) { return !vacTerminee(v.an); }); });
+                            }, style: __assign(__assign({}, S.icnBtn), { width: "auto", padding: "5px 10px", fontSize: 11, fontWeight: 800, marginBottom: 10 }) }, "\uD83D\uDDD1 Supprimer les ann\u00E9es termin\u00E9es"),
+                    vacGroupes(vacs).map(function (_a) {
+                        var an = _a[0], lignes = _a[1];
+                        return (React.createElement("div", { key: an, style: { marginBottom: 12 } },
+                            React.createElement("div", { onClick: function () { return setVacOuv(function (o) {
+                                    var _a;
+                                    return (__assign(__assign({}, o), (_a = {}, _a[an] = !vacOuvert(o, an), _a)));
+                                }); }, style: { fontSize: 11, fontWeight: 800, color: "var(--txt2)", marginBottom: 4, cursor: "pointer", userSelect: "none" } },
+                                vacOuvert(vacOuv, an) ? "▾" : "▸",
+                                " Ann\u00E9e scolaire ",
+                                an,
+                                vacTerminee(an) && React.createElement("span", { style: { fontWeight: 600, color: "var(--txt3)" } }, " \u2014 termin\u00E9e")),
+                            vacOuvert(vacOuv, an) &&
+                                React.createElement("div", { style: { border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" } },
+                                    React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
+                                        React.createElement("tbody", null, lignes.map(function (_a, i9) {
+                                            var v = _a.v, idx = _a.idx;
+                                            return (React.createElement("tr", { key: idx },
+                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)", width: 88, fontWeight: 700 } }, v.nom),
+                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)" } },
+                                                    React.createElement("input", { type: "date", value: v.d1 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d1: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
+                                                React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)" } },
+                                                    React.createElement("input", { type: "date", value: v.d2 || "", disabled: !isEdit, onChange: function (e) { return setVacs(function (l) { return l.map(function (x, i) { return i === idx ? __assign(__assign({}, x), { d2: e.target.value }) : x; }); }); }, style: __assign(__assign({}, S.fi), { fontSize: 11.5, padding: "3px 6px", width: "100%", maxWidth: 150 }) })),
+                                                isEdit && React.createElement("td", { style: { padding: "3px 6px", borderBottom: i9 === lignes.length - 1 ? "none" : "1px solid var(--border)", width: 22 } },
+                                                    React.createElement("span", { title: "Supprimer la ligne " + v.nom + " — à ne faire que pour corriger une saisie : les vacances passées servent à calculer les bornes des périodes passées", onClick: function () { if (window.confirm("Supprimer « " + v.nom + " " + v.an + " » ?\n\nLes vacances passées servent à calculer les bornes des périodes déjà écoulées."))
+                                                            setVacs(function (l) { return l.filter(function (x, i) { return i !== idx; }); }); }, style: { color: "#dc2626", cursor: "pointer", fontWeight: 800 } }, "\u2715"))));
+                                        }))))));
+                    }),
+                    vacs.length === 0 && React.createElement("div", { style: { fontSize: 11.5, color: "var(--txt3)" } }, "Aucune vacance saisie.")),
+                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83C\uDFE5 Salles"),
+                    ["CHL", "CHB", "ANGIO", "PLATEAU"].map(function (site2) {
+                        var list = salleReg.filter(function (s) { return Array.isArray(s.s) ? s.s.indexOf(site2) >= 0 : s.s === site2; });
+                        var lbl = { CHL: "CHL", CHB: "CHB", ANGIO: "PT Angio", PLATEAU: "PT Cardio" }[site2];
+                        return React.createElement("div", { key: site2, style: { marginBottom: 6 } },
+                            React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, lbl),
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
+                                list.map(function (s) { return (React.createElement("span", { key: s.n, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, padding: "3px 7px", borderRadius: 12, border: salleEdit === s.n ? "1.5px solid #388bfd" : "1px solid var(--border)", background: "var(--bg)", color: "var(--txt)" } },
+                                    React.createElement("span", { onClick: function () { setMData(__assign(__assign({}, s), { _origN: s.n })); setModal("salleCfg"); }, style: { cursor: "pointer", textDecoration: "underline dotted", padding: "2px 2px" } }, s.n),
+                                    React.createElement("button", { onClick: function () {
+                                            if (!window.confirm("Supprimer la salle " + s.n + " du registre ?\n(Elle sera aussi retirée des activités ; les cases déjà posées gardent leur salle.)"))
+                                                return;
+                                            setSalleReg(function (p) { return p.filter(function (x) { return x.n !== s.n; }); });
+                                            setActes(function (p) { return p.map(function (a) { return (__assign(__assign({}, a), { salles: (a.salles || []).filter(function (sx) { return sx !== s.n; }) })); }); });
+                                        }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 13, padding: "0 3px", color: "#dc2626", fontWeight: 900 } }, "\u00D7"))); }),
+                                list.length === 0 && React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "\u2014")));
+                    }),
+                    salleEdit && (function () {
+                        var inSalle = actes.filter(function (a) { return (a.salles || []).includes(salleEdit); });
+                        return (React.createElement("div", { style: { marginTop: 6, marginBottom: 6, padding: 8, borderRadius: 7, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.05)" } },
+                            React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#388bfd", marginBottom: 5 } },
+                                "Activit\u00E9s possibles dans ",
+                                salleEdit,
+                                " ",
+                                React.createElement("span", { style: { color: "var(--txt3)", fontWeight: 600 } },
+                                    "(",
+                                    inSalle.length,
+                                    ")")),
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, actes.filter(function (a) { return a.hasSalle && !a.isSystem; }).map(function (a) {
+                                var on = (a.salles || []).includes(salleEdit);
+                                return React.createElement("button", { key: a.id, type: "button", onClick: function () { return setActes(function (p) { return p.map(function (x) { return x.id !== a.id ? x : __assign(__assign({}, x), { salles: on ? (x.salles || []).filter(function (s2) { return s2 !== salleEdit; }) : (x.salles || []).concat([salleEdit]) }); }); }); }, style: { fontSize: 11, padding: "3px 8px", borderRadius: 12, cursor: "pointer", fontWeight: 700, border: on ? "1.5px solid " + a.color : "1px solid var(--border)", background: on ? a.color + "26" : "var(--bg2)", color: on ? "var(--txt)" : "var(--txt3)" } }, a.short);
+                            })),
+                            React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 4 } }, "Un clic ajoute/retire la salle de l'activit\u00E9 \u2014 c'est la m\u00EAme donn\u00E9e que les pastilles de l'\u00E9diteur d'activit\u00E9.")));
+                    })(),
+                    React.createElement("button", { onClick: function () { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
+                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde & archivage"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "Tout ce qui prot\u00E8ge vos donn\u00E9es, regroup\u00E9 ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois."),
                     docSize !== null && (function () {
                         var LIMIT = 1048576;
@@ -12915,17 +12917,18 @@ function CardioPlanning() {
                                                 }
                                             });
                                         }); }, style: { border: "none", background: "none", cursor: "pointer", fontSize: 10, padding: 0, color: "#16a34a", fontWeight: 900 } }, "\u21A9"))); })))));
-                    })(),
-                    React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)" } },
-                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--txt2)", marginBottom: 6 } }, "\uD83C\uDF13 Th\u00E8me"),
-                        React.createElement("div", { style: { display: "flex", gap: 6 } },
-                            React.createElement("button", { onClick: function () { try {
-                                    localStorage.removeItem("cp6_theme");
-                                }
-                                catch (e) { } ; var mm = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)"); setDarkModeRaw(!!(mm && mm.matches)); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCF1 Auto (t\u00E9l\u00E9phone)"),
-                            React.createElement("button", { onClick: function () { return setDarkMode(false); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: !darkMode ? "var(--nav-act)" : "var(--bg2)", color: !darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\u2600\uFE0F Jour"),
-                            React.createElement("button", { onClick: function () { return setDarkMode(true); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: darkMode ? "var(--nav-act)" : "var(--bg2)", color: darkMode ? "var(--nav-act-c)" : "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\uD83C\uDF13 Nuit")),
-                        React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit le r\u00E9glage clair/sombre du t\u00E9l\u00E9phone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix m\u00E9moris\u00E9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil).")))))),
+                    })()),
+                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83C\uDF13 Th\u00E8me"),
+                    React.createElement("div", { style: { display: "flex", gap: 6 } },
+                        React.createElement("button", { onClick: function () { try {
+                                localStorage.removeItem("cp6_theme");
+                            }
+                            catch (e) { } ; setThemeSel("auto"); var mm = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)"); setDarkModeRaw(!!(mm && mm.matches)); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid " + (themeSel === "auto" ? "#7c3aed" : "var(--border)"), background: themeSel === "auto" ? "rgba(124,58,237,.10)" : "var(--bg2)", color: themeSel === "auto" ? "#7c3aed" : "var(--txt2)", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCF1 Auto (t\u00E9l\u00E9phone)"),
+                        React.createElement("button", { onClick: function () { return setDarkMode(false); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid " + (themeSel === "light" ? "#7c3aed" : "var(--border)"), background: themeSel === "light" ? "rgba(124,58,237,.10)" : "var(--bg2)", color: themeSel === "light" ? "#7c3aed" : "var(--txt2)", fontWeight: 800, cursor: "pointer" } }, "\u2600\uFE0F Jour"),
+                        React.createElement("button", { onClick: function () { return setDarkMode(true); }, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1.5px solid " + (themeSel === "dark" ? "#7c3aed" : "var(--border)"), background: themeSel === "dark" ? "rgba(124,58,237,.10)" : "var(--bg2)", color: themeSel === "dark" ? "#7c3aed" : "var(--txt2)", fontWeight: 800, cursor: "pointer" } }, "\uD83C\uDF13 Nuit")),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt)", marginTop: 6, fontWeight: 700 } }, "Mode en vigueur : " + (themeSel === "auto" ? "Auto → " + (darkMode ? "sombre" : "clair") + " (réglage du téléphone)" : themeSel === "dark" ? "Nuit, mémorisé sur cet appareil" : "Jour, mémorisé sur cet appareil")),
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 4 } }, "Auto : suit le r\u00E9glage clair/sombre du t\u00E9l\u00E9phone, en direct (y compris s'il bascule au coucher du soleil). Jour/Nuit : choix m\u00E9moris\u00E9 sur cet appareil (le bouton \uD83C\uDF13 des onglets fait pareil)."))))),
         bkPreview && (function () {
             var ts = bkPreview.ts, b = bkPreview.b, cc = bkPreview.c, added = bkPreview.added, removed = bkPreview.removed, changed = bkPreview.changed;
             var months = Object.keys(b.byMonth || {}).concat(Object.keys(cc.byMonth || {})).filter(function (v, i, arr) { return arr.indexOf(v) === i; }).sort();
