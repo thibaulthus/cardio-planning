@@ -46,7 +46,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.145 — 29/08/2026";
+const APP_VERSION="v10.146 — 29/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -4569,6 +4569,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Périodes à venir : l'état de chaque période et, au besoin, une dérogation par profil."]}),
   HP({children:[HE("b",null,"Garde int., aller-retour")," (v10.145) : éteindre 🎓 Garde int. ramène le cadre là où il était avant de l'allumer — à condition qu'on n'ait rien fait entre-temps. Un défilement, un changement d'onglet ou de période, et le cadre reste où il est."]}),
   HP({children:[HE("b",null,"Pointillé « moi » fermé")," (v10.144) : le pointillé violet de sa propre colonne ferme désormais son cadre, en haut sur l'initiale et en bas sur la dernière ligne, comme le cadre plein de la colonne suivie."]}),
   HP({children:[HE("b",null,"Plus de zoom intempestif sur iPhone")," (v10.143) : toucher un champ de saisie (PIN, note, filtre, fenêtre 🐞…) faisait grossir la page, qui restait ainsi ensuite — Safari agrandit tout champ dont le texte fait moins de 16 px. Sur téléphone, les champs font désormais 16 px : plus de zoom. Le pincement pour agrandir la grille reste possible ; si votre page est déjà zoomée, un pincement la remet à sa taille."]}),
@@ -4582,6 +4583,7 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
+  HP({children:[HE("b",null,"Les périodes à venir")," (v10.146) : fermées à tous sauf l'éditeur, badge « 🚧 En préparation ». Dès qu'il ouvre la demande de congés dans Construire, badge « 🏖️ Congés ouverts » : chacun pose congés, FMC et préférences, et rien d'autre, jusqu'à ce qu'il referme la demande. À la diffusion du planning, la période s'ouvre comme la période en cours. L'éditeur peut déroger pour un profil dans Paramètres."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
@@ -4656,6 +4658,26 @@ function HelpView(){
         HE("span",{style:{flex:1,fontSize:13,fontWeight:800,color:"var(--txt)"}},s.title),
         HE("span",{style:{fontSize:11,color:"var(--txt3)",transform:hOpen[s.id]?"rotate(180deg)":"none",transition:"transform .18s"}},"▼")),
       hOpen[s.id]&&HE("div",{style:{padding:"2px 14px 13px"}},s.body()))));
+}
+
+/* ════ v10.146 : PÉRIODES À VENIR — carte de Paramètres, composant partagé jsx/html ════ */
+const FUT_PROFILS=[["inter","intermédiaires"],["basic","basiques"],["admin","secrétaires et cadres"],["att","attachés et IDE"]];
+const FUT_ETATS={fermee:["⛔ Fermée","#6b7280","personne, sauf l'éditeur"],phase1:["🏖️ Congés ouverts","#0e7490","congés, FMC et préférences, chacun pour soi"],constr:["🚧 En construction","#b45309","personne, sauf l'éditeur"],dif:["📢 Diffusée","#16a34a","tout le monde, comme la période en cours"]};
+function FuturBox(p){
+  const RE=React.createElement;
+  const pers=p.pers||[];
+  return RE("div",{style:Object.assign({},S.card,{marginBottom:10})},
+    RE("div",{style:{fontWeight:700,color:"#b45309",fontSize:13,marginBottom:6}},"🚧 Périodes à venir"),
+    RE("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.5}},"Tout ce qui suit la période en cours est fermé à tous sauf vous. Ouvrir la demande de congés (Construire, tuile 1) ouvre congés, FMC et préférences à chacun ; la refermer referme tout pendant que vous construisez ; diffuser (tuile 8) ouvre tout. L'état se lit dans Construire, rien à régler ici — sauf pour déroger : cocher un profil lui ouvre toute la période, quel que soit son état."),
+    pers.map(x=>{const e=FUT_ETATS[x.etat]||FUT_ETATS.fermee;return RE("div",{key:x.key,style:{border:"1px solid var(--border)",borderRadius:8,padding:"6px 8px",marginBottom:6}},
+      RE("div",{style:{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}},
+        RE("span",{style:{fontSize:12,fontWeight:800,color:"var(--txt)",flex:1}},x.lib),
+        RE("span",{style:{fontSize:10,fontWeight:800,color:"#fff",background:e[1],borderRadius:9,padding:"1px 7px",whiteSpace:"nowrap"}},e[0]+(x.etat==="phase1"&&x.fin?" · jusqu'au "+finLib(x.fin):""))),
+      RE("div",{style:{fontSize:10,color:"var(--txt3)",margin:"3px 0 5px"}},"Peuvent modifier : "+e[2]+"."),
+      x.etat!=="dif"&&RE("div",{style:{display:"flex",gap:10,flexWrap:"wrap",fontSize:11}},
+        RE("span",{style:{color:"var(--txt2)",fontWeight:700}},"Déroger pour :"),
+        FUT_PROFILS.map(pr=>RE("label",{key:pr[0],style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",color:(x.derog||{})[pr[0]]?"#b45309":"var(--txt2)"}},
+          RE("input",{type:"checkbox",checked:!!(x.derog||{})[pr[0]],onChange:ev=>p.onDerog(x.key,pr[0],ev.target.checked)}),pr[1]))));}));
 }
 
 /* ════ v10.142 : SIGNALEMENT IN-APP — composants partagés jsx/html, React.createElement pur ════
@@ -5688,7 +5710,7 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
     const B=(build||{})[k]||{};
     const jrsK=perDaysList(+String(k).split("_")[0],+String(k).split("_")[1]);   /* v10.41 */
     BUILD_DEM.forEach(([id,ic,txt,champ])=>{
-      if((B.dem||{})[id]&&demConcerne(moi,id)&&offEtat(moi,jrsK)!=="off"&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ});
+      if((B.dem||{})[id]&&demConcerne(moi,id)&&offEtat(moi,jrsK)!=="off"&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ,fin:B.demFin||null});
     });
   });
   if(!att.length)return null;
@@ -5700,7 +5722,7 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
           <span style={{fontSize:14}}>{a.ic}</span>
           <div style={{flex:1,minWidth:150}}>
             <div style={{fontSize:12.5,fontWeight:800,color:"#b45309"}}>{a.txt}</div>
-            <div style={{fontSize:11,color:"var(--txt2)"}}>{"Pour la période "+perLibelle(a.k)}</div>
+            <div style={{fontSize:11,color:"var(--txt2)"}}>{"Pour la période "+perLibelle(a.k)+(a.fin?" — avant le "+finLib(a.fin):"")}</div>
           </div>
           <button onClick={()=>onGoPer(a.k)} style={{fontSize:11,padding:"4px 11px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>→ Voir cette période</button>
           <button onClick={()=>onRepondre(a.k,a.champ)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #3fb950",background:"rgba(63,185,80,.13)",color:"#3fb950",fontWeight:800,cursor:"pointer"}}>✓ C'est fait</button>
@@ -5823,6 +5845,8 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
                {isEdit&&<button onClick={()=>setDem(id)} style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",
                  border:"1.5px solid #8b5cf6",background:ouverte?"#8b5cf6":"rgba(139,92,246,.10)",color:ouverte?"#fff":"#8b5cf6"}}>{ouverte?"✓ Demande ouverte":"Ouvrir la demande"}</button>}
                {ouverte&&ouverte.at&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"ouverte le "+ouverte.at}</div>}
+               {id==="conges"&&ouverte&&(isEdit?<label style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"var(--txt3)",marginTop:4}}>{"jusqu'au"}<input type="date" value={B.demFin||""} onChange={e=>patchB({demFin:e.target.value||null})} title="Date de fin indicative, affichée dans le rappel de chacun — la fin réelle, c'est vous qui la décidez en refermant la demande" style={{fontSize:10,padding:"1px 4px",borderRadius:5,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)"}}/></label>
+                 :(B.demFin?<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"jusqu'au "+finLib(B.demFin)+" (indicatif)"}</div>:null))}{/* v10.146 */}
              </div>);
          })}
        </div>
@@ -7664,7 +7688,20 @@ function verrouDebut(){
 /* La borne et le droit de passer outre sont lus dans une REF : les fonctions
    d'écriture ont des dépendances vides et ne doivent pas être recréées à chaque
    changement de mode, sous peine de casser toutes les mémoïsations en aval. */
-function vBloque(r,y,m,d){return dKey(y,m,d)<r.current.deb&&!r.current.passe;}
+/* v10.146 : verrou de l'AVENIR — tout ce qui suit la période en cours. Quatre états par période, lus dans
+   Construire : fermée / congés ouverts (tuile 1, demande « Congés » ouverte) / en construction (demande
+   refermée) / diffusée (tuile 8). L'éditeur n'est jamais bloqué ; les internes et l'astreinte ne sont pas
+   concernés. « quoi » : "abs" (congés, FMC — et les préférences, qui passent par la case) reste possible tant
+   que les congés sont ouverts ; "ast" (astreinte) passe toujours ; le reste attend la diffusion. Une dérogation
+   par période et par profil (Paramètres) ouvre tout à ce profil. */
+function futDebut(){const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());const p=perNext(p0.sy,p0.sm);const l=perDaysList(p.sy,p.sm);return l.length?dKey(l[0].y,l[0].m,l[0].d):"9999-12-31";}
+function vFutBloque(r,y,m,d,quoi){var f=r.current.fut;if(!f||f.profil==="edit"||f.profil==="interne"||f.profil==="view"||quoi==="ast")return false;
+  if(dKey(y,m,d)<f.deb)return false;var e=f.etat(y,m,d);if(e==="dif")return false;if(f.derog(y,m,d,f.profil))return false;
+  if(e==="phase1"&&quoi==="abs")return false;r.current.futHit=e;return true;}
+function vQuoiCell(prev,entry){var ids=[];var l=prev?(Array.isArray(prev)?prev:[prev]):[];l.forEach(function(e){if(e&&e.acteId)ids.push(e.acteId);});if(entry&&entry.acteId)ids.push(entry.acteId);
+  if(!ids.length)return "abs";return ids.every(function(x){return ABS_IDS.indexOf(x)>=0;})?"abs":"autre";}
+function finLib(iso){var a=String(iso||"").split("-");return a.length===3?a[2]+"/"+a[1]+"/"+a[0]:"";}
+function vBloque(r,y,m,d,quoi){return (dKey(y,m,d)<r.current.deb&&!r.current.passe)||vFutBloque(r,y,m,d,quoi);}
 function vAvertit(r,y,m,d){return dKey(y,m,d)<r.current.deb&&r.current.passe;}
 /* v10.128 : verrou du TOUR — une semaine (clé = son lundi) est close quand son
    VENDREDI est passé. Sa règle du 28/08 : « laisse jusqu'au vendredi, cela
@@ -8828,11 +8865,14 @@ function CardioPlanning(){
      localStorage, aucun Firestore : le verrou se remet en place tout seul. */
   const [vUnlock,setVUnlock]=useState(false);
   const vRef=useRef({deb:verrouJ,passe:false,ed:false});
+  const planRef=useRef(plan);planRef.current=plan;   /* v10.146 : lu par setEntry/addEntry pour juger la nature d'une écriture */
   vRef.current={deb:verrouJ,passe:isEdit&&vUnlock,ed:isEdit,arch:perArchivee,clos:perClose};
   /* un seul message par geste : les operations de masse appellent l'ecriture en boucle */
   const vTRef=useRef(0);
   const vToast=useCallback((passe)=>{
     const n=Date.now();if(n-vTRef.current<1500)return;vTRef.current=n;
+    /* v10.146 : l'avenir a son propre message */
+    const fh=vRef.current.futHit;if(fh&&!passe){vRef.current.futHit=null;setNotif({msg:fh==="phase1"?"🚧 Période à venir — congés, FMC et préférences seulement ; le reste s'ouvrira à la diffusion du planning":"🚧 Période à venir — en préparation ; elle s'ouvrira à la diffusion du planning",type:"lock"});clearTimeout(notifTRef.current);notifTRef.current=setTimeout(()=>setNotif(null),3500);return;}
     /* v10.117 : trois situations, trois messages — la période affichée décide.
        Une période entièrement passée reste « close » ; à l'intérieur de la
        période en cours, c'est la JOURNÉE qui est passée. */
@@ -9064,6 +9104,15 @@ function CardioPlanning(){
   useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0||(tab==="internes"&&intCfg.show!==true))setTab(accessMode==="interneEdit"?"internes":"planning");},[accessMode,tab,isMedEdit,intCfg]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
   const isInterne=accessMode==="interneEdit"&&!netOff; /* v10.69 : interne connecte (hors ligne = lecture seule) */
+  /* v10.146 : verrou de l'avenir — profil de la personne, état de chaque période à venir (lu dans Construire
+     et dans les diffusions), dérogations. Posé dans vRef pour que les fonctions d'écriture le lisent sans dépendance. */
+  const vProfil=isEdit?"edit":isAttEdit?"att":isInterEdit?"inter":isMedEdit?"basic":isAdminEdit?"admin":isInterne?"interne":"view";
+  const vFutEtatDe=(sy,sm)=>{const B=(build||{})[sy+"_"+sm]||{};if((secrCfg.dif||{})[perIdOf(sy,sm)])return "dif";if(B.dem&&B.dem.conges)return "phase1";return (B.dem||B.pers||B.etapes||B.prefT||B.prefG)?"constr":"fermee";};
+  vRef.current.fut={deb:futDebut(),profil:vProfil,etat:(y,m,d)=>{const p=perOfDay(y,m,d);return vFutEtatDe(p.sy,p.sm);},derog:(y,m,d,pr)=>{const p=perOfDay(y,m,d);return !!((((build||{})[p.sy+"_"+p.sm]||{}).derog||{})[pr]);}};
+  const perFut=(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());const pF=perStart(year,month);return (pF.sy*12+pF.sm>p0.sy*12+p0.sm)?vFutEtatDe(pF.sy,pF.sm):null;})();
+  const perFutFin=(()=>{const pF=perStart(year,month);return ((build||{})[pF.sy+"_"+pF.sm]||{}).demFin||null;})();
+  const futPers=(()=>{const t=new Date();let p=perStart(t.getFullYear(),t.getMonth());const out=[];for(let i=0;i<3;i++){p=perNext(p.sy,p.sm);const k=p.sy+"_"+p.sm;const B=(build||{})[k]||{};out.push({key:k,lib:perLibelle(p.sy,p.sm),etat:vFutEtatDe(p.sy,p.sm),fin:B.demFin||null,derog:B.derog||{}});}return out;})();
+  const futDerog=(k,pr,v)=>{setBuild(b=>{const cur=(b||{})[k]||{};const d={...(cur.derog||{})};if(v)d[pr]=1;else delete d[pr];return {...(b||{}),[k]:{...cur,derog:d}};});toast(v?"Dérogation ouverte pour les "+(FUT_PROFILS.find(x=>x[0]===pr)||["",pr])[1]:"Dérogation retirée");};
   /* v10.100 : le bandeau de role du bas confirme sous quel acces on est entre,
      puis ne sert plus a rien et mange de la hauteur. Il s'efface au bout de
      6 secondes. doFit mesure les bandeaux a CHAQUE rendu : ce changement
@@ -9165,7 +9214,7 @@ function CardioPlanning(){
 
   /* ── setEntry / addEntry / removeEntry ── */
   const setEntry=useCallback((medId,y2,m2,d2,slot,entry)=>{
-    if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.106 */
+    if(vBloque(vRef,y2,m2,d2,vQuoiCell(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry))){vToast(false);return;}   /* v10.106 */
     const key=sk(y2,m2,d2,slot);
     setPlan(p=>{const dm={...(p[key]||{})};if(entry)dm[medId]=entry;else delete dm[medId];return{...p,[key]:dm};});
     logCell(entry?"add":"del",medId,y2,m2,d2,slot,entry?entry.acteId:null);
@@ -9178,7 +9227,7 @@ function CardioPlanning(){
      et l'entrée posée garde leur mémoire dans `wasCond`, ce qui permet de rétablir le
      choix si on la retire ensuite. */
   const addEntry=useCallback((medId,y2,m2,d2,slot,entry)=>{
-    if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.106 */
+    if(vBloque(vRef,y2,m2,d2,vQuoiCell(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry))){vToast(false);return;}   /* v10.106 */
     const key=sk(y2,m2,d2,slot);
     let refusedBy=null;
     setPlan(p=>{
@@ -9279,7 +9328,7 @@ function CardioPlanning(){
   },[]);
 
   const removeEntry=useCallback((medId,y2,m2,d2,slot,acteId)=>{
-    if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.106 */
+    if(vBloque(vRef,y2,m2,d2,ABS_IDS.indexOf(acteId)>=0?"abs":"autre")){vToast(false);return;}   /* v10.106 */
     if(vAvertit(vRef,y2,m2,d2))vToast(true);
     const key=sk(y2,m2,d2,slot);
     setPlan(p=>{
@@ -9505,7 +9554,7 @@ function CardioPlanning(){
           const t=new Date(cy,cm,d).getTime();
           if(t<fromT||t>toT)continue;
           /* v10.106 : jour clos — saute pour tout le monde sauf l'editeur, averti */
-          if(vBloque(vRef,cy,cm,d)){vSkip=true;continue;}
+          if(vBloque(vRef,cy,cm,d,"abs")){vSkip=true;continue;}
           if(vAvertit(vRef,cy,cm,d))vWarn=true;
           (isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):slots)).forEach(sl=>{const k=sk(cy,cm,d,sl);const dm={...(next[k]||{})};dm[medId]={acteId:absType||"ABSENCE",salle:null};next={...next,[k]:dm};});
         }
@@ -9528,7 +9577,7 @@ function CardioPlanning(){
           const t=new Date(cy,cm,d).getTime();
           if(t<fromT||t>toT)continue;
           /* v10.106 : jour clos — saute pour tout le monde sauf l'editeur, averti */
-          if(vBloque(vRef,cy,cm,d)){vSkip=true;continue;}
+          if(vBloque(vRef,cy,cm,d,"abs")){vSkip=true;continue;}
           if(vAvertit(vRef,cy,cm,d))vWarn=true;
           (isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):["M","AM"]).concat(["JOUR"])).forEach(sl=>{
             const k=sk(cy,cm,d,sl);
@@ -10008,14 +10057,15 @@ function CardioPlanning(){
   const [daySwapSpan,setDaySwapSpan]=useState("J");
   /* v10.108 : plus personne n'ouvre une case close, editeur compris — sauf si
      l'interrupteur de Parametres est leve, et alors la confirmation reste. */
-  const vOuvre=(y2,m2,d2)=>{
+  const vOuvre=(y2,m2,d2,quoi)=>{
+    if(vFutBloque(vRef,y2,m2,d2,quoi)){vToast(false);return false;}   /* v10.146 */
     if(!estClos(y2,m2,d2))return true;
     if(!(isEdit&&vUnlock)){vToast(false);return false;}
     return window.confirm((perClose?"🔒 Période close — elle précède la période en cours.":"🔒 Journée passée — elle précède aujourd'hui.")+"\n\nLe verrou est levé pour cette session : vous pouvez modifier, et chaque modification vous sera signalée.\n\nOuvrir cette case ?");
   };
   const openCell=(medId,y2,m2,d2,slot)=>{
     if(!canEdit(medId))return;
-    if(!vOuvre(y2,m2,d2))return;
+    if(!vOuvre(y2,m2,d2,"abs"))return;
     setMData({medId,y:y2,m:m2,d:d2,slot});setModal("cell");
   };
 
@@ -10387,6 +10437,7 @@ header::-webkit-scrollbar { display: none; }
                   l'en-tête — celle-ci est un flex de hauteur fixe où tout ajout vole sa
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
               {perClose&&<span title={perArchivee?"Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier.":"Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session."} style={{background:perArchivee?"#0e7490":"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perArchivee?"🗄 PÉRIODE ARCHIVÉE":"🔒 PÉRIODE CLOSE"}</span>}
+              {perFut&&perFut!=="dif"&&<span title={perFut==="phase1"?"La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période"+(perFutFin?" (jusqu'au "+finLib(perFutFin)+" à titre indicatif)":"")+". Le reste attend la diffusion du planning.":"Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning."} style={{background:perFut==="phase1"?"#0e7490":"#b45309",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perFut==="phase1"?"🏖️ CONGÉS OUVERTS"+(perFutFin?" → "+finLib(perFutFin).slice(0,5):""):"🚧 EN PRÉPARATION"}</span>}   {/* v10.146 */}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
@@ -10898,7 +10949,7 @@ header::-webkit-scrollbar { display: none; }
                         <span onClick={e=>{if(!canAst)return;e.stopPropagation();
                           /* v10.126 : semaine close = son DIMANCHE est verrouillé (arPerAst) */
                           const q=sem.wk.split("-").map(Number),su=new Date(q[0],q[1],q[2]+6);
-                          if(vBloque(vRef,su.getFullYear(),su.getMonth(),su.getDate())){vToast(false);return;}
+                          if(vBloque(vRef,su.getFullYear(),su.getMonth(),su.getDate(),"ast")){vToast(false);return;}
                           if(vAvertit(vRef,su.getFullYear(),su.getMonth(),su.getDate()))vToast(true);
                           setAstPickModal({dayKey:sem.wk,wKey:sem.wk,isWeek:true,label:"semaine du "+fmtJ(j0)});}}
                           style={{cursor:canAst?"pointer":"default",display:"flex",alignItems:"center",gap:6}}>
@@ -10943,7 +10994,7 @@ header::-webkit-scrollbar { display: none; }
                           const med=mid?medecins.find(x=>String(x.id)===String(mid)):null;
                           const isAbsMed=med?(getEntries(med.id,y,m,d,"M").some(e=>ABS_IDS.includes(e.acteId))||getEntries(med.id,y,m,d,"JOUR").some(e=>ABS_IDS.includes(e.acteId))):false;
                           const dw2=new Date(y,m,d).getDay();
-                          return <div key={dk} onClick={canAst?()=>{if(vBloque(vRef,y,m,d)){vToast(false);return;}if(vAvertit(vRef,y,m,d))vToast(true);   /* v10.126 */
+                          return <div key={dk} onClick={canAst?()=>{if(vBloque(vRef,y,m,d,"ast")){vToast(false);return;}if(vAvertit(vRef,y,m,d))vToast(true);   /* v10.126 */
                             setAstPickModal({dayKey:dk,wKey:sem.wk,isWeek:false,
                             label:["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]+" "+d+" "+MOIS[m]});}:undefined}
                             style={{display:"flex",alignItems:"center",gap:10,padding:"5px 11px 5px 32px",fontSize:12,
@@ -11514,6 +11565,7 @@ header::-webkit-scrollbar { display: none; }
                 </label>
                 {vUnlock&&<div style={{marginTop:6,fontSize:10,color:"#b45309",padding:"4px 7px",borderRadius:6,border:"1px solid #f59e0b",background:"rgba(245,158,11,.10)"}}>⚠ Verrou levé sur cet appareil et pour cette session seulement. Chaque modification faite sur une période close vous sera signalée.</div>}
               </div>}
+            {isEdit&&<FuturBox pers={futPers} onDerog={futDerog}/>}{/* v10.146 */}
             {isEdit&&(()=>{
               const vDeb=verrouDebut();
               /* « archivable » = période ENTIÈREMENT CLOSE — la même borne que le verrou,
