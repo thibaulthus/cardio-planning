@@ -34,7 +34,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.140 — 29/08/2026";
+const APP_VERSION="v10.141 — 29/08/2026";
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
 /* v10.18 : les vacances scolaires deviennent une donnée SAISIE, plus téléchargée. Le
@@ -916,10 +916,11 @@ function lisStyle(hex,op){var c=lisRgba(hex,op);return {borderLeft:"2px dashed "
 /* v10.140 : colonne suivie (Planning / Attachés). gvCadre : le cadre défilant qui contient un
    élément de la grille (le div de TableScroll). gvCentrer : amène la colonne touchée au centre du
    cadre — sur téléphone la grille déborde ; sur ordinateur, quand tout tient, rien ne bouge.
-   gvJour : amène une ligne de jour en haut du cadre (bouton Garde int.) — sans elle, le haut. */
+   gvGauche : ramène le cadre tout à gauche, sans toucher au jour regardé (bouton Garde int., v10.141 :
+   la colonne 🎓 Int. est à gauche, c'est elle qu'on veut voir). */
 function gvCadre(n){var el=n?n.parentElement:null;while(el&&el!==document.body){var cs=window.getComputedStyle(el);if(/auto|scroll/.test(cs.overflowY)||/auto|scroll/.test(cs.overflowX))return el;el=el.parentElement;}return null;}
 function gvCentrer(th){var el=gvCadre(th);if(!el||el.scrollWidth<=el.clientWidth+1)return;var r=th.getBoundingClientRect(),R=el.getBoundingClientRect();var x=Math.max(0,el.scrollLeft+(r.left+r.width/2)-(R.left+R.width/2));try{el.scrollTo({left:x,behavior:"smooth"});}catch(e){el.scrollLeft=x;}}
-function gvJour(key){var rows=document.querySelectorAll("[data-day]");if(!rows.length)return;var el=gvCadre(rows[0]);if(!el)return;var t=key?document.querySelector('[data-day="'+key+'"]'):null;var y=t?Math.max(0,t.offsetTop-el.offsetTop):0;try{el.scrollTo({top:y,behavior:"smooth"});}catch(e){el.scrollTop=y;}}
+function gvGauche(){var rows=document.querySelectorAll("[data-day]");if(!rows.length)return;var el=gvCadre(rows[0]);if(!el)return;try{el.scrollTo({left:0,behavior:"smooth"});}catch(e){el.scrollLeft=0;}}
 /* v10.49 : demi-journées off (onglet Reports) — participation des salles.
    `offOuv` vit sur la fiche de salle ; non renseigné = par défaut les salles où
    une consultation (CS_CHL / CS_CHB) peut se dérouler — son précochage. */
@@ -4428,19 +4429,21 @@ function HBtn(p){
     red:{border:"1px solid #fecdd3",background:"#fff1f2",color:"#dc2626"},
     violet:{border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed"},
     ghost:{border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)"}}[p.kind||"ghost"];
-  return HE("span",{style:Object.assign({display:"inline-block",fontSize:11,padding:"2px 9px",borderRadius:6,fontWeight:800,verticalAlign:"middle",whiteSpace:"nowrap"},st)},p.children);
+  return HK("span",{style:Object.assign({display:"inline-block",fontSize:11,padding:"2px 9px",borderRadius:6,fontWeight:800,verticalAlign:"middle",whiteSpace:"nowrap"},st)},p.children);
 }
 function HAvat(p){return HE("span",{style:{display:"inline-flex",width:19,height:19,borderRadius:"50%",background:p.color||"#3b82f6",color:"#fff",fontSize:8,fontWeight:800,alignItems:"center",justifyContent:"center",verticalAlign:"middle"}},p.txt||"AB");}
 function HBadg(p){return HE("span",{style:{display:"inline-block",padding:"1px 6px",borderRadius:5,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:p.color,color:p.dark?"#fff":"#111",verticalAlign:"middle"}},p.txt);}
 function HChip(p){return HE("span",{style:{display:"inline-block",padding:"1px 7px",borderRadius:9,fontSize:9,fontWeight:800,background:p.bg,color:"#fff",verticalAlign:"middle"}},p.txt);}
-function HP(p){return HE("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.65,marginBottom:p.last?0:8}},p.children);}
-function HT(p){return HE("div",{style:{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,margin:"12px 0 4px"}},p.children);}
+/* v10.141 : un tableau d'enfants passé tel quel fait réclamer une « key » à React ; on l'étale en arguments. */
+function HK(tag,props,c){return HE.apply(null,[tag,props].concat(Array.isArray(c)?c:[c]));}
+function HP(p){return HK("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.65,marginBottom:p.last?0:8}},p.children);}
+function HT(p){return HK("div",{style:{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,margin:"12px 0 4px"}},p.children);}
 function HStep(p){return HE("div",{style:{display:"flex",gap:8,marginBottom:7,alignItems:"flex-start"}},
   HE("span",{style:{flexShrink:0,width:26,height:26,borderRadius:"50%",background:"#1d4ed8",color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}},p.n),
-  HE("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.6}},p.children));}
+  HK("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.6}},p.children));}
 function HTab(p){return HE("div",{style:{marginBottom:7}},
   HE("span",{style:{fontWeight:800,fontSize:12,color:"var(--txt)"}},p.t+" — "),
-  HE("span",{style:{fontSize:12,color:"var(--txt2)",lineHeight:1.6}},p.children));}
+  HK("span",{style:{fontSize:12,color:"var(--txt2)",lineHeight:1.6}},p.children));}
 
 const HELP_SECTIONS=[
  {id:"consult",icon:"👤",title:"Utiliser le planning sans être éditeur",body:()=>HE("div",null,
@@ -4550,7 +4553,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Colonne suivie")," (v10.140) : dans Planning et Attachés, l'éditeur et les médecins de niveau intermédiaire peuvent appuyer sur l'initiale en tête d'une colonne pour la suivre : cadre plein de la couleur du médecin, anneau autour de son initiale, teinte légère sur ses cases vides, et les autres colonnes s'estompent à 40 %. Un second appui relâche, une autre initiale déplace le suivi ; une seule colonne à la fois, conservée le temps de la session, d'un onglet et d'une période à l'autre — elle cohabite avec le pointillé violet de sa propre colonne. Sur téléphone, la colonne suivie vient se centrer à l'écran. Le bouton 🎓 Garde int. amène désormais le cadre sur la ligne d'aujourd'hui (ou le début de la période s'il est ailleurs), sans changer sa hauteur. La carte 🌓 Thème de Paramètres est retirée : c'est un réglage par appareil, que le bouton 🌓 des onglets couvre (voir 📱 Installer sur votre téléphone)."]}),
+  HP({children:[HE("b",null,"Colonne suivie")," (v10.140) : dans Planning et Attachés, l'éditeur et les médecins de niveau intermédiaire peuvent appuyer sur l'initiale en tête d'une colonne pour la suivre : cadre plein de la couleur du médecin, anneau autour de son initiale, teinte légère sur ses cases vides, et les autres colonnes s'estompent à 40 %. Un second appui relâche, une autre initiale déplace le suivi ; une seule colonne à la fois, conservée le temps de la session, d'un onglet et d'une période à l'autre — elle cohabite avec le pointillé violet de sa propre colonne. Sur téléphone, la colonne suivie vient se centrer à l'écran. Le bouton 🎓 Garde int. ramène le cadre tout à gauche pour montrer la colonne 🎓 Int., sans changer ni le jour regardé ni la hauteur (v10.141). La carte 🌓 Thème de Paramètres est retirée : c'est un réglage par appareil, que le bouton 🌓 des onglets couvre (voir 📱 Installer sur votre téléphone)."]}),
             HP({children:[HE("b",null,"Bornes de navigation")," (v10.138) : les flèches ‹ › ne remontent pas avant la plus ancienne archive (à défaut deux ans en arrière) et ne vont pas au-delà de six périodes — deux ans — devant la période en cours ; un message le dit à la borne. Cela vaut pour tous les onglets qui naviguent par période : Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Planning type, Tour, Reports, Construire, Astreinte, Stats et l'export. Les Internes naviguent par semestre, entre les semestres déclarés. Naviguer ne crée aucune donnée ; la borne évite qu'une case posée par erreur très loin dans le futur ne pèse sans que personne ne la voie. La carte Poids affiche aussi le poids des archives, rangées dans leur propre collection et donc hors de la jauge du document actif."]}),
   HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles et Sauvegarde & archivage sont trois cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto avec un message à chaque appui (v10.139), donc chacun choisit son mode sans Paramètres ; à la reprise de l'application en veille, le réglage du téléphone est relu. La carte Thème de Paramètres, devenue redondante, est retirée en v10.140. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
   HP({children:[HE("b",null,"Version périmée")," (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."]}),
@@ -10400,7 +10403,7 @@ header::-webkit-scrollbar { display: none; }
           </div>}
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8,alignItems:"center",position:"relative"}}>
             <button data-keep="1" onClick={()=>setFiltOpen(v=>!v)} title="Choisir les médecins affichés" style={{fontSize:11,padding:"3px 11px",borderRadius:8,border:"1.5px solid "+(planFilter.length?"#1d4ed8":"var(--border)"),background:planFilter.length?"rgba(29,78,216,.10)":"var(--bg2)",color:planFilter.length?"#1d4ed8":"var(--txt2)",fontWeight:700,cursor:"pointer"}}>{"🔍 Filtre : "+filtLbl+" ▾"}</button>
-            {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>{const nv=!intGardeOn;setIntGardeOn(nv);if(nv){const t=new Date();setTimeout(()=>gvJour(t.getFullYear()+"-"+t.getMonth()+"-"+t.getDate()),60);}}} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
+            {intCfg.show===true&&(intCfg.sems||[]).length>0&&<button onClick={()=>{const nv=!intGardeOn;setIntGardeOn(nv);if(nv)setTimeout(gvGauche,60);}} title="Afficher la colonne de garde des internes (lecture seule)" style={{padding:"2px 8px",borderRadius:10,border:`1px solid ${intGardeOn?"#1d4ed8":"var(--border)"}`,background:intGardeOn?"#1d4ed8":"var(--bg2)",color:intGardeOn?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:intGardeOn?700:400}}>🎓 Garde int.</button>}
             {filtOpen&&<div data-keep="1" style={{position:"absolute",top:"100%",left:0,zIndex:60,marginTop:4,padding:8,borderRadius:10,border:"1px solid var(--border)",background:"var(--bg)",boxShadow:"0 6px 18px rgba(0,0,0,.18)",display:"flex",flexWrap:"wrap",gap:4,maxWidth:"min(92vw,520px)"}}>
               <button onClick={()=>setPlanFilter([])} style={{padding:"2px 8px",borderRadius:10,border:"1px solid var(--border)",background:planFilter.length===0?"#1d4ed8":"var(--bg2)",color:planFilter.length===0?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:600}}>Tous</button>
               {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
