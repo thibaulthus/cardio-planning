@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.148 — 29/08/2026";
+const APP_VERSION="v10.149 — 30/08/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -4634,6 +4634,9 @@ const HELP_SECTIONS=[
   HP({children:["⚠ Conséquence pratique : ",HE("b",null,"saisissez les noms avant de construire la période"),". Sinon le planning type saute ces mois, et il faudra le réappliquer une fois les noms entrés."]}),
   HP({children:["Effacer un nom déjà saisi ",HE("b",null,"n'efface aucune activité")," : les cases se reverrouillent, le contenu reste dessous. La fiche le ",HE("b",null,"compte")," et propose de retirer ces activités si c'est ce que vous voulez."]}),
   HP({children:["Un rôle ",HE("b",null,"sans titulaire sur toute la période")," ne compte pas pour une personne : il sort des listes et des totaux des tuiles Tour et Gardes (et des Stats), et la répartition automatique l'ignore. Ses cases restent visibles, hachurées, dans le planning — et l'éditeur peut toujours lui poser une garde à la main depuis la grille."]}),
+  HT({children:"Le rappel des congés et des préférences"}),
+  HP({children:["Le rappel affiché dans le Planning (« Poser vos congés… », « Dire vos préférences… ») ne s'adresse à un rôle junior que si ",HE("b",null,"le semestre en cours aujourd'hui"),", celui de la personne connectée, recouvre la période demandée, au moins en partie (v10.149). Deux fois par an, le junior ne reçoit donc rien : la période suivante appartient à son successeur. Une fois par an — la période à cheval sur la bascule — il le reçoit."]}),
+  HP({children:["Dans la tuile 1 de Construire, le rôle reste dans la liste et dans le compte : ses congés sont ",HE("b",null,"saisis par l'éditeur"),", et une mention « junior suivant » le rappelle sous son nom. Rien à régler : tout découle des semestres de Paramètres › Internes."]}),
   HT({children:"Quand le changement tombe au milieu d'une période"}),
   HP({last:true,children:["Le changement du 2 novembre tombe sur une frontière de période : rien à gérer. Seule la période ",HE("b",null,"mars-juin")," contient une bascule. Dans ce cas, l'en-tête de colonne montre ",HE("b",null,"un seul jeu d'initiales"),", celui du titulaire du moment, et bascule tout seul le jour dit. Dans Construire, le tour et les gardes, le rôle reste ",HE("b",null,"une seule ligne")," portant les deux noms (« X puis Y ») : il compte ainsi sur la période entière, comme tout le monde."]}))},
 
@@ -5708,6 +5711,7 @@ function BuildPersonList({gens,etat,onSet,peut,vide}){
             border:"1.5px solid "+(on?"#3fb950":"var(--border)"),background:on?"#3fb950":"transparent",color:"#fff"}}>{on?"✓":""}</span>
           <span style={{width:26,height:20,borderRadius:5,background:m.color||"#888",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 26px"}}>{m.init}</span>
           <span style={{fontSize:11,color:"var(--txt2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m._lib||(m.prenom+" "+m.nom)}</span>
+          {m._note&&<span style={{fontSize:9.5,color:"var(--txt3)",fontStyle:"italic",marginLeft:"auto",whiteSpace:"nowrap"}}>{m._note}</span>}{/* v10.149 */}
         </div>);})}
     </div>
   );
@@ -5735,7 +5739,7 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
     const B=(build||{})[k]||{};
     const jrsK=perDaysList(+String(k).split("_")[0],+String(k).split("_")[1]);   /* v10.41 */
     BUILD_DEM.forEach(([id,ic,txt,champ])=>{
-      if((B.dem||{})[id]&&demConcerne(moi,id)&&offEtat(moi,jrsK)!=="off"&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ,fin:B.demFin||null});
+      if((B.dem||{})[id]&&demConcerne(moi,id)&&offEtat(moi,jrsK)!=="off"&&djActuelCouvre(moi,jrsK)&&!((B[champ]||{})[editMedId]))att.push({k:k,id:id,ic:ic,txt:txt,champ:champ,fin:B.demFin||null});
     });
   });
   if(!att.length)return null;
@@ -5876,7 +5880,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
          })}
        </div>
        <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Une coche par personne dès qu'elle a posé ses vacances — elle se coche aussi toute seule quand le médecin répond au rappel affiché dans son Planning. Les attachés et les IDE sont rappelés à l'étape 4.</div>
-       <BuildPersonList gens={meds.map(m=>{const l=djNomsPeriode(m,bJours);return l?{...m,_lib:l}:m;})} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>
+       <BuildPersonList gens={meds.map(m=>{const l=djNomsPeriode(m,bJours);const n=djActuelCouvre(m,bJours)?null:"junior suivant — congés saisis par l'éditeur";return (l||n)?{...m,_lib:l||undefined,_note:n}:m;})} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>
      </div>},
     {n:2,icon:"🔄",titre:"Distribution du tour",
      sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
@@ -6553,6 +6557,22 @@ function djSemsPour(d1,d2){
     last=c;n++;
   }
   return out;
+}
+/* v10.149, SA REMARQUE DU 29/08 : le PIN d'un rôle junior est le même d'un semestre à
+   l'autre, mais la PERSONNE change. Le junior en poste de mai à octobre recevait le
+   rappel « posez vos congés » pour novembre–février — une période où il ne sera plus
+   là. Règle : un rôle junior n'est concerné par une période que si le semestre EN
+   COURS AUJOURD'HUI (celui de la personne connectée) la recouvre, au moins en partie.
+   Deux fois par an il ne reçoit rien, une fois par an (période à cheval) il le reçoit.
+   Sans semestre connu, ou pour un médecin ordinaire : toujours concerné, comme avant. */
+function djActuelCouvre(m,jours){
+  if(!djRole(m)||!jours||!jours.length)return true;
+  var tj=intISO(new Date()),s=null;
+  for(var i=0;i<DJ_SEMS.length;i++){if(DJ_SEMS[i].deb<=tj&&tj<=DJ_SEMS[i].fin){s=DJ_SEMS[i];break;}}
+  if(!s)return true;
+  var a=jours[0],z=jours[jours.length-1];
+  var d1=dKey(a.y,a.m,a.d),d2=dKey(z.y,z.m,z.d);
+  return !(s.fin<d1||s.deb>d2);
 }
 function djAff(m,iso){
   if(!djRole(m)||!iso)return m;
