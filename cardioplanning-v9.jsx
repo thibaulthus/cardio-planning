@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.150 — 30/08/2026";
+const APP_VERSION="v10.151 — 30/08/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -875,7 +875,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   const sv=suiviId!==null&&String(med.id)===String(suiviId);
                   const svSh=sv?"inset 3px 0 0 "+med.color+", inset -3px 0 0 "+med.color+(di===printDays.length-1&&si===slots.length-1?", inset 0 -3px 0 "+med.color:""):null;
                   const svTint=sv&&!es.length&&!bl&&!offC&&!isAst&&!prefBg?lisRgba(med.color,.14):null;
-                  return <td key={med.id} title={offC?("Indisponible — désactivé "+medOffL(med).map(r=>"du "+offFr(r.du)+" au "+offFr(r.au)).join(", ")):((issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined)}
+                  return <td key={med.id} title={offC?("Indisponible — désactivé "+medOffL(med).map(offLib).join(", ")):((issueT?issueT+(noteT?" | "+noteT:""):noteT)||undefined)}
                     style={{...S.td,...(we?S.tdWE:{}),...(isAst?{background:"var(--ast-bg)",boxShadow:astSh}:{}),...(prefBg?{background:prefBg}:{}),...(bl?{background:"var(--bg)",opacity:.4,cursor:"default"}:{cursor:isEdit?"pointer":"default"}),...(offC?{background:"repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(120,130,150,.20) 5px,rgba(120,130,150,.20) 10px)",opacity:.55,cursor:"default"}:{}),...(HL.on[sk(ey,em,d,sl)+"|"+med.id]?{outline:"3px solid #e3b341",outlineOffset:-3}:{}),display:"table-cell",verticalAlign:"middle",position:"relative",...(String(med.id)===String(selfId)?{...lis,...(di===printDays.length-1&&si===slots.length-1?{borderBottom:lis.borderLeft}:{})}:{}),...(svTint?{background:svTint}:{}),...(svSh?{boxShadow:(isAst?astSh+", ":"")+svSh}:{}),...(suiviId!==null&&!sv?{opacity:.4}:{})}}
                     onContextMenu={onCellHistory?e=>{e.preventDefault();onCellHistory(med.id,ey,em,d,sl);}:undefined}
                     onTouchStart={onCellHistory?()=>{_gvLpF=false;clearTimeout(_gvLpT);_gvLpT=setTimeout(()=>{_gvLpF=true;onCellHistory(med.id,ey,em,d,sl);},600);}:undefined}
@@ -2135,7 +2135,7 @@ function PTOccRooms({medecins,planningType,actes,acteById,salleReg,darkMode,perD
   const medsAct=medecins.filter(m=>oeOf[m.id]!=="off");
   const HACHO="repeating-linear-gradient(45deg,rgba(245,158,11,.35),rgba(245,158,11,.35) 3px,transparent 3px,transparent 7px)";
   const Rond=({m})=>{const part=oeOf[m.id]==="part";
-    const tt=((m.prenom||"")+" "+(m.nom||"")).trim()+(part?(" — indisponible "+medOffL(m).map(r=>"du "+offFr(r.du)+" au "+offFr(r.au)).join(", ")):"");
+    const tt=((m.prenom||"")+" "+(m.nom||"")).trim()+(part?(" — indisponible "+medOffL(m).map(offLib).join(", ")):"");
     return(
       <div title={tt} style={{padding:part?2:0,borderRadius:6,background:part?HACHO:"none",flexShrink:0}}>
         <div style={{width:22,height:22,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800}}>{m.init}</div>
@@ -2252,7 +2252,7 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
             <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:48}}>Jour</th>
             <th style={{...S.thFix,position:"sticky",top:0,left:48,zIndex:40,minWidth:26,borderRight:"2px solid var(--border)"}}>Sl</th>
             {medecins.map(med=>{const oe=offEtat(med,perDays);
-              const tt="Dr. "+(med.prenom||"")+" "+(med.nom||"")+(oe?(" — indisponible "+medOffL(med).map(r=>"du "+offFr(r.du)+" au "+offFr(r.au)).join(", ")):(onMedClick?" — cliquer pour activer / désactiver":""));
+              const tt="Dr. "+(med.prenom||"")+" "+(med.nom||"")+(oe?(" — indisponible "+medOffL(med).map(offLib).join(", ")):(onMedClick?" — cliquer pour activer / désactiver":""));
               return <th key={med.id} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20}} title={tt}>
               <div onClick={()=>{if(onMedClick)onMedClick(med);}}
                 style={{...S.avT,background:med.color,margin:"0 auto",cursor:onMedClick?"pointer":"default",
@@ -4605,6 +4605,9 @@ const HELP_SECTIONS=[
   HT({children:"Désactiver quelqu'un"}),
   HP({children:["Pour un long congé, un départ, une période sans remplaçant : plutôt qu'une ligne remplie d'absences, on ",HE("b",null,"désactive")," la personne sur des dates. Dans l'onglet ",HE("b",null,"Type"),", cliquez sur ",HE("b",null,"la pastille ronde")," d'un médecin (éditeur seulement) : la fenêtre propose « sur toute la période affichée » ou « de date à date », et liste les indisponibilités déjà posées avec un bouton ▶ Réactiver chacune."]}),
   HP({children:["Pendant ses dates, la personne sort du ",HE("b",null,"tour, des gardes, du bip")," et des demandes de Construire. Sa pastille reste dans Type (grisée ⏸) pour la réactiver, et elle redevient disponible ",HE("b",null,"le jour de son retour"),", sans autre manipulation. Ce sont des ",HE("b",null,"dates")," qui sont enregistrées : changer la durée des périodes ne déplace rien."]}),
+  HT({children:"🚪 Quand quelqu'un quitte le service"}),
+  HP({children:["Ne supprimez pas sa fiche : indiquez sa ",HE("b",null,"date de départ"),", dans la fiche (Équipe › ✏️ › « Parti le »). C'est une désactivation sans fin : à partir de cette date la personne sort du tour, des gardes, des salles, du planning type, des demandes de Construire et des rappels ; les stats la comptent jusqu'au départ. Son ",HE("b",null,"PIN n'ouvre plus l'application"),", et il peut être donné à un nouveau venu. Sa fiche passe dans le groupe replié « Anciens membres » en bas d'Équipe, d'où on peut la rouvrir — ou annuler le départ (v10.151)."]}),
+  HP({children:["Tout son historique ",HE("b",null,"reste lisible"),", dans les périodes vivantes comme dans les archives. La corbeille 🗑️ refuse désormais de supprimer une fiche qui a des cases dans le planning : elle ne sert plus qu'aux fiches créées par erreur. Et chaque archive emporte une copie des fiches de l'équipe : même une fiche disparue y garde son nom et sa couleur."]}),
   HT({children:"⚠ Les limites à connaître"}),
   HP({children:["• ",HE("b",null,"Retirez ses activités avant de désactiver")," : la désactivation n'efface ",HE("b",null,"rien"),'. La fenêtre compte ce qui est posé sur les dates choisies et propose « 🧹 Retirer ses activités sur ces dates » (gardes, tour et absences comprises).']}),
   HP({children:["• L'",HE("b",null,"astreinte")," n'est pas couverte : gérez-la à part dans son onglet."]}),
@@ -6307,7 +6310,7 @@ function setScan(el){
    (semestre sans nom). La fenêtre de désactivation ne lit et n'écrit que
    les manuelles — une plage automatique ne doit pas être « réactivable ». */
 const medOffMan=(m)=>Array.isArray(m&&m.off)?m.off.filter(r=>r&&r.du&&r.au):[];
-const medOffL=(m)=>{const a=medOffMan(m);const b=djOffRanges(m);return b.length?a.concat(b):a;};
+const medOffL=(m)=>{let a=medOffMan(m);const b=djOffRanges(m);if(b.length)a=a.concat(b);if(m&&m.depart)a=a.concat([{du:m.depart,au:"9999-12-31",parti:true}]);return a;};   /* v10.151 : le départ est une désactivation sans fin */
 const offOn=(m,y2,m2,d2)=>{const k=dKey(y2,m2,d2);return medOffL(m).some(r=>r.du<=k&&k<=r.au);};
 /* état sur une liste de jours : null (actif), "part", ou "off" (tous couverts) */
 const offEtat=(m,jours)=>{
@@ -6316,6 +6319,57 @@ const offEtat=(m,jours)=>{
   return n===0?null:n===jours.length?"off":"part";
 };
 const offFr=(iso)=>{const a=String(iso).split("-");return a[2]+"/"+a[1]+"/"+a[0];};
+/* ═══ v10.151 : DÉPART D'UN MEMBRE ═══
+   Sa question du 30/08 : « si un médecin part, comment garder son historique ? ». Supprimer la fiche
+   ne supprimait aucune case, mais les rendait MUETTES : les colonnes sont dessinées depuis la liste
+   des fiches. On n'efface donc plus : on date le départ. À partir de cette date la personne est
+   traitée comme désactivée (tour, gardes, salles, planning type, Construire, rappels, stats), son
+   PIN n'ouvre plus rien (et peut être donné à quelqu'un d'autre), sa fiche passe dans « Anciens
+   membres ». Tout son passé reste lisible. */
+function medParti(m){return !!(m&&m.depart&&m.depart<=intISO(new Date()));}
+function offLib(r){return r&&r.parti?("parti le "+offFr(r.du)):("du "+offFr(r.du)+" au "+offFr(r.au));}
+/* le 🗑️ compte d'abord : une fiche qui a des cases ne se supprime pas, elle se date */
+function medNbCases(medId,plan,archPlan){var n=0;[plan,archPlan].forEach(function(P){Object.keys(P||{}).forEach(function(k){if(P[k]&&P[k][medId])n++;});});return n;}
+/* l'archive emporte l'annuaire : les fiches relues (absentes de l'équipe vivante) s'ajoutent POUR
+   L'AFFICHAGE, datées du début de la période en cours — visibles dans le passé, jamais dans l'avenir */
+function arMedsAjoute(meds,anx){
+  var A=(anx&&anx.meds)||{};var ks=Object.keys(A);if(!ks.length)return meds;
+  var have={};meds.forEach(function(m){have[String(m.id)]=1;});
+  var t=new Date(),p0=perStart(t.getFullYear(),t.getMonth()),l0=perDaysList(p0.sy,p0.sm);
+  var d0=l0.length?dKey(l0[0].y,l0[0].m,l0[0].d):intISO(t);
+  var add=[];ks.forEach(function(k){var s=A[k];if(!s||have[String(s.id)])return;add.push(Object.assign({},s,{depart:s.depart&&s.depart<d0?s.depart:d0,_arch:true}));});
+  return add.length?meds.concat(add):meds;
+}
+/* la fiche : « Parti le … » — commun aux deux fichiers */
+function DepartFiche(p){
+  var RE=React.createElement,m=p.mData,set=p.setMData;
+  if(!m||m._new)return null;
+  var parti=medParti(m);
+  return RE("div",{style:{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8}},
+    RE("div",{style:{fontSize:10,fontWeight:800,color:"#dc2626",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}},"🚪 Départ"),
+    RE("div",{style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},
+      RE("span",{style:{fontSize:13,color:"var(--txt2)"}},"Parti le"),
+      RE("input",{type:"date",value:m.depart||"",onChange:function(e){var v=e.target.value||null;set(function(q){return Object.assign({},q,{depart:v});});},style:Object.assign({},S.fi,{width:150})}),
+      m.depart?RE("button",{type:"button",onClick:function(){set(function(q){var o=Object.assign({},q);delete o.depart;return o;});},style:{fontSize:11,padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}},"Annuler le départ"):null),
+    RE("div",{style:{fontSize:11,color:"var(--txt3)",marginTop:4}},m.depart
+      ?(parti?"Parti : sa fiche est dans « Anciens membres », son PIN n'ouvre plus l'application et peut être donné à quelqu'un d'autre. Tout son historique reste lisible.":"À partir de cette date : plus de tour, de gardes, de salles ni de demandes ; le PIN cessera d'ouvrir l'application. L'historique reste.")
+      :"Pour un membre qui quitte le service : à partir de cette date il sort du tour, des gardes, des salles et des demandes de Construire, et son PIN n'ouvre plus l'application. Rien n'est effacé — préférez cela à la corbeille."));
+}
+/* Équipe : le groupe replié des anciens membres */
+function AnciensEquipe(p){
+  var RE=React.createElement;
+  var l=(p.medecins||[]).filter(medParti);
+  if(!l.length)return null;
+  return RE("details",{style:{marginBottom:18}},
+    RE("summary",{style:{fontSize:10,fontWeight:700,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:7,cursor:"pointer"}},"🚪 Anciens membres ("+l.length+")"),
+    RE("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:7}},
+      l.map(function(m){return RE("div",{key:m.id,style:Object.assign({},S.card,{display:"flex",alignItems:"center",gap:9,opacity:.75})},
+        RE("div",{style:{width:38,height:38,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:800,flexShrink:0}},m.init),
+        RE("div",{style:{flex:1}},
+          RE("div",{style:{fontWeight:700,color:"var(--txt)",fontSize:13}},(m.prenom||"")+" "+(m.nom||"")),
+          RE("div",{style:{fontSize:10,color:"var(--txt3)"}},"Parti le "+offFr(m.depart)+" · "+((m.role||"medecin")==="medecin"?"médecin":m.role==="attache"?"attaché":"IDE")+" · historique conservé")),
+        p.onEdit?RE("button",{style:S.icnBtn,onClick:function(){p.onEdit(m);}},"✏️"):null);})));
+}
 
 /* La fenêtre, centrée comme toutes celles de l'application. Réservée à
    l'éditeur par construction : la pastille n'est cliquable que pour lui. */
@@ -7612,7 +7666,7 @@ const AR_LU=AR_FAM.filter(f=>f.lu).map(f=>f.ch);
 /* v10.125 : annexes de STRUCTURE — semestres d'internes (sems, par id) et noms de
    juniors (djs, aplatis en "medId|deb" pour que la fusion à un niveau d'arFusion
    reste correcte). Relues comme AR_LU, jamais purgeables par clé de jour. */
-const AR_XTRA=["sems","djs"];
+const AR_XTRA=["sems","djs","meds"];   /* v10.151 : + l'annuaire (fiches allégées) */
 /* Copie, AVANT le retrait de la v10.88, les semestres ENTIÈREMENT clos et les noms de
    juniors correspondants dans l'annexe de CHAQUE période archivée qu'ils recouvrent
    (un semestre chevauche deux périodes : le consulter doit marcher depuis chacune).
@@ -7635,6 +7689,9 @@ function arSemsDjs(intCfg,medecins,list,lastMk){
     clos.forEach(s=>{if(s.deb<=p2&&s.fin>=p1)S[String(s.id||s.deb)]=s;});
     djC.forEach(c=>{if(c.deb<=p2&&c.fin>=p1)D[c.mid+"|"+(c.e.deb||c.deb)]={mid:c.mid,e:c.e};});
     const o={};if(Object.keys(S).length)o.sems=S;if(Object.keys(D).length)o.djs=D;
+    /* v10.151 : l'annuaire part avec chaque période — une fiche supprimée plus tard y garde son nom */
+    const M={};(medecins||[]).forEach(m=>{M[String(m.id)]={id:m.id,nom:m.nom||"",prenom:m.prenom||"",init:m.init||"",color:m.color||"#888",role:m.role||"medecin",statut:m.statut||null,depart:m.depart||null,dj:djL(m)};});
+    o.meds=M;
     if(Object.keys(o).length)out[pid]=o;
   });
   return out;
@@ -10145,10 +10202,19 @@ function CardioPlanning(){
       return add.length?Object.assign({},m,{dj:l.concat(add)}):m;
     });
   },[medecins,archAnx]);
-  const medsAff=djSubst(medsDj,intCfgAff,djRefIso);
+  const medsAff=djSubst(arMedsAjoute(medsDj,archAnx),intCfgAff,djRefIso);   /* v10.151 : + fiches relues des archives */
   const medPlan=medsAff.filter(m=>m.role==="medecin");
   const medAttache=medsAff.filter(m=>m.role==="attache");
   // ── Ordre d'affichage : déplace un médecin dans son groupe de rôle (ordre du tableau = ordre partout) ──
+  /* v10.151 : la corbeille compte d'abord. Une fiche qui a des cases (vivantes ou archivées chargées)
+     ne se supprime pas : elle se date. Sinon la fiche part, et son PIN avec elle. */
+  const supprMed=(m)=>{
+    const n=medNbCases(m.id,plan,archPlan);
+    if(n>0){toast("🚪 "+(m.prenom||"")+" "+(m.nom||"")+" a "+n+" case"+(n>1?"s":"")+" dans le planning — indiquez sa date de départ dans sa fiche (✏️) : son historique reste, sa fiche passe dans « Anciens membres ».","warn");return;}
+    if(!window.confirm("Supprimer "+(m.nom||"")+" ? Cette fiche n'a aucune case dans le planning."))return;
+    setMedecins(p=>p.filter(x=>x.id!==m.id));
+    setMedPins(p=>{if(!p[m.id])return p;const q={...p};delete q[m.id];return q;});
+  };
   const moveMed=(id,dir)=>{
     setMedecins(prev=>{
       const idx=prev.findIndex(m=>String(m.id)===String(id));
@@ -10263,7 +10329,7 @@ function CardioPlanning(){
         </div>
         <input value={pinInput} onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){
     if(pinInput===editPin){setAccessMode("edit");setPinError(false);return;}
-    const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3);
+    const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3&&!medParti(medecins.find(m=>m.id===parseInt(id))));
     if(medEntry){setEditMedId(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);
       /* v10.72 : un ATTACHE ouvre directement sur l'onglet Attaches — son planning
          n'est pas dans l'onglet Planning, qui ne montre que les medecins. */
@@ -10278,7 +10344,7 @@ function CardioPlanning(){
           onClick={()=>{
             if(pinInput===editPin){setAccessMode("edit");setPinError(false);return;}
             // Check medecin PINs
-            const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3);
+            const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3&&!medParti(medecins.find(m=>m.id===parseInt(id))));
             if(medEntry){
               setEditMedId(parseInt(medEntry[0]));
               setAccessMode("medecinEdit");
@@ -10734,7 +10800,7 @@ header::-webkit-scrollbar { display: none; }
             <div key={role} style={{marginBottom:18}}>
               <div style={{fontSize:10,fontWeight:700,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:7}}>{role==="medecin"?"Médecins":role==="attache"?"Attachés":"IDE"}</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:7}}>
-                {medecins.filter(m=>(m.role||"medecin")===role).map(m=>(
+                {medecins.filter(m=>(m.role||"medecin")===role&&!medParti(m)).map(m=>(
                   <div key={m.id} style={{...S.card,display:"flex",alignItems:"center",gap:9}}>
                     <div style={{width:38,height:38,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:800,flexShrink:0}}>{m.init}</div>
                     <div style={{flex:1}}>
@@ -10756,7 +10822,7 @@ header::-webkit-scrollbar { display: none; }
                     <div style={{display:"flex",flexDirection:"column",gap:3}}>
                       <div style={{display:"flex",gap:3}}>
                         <button style={{...S.icnBtn}} onClick={()=>{setMData({...m,_new:false});setModal("editMed");}}>✏️</button>
-                        {isEdit&&<button style={{...S.icnBtn,background:"#fff1f2",border:"1px solid #fecdd3",color:"#dc2626"}} onClick={()=>{if(confirm(`Supprimer ${m.nom} ?`))setMedecins(p=>p.filter(x=>x.id!==m.id));}}>🗑️</button>}
+                        {isEdit&&<button style={{...S.icnBtn,background:"#fff1f2",border:"1px solid #fecdd3",color:"#dc2626"}} onClick={()=>supprMed(m)}>🗑️</button>}{/* v10.151 */}
                       </div>
                       {isEdit&&<button style={{...S.icnBtn,fontSize:11,textAlign:"center"}} onClick={()=>{setMData({...m,_pinMode:true});setModal("editMedPin");}}>🔑</button>}
                       {isEdit&&<div style={{display:"flex",gap:3}}>
@@ -10769,6 +10835,7 @@ header::-webkit-scrollbar { display: none; }
               </div>
             </div>
           ))}
+          <AnciensEquipe medecins={medecins} onEdit={isEdit?(m=>{setMData({...m,_new:false});setModal("editMed");}):null}/>{/* v10.151 */}
           <InternesEquipe intCfg={intCfg} setIntCfg={setIntCfg} isEdit={isEdit}/>
         </div>
       )}
@@ -12467,6 +12534,7 @@ header::-webkit-scrollbar { display: none; }
           </div>
           <div style={{marginBottom:12}}>
             <div style={{fontSize:12,color:"var(--txt2)",marginBottom:8}}>PIN actuel : <strong style={{color:medPins[mData.id]?"var(--today-c)":"var(--txt3)"}}>{medPins[mData.id]||"Non défini"}</strong></div>
+            {medParti(mData)&&<div style={{fontSize:11,color:"#dc2626",marginBottom:8}}>{"🚪 Parti le "+offFr(mData.depart)+" — ce PIN n'ouvre plus l'application et peut être attribué à quelqu'un d'autre."}</div>}{/* v10.151 */}
             <div style={{display:"flex",gap:8}}>
               <input id="medpin" type="text" placeholder="Nouveau PIN (min 3 car.)" maxLength={8}
                 style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4,fontSize:16}}/>
@@ -12475,9 +12543,9 @@ header::-webkit-scrollbar { display: none; }
                 if(v.length<3)return toast("Min 3 caractères","warn");
                 if(v===editPin)return toast("Ce PIN est réservé à l'admin","warn");
                 // Check not used by another med
-                const conflict=Object.entries(medPins).find(([id,p])=>p===v&&parseInt(id)!==mData.id);
+                const conflict=Object.entries(medPins).find(([id,p])=>p===v&&parseInt(id)!==mData.id&&!medParti(medecins.find(m=>m.id===parseInt(id))));   /* v10.151 : le PIN d'un parti est libre */
                 if(conflict){const m2=medecins.find(m=>m.id===parseInt(conflict[0]));return toast(`Ce PIN est déjà utilisé par ${m2?.init||"un autre médecin"}`,"warn");}
-                setMedPins(p=>({...p,[mData.id]:v}));
+                setMedPins(p=>{const n={...p,[mData.id]:v};Object.keys(n).forEach(k=>{if(k!==String(mData.id)&&n[k]===v)delete n[k];});return n;});   /* v10.151 : retiré au parti qui l'avait */
                 toast(`PIN de ${mData.init} enregistré`);
                 setModal(null);
               }}>OK</button>
@@ -12967,6 +13035,7 @@ header::-webkit-scrollbar { display: none; }
                 <div style={{fontSize:9,color:"var(--txt3)",marginTop:4}}>Sa propre ligne est toujours modifiable. Ni les IDE ni les internes ne figurent dans cette liste.</div>
               </div>}
             </div>
+            <DepartFiche mData={mData} setMData={setMData}/>{/* v10.151 */}
             {(mData.role||"medecin")!=="ide"&&<div style={{gridColumn:"1/-1",borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,fontSize:10,fontWeight:800,color:"#388bfd",textTransform:"uppercase",letterSpacing:.5}}>🎯 Activités autorisées</div>}
             {(mData.role||"medecin")!=="ide"&&<div style={{gridColumn:"1/-1"}}>
               {!mData.init
