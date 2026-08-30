@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.149 — 30/08/2026";
+const APP_VERSION="v10.150 — 30/08/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -10453,7 +10453,7 @@ header::-webkit-scrollbar { display: none; }
         📴 Hors ligne — dernier planning reçu · lecture seule
       </div>}
       {isMedEdit&&botOn&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
-        ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(medecins.find(m=>m.id===editMedId)||{nom:""}).nom}
+        ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(djAff(medecins.find(m=>m.id===editMedId),djTodayIso)||{nom:""}).nom}{/* v10.150 : le junior en poste, pas le rôle */}
       </div>}
       {isInterne&&botOn&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e9f9f",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         🎓 Accès interne — {interneName||"?"}
