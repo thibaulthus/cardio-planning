@@ -166,7 +166,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.151 — 30/08/2026";
+var APP_VERSION = "v10.152 — 30/08/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -11775,10 +11775,10 @@ function CardioPlanning() {
                 React.createElement("div", null,
                     React.createElement("div", { style: { fontWeight: 800, fontSize: 14, color: "#f0f6fc" } }, "CardioPlanning"),
                     React.createElement("div", { style: { fontSize: 8, color: "#484f58", display: "flex", alignItems: "center", gap: 4 } },
-                        "CHL & CHB",
+                        /* v10.152 : « CHL & CHB » retiré — sur téléphone, chaque pixel de cette rangée manque au nav */
                         !isEdit && React.createElement("span", { style: { color: "#e3b341", marginLeft: 5 } }, "\uD83D\uDC41"),
                         perClose && React.createElement("span", { title: perArchivee ? "P\u00E9riode archiv\u00E9e : retir\u00E9e des donn\u00E9es actives et relue ici en consultation. D\u00E9sarchivez-la depuis Param\u00E8tres pour la modifier." : "P\u00E9riode close : elle pr\u00E9c\u00E8de la p\u00E9riode en cours. Les modifications y sont bloqu\u00E9es pour tout le monde. L'\u00E9diteur peut lever le verrou depuis Param\u00E8tres, le temps d'une session.", style: { background: perArchivee ? "#0e7490" : "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perArchivee ? "\uD83D\uDDC4 P\u00C9RIODE ARCHIV\u00C9E" : "\uD83D\uDD12 P\u00C9RIODE CLOSE"),
-                        perFut && perFut !== "dif" && React.createElement("span", { title: perFut === "phase1" ? "La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période" + (perFutFin ? " (jusqu'au " + finLib(perFutFin) + " à titre indicatif)" : "") + ". Le reste attend la diffusion du planning." : "Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning.", style: { background: perFut === "phase1" ? "#0e7490" : "#b45309", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perFut === "phase1" ? "🏖️ CONGÉS OUVERTS" + (perFutFin ? " → " + finLib(perFutFin).slice(0, 5) : "") : "🚧 EN PRÉPARATION"), /* v10.146 */
+                        perFut && perFut !== "dif" && React.createElement("span", { title: perFut === "phase1" ? "La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période" + (perFutFin ? " (jusqu'au " + finLib(perFutFin) + " à titre indicatif)" : "") + ". Le reste attend la diffusion du planning." : "Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning.", style: { background: perFut === "phase1" ? "#0e7490" : "#b45309", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perFut === "phase1" ? "🏖️ CONGÉS OUVERTS" : "🚧 EN PRÉPARATION") /* v10.152 : sans la date */, /* v10.146 */
                         React.createElement("span", { style: { marginLeft: 4, width: 6, height: 6, borderRadius: "50%", display: "inline-block",
                                 background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: netOff ? "Hors ligne — lecture seule" : fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
             React.createElement("nav", { style: S.nav }, orderedTabs.map(function (_a) {

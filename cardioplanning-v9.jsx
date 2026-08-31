@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.151 — 30/08/2026";
+const APP_VERSION="v10.152 — 30/08/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -10543,12 +10543,13 @@ header::-webkit-scrollbar { display: none; }
           <div>
             <div style={{fontWeight:800,fontSize:14,color:"#f0f6fc"}}>CardioPlanning</div>
             <div style={{fontSize:8,color:"#484f58",display:"flex",alignItems:"center",gap:4}}>
-              CHL & CHB{!isEdit&&<span style={{color:"#e3b341",marginLeft:5}}>👁</span>}
+              {/* v10.152 : « CHL & CHB » retiré — sur téléphone, chaque pixel de cette rangée manque au nav */}
+              {!isEdit&&<span style={{color:"#e3b341",marginLeft:5}}>👁</span>}
               {/* v10.106 : l'indicateur vit dans le BLOC DE TITRE, pas dans la rangée de
                   l'en-tête — celle-ci est un flex de hauteur fixe où tout ajout vole sa
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
               {perClose&&<span title={perArchivee?"Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier.":"Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session."} style={{background:perArchivee?"#0e7490":"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perArchivee?"🗄 PÉRIODE ARCHIVÉE":"🔒 PÉRIODE CLOSE"}</span>}
-              {perFut&&perFut!=="dif"&&<span title={perFut==="phase1"?"La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période"+(perFutFin?" (jusqu'au "+finLib(perFutFin)+" à titre indicatif)":"")+". Le reste attend la diffusion du planning.":"Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning."} style={{background:perFut==="phase1"?"#0e7490":"#b45309",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perFut==="phase1"?"🏖️ CONGÉS OUVERTS"+(perFutFin?" → "+finLib(perFutFin).slice(0,5):""):"🚧 EN PRÉPARATION"}</span>}   {/* v10.146 */}
+              {perFut&&perFut!=="dif"&&<span title={perFut==="phase1"?"La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période"+(perFutFin?" (jusqu'au "+finLib(perFutFin)+" à titre indicatif)":"")+". Le reste attend la diffusion du planning.":"Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning."} style={{background:perFut==="phase1"?"#0e7490":"#b45309",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perFut==="phase1"?"🏖️ CONGÉS OUVERTS":"🚧 EN PRÉPARATION"}</span>}{/* v10.152 : sans la date */}   {/* v10.146 */}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
