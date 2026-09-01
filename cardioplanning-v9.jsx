@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.156 — 01/09/2026";
+const APP_VERSION="v10.157 — 01/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -4589,7 +4589,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -12029,10 +12029,18 @@ header::-webkit-scrollbar { display: none; }
         const{medId,y:y2,m:m2,d:d2}=mData;
         const med=medecins.find(m=>m.id===medId);
         const wkC=wKey(y2,m2,d2),wmC=tourMed[wkC]||{HC:[],USIC:[]};
-        const unitC=(wmC.HC||[]).includes(medId)?"HC":"USIC";
+        /* v10.157 : deux cas. Tourneur de la SEMAINE : dérogation + remplaçant (inchangé).
+           Remplaçant DU JOUR : pas de dérogation à poser — ses cases TOUR_x passent au
+           nouveau remplaçant, sur les seuls créneaux qu'il tient réellement. */
+        const isTourWkS=[...(wmC.HC||[]),...(wmC.USIC||[])].includes(medId);
+        const heldSlots=["M","AM"].filter(sl=>cellHasAny((plan[sk(y2,m2,d2,sl)]||{})[medId],["TOUR_HC","TOUR_USIC"]));
+        const unitC=isTourWkS?((wmC.HC||[]).includes(medId)?"HC":"USIC")
+          :(cellHasAny((plan[sk(y2,m2,d2,heldSlots[0]||"M")]||{})[medId],["TOUR_HC"])?"HC":"USIC");
         const busyC=[...(wmC.HC||[]),...(wmC.USIC||[])];
         const dkC=dKey(y2,m2,d2);
-        const spanSel=daySwapSpan; // "J","M","AM"
+        const spanChoices=(isTourWkS||heldSlots.length===2)?[["J","Journée"],["M","Matin"],["AM","Après-midi"]]
+          :heldSlots.map(sl=>[sl,sl==="M"?"Matin":"Après-midi"]);
+        const spanSel=spanChoices.some(c=>c[0]===daySwapSpan)?daySwapSpan:spanChoices[0][0]; // "J","M","AM"
         const slots=spanSel==="J"?["M","AM"]:[spanSel];
         const cands=medecins.filter(mc=>mc.role==="medecin"&&mc.tourMed&&mc.id!==medId&&!busyC.includes(mc.id)).map(mc=>{
           const blockedBy=[];
@@ -12040,11 +12048,13 @@ header::-webkit-scrollbar { display: none; }
             const e=(plan[sk(y2,m2,d2,sl)]||{})[mc.id];
             const a=(cellEs(e).find(x=>x&&EXCL_IDS.includes(x.acteId))||{}).acteId;
             if(a)blockedBy.push(a==="ABSENCE"?"absent":a==="TP"?"temps partiel":a==="GARDE"?"garde":a==="REPOS_GARDE"?"repos de garde":"formation");
+            else if(cellHasAny(e,["TOUR_HC","TOUR_USIC"]))blockedBy.push("déjà de tour ce jour");   /* v10.157 */
           });
           return {m:mc,blocked:blockedBy.length>0,reason:blockedBy[0]||""};
         });
         const doDaySwap=(replId)=>{
           const repl=medecins.find(m2=>m2.id===replId);
+          if(isTourWkS){
           // 1. dérogation du tourneur (jour entier ou slot)
           setTourDerog(p=>{
             const n={...p};const o={...(n[dkC]||{})};
@@ -12057,6 +12067,18 @@ header::-webkit-scrollbar { display: none; }
             }
             n[dkC]=o;return n;
           });
+          }else{
+          /* 1bis (v10.157) : remplaçant du jour — retirer ses cases TOUR_x sur les créneaux échangés */
+          setPlan(p=>{
+            let next={...p};
+            slots.forEach(sl=>{
+              const k=sk(y2,m2,d2,sl);if(!next[k])return;
+              const dmS={...next[k]};
+              if(cellHasAny(dmS[medId],["TOUR_"+unitC])){const r=cellDrop(dmS[medId],["TOUR_"+unitC]);if(r)dmS[medId]=r;else delete dmS[medId];next[k]=dmS;}
+            });
+            return next;
+          });
+          }
           // 2. entrée Tour réelle pour le remplaçant sur les slots
           setPlan(p=>{
             let next={...p};
@@ -12081,7 +12103,7 @@ header::-webkit-scrollbar { display: none; }
               <b style={{color:med&&med.color}}>{med&&med.init}</b> quitte le tour <b>{unitC}</b> le {JOURSL[dow(y2,m2,d2)]} {d2} {MOIS[m2]} — choisissez son remplaçant :
             </div>
             <div style={{display:"flex",gap:6,marginBottom:10}}>
-              {[["J","Journée"],["M","Matin"],["AM","Après-midi"]].map(([v,lb])=>(
+              {spanChoices.map(([v,lb])=>(
                 <button key={v} onClick={()=>setDaySwapSpan(v)}
                   style={{flex:1,padding:"6px 4px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",
                     border:"2px solid "+(spanSel===v?"#388bfd":"var(--border2)"),
@@ -12512,9 +12534,13 @@ header::-webkit-scrollbar { display: none; }
                 {canEditThisMed&&med&&(()=>{
                   const wkC=wKey(y2,m2,d2),wmC=tourMed[wkC]||{HC:[],USIC:[]};
                   const isTourWk=[...(wmC.HC||[]),...(wmC.USIC||[])].includes(medId);
-                  if(!isTourWk||isWE(y2,m2,d2))return null;
+                  /* v10.157 : un remplaçant DU JOUR (junior sur temps partiel, ou remplaçant
+                     posé par un échange de jour) porte des cases TOUR_x sans être au tour de
+                     la semaine — il a droit au même « ⇄ Échanger ce jour de tour ». */
+                  const replSlotsB=isTourWk?[]:["M","AM"].filter(sl=>cellHasAny((plan[sk(y2,m2,d2,sl)]||{})[medId],["TOUR_HC","TOUR_USIC"]));
+                  if((!isTourWk&&replSlotsB.length===0)||isWE(y2,m2,d2))return null;
                   const dkC=dKey(y2,m2,d2);
-                  const derog=((tourDerog||{})[dkC]||{})[medId];
+                  const derog=isTourWk?((tourDerog||{})[dkC]||{})[medId]:null;
                   const unitC=(wmC.HC||[]).includes(medId)?"HC":"USIC";
                   if(derog)return(<button style={{...S.qBtn,borderColor:"#16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a"}}
                     onClick={()=>{
