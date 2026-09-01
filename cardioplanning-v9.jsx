@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.158 — 01/09/2026";
+const APP_VERSION="v10.159 — 01/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -3481,7 +3481,16 @@ function AbsModal({medecins,onApply,onRemove,onClose,initMedId=null,initDate=nul
 /* ════════════════════════════════════════════════════════════
    MAIN APP
 ════════════════════════════════════════════════════════════ */
-function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast}){
+function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit:isEditIn,edReel,build,secrDif,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast}){
+  /* v10.159 : deux niveaux de droits dans la tuile Tour.
+     — edReel (vrais éditeurs) : répartition automatique, 🗑 Retirer, rapport ;
+     — isEdit (le geste MANUEL — attribution, échanges) : les éditeurs toujours,
+       les intermédiaires seulement quand la période leur est ouverte — période
+       en cours ou passée, dérogation (validée à l'étape 5) ou diffusion. */
+  const _pT0=perStart(tourYear,tourMonth);
+  const _tFut=(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return _pT0.sy*12+_pT0.sm>p0.sy*12+p0.sm;})();
+  const _interOuvert=!_tFut||!!((((build||{})[_pT0.sy+"_"+_pT0.sm]||{}).derog||{}).inter)||!!((secrDif||{})[perIdOf(_pT0.sy,_pT0.sm)]);
+  const isEdit=edReel||(isEditIn&&_interOuvert);
   const _psT=perStart(tourYear,tourMonth);
   const perT={pi:_psT.sm,startY:_psT.sy,startM:_psT.sm};
   const perKeyT=perT.startY+"_"+perT.startM;
@@ -4066,8 +4075,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         </div>
       </div>
       <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
-          {isEdit&&<button onClick={openAutoModal} title="Répartition automatique" style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>⚙️ Répartition auto</button>}
-          {isEdit&&<button onClick={()=>{
+          {edReel&&<button onClick={openAutoModal} title="Répartition automatique" style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>⚙️ Répartition auto</button>}
+          {edReel&&<button onClick={()=>{
             if(weeksT.length&&!wChk(weeksT[0].key))return;   /* v10.128 */
             if(!window.confirm("Supprimer TOUTES les attributions du tour sur la période affichée ?"))return;
             if(!window.confirm("Confirmez-vous la suppression définitive ? (récupérable via le bouton Annuler ↶)"))return;
@@ -4077,7 +4086,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
             toast("Attributions de la période supprimées — remplaçants juniors et TP de dérogation retirés","info");
           }} title="Effacer toutes les attributions de la période" style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}}>🗑 Retirer</button>}
       </div>
-      {isEdit&&lastReport&&<div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 12px",marginBottom:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",fontSize:11,color:"var(--txt2)"}}>
+      {edReel&&lastReport&&<div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 12px",marginBottom:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",fontSize:11,color:"var(--txt2)"}}>
         <span style={{flexShrink:0}}>ℹ️</span>
         <span style={{flex:1,whiteSpace:"pre-line"}}>{lastReport}{(()=>{const all=[];weeksT.forEach(w2=>weekTPInfo(w2.key).forEach(t3=>all.push(t3)));return all.length>0?"\n• ✂ Remplacements TP : "+all.join(" · ")+".":"";})()}</span>
         
@@ -4589,7 +4598,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, un badge « 👁 Tour non validé » le leur rappelle ; la diffusion les révèle dans tous les cas (v10.158)."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159)."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -5935,7 +5944,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
      L'etape 5 (planning type) est la seule qui ne se mesure pas — elle garde
      donc son bouton de validation a la main. */
   const autoOk={1:meds.length>0&&nMeds===meds.length,
-    2:tour.tot>0&&tour.ok===tour.tot,
+    2:tour.tot>0&&tour.ok===tour.tot&&(!bFut||!!B.tourOk),   /* v10.159 : à venir = validation requise */
     3:gardes.tot>0&&gardes.ok===gardes.tot,
     4:autres.length>0&&nAutres===autres.length,
     5:false,
@@ -6019,7 +6028,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
      </div>},
     {n:2,icon:"🔄",titre:"Distribution du tour",
      sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
-     alerte:mTour?(mTour+" semaine"+(mTour>1?"s":"")+" sans tour attribué"):null,
+     alerte:mTour?(mTour+" semaine"+(mTour>1?"s":"")+" sans tour attribué"):(bFut&&tour.tot>0&&tour.ok===tour.tot&&!B.tourOk?"Tour attribué mais non validé — invisible de l'équipe (bandeau ci-dessous)":null),   /* v10.159 */
      body:<div>
        {bFut&&edReel&&<div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",margin:"2px 0 8px",padding:"6px 9px",borderRadius:8,border:"1px solid "+(B.tourOk?"#3fb950":"#8b5cf6"),background:B.tourOk?"rgba(63,185,80,.10)":"rgba(139,92,246,.08)"}}>
          <span style={{fontSize:11,fontWeight:700,color:B.tourOk?"#3fb950":"#8b5cf6"}}>{B.tourOk?("✓ Tour validé — visible de toute l'équipe"+(B.tourOk.by?" (par "+B.tourOk.by+" le "+B.tourOk.at+")":"")):"👁 Tour visible des seuls éditeurs — pas encore validé"}</span>
@@ -9366,17 +9375,6 @@ function CardioPlanning(){
   vRef.current.fut={deb:futDebut(),profil:vProfil,etat:(y,m,d)=>{const p=perOfDay(y,m,d);return vFutEtatDe(p.sy,p.sm);},derog:(y,m,d,pr)=>{const p=perOfDay(y,m,d);return !!((((build||{})[p.sy+"_"+p.sm]||{}).derog||{})[pr]);}};
   const perFut=(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());const pF=perStart(year,month);return (pF.sy*12+pF.sm>p0.sy*12+p0.sm)?vFutEtatDe(pF.sy,pF.sm):null;})();
   const perFutFin=(()=>{const pF=perStart(year,month);return ((build||{})[pF.sy+"_"+pF.sm]||{}).demFin||null;})();
-  /* v10.158 : badge « tour non validé » pour l'éditeur — période à venir affichée,
-     des semaines de tour attribuées, ni validées (tuile 2) ni diffusées. */
-  const perFutTourCache=(()=>{
-    if(!isEdit||!perFut||perFut==="dif")return false;
-    const pF=perStart(year,month);
-    if(((build||{})[pF.sy+"_"+pF.sm]||{}).tourOk)return false;
-    return Object.keys(tourMed||{}).some(wk=>{const q=String(wk).split("-").map(Number);
-      if(q.length!==3)return false;
-      const wm=tourMed[wk]||{};if(!((wm.HC||[]).length||(wm.USIC||[]).length))return false;
-      const p=perOfDay(q[0],q[1],q[2]);return p.sy===pF.sy&&p.sm===pF.sm;});
-  })();
   const futPers=(()=>{const t=new Date();let p=perStart(t.getFullYear(),t.getMonth());const out=[];for(let i=0;i<3;i++){p=perNext(p.sy,p.sm);const k=p.sy+"_"+p.sm;const B=(build||{})[k]||{};out.push({key:k,lib:perLibelle(p.sy,p.sm),etat:vFutEtatDe(p.sy,p.sm),fin:B.demFin||null,derog:B.derog||{}});}return out;})();
   const futDerog=(k,pr,v)=>{setBuild(b=>{const cur=(b||{})[k]||{};const d={...(cur.derog||{})};if(v)d[pr]=1;else delete d[pr];return {...(b||{}),[k]:{...cur,derog:d}};});toast(v?"Dérogation ouverte pour les "+(FUT_PROFILS.find(x=>x[0]===pr)||["",pr])[1]:"Dérogation retirée");};
   /* v10.100 : le bandeau de role du bas confirme sous quel acces on est entre,
@@ -10620,7 +10618,7 @@ function CardioPlanning(){
     window.location.reload();};
   const verRetablir=()=>{if(!window.confirm("Déclarer CETTE version ("+APP_VERSION+") comme version en service ?\n\nÀ n'utiliser qu'après un retour volontaire à une version antérieure : toutes les copies plus récentes passeront à leur tour en lecture seule."))return;
     if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
-  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast};
+  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast};
   const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
@@ -10748,7 +10746,6 @@ header::-webkit-scrollbar { display: none; }
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
               {perClose&&<span title={perArchivee?"Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier.":"Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session."} style={{background:perArchivee?"#0e7490":"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perArchivee?"🗄 PÉRIODE ARCHIVÉE":"🔒 PÉRIODE CLOSE"}</span>}
               {perFut&&perFut!=="dif"&&<span title={perFut==="phase1"?"La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période"+(perFutFin?" (jusqu'au "+finLib(perFutFin)+" à titre indicatif)":"")+". Le reste attend la diffusion du planning.":"Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning."} style={{background:perFut==="phase1"?"#0e7490":"#b45309",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perFut==="phase1"?"🏖️ CONGÉS OUVERTS":"🚧 EN PRÉPARATION"}</span>}{/* v10.152 : sans la date */}   {/* v10.146 */}
-              {perFutTourCache&&<span title="Le tour de cette période est attribué mais pas encore validé (Construire, tuile 2) : les semaines de tour sont invisibles de l'équipe — seuls les éditeurs les voient." style={{background:"#8b5cf6",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>👁 TOUR NON VALIDÉ</span>}{/* v10.158 */}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>

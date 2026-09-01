@@ -166,7 +166,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.158 — 01/09/2026";
+var APP_VERSION = "v10.159 — 01/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -3607,19 +3607,38 @@ function AbsModal(_a) {
    MAIN APP
 ════════════════════════════════════════════════════════════ */
 function TourTab(_a) {
-    var _b = _a.noNav, noNav = _b === void 0 ? false : _b, _c = _a.specColors, specColors = _c === void 0 ? null : _c, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, tourPtOte = _a.tourPtOte, setTourPtOte = _a.setTourPtOte, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEdit = _a.isEdit, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast, vRef = _a.vRef, vToast = _a.vToast;
+    var _b = _a.noNav, noNav = _b === void 0 ? false : _b, _c = _a.specColors, specColors = _c === void 0 ? null : _c, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, tourPtOte = _a.tourPtOte, setTourPtOte = _a.setTourPtOte, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, medecins = _a.medecins, getEntries = _a.getEntries, isEditIn = _a.isEdit, edReel = _a.edReel, build = _a.build, secrDif = _a.secrDif, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast, vRef = _a.vRef, vToast = _a.vToast;
+    /* v10.159 : deux niveaux de droits dans la tuile Tour.
+       — edReel (vrais éditeurs) : répartition automatique, 🗑 Retirer, rapport ;
+       — isEdit (le geste MANUEL — attribution, échanges) : les éditeurs toujours,
+         les intermédiaires seulement quand la période leur est ouverte — période
+         en cours ou passée, dérogation (validée à l'étape 5) ou diffusion. */
+    var _pT0 = perStart(tourYear, tourMonth);
+    var _tFut = (function () { var t = new Date(); var p0 = perStart(t.getFullYear(), t.getMonth()); return _pT0.sy * 12 + _pT0.sm > p0.sy * 12 + p0.sm; })();
+    var _interOuvert = !_tFut || !!((((build || {})[_pT0.sy + "_" + _pT0.sm] || {}).derog || {}).inter) || !!((secrDif || {})[perIdOf(_pT0.sy, _pT0.sm)]);
+    var isEdit = edReel || (isEditIn && _interOuvert);
     var _psT = perStart(tourYear, tourMonth);
     var perT = { pi: _psT.sm, startY: _psT.sy, startM: _psT.sm };
     var perKeyT = perT.startY + "_" + perT.startM;
     var savedCfg = (tourCfg || {})[perKeyT] || null;
     var perLabelT = MOIS[perT.startM] + " — " + MOIS[(perT.startM + PCFG.len - 1) % 12];
-    var prevPeriodT = function () { var p = perPrevB(perT.startY, perT.startM); if (!p) return; setTourMonth(p.sm); setTourYear(p.sy); };
-    var nextPeriodT = function () { var p = perNextB(perT.startY, perT.startM); if (!p) return; setTourMonth(p.sm); setTourYear(p.sy); };
-    /* v10.109 : les semaines viennent des BORNES REELLES de la periode (voir le jsx). */
+    var prevPeriodT = function () { var p = perPrevB(perT.startY, perT.startM); if (!p)
+        return; setTourMonth(p.sm); setTourYear(p.sy); };
+    var nextPeriodT = function () { var p = perNextB(perT.startY, perT.startM); if (!p)
+        return; setTourMonth(p.sm); setTourYear(p.sy); };
+    /* v10.109 : les semaines viennent des BORNES REELLES de la periode. Avant, elles
+       partaient du 1er lundi >= 1er du mois et s'arretaient au dernier jour du dernier
+       mois — juste tant qu'aucune extension ne deplacait une borne. */
     var weeksT = perWeeksList(perT.startY, perT.startM);
     /* v10.128 : verrou des semaines passées (jugées sur leur vendredi, vSemBloque) */
     var wLock = function (wk) { return !!vRef && vSemBloque(vRef, wk); };
-    var wChk = function (wk) { if (!vRef) return true; if (vSemBloque(vRef, wk)) { if (vToast) vToast(false); return false; } if (vSemAvertit(vRef, wk) && vToast) vToast(true); return true; };
+    var wChk = function (wk) { if (!vRef)
+        return true; if (vSemBloque(vRef, wk)) {
+        if (vToast)
+            vToast(false);
+        return false;
+    } if (vSemAvertit(vRef, wk) && vToast)
+        vToast(true); return true; };
     var isBlockedInWeek = function (medId, wk2) {
         var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
         var _mo = medecins.find(function (m) { return String(m.id) === String(medId); }); /* v10.41 */
@@ -3644,7 +3663,7 @@ function TourTab(_a) {
        fériés : semaine de 5 jours = 10 demi-journées, il compte au-delà de 5 ; semaine
        à férié = 8, au-delà de 4. Un jour désactivé vaut 2 demi-journées d'absence. */
     var presentMajSem = function (medId, wk2) {
-        var _p9 = wk2.split("-").map(Number), wy2 = _p9[0], wm2 = _p9[1], wd2 = _p9[2];
+        var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
         var _mo = medecins.find(function (m) { return String(m.id) === String(medId); });
         var tot = 0, nAbs = 0;
         for (var i = 0; i < 5; i++) {
@@ -3671,15 +3690,14 @@ function TourTab(_a) {
        dernières (clearWeekActivities). Rend le premier jour bloquant (« Mar 6 »), sinon null. */
     var actManuelleSem = function (medId, wk2) {
         var SYS2 = ABS_IDS.concat(["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC", "TP"]);
-        var _p1 = wk2.split("-").map(Number), wy2 = _p1[0], wm2 = _p1[1], wd2 = _p1[2];
+        var _a = wk2.split("-").map(Number), wy2 = _a[0], wm2 = _a[1], wd2 = _a[2];
         for (var i = 0; i < 5; i++) {
             var dt = new Date(wy2, wm2, wd2 + i);
             var dy = dt.getFullYear(), dm3 = dt.getMonth(), dd = dt.getDate();
             if (isFerie(dy, dm3, dd))
                 continue; /* v10.156 */
-            var sls = ["M", "AM"];
-            for (var i2 = 0; i2 < sls.length; i2++) {
-                var sl = sls[i2];
+            for (var _i = 0, _b = ["M", "AM"]; _i < _b.length; _i++) {
+                var sl = _b[_i];
                 var ex = (plan[sk(dy, dm3, dd, sl)] || {})[medId];
                 if (!ex)
                     continue;
@@ -3755,7 +3773,7 @@ function TourTab(_a) {
                 return [0, 1, 2, 3, 4].map(function (i) { var dt = new Date(wy2, wm2, wd2 + i); return [dt.getFullYear(), dt.getMonth(), dt.getDate()]; });
             };
             var PROT_1 = PROT_TOUR;
-            var oteAdd = [], oteDel = []; /* v10.155 : témoins — posés à l'arrivée si des cases partent, consommés au départ */
+            var oteAdd_1 = [], oteDel_1 = []; /* v10.155 : témoins — posés à l'arrivée si des cases partent, consommés au départ */
             setPlan(function (p) {
                 var next = __assign({}, p);
                 // Chaque personne : retirer ses activités sur sa semaine d'ARRIVÉE, ré-appliquer son PT sur sa semaine de DÉPART
@@ -3778,13 +3796,13 @@ function TourTab(_a) {
                             var dm3 = __assign({}, next[k]);
                             delete dm3[mid];
                             next[k] = dm3;
-                            oteAdd.push([arriveKey, mid]);
+                            oteAdd_1.push([arriveKey, mid]);
                         });
                     });
                     var pt = planningType[mid];
                     var temoin = !!(((tourPtOte || {})[leaveKey] || {})[mid]); /* v10.155 : sans témoin, la semaine quittée reste telle quelle */
                     if (temoin)
-                        oteDel.push([leaveKey, mid]);
+                        oteDel_1.push([leaveKey, mid]);
                     if (pt && temoin)
                         weekDays_1(leaveKey).forEach(function (_a) {
                             var dy = _a[0], dm = _a[1], dd = _a[2];
@@ -3810,7 +3828,22 @@ function TourTab(_a) {
                 });
                 return next;
             });
-            setTimeout(function () { if (oteAdd.length || oteDel.length) setTourPtOte(function (p2) { var n2 = __assign({}, p2); oteDel.forEach(function (_a) { var wk = _a[0], mid = _a[1]; if (!n2[wk]) return; var o = __assign({}, n2[wk]); delete o[mid]; if (Object.keys(o).length === 0) delete n2[wk]; else n2[wk] = o; }); oteAdd.forEach(function (_a) { var wk = _a[0], mid = _a[1]; n2[wk] = __assign({}, (n2[wk] || {})); n2[wk][mid] = true; }); return n2; }); }, 0); /* v10.155 */
+            setTimeout(function () { if (oteAdd_1.length || oteDel_1.length)
+                setTourPtOte(function (p2) { var n2 = __assign({}, p2); oteDel_1.forEach(function (_a) {
+                    var wk = _a[0], mid = _a[1];
+                    if (!n2[wk])
+                        return;
+                    var o = __assign({}, n2[wk]);
+                    delete o[mid];
+                    if (Object.keys(o).length === 0)
+                        delete n2[wk];
+                    else
+                        n2[wk] = o;
+                }); oteAdd_1.forEach(function (_a) {
+                    var wk = _a[0], mid = _a[1];
+                    n2[wk] = __assign({}, (n2[wk] || {}));
+                    n2[wk][mid] = true;
+                }); return n2; }); }, 0); /* v10.155 */
         }
         // Temps partiels : nettoyer les semaines quittées, appliquer sur les semaines d'arrivée (si USIC)
         var mS2 = medecins.find(function (m) { return m.id === swapSrcMed; }), mD2 = medecins.find(function (m) { return m.id === swapDstMed; });
@@ -3854,6 +3887,9 @@ function TourTab(_a) {
         }
         return infos;
     };
+    /* v10.95 : liste de la PÉRIODE de cet écran (celle de Construire quand la
+       tuile l'embarque) — les indisponibles sur toute la période en sortent et
+       un rôle junior porte les initiales de ses deux titulaires. */
     var medsPerT = djListePeriode(medecins, perDaysList(perT.startY, perT.startM));
     var tourMeds = medsPerT.filter(function (m) { return m.tourMed && !m._nonPourvu; }); /* v10.123 */
     var horsTourSpecMeds = medsPerT.filter(function (m) { return m.role === "medecin" && !m.tourMed && m.surSpec; });
@@ -3866,11 +3902,11 @@ function TourTab(_a) {
     var _l = React.useState(1), cfgMinEEP = _l[0], setCfgMinEEP = _l[1];
     var _m = React.useState(1), cfgMinPace = _m[0], setCfgMinPace = _m[1];
     var _o = React.useState(1), cfgMinETT = _o[0], setCfgMinETT = _o[1];
-    var _q = React.useState(3), cfgMinCoro = _q[0], setCfgMinCoro = _q[1];
-    var _s = React.useState({}), cfgExcl = _s[0], setCfgExcl = _s[1]; // {medId: true = ne participe pas}
-    var _t = React.useState({}), cfgWeeks = _t[0], setCfgWeeks = _t[1]; // {medId: nWeeks}
-    var _u = React.useState({}), cfgPref2HC = _u[0], setCfgPref2HC = _u[1]; // {medId: bool}
-    var _v = React.useState({}), cfgPref2USIC = _v[0], setCfgPref2USIC = _v[1]; // {medId: bool}
+    var _p = React.useState(3), cfgMinCoro = _p[0], setCfgMinCoro = _p[1];
+    var _q = React.useState({}), cfgExcl = _q[0], setCfgExcl = _q[1]; // {medId: true = ne participe pas}
+    var _s = React.useState({}), cfgWeeks = _s[0], setCfgWeeks = _s[1]; // {medId: nWeeks}
+    var _t = React.useState({}), cfgPref2HC = _t[0], setCfgPref2HC = _t[1]; // {medId: bool}
+    var _u = React.useState({}), cfgPref2USIC = _u[0], setCfgPref2USIC = _u[1]; // {medId: bool}
     var totalSlots = weeksT.length * 4; // 2 HC + 2 USIC per week
     var activeMeds = tourMeds.filter(function (m) { return !cfgExcl[m.id]; });
     var nominalW = activeMeds.length > 0 ? Math.ceil(totalSlots / activeMeds.length) : 0;
@@ -4001,8 +4037,8 @@ function TourTab(_a) {
                     var w1 = weeksT[i2], w2 = weeksT[i2 + 1];
                     if (assignedThisWeek[w1.key].includes(m.id) || assignedThisWeek[w2.key].includes(m.id))
                         continue;
-                    if (horsW(m.id, w1.key) || horsW(m.id, w2.key)) /* v10.153 */
-                        continue;
+                    if (horsW(m.id, w1.key) || horsW(m.id, w2.key))
+                        continue; /* v10.153 */
                     if (isAvoid(m.id, w1.key) || isAvoid(m.id, w2.key))
                         continue;
                     if (assign[w1.key][unit].length >= 2 || assign[w2.key][unit].length >= 2)
@@ -4035,7 +4071,7 @@ function TourTab(_a) {
             weeksByConstraint.forEach(function (w) {
                 var units = Math.random() < 0.5 ? ["HC", "USIC"] : ["USIC", "HC"];
                 units.forEach(function (unit) {
-                    while (assign[w.key][unit].length < 2) {
+                    var _loop_3 = function () {
                         var baseC = tourMeds.filter(function (m) { return quota[m.id] > 0
                             && !assignedThisWeek[w.key].includes(m.id)
                             && !horsW(m.id, w.key); }); /* v10.153 */
@@ -4061,7 +4097,7 @@ function TourTab(_a) {
                             }
                         }
                         if (cands.length === 0)
-                            break;
+                            return "break";
                         /* v10.154 : tension = quota restant / semaines encore ouvertes au médecin —
                            les plus contraints sont servis d'abord, les plus larges restent en réserve
                            pour les semaines difficiles. */
@@ -4109,6 +4145,11 @@ function TourTab(_a) {
                         else
                             usicCount[m.id]++;
                         quota[m.id]--;
+                    };
+                    while (assign[w.key][unit].length < 2) {
+                        var state_2 = _loop_3();
+                        if (state_2 === "break")
+                            break;
                     }
                 });
             });
@@ -4145,7 +4186,7 @@ function TourTab(_a) {
                                 && !assignedThisWeek[w.key].includes(c.id)
                                 && !horsW(c.id, w.key); }); /* v10.153 */
                             var repaired = false;
-                            var _loop_3 = function (c) {
+                            var _loop_4 = function (c) {
                                 if (repaired)
                                     return "break";
                                 for (var _a = 0, weeksT_1 = weeksT; _a < weeksT_1.length; _a++) {
@@ -4158,15 +4199,15 @@ function TourTab(_a) {
                                         var unit2 = _c[_b];
                                         if (repaired)
                                             break;
-                                        var _loop_4 = function (m2id) {
+                                        var _loop_5 = function (m2id) {
                                             if (assignedThisWeek[w.key].includes(m2id))
                                                 return "continue";
-                                            if (horsW(m2id, w.key)) /* v10.153 */
-                                                return "continue";
+                                            if (horsW(m2id, w.key))
+                                                return "continue"; /* v10.153 */
                                             if (assignedThisWeek[w2.key].includes(c.id))
                                                 return "continue";
-                                            if (horsW(c.id, w2.key)) /* v10.153 */
-                                                return "continue";
+                                            if (horsW(c.id, w2.key))
+                                                return "continue"; /* v10.153 */
                                             assign[w2.key][unit2] = assign[w2.key][unit2].filter(function (x) { return x !== m2id; });
                                             assignedThisWeek[w2.key] = assignedThisWeek[w2.key].filter(function (x) { return x !== m2id; });
                                             assign[w2.key][unit2].push(c.id);
@@ -4210,8 +4251,8 @@ function TourTab(_a) {
                                         };
                                         for (var _d = 0, _e = __spreadArray([], assign[w2.key][unit2], true); _d < _e.length; _d++) {
                                             var m2id = _e[_d];
-                                            var state_3 = _loop_4(m2id);
-                                            if (state_3 === "break")
+                                            var state_4 = _loop_5(m2id);
+                                            if (state_4 === "break")
                                                 break;
                                         }
                                     }
@@ -4219,8 +4260,8 @@ function TourTab(_a) {
                             };
                             for (var _i = 0, stuck_1 = stuck; _i < stuck_1.length; _i++) {
                                 var c = stuck_1[_i];
-                                var state_2 = _loop_3(c);
-                                if (state_2 === "break")
+                                var state_3 = _loop_4(c);
+                                if (state_3 === "break")
                                     break;
                             }
                             if (!repaired)
@@ -4302,7 +4343,7 @@ function TourTab(_a) {
         tourMeds.forEach(function (m) {
             if (cfgExcl[m.id])
                 return;
-            var sems = weeksT.map(function (w2) { return { l: w2.label, j: actManuelleSem(m.id, w2.key) }; }).filter(function (x) { return x.j; });
+            var sems = weeksT.map(function (w2) { return ({ l: w2.label, j: actManuelleSem(m.id, w2.key) }); }).filter(function (x) { return x.j; });
             if (sems.length)
                 actBloq.push(m.init + " : " + sems.map(function (x) { return "sem. " + x.l + " (" + x.j + ")"; }).join(", "));
         });
@@ -4343,8 +4384,8 @@ function TourTab(_a) {
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
-            isEdit && React.createElement("button", { onClick: openAutoModal, title: "R\u00E9partition automatique", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
-            isEdit && React.createElement("button", { onClick: function () {
+            edReel && React.createElement("button", { onClick: openAutoModal, title: "R\u00E9partition automatique", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
+            edReel && React.createElement("button", { onClick: function () {
                     if (weeksT.length && !wChk(weeksT[0].key))
                         return; /* v10.128 */
                     if (!window.confirm("Supprimer TOUTES les attributions du tour sur la période affichée ?"))
@@ -4356,7 +4397,7 @@ function TourTab(_a) {
                     setLastReport(null);
                     toast("Attributions de la période supprimées — remplaçants juniors et TP de dérogation retirés", "info");
                 }, title: "Effacer toutes les attributions de la p\u00E9riode", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer")),
-        isEdit && lastReport && React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", fontSize: 11, color: "var(--txt2)" } },
+        edReel && lastReport && React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", marginBottom: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", fontSize: 11, color: "var(--txt2)" } },
             React.createElement("span", { style: { flexShrink: 0 } }, "\u2139\uFE0F"),
             React.createElement("span", { style: { flex: 1, whiteSpace: "pre-line" } },
                 lastReport,
@@ -4516,7 +4557,10 @@ function TourTab(_a) {
                     var sameWeek = swapSrcKey === swapDstKey;
                     // Bloquants
                     var blocks = [];
-                    if(wLock(swapSrcKey))blocks.push("La semaine du "+lS+" est passée — verrouillée.");if(!sameWeek&&wLock(swapDstKey))blocks.push("La semaine du "+lD+" est passée — verrouillée.");
+                    if (wLock(swapSrcKey))
+                        blocks.push("La semaine du " + lS + " est passée — verrouillée.");
+                    if (!sameWeek && wLock(swapDstKey))
+                        blocks.push("La semaine du " + lD + " est passée — verrouillée.");
                     if (!sameWeek && unitOf(swapSrcMed, swapDstKey))
                         blocks.push(mS.init + " est déjà de tour la semaine du " + lD + ".");
                     if (!sameWeek && unitOf(swapDstMed, swapSrcKey))
@@ -4567,7 +4611,7 @@ function TourTab(_a) {
                             wn); }),
                         !sameWeek && React.createElement("label", { style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--txt)", marginTop: 10, cursor: "pointer" } },
                             React.createElement("input", { type: "checkbox", checked: swapUpdPlan, onChange: function (e) { return setSwapUpdPlan(e.target.checked); }, style: { width: 14, height: 14 } }),
-                            "Mettre \u00E0 jour le planning des 2 praticiens (retirer les activit\u00E9s sur la semaine d'arriv\u00E9e, r\u00E9-appliquer le planning type sur la semaine quitt\u00E9e) — les cases pos\u00E9es \u00E0 la main sont conserv\u00E9es, et le planning type ne revient sur la semaine quitt\u00E9e que s'il y \u00E9tait \u00E0 la prise"),
+                            "Mettre \u00E0 jour le planning des 2 praticiens (retirer les activit\u00E9s sur la semaine d'arriv\u00E9e, r\u00E9-appliquer le planning type sur la semaine quitt\u00E9e) \u2014 les cases pos\u00E9es \u00E0 la main sont conserv\u00E9es, et le planning type ne revient sur la semaine quitt\u00E9e que s'il y \u00E9tait \u00E0 la prise"),
                         sameWeek && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 8 } }, "\u00C9change HC \u21C4 USIC au sein de la m\u00EAme semaine : le planning n'est pas modifi\u00E9."),
                         React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 } },
                             React.createElement("button", { onClick: function () { return setSwapOpen(false); }, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
@@ -4652,7 +4696,6 @@ function TourTab(_a) {
                     React.createElement("button", { onClick: runAutoRepartition, style: { flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#1d4ed8", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" } }, "\uD83D\uDE80 Lancer la r\u00E9partition"),
                     React.createElement("button", { onClick: closeAutoModal, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Fermer (enregistre la config)")))))));
 }
-
 function StatsTab(_a) {
     var medecins = _a.medecins, actes = _a.actes, plan = _a.plan, year = _a.year, month = _a.month, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, tourMed = _a.tourMed;
     var _b = React.useState(function () { return new Date().getFullYear(); }), statsYear = _b[0], setStatsYear = _b[1];
@@ -4841,7 +4884,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, un badge « 👁 Tour non validé » le leur rappelle ; la diffusion les révèle dans tous les cas (v10.158)."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159)."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -6207,7 +6250,7 @@ function BuildTab(_a) {
        L'etape 5 (planning type) est la seule qui ne se mesure pas — elle garde
        donc son bouton de validation a la main. */
     var autoOk = { 1: meds.length > 0 && nMeds === meds.length,
-        2: tour.tot > 0 && tour.ok === tour.tot,
+        2: tour.tot > 0 && tour.ok === tour.tot && (!bFut || !!B.tourOk), /* v10.159 : à venir = validation requise */
         3: gardes.tot > 0 && gardes.ok === gardes.tot,
         4: autres.length > 0 && nAutres === autres.length,
         5: false,
@@ -6310,7 +6353,7 @@ function BuildTab(_a) {
                 React.createElement(BuildPersonList, { gens: meds.map(function (m) { var l = djNomsPeriode(m, bJours); var n = djActuelCouvre(m, bJours) ? null : "junior suivant — congés saisis par l'éditeur"; return (l || n) ? __assign(__assign({}, m), { _lib: l || undefined, _note: n }) : m; }), etat: B.pers, onSet: setPers, peut: isEdit, vide: "Aucun m\u00E9decin dans l'\u00E9quipe." })) },
         { n: 2, icon: "🔄", titre: "Distribution du tour",
             sous: tour.ok + " semaine" + (tour.ok > 1 ? "s" : "") + " sur " + tour.tot + " ont un tourneur",
-            alerte: mTour ? (mTour + " semaine" + (mTour > 1 ? "s" : "") + " sans tour attribué") : null,
+            alerte: mTour ? (mTour + " semaine" + (mTour > 1 ? "s" : "") + " sans tour attribué") : (bFut && tour.tot > 0 && tour.ok === tour.tot && !B.tourOk ? "Tour attribué mais non validé — invisible de l'équipe (bandeau ci-dessous)" : null), /* v10.159 */
             body: React.createElement("div", null,
                 bFut && edReel && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "2px 0 8px", padding: "6px 9px", borderRadius: 8, border: "1px solid " + (B.tourOk ? "#3fb950" : "#8b5cf6"), background: B.tourOk ? "rgba(63,185,80,.10)" : "rgba(139,92,246,.08)" } },
                     React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: B.tourOk ? "#3fb950" : "#8b5cf6" } }, B.tourOk ? ("✓ Tour validé — visible de toute l'équipe" + (B.tourOk.by ? " (par " + B.tourOk.by + " le " + B.tourOk.at + ")" : "")) : "👁 Tour visible des seuls éditeurs — pas encore validé"),
@@ -10793,25 +10836,6 @@ function CardioPlanning() {
     vRef.current.fut = { deb: futDebut(), profil: vProfil, etat: function (y, m, d) { var p = perOfDay(y, m, d); return vFutEtatDe(p.sy, p.sm); }, derog: function (y, m, d, pr) { var p = perOfDay(y, m, d); return !!((((build || {})[p.sy + "_" + p.sm] || {}).derog || {})[pr]); } };
     var perFut = (function () { var t = new Date(); var p0 = perStart(t.getFullYear(), t.getMonth()); var pF = perStart(year, month); return (pF.sy * 12 + pF.sm > p0.sy * 12 + p0.sm) ? vFutEtatDe(pF.sy, pF.sm) : null; })();
     var perFutFin = (function () { var pF = perStart(year, month); return ((build || {})[pF.sy + "_" + pF.sm] || {}).demFin || null; })();
-    /* v10.158 : badge « tour non validé » pour l'éditeur — période à venir affichée,
-       des semaines de tour attribuées, ni validées (tuile 2) ni diffusées. */
-    var perFutTourCache = (function () {
-        if (!isEdit || !perFut || perFut === "dif")
-            return false;
-        var pF = perStart(year, month);
-        if (((build || {})[pF.sy + "_" + pF.sm] || {}).tourOk)
-            return false;
-        return Object.keys(tourMed || {}).some(function (wk) {
-            var q = String(wk).split("-").map(Number);
-            if (q.length !== 3)
-                return false;
-            var wm = tourMed[wk] || {};
-            if (!((wm.HC || []).length || (wm.USIC || []).length))
-                return false;
-            var p = perOfDay(q[0], q[1], q[2]);
-            return p.sy === pF.sy && p.sm === pF.sm;
-        });
-    })();
     var futPers = (function () { var t = new Date(); var p = perStart(t.getFullYear(), t.getMonth()); var out = []; for (var i = 0; i < 3; i++) {
         p = perNext(p.sy, p.sm);
         var k = p.sy + "_" + p.sm;
@@ -12693,7 +12717,7 @@ function CardioPlanning() {
             return;
         Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, { appVer: APP_VERSION }, { merge: true })).then(function () { VER_STALE.on = false; setStale(false); toast("Version rétablie : " + APP_VERSION, "info"); }).catch(function () { return toast("Échec du rétablissement", "warn"); });
     };
-    var tourProps = { medecins: medsAff, specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, tourPtOte: tourPtOte, setTourPtOte: setTourPtOte, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, getEntries: getEntries, isEdit: isEdit || (isInterEdit && !isAttEdit), darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast, vRef: vRef, vToast: vToast };
+    var tourProps = { medecins: medsAff, specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, tourPtOte: tourPtOte, setTourPtOte: setTourPtOte, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, getEntries: getEntries, isEdit: isEdit || (isInterEdit && !isAttEdit), edReel: isEdit, build: build, secrDif: secrCfg.dif || {}, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast, vRef: vRef, vToast: vToast };
     var gardeProps = { onRemoveGarde: removeGardeDay, printWk: printWk, onPrint: function () { return setModal("print"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, getEntry: getEntry, allDays: allDays, isEdit: isEdit, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast };
     return (React.createElement("div", { style: S.app },
         React.createElement("style", null, setFoldCSS() + "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav{scrollbar-width:none;-ms-overflow-style:none}\nnav::-webkit-scrollbar { display: none; }\n/* v10.52 : sur ordinateur (pointeur souris), la barre reapparait \u2014 le navigateur\n   ne la dessine que si les onglets debordent, elle reste invisible sinon */\n@media (pointer:fine){\n  nav{scrollbar-width:thin}\n  nav::-webkit-scrollbar{display:block;height:5px}\n}\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; }\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
@@ -12737,7 +12761,6 @@ function CardioPlanning() {
                         perClose && React.createElement("span", { title: perArchivee ? "Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier." : "Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session.", style: { background: perArchivee ? "#0e7490" : "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perArchivee ? "🗄 PÉRIODE ARCHIVÉE" : "🔒 PÉRIODE CLOSE"),
                         perFut && perFut !== "dif" && React.createElement("span", { title: perFut === "phase1" ? "La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période" + (perFutFin ? " (jusqu'au " + finLib(perFutFin) + " à titre indicatif)" : "") + ". Le reste attend la diffusion du planning." : "Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning.", style: { background: perFut === "phase1" ? "#0e7490" : "#b45309", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perFut === "phase1" ? "🏖️ CONGÉS OUVERTS" : "🚧 EN PRÉPARATION"),
                         "   ",
-                        perFutTourCache && React.createElement("span", { title: "Le tour de cette p\u00E9riode est attribu\u00E9 mais pas encore valid\u00E9 (Construire, tuile 2) : les semaines de tour sont invisibles de l'\u00E9quipe \u2014 seuls les \u00E9diteurs les voient.", style: { background: "#8b5cf6", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, "\uD83D\uDC41 TOUR NON VALID\u00C9"),
                         React.createElement("span", { style: { marginLeft: 4, width: 6, height: 6, borderRadius: "50%", display: "inline-block",
                                 background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: netOff ? "Hors ligne — lecture seule" : fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
             React.createElement("nav", { style: S.nav }, orderedTabs.map(function (_a) {
