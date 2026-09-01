@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.154 — 01/09/2026";
+const APP_VERSION="v10.155 — 01/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -3481,7 +3481,7 @@ function AbsModal({medecins,onApply,onRemove,onClose,initMedId=null,initDate=nul
 /* ════════════════════════════════════════════════════════════
    MAIN APP
 ════════════════════════════════════════════════════════════ */
-function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast}){
+function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast}){
   const _psT=perStart(tourYear,tourMonth);
   const perT={pi:_psT.sm,startY:_psT.sy,startM:_psT.sm};
   const perKeyT=perT.startY+"_"+perT.startM;
@@ -3581,6 +3581,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         return [0,1,2,3,4].map(i=>{const dt=new Date(wy2,wm2,wd2+i);return[dt.getFullYear(),dt.getMonth(),dt.getDate()];});
       };
       const PROT=PROT_TOUR;
+      const oteAdd=[],oteDel=[];   /* v10.155 : témoins — posés à l'arrivée si des cases partent, consommés au départ */
       setPlan(p=>{
         let next={...p};
         // Chaque personne : retirer ses activités sur sa semaine d'ARRIVÉE, ré-appliquer son PT sur sa semaine de DÉPART
@@ -3594,11 +3595,13 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
               if(cellHasAny(next[k][mid],PROT))return;
               /* v10.154 : même règle qu'à la prise du tour (v10.118) — une case posée à la main survit à l'échange */
               if(!(ptOwnTP(next[k][mid])||ptOwn(next[k][mid],((planningType[mid]||{})[dow(dy,dm,dd)]||{})[sl])))return;
-              const dm3={...next[k]};delete dm3[mid];next[k]=dm3;
+              const dm3={...next[k]};delete dm3[mid];next[k]=dm3;oteAdd.push([arriveKey,mid]);
             });
           });
           const pt=planningType[mid];
-          if(pt)weekDays(leaveKey).forEach(([dy,dm,dd])=>{
+          const temoin=!!(((tourPtOte||{})[leaveKey]||{})[mid]);   /* v10.155 : sans témoin, la semaine quittée reste telle quelle */
+          if(temoin)oteDel.push([leaveKey,mid]);
+          if(pt&&temoin)weekDays(leaveKey).forEach(([dy,dm,dd])=>{
             if(isWE(dy,dm,dd))return;
             const dw2=dow(dy,dm,dd);
             if(!pt[dw2])return;
@@ -3615,6 +3618,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         });
         return next;
       });
+      setTimeout(()=>{if(oteAdd.length||oteDel.length)setTourPtOte(p2=>{const n2={...p2};oteDel.forEach(([wk,mid])=>{if(!n2[wk])return;const o={...n2[wk]};delete o[mid];if(Object.keys(o).length===0)delete n2[wk];else n2[wk]=o;});oteAdd.forEach(([wk,mid])=>{n2[wk]={...(n2[wk]||{})};n2[wk][mid]=true;});return n2;});},0);   /* v10.155 */
     }
     // Temps partiels : nettoyer les semaines quittées, appliquer sur les semaines d'arrivée (si USIC)
     const mS2=medecins.find(m=>m.id===swapSrcMed),mD2=medecins.find(m=>m.id===swapDstMed);
@@ -4242,7 +4246,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                 {warns.map((wn,i2)=><div key={i2} style={{marginTop:6,padding:"7px 10px",borderRadius:7,border:"1px solid #f59e0b",background:"rgba(245,158,11,.10)",fontSize:12,fontWeight:600,color:"#b45309"}}>⚠ {wn}</div>)}
                 {!sameWeek&&<label style={{display:"flex",gap:6,alignItems:"center",fontSize:12,color:"var(--txt)",marginTop:10,cursor:"pointer"}}>
                   <input type="checkbox" checked={swapUpdPlan} onChange={e=>setSwapUpdPlan(e.target.checked)} style={{width:14,height:14}}/>
-                  Mettre à jour le planning des 2 praticiens (retirer les activités sur la semaine d'arrivée, ré-appliquer le planning type sur la semaine quittée) — les cases posées à la main sont conservées
+                  Mettre à jour le planning des 2 praticiens (retirer les activités sur la semaine d'arrivée, ré-appliquer le planning type sur la semaine quittée) — les cases posées à la main sont conservées, et le planning type ne revient sur la semaine quittée que s'il y était à la prise
                 </label>}
                 {sameWeek&&<div style={{fontSize:11,color:"var(--txt3)",marginTop:8}}>Échange HC ⇄ USIC au sein de la même semaine : le planning n'est pas modifié.</div>}
                 <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:12}}>
@@ -4562,7 +4566,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -7709,6 +7713,7 @@ function arPerSecr(k){const p=String(k).split("|");return p.length>=3?arPerClair
 const AR_FAM=[
   {ch:"tourMed",    per:arPerTechSem, lu:true,  lib:"semaine de tour|semaines de tour"},
   {ch:"tourDerog",  per:arPerClair,   lu:true,  lib:"dérogation de tour|dérogations de tour"},
+  {ch:"tourPtOte",  per:arPerTechSem, lu:false, lib:"témoin de planning type|témoins de planning type"},   /* v10.155 */
   {ch:"notes",      per:arPerNote,    lu:true,  lib:"note|notes"},
   {ch:"tourWish",   per:arPerTechSem, lu:false, lib:"souhait de tour|souhaits de tour"},
   {ch:"tourAvoid",  per:arPerTechSem, lu:false, lib:"tour à éviter|tours à éviter"},
@@ -8071,6 +8076,7 @@ function CardioPlanning(){
   const [csActsSel,setCsActsSel]=useState({});   // {medId:[acteIds]} activités comptées comme consultation
   const [csActsGlobal,setCsActsGlobal]=useState(["CS_CHL","CS_CHB","DOBU","DOBU_CHB","ETO_CHL","PM_CS","DEFIB_CS","RYTHMO_CHB"]); // activités proposables dans l'onglet Reports (réglé dans Paramètres)
   const [tourDerog,setTourDerog]=useState({});   // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
+  const [tourPtOte,setTourPtOte]=useState({});   /* v10.155 : témoin {weekKey:{medId:true}} — la prise du tour a réellement retiré des cases de planning type (ou TP) à ce médecin cette semaine-là ; le retrait ne repeint que si le témoin existe */
   const [tourReport,setTourReport]=useState(null); // rapport persistant de la dernière répartition auto du tour
   const [astReport,setAstReport]=useState(null);
   /* v10.35 : sauvegarde sur SON ordinateur. Tout est LOCAL a l'appareil
@@ -8445,6 +8451,7 @@ function CardioPlanning(){
           if(data.csActsSel)setCsActsSel(JSON.parse(data.csActsSel));
           if(data.csActsGlobal)setCsActsGlobal(JSON.parse(data.csActsGlobal));
           if(data.tourDerog)setTourDerog(JSON.parse(data.tourDerog));
+          if(data.tourPtOte)setTourPtOte(JSON.parse(data.tourPtOte));   /* v10.155 */
           if(data.tourReport!==undefined&&data.tourReport!=="")setTourReport(data.tourReport);
           if(data.astReport!==undefined&&data.astReport!=="")setAstReport(data.astReport);
           /* v9.89 : le champ ABSENT signifie « jamais configuré » (on déduit alors les
@@ -8658,6 +8665,7 @@ function CardioPlanning(){
 
 /* ── Purge des dérogations et remplacements Tour d'une liste de semaines ── */
   const purgeTourExtras=useCallback((weekKeys)=>{
+    setTourPtOte(p=>{const n={...p};weekKeys.forEach(wk=>{delete n[wk];});return n;});   /* v10.155 : les témoins de ces semaines partent avec les attributions */
     const allDates=[];
     weekKeys.forEach(wk2=>{
       const[py,pm,pd]=wk2.split("-").map(Number);
@@ -8698,6 +8706,7 @@ function CardioPlanning(){
     // pairs: [{medId,weekKey}] — retire les activités (dont TP) des nouveaux tourneurs, garde abs/gardes/formations
     const PROT2=["ABSENCE","GARDE","REPOS_GARDE","FORM","FORMATION"]; // sans TP : il est retiré exprès des nouveaux tourneurs
     const garde=[];   /* v10.118 : cases manuelles épargnées */
+    const ote=[];   /* v10.155 : cases de planning type (ou TP) réellement retirées → témoin */
     setPlan(p=>{
       let next={...p};
       pairs.forEach(({medId,weekKey})=>{
@@ -8716,15 +8725,19 @@ function CardioPlanning(){
                posée à la main survit à la prise du tour, et on le signale (Voir). */
             const ptW=((planningType[medId]||{})[dw2]||{})[sl];
             if(!(ptOwnTP(e)||ptOwn(e,ptW))){garde.push({c:k+"|"+medId,y:dy,m:dm3});return;}
-            const dm2={...next[k]};delete dm2[medId];next[k]=dm2;
+            const dm2={...next[k]};delete dm2[medId];next[k]=dm2;ote.push({medId,weekKey});
           });
         }
       });
       return next;
     });
     setTimeout(()=>{if(garde.length)toast(garde.length+(garde.length>1?" cases manuelles conservées":" case manuelle conservée")+" (prise du tour)","info",{n:garde.length,cells:garde});},0);   /* v10.118 */
+    setTimeout(()=>{if(ote.length)setTourPtOte(p=>{const n={...p};ote.forEach(({medId,weekKey})=>{n[weekKey]={...(n[weekKey]||{})};n[weekKey][medId]=true;});return n;});},0);   /* v10.155 : poser le témoin */
   },[planningType]);
   const reapplyPTWeek=useCallback((medId,weekKey)=>{
+    /* v10.155 : témoin obligatoire — sans lui, la prise du tour n'avait rien retiré (semaine vierge) et le retrait ne repeint rien ; avec lui, on repeint puis on le consomme. */
+    if(!((tourPtOte||{})[weekKey]||{})[medId])return;
+    setTourPtOte(p=>{const n={...p};const o={...(n[weekKey]||{})};delete o[medId];if(Object.keys(o).length===0)delete n[weekKey];else n[weekKey]=o;return n;});
     secrMuteRef.current=Date.now();   /* v10.115 : le planning type n'émet pas de notification */
     const med=medecins.find(m=>m.id===medId);if(!med)return;
     const pt=planningType[medId];
@@ -8759,7 +8772,7 @@ function CardioPlanning(){
       return next;
     });
     setTimeout(()=>{if(garde.length)toast(garde.length+(garde.length>1?" cases manuelles conservées":" case manuelle conservée")+" (retour du planning type)","info",{n:garde.length,cells:garde});},0);   /* v10.118 */
-  },[medecins,planningType]);
+  },[medecins,planningType,tourPtOte]);
 
   /* ── Temps partiel & USIC : dérogation + TP + junior remplaçant ── */
   const applyTPForWeek=useCallback((medId,weekKeyOrList)=>{
@@ -8897,6 +8910,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsSel:JSON.stringify(csActsSel)});},[csActsSel]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsGlobal:JSON.stringify(csActsGlobal)});},[csActsGlobal]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourDerog:JSON.stringify(tourDerog)});},[tourDerog]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourPtOte:JSON.stringify(tourPtOte)});},[tourPtOte]);   /* v10.155 */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourReport:tourReport||""});},[tourReport]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astReport:astReport||""});},[astReport]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleReg:JSON.stringify(salleReg)});},[salleReg]);
@@ -10126,6 +10140,8 @@ function CardioPlanning(){
       });
       return n?next:tm;
     });
+    /* v10.155 : les témoins du médecin partent avec ses semaines de tour — sans repeindre (comportement historique de la désactivation) */
+    setTourPtOte(pt=>{const n2={...pt};let ch=false;Object.keys(n2).forEach(wk=>{const q=wk.split("-").map(Number);const t=new Date(q[0],q[1],q[2]).getTime();if(isNaN(t))return;if(vBloque(vRef,q[0],q[1],q[2]))return;const fin=t+6*86400000;if(fin<fromT||t>toT)return;if(n2[wk]&&n2[wk][medId]){const o={...n2[wk]};delete o[medId];if(Object.keys(o).length===0)delete n2[wk];else n2[wk]=o;ch=true;}});return ch?n2:pt;});
   },[]);
 
   const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,keepGardes=true,slotsParJour=null})=>{
@@ -10492,7 +10508,7 @@ function CardioPlanning(){
     window.location.reload();};
   const verRetablir=()=>{if(!window.confirm("Déclarer CETTE version ("+APP_VERSION+") comme version en service ?\n\nÀ n'utiliser qu'après un retour volontaire à une version antérieure : toutes les copies plus récentes passeront à leur tour en lecture seule."))return;
     if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
-  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast};
+  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast};
   const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
@@ -11646,7 +11662,7 @@ header::-webkit-scrollbar { display: none; }
                 </div>
                 {docDet&&(()=>{ /* v10.101 : le détail du poids, par famille de données */
                   const EQ="Équipe & internes",AC="Activités & salles",TO="Tour médical",SO="Souhaits ⭐🚫",AS="Astreinte",RE="Reports";
-                  const FAMN={planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2:EQ,medecinsV2Order:EQ,medecins:EQ,intCfg:EQ,medPins:EQ,actesV2:AC,actesV2Order:AC,actes:AC,salleReg:AC,tourMed:TO,tourDerog:TO,tourMins:TO,tourMinsHard:TO,tourCfg:TO,tourReport:TO,tourWish:SO,tourAvoid:SO,gardeWish:SO,gardeAvoid:SO,astreinte:AS,astReport:AS,notes:"Notes",build:"Construire",csRep:RE,csBlanches:RE,csActsSel:RE,csActsGlobal:RE,journal:"Journal"};
+                  const FAMN={planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2:EQ,medecinsV2Order:EQ,medecins:EQ,intCfg:EQ,medPins:EQ,actesV2:AC,actesV2Order:AC,actes:AC,salleReg:AC,tourMed:TO,tourDerog:TO,tourPtOte:TO,tourMins:TO,tourMinsHard:TO,tourCfg:TO,tourReport:TO,tourWish:SO,tourAvoid:SO,gardeWish:SO,gardeAvoid:SO,astreinte:AS,astReport:AS,notes:"Notes",build:"Construire",csRep:RE,csBlanches:RE,csActsSel:RE,csActsGlobal:RE,journal:"Journal"};
                   const g={};Object.keys(docDet).forEach(k=>{const f=FAMN[k]||"Réglages divers";g[f]=(g[f]||0)+docDet[k];});
                   const rows=Object.keys(g).map(f=>({f,b:g[f]})).sort((a,b)=>b.b-a.b);
                   return <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
@@ -11732,6 +11748,7 @@ header::-webkit-scrollbar { display: none; }
                   if(data.medecins)setMedecins(data.medecins);
                   if(data.actes)setActes(data.actes);
                   if(data.tourDerog)setTourDerog(data.tourDerog);
+                  if(data.tourPtOte)setTourPtOte(data.tourPtOte);   /* v10.155 */
                   if(data.salleReg)setSalleReg(data.salleReg);
                   setImpWait(null);toast("Sauvegarde restaurée");
                 }}>↩ Restaurer</button>
@@ -11751,13 +11768,13 @@ header::-webkit-scrollbar { display: none; }
                 const a=pid.split("-");const l=perDaysList(+a[0],+a[1]);
                 return l.length>0&&dKey(l[l.length-1].y,l[l.length-1].m,l[l.length-1].d)<vDeb;
               }).sort(perCmp);
-              const anx=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,astreinte,secrNotif,build,csRep,csBlanches},persInPlan);
+              const anx=arDecoupe({tourMed,tourDerog,tourPtOte,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,astreinte,secrNotif,build,csRep,csBlanches},persInPlan);
               /* v10.111 : archivage période par période (sa demande) — la même mécanique,
                  paramétrée par la liste. Le découpage est recalculé AU CLIC pour être
                  annoncé dans la confirmation avant le moindre retrait. */
               const archiverPers=async(list)=>{
                 const libs=list.map(perLib);
-                const anxL=arDecoupe({tourMed,tourDerog,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,astreinte,secrNotif,build,csRep,csBlanches},list);
+                const anxL=arDecoupe({tourMed,tourDerog,tourPtOte,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,astreinte,secrNotif,build,csRep,csBlanches},list);
         /* v10.125 : semestres d'internes clos et noms de juniors — copiés dans
            l'annexe de chaque période recouverte AVANT leur retrait (v10.88), et donc
            aussi dans le fichier téléchargé. Même borne que le retrait. */
@@ -11808,6 +11825,7 @@ header::-webkit-scrollbar { display: none; }
                 const okP=(pid)=>!!pid&&list.indexOf(pid)>=0;
                 setTourMed(o=>arPurge(o,arPerTechSem,okP));
                 setTourDerog(o=>arPurge(o,arPerClair,okP));
+                setTourPtOte(o=>arPurge(o,arPerTechSem,okP));   /* v10.155 */
                 setNotes(o=>arPurge(o,arPerNote,okP));
                 setTourWish(o=>arPurge(o,arPerTechSem,okP));
                 setTourAvoid(o=>arPurge(o,arPerTechSem,okP));
