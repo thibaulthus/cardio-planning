@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.155 — 01/09/2026";
+const APP_VERSION="v10.156 — 01/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -3502,12 +3502,34 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     for(let i=0;i<5;i++){
       const dt=new Date(wy2,wm2,wd2+i);
       const dy=dt.getFullYear(),dm=dt.getMonth(),dd=dt.getDate();
+      if(isFerie(dy,dm,dd))continue;   /* v10.156 : un férié ne compte jamais dans le jugement d'une semaine */
       if(_mo&&offOn(_mo,dy,dm,dd))return true;   /* désactivé ce jour-là → semaine bloquée */
       const es1=getEntries(medId,dy,dm,dd,"M");
       const es2=getEntries(medId,dy,dm,dd,"AM");
       if([...es1,...es2].some(e=>ABS_IDS.includes(e.acteId)))return true;
     }
     return false;
+  };
+  /* v10.156 : présence majoritaire pour le décompte de SURSPÉCIALITÉ — sa règle du
+     01/09/2026. Le tour reste strict (isBlockedInWeek : une vraie absence hors férié
+     dans la semaine = non choisissable) ; mais pour COMPTER dans sa surpécialité, le
+     médecin est présent s'il l'est plus de la moitié des demi-journées ouvrées hors
+     fériés : semaine de 5 jours = 10 demi-journées, il compte au-delà de 5 ; semaine
+     à férié = 8, au-delà de 4. Un jour désactivé vaut 2 demi-journées d'absence. */
+  const presentMajSem=(medId,wk2)=>{
+    const[wy2,wm2,wd2]=wk2.split("-").map(Number);
+    const _mo=medecins.find(m=>String(m.id)===String(medId));
+    let tot=0,nAbs=0;
+    for(let i=0;i<5;i++){
+      const dt=new Date(wy2,wm2,wd2+i);
+      const dy=dt.getFullYear(),dm=dt.getMonth(),dd=dt.getDate();
+      if(isFerie(dy,dm,dd))continue;
+      tot+=2;
+      if(_mo&&offOn(_mo,dy,dm,dd)){nAbs+=2;continue;}
+      if(getEntries(medId,dy,dm,dd,"M").some(e=>ABS_IDS.includes(e.acteId)))nAbs++;
+      if(getEntries(medId,dy,dm,dd,"AM").some(e=>ABS_IDS.includes(e.acteId)))nAbs++;
+    }
+    return tot-nAbs>tot/2;
   };
   /* v10.153 : une activité posée À LA MAIN — consultation, écho… — rend le médecin NON
      CHOISISSABLE par la répartition automatique cette semaine-là. Ne bloquent pas : les
@@ -3520,6 +3542,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     for(let i=0;i<5;i++){
       const dt=new Date(wy2,wm2,wd2+i);
       const dy=dt.getFullYear(),dm3=dt.getMonth(),dd=dt.getDate();
+      if(isFerie(dy,dm3,dd))continue;   /* v10.156 */
       for(const sl of ["M","AM"]){
         const ex=(plan[sk(dy,dm3,dd,sl)]||{})[medId];
         if(!ex)continue;
@@ -3546,6 +3569,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     for(let i=0;i<5;i++){
       const dt=new Date(wy2,wm2,wd2+i);
       const dy=dt.getFullYear(),dm=dt.getMonth(),dd=dt.getDate();
+      if(isFerie(dy,dm,dd))continue;   /* v10.156 */
       const es=[...getEntries(medId,dy,dm,dd,"M"),...getEntries(medId,dy,dm,dd,"AM")];
       if(es.some(e=>ABS_IDS.includes(e.acteId)))days.push(JOURS_SW[dt.getDay()]+" "+dd);
     }
@@ -3771,8 +3795,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       const assignedThisWeek={};weeksT.forEach(w=>{assignedThisWeek[w.key]=[];});
       const specOK=(wKey,extraAssigned,mns)=>{
         const busy=[...assignedThisWeek[wKey],...extraAssigned];
-        // Séniors présents (hors absents), indépendamment du tour
-        const present=medecins.filter(m=>m.role==="medecin"&&(m.statut||"senior")!=="junior"&&!isBlockedInWeek(m.id,wKey));
+        // Séniors présents (présence majoritaire, fériés exclus — v10.156), indépendamment du tour
+        const present=medecins.filter(m=>m.role==="medecin"&&(m.statut||"senior")!=="junior"&&presentMajSem(m.id,wKey));
         // Séniors restant disponibles une fois le tour assigné
         const avail=present.filter(m=>!busy.includes(m.id));
         const cnt=(list,pred)=>list.filter(pred).length;
@@ -4001,7 +4025,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     // Semaines où il reste moins de coro dispo que le minimum standard
     const lowCoroW=weeksT.filter(w2=>{
       const busyL=[...best.assign[w2.key].HC,...best.assign[w2.key].USIC].map(String);
-      const nC=medecins.filter(m=>m.role==="medecin"&&(m.statut||"senior")!=="junior"&&m.surSpec==="coro"&&!busyL.includes(String(m.id))&&!isBlockedInWeek(m.id,w2.key)).length;
+      const nC=medecins.filter(m=>m.role==="medecin"&&(m.statut||"senior")!=="junior"&&m.surSpec==="coro"&&!busyL.includes(String(m.id))&&presentMajSem(m.id,w2.key)).length;
       return nC<cfgMinCoro;
     }).map(w2=>w2.label);
     /* v10.153 : qui a été écarté (et quand) par une activité posée à la main */
@@ -4097,7 +4121,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                 {[["coro","Coro"],["pace","Pace"],["eep","EEP"],["ett","ETT"]].map(([sk2,lb2])=>{
                   const wmS=tourMed[w.key]||{HC:[],USIC:[]};
                   const busyS=[...(wmS.HC||[]),...(wmS.USIC||[])].map(String);
-                  const nDispo=medecins.filter(m=>m.role==="medecin"&&(m.statut||"senior")!=="junior"&&m.surSpec===sk2&&!busyS.includes(String(m.id))&&!isBlockedInWeek(m.id,w.key)).length;
+                  const nDispo=medecins.filter(m=>m.role==="medecin"&&(m.statut||"senior")!=="junior"&&m.surSpec===sk2&&!busyS.includes(String(m.id))&&presentMajSem(m.id,w.key)).length;
                   const minS=(tourMins||{})[sk2]||0;
                   const lowS=nDispo<minS;
                   return <span key={sk2} title={"Séniors "+lb2+" disponibles (hors tour, hors absents) — minimum réglé: "+minS}
@@ -4107,9 +4131,9 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
               {horsTourSpecMeds.length>0&&<span style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
                 <span style={{fontSize:8,color:"var(--txt3)",fontWeight:600,textTransform:"uppercase"}}>Hors tour:</span>
                 {horsTourSpecMeds.map(hm=>{
-                  const hBlocked=isBlockedInWeek(hm.id,w.key);
+                  const hBlocked=!presentMajSem(hm.id,w.key);   /* v10.156 : présence majoritaire */
                   return(
-                    <span key={hm.id} title={hm.prenom+" "+hm.nom+" ("+hm.surSpec+") — "+(hBlocked?"absent/formation":"présent")}
+                    <span key={hm.id} title={hm.prenom+" "+hm.nom+" ("+hm.surSpec+") — "+(hBlocked?"absent la majorité de la semaine":"présent")}
                       style={{fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:5,cursor:"default",
                         border:"1.5px solid "+(SPEC_COLORS[hm.surSpec]||"var(--border)"),
                         color:hBlocked?"var(--txt3)":(SPEC_COLORS[hm.surSpec]||"var(--txt2)"),
@@ -4348,7 +4372,6 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                 Fermer (enregistre la config)
               </button>
             </div>
-            <div style={{marginTop:8,fontSize:10,color:"#ef4444"}}>⚠ La répartition remplace toutes les assignations existantes de la période.</div>
           </div>
         </Ov>
       )}
@@ -4566,7 +4589,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
