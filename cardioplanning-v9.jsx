@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.152 — 30/08/2026";
+const APP_VERSION="v10.153 — 01/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -3509,6 +3509,28 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     }
     return false;
   };
+  /* v10.153 : une activité posée À LA MAIN — consultation, écho… — rend le médecin NON
+     CHOISISSABLE par la répartition automatique cette semaine-là. Ne bloquent pas : les
+     absences/formations (déjà vues par isBlockedInWeek), les cases système (garde, repos,
+     tour, TP) et tout ce que le PLANNING TYPE a posé — l'algorithme retire lui-même ces
+     dernières (clearWeekActivities). Rend le premier jour bloquant (« Mar 6 »), sinon null. */
+  const actManuelleSem=(medId,wk2)=>{
+    const SYS2=ABS_IDS.concat(["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","TP"]);
+    const[wy2,wm2,wd2]=wk2.split("-").map(Number);
+    for(let i=0;i<5;i++){
+      const dt=new Date(wy2,wm2,wd2+i);
+      const dy=dt.getFullYear(),dm3=dt.getMonth(),dd=dt.getDate();
+      for(const sl of ["M","AM"]){
+        const ex=(plan[sk(dy,dm3,dd,sl)]||{})[medId];
+        if(!ex)continue;
+        if(!cellEs(ex).some(e=>e&&e.acteId&&!SYS2.includes(e.acteId)))continue;
+        if(ptOwnTP(ex)||ptOwn(ex,((planningType[medId]||{})[dow(dy,dm3,dd)]||{})[sl]))continue;
+        return JOURSC[dt.getDay()]+" "+dd;
+      }
+    }
+    return null;
+  };
+  const horsAlgo=(medId,wk2)=>isBlockedInWeek(medId,wk2)||!!actManuelleSem(medId,wk2);
   /* ═══ Échange de semaines de tour ═══ */
   const [swapOpen,setSwapOpen]=React.useState(false);
   const [swapSrcKey,setSwapSrcKey]=React.useState(null);
@@ -3721,7 +3743,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     // Disponibilité statique par semaine (médecins participants non absents)
     const availCount={};
     weeksT.forEach(w=>{
-      availCount[w.key]=tourMeds.filter(m=>!cfgExcl[m.id]&&(cfgWeeks[m.id]||0)>0&&!isBlockedInWeek(m.id,w.key)).length;
+      availCount[w.key]=tourMeds.filter(m=>!cfgExcl[m.id]&&(cfgWeeks[m.id]||0)>0&&!horsAlgo(m.id,w.key)).length;   /* v10.153 : + activités posées à la main */
     });
     // Semaines triées : les plus contraintes d'abord (moins de disponibles)
     const weeksByConstraint=[...weeksT].sort((a,b)=>availCount[a.key]-availCount[b.key]);
@@ -3756,7 +3778,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         for(let i2=0;i2<weeksT.length-1;i2++){
           const w1=weeksT[i2],w2=weeksT[i2+1];
           if(assignedThisWeek[w1.key].includes(m.id)||assignedThisWeek[w2.key].includes(m.id))continue;
-          if(isBlockedInWeek(m.id,w1.key)||isBlockedInWeek(m.id,w2.key))continue;
+          if(horsAlgo(m.id,w1.key)||horsAlgo(m.id,w2.key))continue;   /* v10.153 */
           if(isAvoid(m.id,w1.key)||isAvoid(m.id,w2.key))continue;
           if(assign[w1.key][unit].length>=2||assign[w2.key][unit].length>=2)continue;
           if(!specOK(w1.key,[m.id],idealMins)||!specOK(w2.key,[m.id],idealMins))continue;
@@ -3782,7 +3804,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
           while(assign[w.key][unit].length<2){
             const baseC=tourMeds.filter(m=>quota[m.id]>0
               &&!assignedThisWeek[w.key].includes(m.id)
-              &&!isBlockedInWeek(m.id,w.key));
+              &&!horsAlgo(m.id,w.key));   /* v10.153 */
             const noAv=baseC.filter(m=>!isAvoid(m.id,w.key));
             let usedAvoid=false;
             let cands=noAv.filter(m=>specOK(w.key,[m.id],idealMins));
@@ -3853,7 +3875,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
             while(assign[w.key][unit].length<2){
               const stuck=tourMeds.filter(c=>quota[c.id]>0
                 &&!assignedThisWeek[w.key].includes(c.id)
-                &&!isBlockedInWeek(c.id,w.key));
+                &&!horsAlgo(c.id,w.key));   /* v10.153 */
               let repaired=false;
               for(const c of stuck){
                 if(repaired)break;
@@ -3864,9 +3886,9 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                     if(repaired)break;
                     for(const m2id of [...assign[w2.key][unit2]]){
                       if(assignedThisWeek[w.key].includes(m2id))continue;
-                      if(isBlockedInWeek(m2id,w.key))continue;
+                      if(horsAlgo(m2id,w.key))continue;   /* v10.153 */
                       if(assignedThisWeek[w2.key].includes(c.id))continue;
-                      if(isBlockedInWeek(c.id,w2.key))continue;
+                      if(horsAlgo(c.id,w2.key))continue;   /* v10.153 */
                       assign[w2.key][unit2]=assign[w2.key][unit2].filter(x=>x!==m2id);
                       assignedThisWeek[w2.key]=assignedThisWeek[w2.key].filter(x=>x!==m2id);
                       assign[w2.key][unit2].push(c.id);assignedThisWeek[w2.key].push(c.id);
@@ -3948,23 +3970,35 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       return nSpec<=(minBySpec[m.surSpec]||0)?" [bloqué: seul(s) "+m.surSpec+"]":"";
     };
     const leftover=tourMeds.filter(m=>best.quota[m.id]>0).map(m=>m.init+"("+best.quota[m.id]+")"+lockedInfo(m));
-    const minsTxt=" (idéal: "+minsLabel(idealMins)+" — min: "+minsLabel(hardMins)+")";
-    let msg=(bestStage.label==="standard"?"Répartition effectuée.":"Répartition effectuée — mode: "+bestStage.label+".")+minsTxt;
-    if(best.unfilled>0)msg+=" ⚠ "+best.unfilled+" semaine(s) incomplète(s) malgré toutes les relaxations.";
-    else msg+=" ✓ Toutes les semaines sont complètes (2 HC + 2 USIC).";
     // Semaines où il reste moins de coro dispo que le minimum standard
     const lowCoroW=weeksT.filter(w2=>{
       const busyL=[...best.assign[w2.key].HC,...best.assign[w2.key].USIC].map(String);
       const nC=medecins.filter(m=>m.role==="medecin"&&(m.statut||"senior")!=="junior"&&m.surSpec==="coro"&&!busyL.includes(String(m.id))&&!isBlockedInWeek(m.id,w2.key)).length;
       return nC<cfgMinCoro;
     }).map(w2=>w2.label);
-    if(best.relaxedWeeks&&best.relaxedWeeks.length>0)msg+=" ⚠ Semaines passées au minimum: "+best.relaxedWeeks.join(", ")+".";
-    else msg+=" Idéal de surspécialités respecté chaque semaine.";
-    if(best.avoidViol&&best.avoidViol.length>0)msg+=" ⚠ Préférences \"pas de tour\" non respectées: "+best.avoidViol.join(", ")+".";
-    if(lowCoroW.length>0)msg+=" (Moins de "+cfgMinCoro+" coro dispo: "+lowCoroW.join(", ")+")";
-    if(leftover.length>0)msg+=" Quota restant: "+leftover.join(", ");
+    /* v10.153 : qui a été écarté (et quand) par une activité posée à la main */
+    const actBloq=[];
+    tourMeds.forEach(m=>{
+      if(cfgExcl[m.id])return;
+      const sems=weeksT.map(w2=>({l:w2.label,j:actManuelleSem(m.id,w2.key)})).filter(x=>x.j);
+      if(sems.length)actBloq.push(m.init+" : "+sems.map(x=>"sem. "+x.l+" ("+x.j+")").join(", "));
+    });
+    /* v10.153 : rapport en points — un constat par ligne, ✓ ce qui a marché, ⚠ ce qui a coincé */
+    const L=[bestStage.label==="standard"?"Répartition terminée.":"Répartition terminée — les préférences « 2 semaines d'affilée » n'ont pas pu être respectées."];
+    L.push(best.unfilled>0?"⚠ "+best.unfilled+" semaine(s) sans équipe complète (2 HC + 2 USIC), malgré tous les assouplissements — à compléter à la main (fond grisé).":"✓ Toutes les semaines sont complètes : 2 médecins en HC + 2 en USIC.");
+    if(best.relaxedWeeks&&best.relaxedWeeks.length>0)L.push("⚠ Surspécialités : l'idéal ("+minsLabel(idealMins)+") n'a pas pu être tenu partout — semaines passées au minimum ("+minsLabel(hardMins)+") : "+best.relaxedWeeks.join(", ")+".");
+    else L.push("✓ Surspécialités : l'idéal ("+minsLabel(idealMins)+") est respecté chaque semaine.");
+    if(lowCoroW.length>0)L.push("⚠ Moins de "+cfgMinCoro+" coro disponibles (hors tour, hors absents) : sem. "+lowCoroW.join(", ")+".");
+    if(best.avoidViol&&best.avoidViol.length>0)L.push("⚠ Préférences 🚫 « pas de tour » non respectées : "+best.avoidViol.join(", ")+".");
+    else L.push("✓ Préférences 🚫 « pas de tour » : toutes respectées.");
+    if(leftover.length>0)L.push("⚠ N'ont pas reçu toutes leurs semaines (nombre restant entre parenthèses) : "+leftover.join(", ")+".");
+    else L.push("✓ Chacun a reçu son nombre de semaines.");
+    if(actBloq.length>0)L.push("✋ Écartés certaines semaines par une activité déjà posée à la main dans le planning : "+actBloq.join(" · ")+".");
+    const nbW=L.filter(x=>x.indexOf("⚠")===0).length;
+    const msg=L[0]+"\n"+L.slice(1).map(x=>"• "+x).join("\n");
     setLastReport(msg);
-    toast(msg);
+    if(nbW>0)toast("Répartition terminée — "+nbW+" point(s) d'attention, détail au-dessus des semaines.","warn");
+    else toast("Répartition terminée — tout est complet. Détail au-dessus des semaines.");
     setAutoModal(false);
   };
   return(
@@ -3986,13 +4020,14 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
             if(!window.confirm("Supprimer TOUTES les attributions du tour sur la période affichée ?"))return;
             if(!window.confirm("Confirmez-vous la suppression définitive ? (récupérable via le bouton Annuler ↶)"))return;
             setTourMed(p=>{const n={...p};weeksT.forEach(w=>{delete n[w.key];});return n;});
+            purgeTourExtras(weeksT.map(w=>w.key));   /* v10.153 : dérogations, remplaçants juniors et TP de dérogation partent aussi */
             setLastReport(null);
-            toast("Attributions de la période supprimées","info");
+            toast("Attributions de la période supprimées — remplaçants juniors et TP de dérogation retirés","info");
           }} title="Effacer toutes les attributions de la période" style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}}>🗑 Retirer</button>}
       </div>
       {isEdit&&lastReport&&<div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 12px",marginBottom:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",fontSize:11,color:"var(--txt2)"}}>
         <span style={{flexShrink:0}}>ℹ️</span>
-        <span style={{flex:1}}>{lastReport}{(()=>{const all=[];weeksT.forEach(w2=>weekTPInfo(w2.key).forEach(t3=>all.push(t3)));return all.length>0?" ✂ Remplacements TP : "+all.join(" · ")+".":"";})()}</span>
+        <span style={{flex:1,whiteSpace:"pre-line"}}>{lastReport}{(()=>{const all=[];weeksT.forEach(w2=>weekTPInfo(w2.key).forEach(t3=>all.push(t3)));return all.length>0?"\n• ✂ Remplacements TP : "+all.join(" · ")+".":"";})()}</span>
         
       </div>}
       <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:14,paddingBottom:4,position:"sticky",top:noNav?(HDR_H+BUILD_BAR_H):44,zIndex:noNav?10:30,background:"var(--bg)",paddingTop:4}}>
@@ -4497,7 +4532,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -8601,6 +8636,7 @@ function CardioPlanning(){
         allDates.push([dt.getFullYear(),dt.getMonth(),dt.getDate()]);
       }
     });
+    const derogSnap=tourDerog||{};   /* v10.153 : mémorise QUI avait une dérogation, pour retirer son TP */
     setTourDerog(p=>{
       const n={...p};
       allDates.forEach(([dy,dm3,dd])=>{delete n[dKey(dy,dm3,dd)];});
@@ -8616,12 +8652,16 @@ function CardioPlanning(){
           Object.keys(dm2).forEach(mid=>{
             if(cellHasAny(dm2[mid],["TOUR_HC","TOUR_USIC"])){const r=cellDrop(dm2[mid],["TOUR_HC","TOUR_USIC"]);if(r)dm2[mid]=r;else delete dm2[mid];ch=true;}
           });
+          /* v10.153 : le TP posé par la dérogation part avec elle */
+          Object.keys(derogSnap[dKey(dy,dm3,dd)]||{}).forEach(mid=>{
+            if(cellHasAny(dm2[mid],["TP"])){const r=cellDrop(dm2[mid],["TP"]);if(r)dm2[mid]=r;else delete dm2[mid];ch=true;}
+          });
           if(ch)next[k]=dm2;
         });
       });
       return next;
     });
-  },[]);
+  },[tourDerog]);   /* v10.153 : lit tourDerog pour cibler les TP de dérogation */
 
   /* ── Cohérence planning ↔ tour : retrait/réapplication à l'assignation ── */
   const clearWeekActivities=useCallback((pairs)=>{
@@ -12270,8 +12310,11 @@ header::-webkit-scrollbar { display: none; }
                               style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:10,fontWeight:800,padding:"3px 8px",whiteSpace:"nowrap"}}>Choisir la salle…</button>}
                           </>);
                         })()}
-                        {/* v10.86 : un tour ne se retire pas d'une case (il s'echange) — pas de croix */}
-                        {canEditThisMed&&["TOUR_HC","TOUR_USIC"].indexOf(a.id)<0&&(!isAdminEdit||a[roleOkKey]===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
+                        {/* v10.86 : un tour ne se retire pas d'une case (il s'echange) — pas de croix.
+                           v10.153 : EXCEPTION — un remplacement RÉEL (entrée écrite dans le plan, ex. un
+                           junior posé sur un temps partiel), lui, garde sa croix pour l'éditeur complet :
+                           il était devenu insupprimable une fois le tour de la période retiré. */}
+                        {canEditThisMed&&(["TOUR_HC","TOUR_USIC"].indexOf(a.id)<0||(isEdit&&cellHasAny((plan[sk(y2,m2,d2,slot)]||{})[medId],[a.id])))&&(!isAdminEdit||a[roleOkKey]===true||a.acteId==="ABSENCE"||a.id==="ABSENCE"||a.id==="FORMATION")&&<button onClick={()=>{
                           if(e.acteId==="GARDE"){
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);
                             const dt=new Date(y2,m2,d2+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd3=dt.getDate();
