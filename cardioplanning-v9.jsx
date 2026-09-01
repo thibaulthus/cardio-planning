@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.157 — 01/09/2026";
+const APP_VERSION="v10.158 — 01/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -4581,7 +4581,7 @@ const HELP_SECTIONS=[
   HP({children:["La ",HE("b",null,"période se choisit en haut"),", une seule fois, et vaut pour toutes les tuiles — l'onglet s'ouvre sur la ",HE("b",null,"période suivante"),", celle qu'on construit. Les tuiles Tour et Gardes reprennent ces deux écrans en entier : leurs onglets ne sont plus affichés dans la barre, ils vivent désormais ici."]}),
   HP({children:["Une étape mesurable se termine ",HE("b",null,"d'elle-même"),' (pastille « terminé ») ; seule l\'étape 5, planning type, se valide à la main, et l\'étape 8 se termine par le bouton 📢 Diffuser. Rien n\'est bloquant : une étape en retard n\'empêche jamais d\'avancer.']}),
   HT({children:"Les demandes à l'équipe"}),
-  HP({children:["Depuis la tuile 1, trois demandes s'ouvrent séparément : ",HE("b",null,"poser ses congés"),", ",HE("b",null,"préférences de tour"),", ",HE("b",null,"préférences de gardes"),". Chaque médecin concerné voit alors un ",HE("b",null,"bandeau dans son Planning"),", quelle que soit la période affichée, avec un bouton pour aller à la bonne période et « ✓ C'est fait » qui coche sa ligne. Les préférences de tour ne partent qu'à ceux qui tournent, celles de gardes à ceux qui en prennent."]}),
+  HP({children:["Depuis la tuile 1, trois demandes s'ouvrent séparément : ",HE("b",null,"poser ses congés"),", ",HE("b",null,"préférences de tour"),", ",HE("b",null,"préférences de gardes"),". Chaque médecin concerné voit alors un ",HE("b",null,"bandeau dans son Planning"),", quelle que soit la période affichée, avec un bouton pour aller à la bonne période et « ✓ C'est fait » qui coche sa ligne. Les préférences de tour ne partent qu'à ceux qui tournent, celles de gardes à ceux qui en prennent. Dès que l'étape 1 est terminée — tous les médecins pointés, ou validation à la main —, les demandes encore ouvertes se referment d'elles-mêmes et la période se verrouille pour toute l'équipe, éditeurs exceptés (v10.158)."]}),
   HP({children:["Accès : éditeur et intermédiaires. Le bouton du ",HE("b",null,"Bip de Béthune")," vit dans la tuile 7 (il n'est plus dans l'onglet CHB)."]}),
   HT({children:"Le détail, étape par étape"}),
   HP({children:["L'ordre compte : chaque étape s'appuie sur la précédente. Tout se fait sur la ",HE("b",null,"période affichée")," (généralement 4 mois). La période s'étend jusqu'au ",HE("b",null,"dimanche qui clôt la dernière semaine"),", et rattache le lundi suivant s'il est férié (ex. 1er novembre) : la répartition se fait en semaines complètes, et la période suivante démarre le lendemain."]}),
@@ -4589,7 +4589,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, un badge « 👁 Tour non validé » le leur rappelle ; la diffusion les révèle dans tous les cas (v10.158)."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -4666,7 +4666,7 @@ const HELP_SECTIONS=[
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
-  HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre."]}),
+  HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre. Depuis la v10.158 : la fin de l'étape 1 de Construire referme d'elle-même les demandes (la période se verrouille), les semaines de tour d'une période à venir restent invisibles des non-éditeurs tant que le tour n'est pas validé (tuile 2), et valider l'étape 5 ouvre automatiquement la dérogation des intermédiaires — la dévalider la referme."]}),
   HP({children:[HE("b",null,"Garde int., aller-retour")," (v10.145) : éteindre 🎓 Garde int. ramène le cadre là où il était avant de l'allumer — à condition qu'on n'ait rien fait entre-temps. Un défilement, un changement d'onglet ou de période, et le cadre reste où il est."]}),
   HP({children:[HE("b",null,"Pointillé « moi » fermé")," (v10.144) : le pointillé violet de sa propre colonne ferme désormais son cadre, en haut sur l'initiale et en bas sur la dernière ligne, comme le cadre plein de la colonne suivie."]}),
   HP({children:[HE("b",null,"Plus de zoom intempestif sur iPhone")," (v10.143) : toucher un champ de saisie (PIN, note, filtre, fenêtre 🐞…) faisait grossir la page, qui restait ainsi ensuite — Safari agrandit tout champ dont le texte fait moins de 16 px. Sur téléphone, les champs font désormais 16 px : plus de zoom. Le pincement pour agrandir la grille reste possible ; si votre page est déjà zoomée, un pincement la remet à sa taille."]}),
@@ -4680,7 +4680,7 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Les journées passées")," : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."]}),
   HP({children:[HE("b",null,"Le planning type ne touche plus aux cases posées à la main")," : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."]}),
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
-  HP({children:[HE("b",null,"Les périodes à venir")," (v10.146) : fermées à tous sauf l'éditeur, badge « 🚧 En préparation ». Dès qu'il ouvre la demande de congés dans Construire, badge « 🏖️ Congés ouverts » : chacun pose congés, FMC et préférences, et rien d'autre, jusqu'à ce qu'il referme la demande. À la diffusion du planning, la période s'ouvre comme la période en cours. L'éditeur peut déroger pour un profil dans Paramètres."]}),
+  HP({children:[HE("b",null,"Les périodes à venir")," (v10.146) : fermées à tous sauf l'éditeur, badge « 🚧 En préparation ». Dès qu'il ouvre la demande de congés dans Construire, badge « 🏖️ Congés ouverts » : chacun pose congés, FMC et préférences, et rien d'autre, jusqu'à ce qu'il referme la demande. À la diffusion du planning, la période s'ouvre comme la période en cours. L'éditeur peut déroger pour un profil dans Paramètres. Les semaines de tour, elles, restent invisibles tant que l'éditeur n'a pas validé le tour dans Construire (v10.158)."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
@@ -5856,18 +5856,26 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
   );
 }
 
-function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps,secrDif,onDiffuser,onAnnulerDif}){
+function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps,secrDif,onDiffuser,onAnnulerDif}){
   /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
   const [bPer,setBPer]=React.useState(()=>{if(BUILD_MEM.per)return BUILD_MEM.per;const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
   const allerA=(p)=>{BUILD_MEM.per={sy:p.sy,sm:p.sm};setBPer({sy:p.sy,sm:p.sm});};
   const pKey=bPer.sy+"_"+bPer.sm;
   const bPid=perIdOf(bPer.sy,bPer.sm);   /* v10.115 : identifiant de période des notifications */
+  /* v10.158 : la période de Construire est-elle À VENIR ? (le masque du tour ne joue que là) */
+  const bFut=(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return bPer.sy*12+bPer.sm>p0.sy*12+p0.sm;})();
   const B=(build||{})[pKey]||{};
   const patchB=(patch)=>setBuild(p=>{const cur=(p||{})[pKey]||{};return {...(p||{}),[pKey]:{...cur,...patch}};});
   const sign=()=>({by:author||"?",at:new Date().toLocaleDateString("fr-FR")});
   const setPers=(medId,v)=>{const c={...(B.pers||{})};if(v)c[medId]=1;else delete c[medId];patchB({pers:c});};
   const setRep=(champ,medId,v)=>{const c={...(B[champ]||{})};if(v)c[medId]=1;else delete c[medId];patchB({[champ]:c});};
-  const setDem=(id)=>{const d={...(B.dem||{})};if(d[id])delete d[id];else d[id]=sign();patchB({dem:d});};
+  const setDem=(id)=>{const d={...(B.dem||{})};
+    if(d[id]){
+      /* v10.158 : refermer la demande de congés verrouille la période — on le dit avant */
+      if(id==="conges"&&!window.confirm("Refermer la demande de congés verrouille la période pour toute l'équipe (sauf éditeurs) jusqu'à la diffusion du planning. Continuer ?"))return;
+      delete d[id];
+    }else d[id]=sign();
+    patchB({dem:d});};
   const setSpec=(nom)=>{const s={...(B.specs||{})};if(s[nom])delete s[nom];else s[nom]=sign();patchB({specs:s});};
 
   const perLbl=perLibelle(bPer.sy,bPer.sm);
@@ -5935,6 +5943,18 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     7:bips.tot>0&&bips.ok===bips.tot,
     8:!!(secrDif||{})[bPid]};
   const estFait=(n)=>!!(valide(n)||autoOk[n]);
+  /* v10.158 : FIN DE L'ÉTAPE 1 = FENÊTRE REFERMÉE. Dès que l'étape 1 est terminée
+     (tous les médecins pointés, ou validation à la main), les demandes encore
+     ouvertes de la tuile 1 se referment d'elles-mêmes : la période passe en
+     construction et se verrouille pour les non-éditeurs (verrou de l'avenir). */
+  const fait1=estFait(1);
+  React.useEffect(()=>{
+    if(!isEdit||!fait1)return;
+    const d=B.dem||{};
+    if(!Object.keys(d).length)return;
+    patchB({dem:{}});
+    tourProps.toast&&tourProps.toast("Étape 1 terminée — demandes refermées : la période est verrouillée pour l'équipe jusqu'à la diffusion","info");
+  },[fait1,B.dem,isEdit]);
 
   /* la premiere etape non terminee est ouverte au premier affichage ; une etape
      validee se REFERME (sa demande) et ne se rouvre jamais toute seule */
@@ -5943,7 +5963,27 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
   const toggle=(n)=>majOuv(o=>({...o,[n]:!o[n]}));
   const setEtape=(n)=>{
     const st={...(B.etapes||{})};
-    if(st[n])delete st[n];else{st[n]=sign();majOuv(o=>({...o,[n]:false}));}
+    if(st[n]){
+      delete st[n];
+      /* v10.158 : dévalider l'étape 5 referme l'accès des intermédiaires */
+      if(n===5&&edReel&&((B.derog||{}).inter)){
+        const dr={...(B.derog||{})};delete dr.inter;
+        patchB({etapes:st,derog:dr});
+        tourProps.toast&&tourProps.toast("Étape 5 dévalidée — l'accès des intermédiaires à la période est refermé","info");
+        return;
+      }
+      patchB({etapes:st});
+      return;
+    }
+    /* v10.158 : valider l'étape 5 rouvre la période aux intermédiaires (dérogation) */
+    if(n===5&&edReel){
+      if(!window.confirm("Valider cette étape rouvre la modification du planning de cette période aux intermédiaires — leurs droits habituels, sur les lignes de tous. Continuer ?"))return;
+      st[n]=sign();majOuv(o=>({...o,[n]:false}));
+      patchB({etapes:st,derog:{...(B.derog||{}),inter:1}});
+      tourProps.toast&&tourProps.toast("Étape 5 validée — le planning de la période est rouvert aux intermédiaires","info");
+      return;
+    }
+    st[n]=sign();majOuv(o=>({...o,[n]:false}));
     patchB({etapes:st});
   };
 
@@ -5980,7 +6020,13 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,darkMode,se
     {n:2,icon:"🔄",titre:"Distribution du tour",
      sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
      alerte:mTour?(mTour+" semaine"+(mTour>1?"s":"")+" sans tour attribué"):null,
-     body:<BuildEmbed><TourTab key={pKey} {...tourProps} medecins={medsB} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     body:<div>
+       {bFut&&edReel&&<div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",margin:"2px 0 8px",padding:"6px 9px",borderRadius:8,border:"1px solid "+(B.tourOk?"#3fb950":"#8b5cf6"),background:B.tourOk?"rgba(63,185,80,.10)":"rgba(139,92,246,.08)"}}>
+         <span style={{fontSize:11,fontWeight:700,color:B.tourOk?"#3fb950":"#8b5cf6"}}>{B.tourOk?("✓ Tour validé — visible de toute l'équipe"+(B.tourOk.by?" (par "+B.tourOk.by+" le "+B.tourOk.at+")":"")):"👁 Tour visible des seuls éditeurs — pas encore validé"}</span>
+         <button onClick={()=>{if(B.tourOk){if(!window.confirm("Masquer à nouveau les semaines de tour de cette période à l'équipe (éditeurs exceptés) ?"))return;patchB({tourOk:null});}else{if(!window.confirm("Rendre les semaines de tour de cette période visibles de toute l'équipe dans le Planning ?"))return;patchB({tourOk:sign()});}}} style={{marginLeft:"auto",fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",border:"1.5px solid "+(B.tourOk?"var(--border)":"#8b5cf6"),background:B.tourOk?"var(--bg3)":"#8b5cf6",color:B.tourOk?"var(--txt2)":"#fff"}}>{B.tourOk?"Masquer à nouveau":"✓ Valider le tour"}</button>
+       </div>}
+       <BuildEmbed><TourTab key={pKey} {...tourProps} medecins={medsB} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>
+     </div>},
     {n:3,icon:"🌙",titre:"Gardes",
      sous:gardes.ok+" jour"+(gardes.ok>1?"s":"")+" sur "+gardes.tot+" ont une garde",
      alerte:mGar?(mGar+" jour"+(mGar>1?"s":"")+" sans garde sur la période"):null,
@@ -9320,6 +9366,17 @@ function CardioPlanning(){
   vRef.current.fut={deb:futDebut(),profil:vProfil,etat:(y,m,d)=>{const p=perOfDay(y,m,d);return vFutEtatDe(p.sy,p.sm);},derog:(y,m,d,pr)=>{const p=perOfDay(y,m,d);return !!((((build||{})[p.sy+"_"+p.sm]||{}).derog||{})[pr]);}};
   const perFut=(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());const pF=perStart(year,month);return (pF.sy*12+pF.sm>p0.sy*12+p0.sm)?vFutEtatDe(pF.sy,pF.sm):null;})();
   const perFutFin=(()=>{const pF=perStart(year,month);return ((build||{})[pF.sy+"_"+pF.sm]||{}).demFin||null;})();
+  /* v10.158 : badge « tour non validé » pour l'éditeur — période à venir affichée,
+     des semaines de tour attribuées, ni validées (tuile 2) ni diffusées. */
+  const perFutTourCache=(()=>{
+    if(!isEdit||!perFut||perFut==="dif")return false;
+    const pF=perStart(year,month);
+    if(((build||{})[pF.sy+"_"+pF.sm]||{}).tourOk)return false;
+    return Object.keys(tourMed||{}).some(wk=>{const q=String(wk).split("-").map(Number);
+      if(q.length!==3)return false;
+      const wm=tourMed[wk]||{};if(!((wm.HC||[]).length||(wm.USIC||[]).length))return false;
+      const p=perOfDay(q[0],q[1],q[2]);return p.sy===pF.sy&&p.sm===pF.sm;});
+  })();
   const futPers=(()=>{const t=new Date();let p=perStart(t.getFullYear(),t.getMonth());const out=[];for(let i=0;i<3;i++){p=perNext(p.sy,p.sm);const k=p.sy+"_"+p.sm;const B=(build||{})[k]||{};out.push({key:k,lib:perLibelle(p.sy,p.sm),etat:vFutEtatDe(p.sy,p.sm),fin:B.demFin||null,derog:B.derog||{}});}return out;})();
   const futDerog=(k,pr,v)=>{setBuild(b=>{const cur=(b||{})[k]||{};const d={...(cur.derog||{})};if(v)d[pr]=1;else delete d[pr];return {...(b||{}),[k]:{...cur,derog:d}};});toast(v?"Dérogation ouverte pour les "+(FUT_PROFILS.find(x=>x[0]===pr)||["",pr])[1]:"Dérogation retirée");};
   /* v10.100 : le bandeau de role du bas confirme sous quel acces on est entre,
@@ -9403,9 +9460,41 @@ function CardioPlanning(){
      un objet de plusieurs centaines de clés à chaque appel gelait toute l'application
      dès qu'une archive était chargée (son signalement du 25/08/2026). */
   const planAff=useMemo(()=>Object.keys(archPlan).length>0?{...archPlan,...plan}:plan,[plan,archPlan]);
+  /* v10.158 : MASQUE DU TOUR — tant que l'éditeur n'a pas validé le tour d'une période
+     À VENIR (Construire, tuile 2, bouton « ✓ Valider le tour »), ses cases TOUR_HC /
+     TOUR_USIC (remplaçants juniors compris) sont invisibles des non-éditeurs. La
+     diffusion (tuile 8) rend tout visible même sans validation. Simple filtre
+     d'AFFICHAGE : rien n'est déplacé ni effacé, les écritures lisent l'état brut. */
+  const tourMasque=useMemo(()=>{
+    if(isEdit)return null;
+    const deb=futDebut();
+    return (y2,m2,d2)=>{
+      if(dKey(y2,m2,d2)<deb)return false;
+      const p=perOfDay(y2,m2,d2);
+      if(((build||{})[p.sy+"_"+p.sm]||{}).tourOk)return false;
+      if((secrCfg.dif||{})[perIdOf(p.sy,p.sm)])return false;
+      return true;
+    };
+  },[isEdit,build,secrCfg]);
+  /* la même règle appliquée au registre des semaines de tour : une semaine est jugée
+     par son LUNDI (règle d'appartenance des semaines). Sert à getEntries et aux vues
+     qui lisent tourMed directement (Rapports, Stats). */
+  const tourMedVu=useMemo(()=>{
+    if(!tourMasque)return tourMedAff;
+    const n={};let ch=false;
+    Object.keys(tourMedAff).forEach(wk=>{const q=String(wk).split("-").map(Number);
+      if(q.length===3&&tourMasque(q[0],q[1],q[2])){ch=true;return;}
+      n[wk]=tourMedAff[wk];});
+    return ch?n:tourMedAff;
+  },[tourMedAff,tourMasque]);
   const getEntries=useCallback((medId,y2,m2,d2,slot)=>{
-    return expEntries(planAff,tourMedAff,tourDerogAff,medId,y2,m2,d2,slot);
-  },[planAff,tourMedAff,tourDerogAff]);
+    const es=expEntries(planAff,tourMedVu,tourDerogAff,medId,y2,m2,d2,slot);
+    if(tourMasque&&es.length&&tourMasque(y2,m2,d2)){
+      const f=es.filter(e=>!(e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC")));
+      if(f.length!==es.length)return f;
+    }
+    return es;
+  },[planAff,tourMedVu,tourDerogAff,tourMasque]);
 
   const getEntry=useCallback((medId,y2,m2,d2,slot)=>getEntries(medId,y2,m2,d2,slot)[0]||null,[getEntries]);
 
@@ -10659,6 +10748,7 @@ header::-webkit-scrollbar { display: none; }
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
               {perClose&&<span title={perArchivee?"Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier.":"Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session."} style={{background:perArchivee?"#0e7490":"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perArchivee?"🗄 PÉRIODE ARCHIVÉE":"🔒 PÉRIODE CLOSE"}</span>}
               {perFut&&perFut!=="dif"&&<span title={perFut==="phase1"?"La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période"+(perFutFin?" (jusqu'au "+finLib(perFutFin)+" à titre indicatif)":"")+". Le reste attend la diffusion du planning.":"Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning."} style={{background:perFut==="phase1"?"#0e7490":"#b45309",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perFut==="phase1"?"🏖️ CONGÉS OUVERTS":"🚧 EN PRÉPARATION"}</span>}{/* v10.152 : sans la date */}   {/* v10.146 */}
+              {perFutTourCache&&<span title="Le tour de cette période est attribué mais pas encore validé (Construire, tuile 2) : les semaines de tour sont invisibles de l'équipe — seuls les éditeurs les voient." style={{background:"#8b5cf6",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>👁 TOUR NON VALIDÉ</span>}{/* v10.158 */}
               <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
@@ -10783,7 +10873,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="tourmedical"&&<TourTab {...tourProps}/>}
 
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
-      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
+      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
       {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -10950,7 +11040,7 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMed} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
+      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
       {tab==="internes"&&<InternesView intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
@@ -11334,7 +11424,7 @@ header::-webkit-scrollbar { display: none; }
         );
       })()}
 
-      {tab==="stats"&&(isEdit||isInterEdit)&&<StatsTab medecins={medsAff} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMed}/>}
+      {tab==="stats"&&(isEdit||isInterEdit)&&<StatsTab medecins={medsAff} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMedVu}/>}
       {tab==="partage"&&accessMode!=="adminEdit"&&!isMedEdit&&(
         <div style={{maxWidth:500}} className={"pset "+psetFold.map(i=>"pf"+i).join(" ")} ref={psetRef} onClick={psetClick}>
           <div data-noskip="1" style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
