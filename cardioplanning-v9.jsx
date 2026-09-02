@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.159 — 01/09/2026";
+const APP_VERSION="v10.160 — 02/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -4598,7 +4598,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159)."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159)."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -9159,7 +9159,11 @@ function CardioPlanning(){
      report lui-meme restait hors photo : un retour arriere retirait le commentaire
      et laissait le report en place — les deux donnees se contredisaient. Cocher
      « rouvert » ou une semaine blanche ne creait, lui, aucun cran du tout. */
-  const histSnapshot=()=>({plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel});
+  /* v10.160 : tourDerog et tourPtOte entrent dans la photo. Sans eux, un 🗑 Retirer
+     du tour suivi d'un ↶ rendait les semaines et les cases mais PAS les dérogations
+     de jour : le titulaire d'un échange réapparaissait au tour en plus de son
+     remplaçant. Le témoin du planning type suivait le même trou. */
+  const histSnapshot=()=>({plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel,tourDerog,tourPtOte});
   /* v10.8 : sérialisation à CLÉS TRIÉES. Mon dédoublonnage de la v10.7 comparait deux
      textes bruts ; or l'écho du serveur renvoie les mêmes données dans un ORDRE DE CLÉS
      différent, donc le doublon passait quand même et le premier « retour » revenait sur
@@ -9213,7 +9217,7 @@ function CardioPlanning(){
     if(h.stack.length>50){h.stack.shift();h.pas.shift();}
     h.idx=h.stack.length-1;
     setHistVer(v=>v+1);
-  },[plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel]);
+  },[plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel,tourDerog,tourPtOte]);   /* v10.160 */
   /* Sans dependances : s'execute a chaque rendu, donc toujours APRES l'effet
      ci-dessus (les effets s'executent dans l'ordre de declaration). */
   useEffect(()=>{fromServer.current=false;});
@@ -9244,7 +9248,7 @@ function CardioPlanning(){
     });
     return out;
   };
-  const HIST_CHAMPS=["tourMed","astreinte","notes","planningType","csBlanches","csRep","csActsSel"];
+  const HIST_CHAMPS=["tourMed","astreinte","notes","planningType","csBlanches","csRep","csActsSel","tourDerog","tourPtOte"];   /* v10.160 */
   const histPas=(snAv,snAp)=>{
     try{
       const A=JSON.parse(snAv),B=JSON.parse(snAp);
@@ -9292,7 +9296,7 @@ function CardioPlanning(){
     const s=sens<0?1:0;                 /* retour : l'état attendu est l'APRÈS du geste */
     const att=v=>v[s], vis=v=>v[1-s];
     let nc=0;
-    const cur={plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel};
+    const cur={plan,tourMed,astreinte,notes,planningType,csBlanches,csRep,csActsSel,tourDerog,tourPtOte};   /* v10.160 */
     const dPlan={};
     Object.keys(P.plan||{}).forEach(k=>{
       const c2=(cur.plan||{})[k]||{},d={};
@@ -9313,9 +9317,11 @@ function CardioPlanning(){
       });
       dCh[c]=d;
     });
-    histRef.current.restoring=1;   /* React regroupe les huit changements en un seul rendu */
+    histRef.current.restoring=1;   /* React regroupe les dix changements en un seul rendu */
     setPlan(c=>posePlan(c,dPlan));
     setTourMed(c=>poseObj(c,dCh.tourMed));
+    setTourDerog(c=>poseObj(c,dCh.tourDerog));   /* v10.160 */
+    setTourPtOte(c=>poseObj(c,dCh.tourPtOte));   /* v10.160 */
     setAstreinte(c=>poseObj(c,dCh.astreinte));
     setNotes(c=>poseObj(c,dCh.notes));
     setPlanningType(c=>poseObj(c,dCh.planningType));
