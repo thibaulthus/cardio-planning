@@ -166,7 +166,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.162 — 02/09/2026";
+var APP_VERSION = "v10.163 — 02/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -863,7 +863,7 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
                 React.createElement("div", { style: { color: "var(--txt2)", fontSize: 12, marginTop: -6, marginBottom: 8 } }, "Le repos post-garde est pos\u00E9 automatiquement."),
                 (() => {
                     const pgf2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
-                    const cgm = getGardeMed2(pgf2.y, pgf2.m, pgf2.d);
+                    const cgm = djAff(getGardeMed2(pgf2.y, pgf2.m, pgf2.d), dKey(pgf2.y, pgf2.m, pgf2.d));
                     return cgm ? (React.createElement("div", { style: { marginBottom: 12, padding: "8px 10px", background: "var(--garde-bg)", borderRadius: 7, border: "1px solid #86efac" } },
                         React.createElement("div", { style: { fontSize: 10, color: "#16a34a", fontWeight: 700, marginBottom: 5 } }, "\u2713 Garde assign\u00E9e"),
                         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 8 } },
@@ -878,7 +878,7 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
                 })(),
                 gardeSwapOpen && (() => {
                     const pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
-                    const medA = getGardeMed2(pgf.y, pgf.m, pgf.d);
+                    const medA = djAff(getGardeMed2(pgf.y, pgf.m, pgf.d), dKey(pgf.y, pgf.m, pgf.d)); /* v10.163 */
                     if (!medA)
                         return null;
                     const A = { y: pgf.y, m: pgf.m, d: pgf.d, medId: medA.id };
@@ -886,7 +886,7 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
                     const others = effectiveDays.map(({ y: gy, m: gm, d: gd }) => {
                         if (gy === pgf.y && gm === pgf.m && gd === pgf.d)
                             return null;
-                        const mB = getGardeMed2(gy, gm, gd);
+                        const mB = djAff(getGardeMed2(gy, gm, gd), dKey(gy, gm, gd)); /* v10.163 : nom du jour de CETTE garde */
                         if (!mB || mB.id === medA.id)
                             return null;
                         const blockA = isAbsOn(medA.id, gy, gm, gd); // A absent le jour de B
@@ -927,7 +927,8 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
                         React.createElement("button", { onClick: () => setGardeSwapOpen(false), style: { marginTop: 6, fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", cursor: "pointer", fontWeight: 600 } }, "Annuler l'\u00E9change")));
                 })(),
                 (() => {
-                    const filteredGM = gardePickMeds.filter(m => !gardeSearch || m.init.toUpperCase().startsWith(gardeSearch));
+                    const dkPick = (() => { const p2 = pickGardeDayFull || { d: pickGardeDay, y: year, m: month }; return dKey(p2.y, p2.m, p2.d); })();
+                    const filteredGM = gardePickMeds.map(m => djAff(m, dkPick)).filter(m => !gardeSearch || m.init.toUpperCase().startsWith(gardeSearch)); /* v10.163 : la recherche porte sur les vraies initiales */
                     const onEnter = e => { if (e.key === "Enter" && filteredGM.length === 1) {
                         const pgf = pickGardeDayFull || { d: pickGardeDay, y: year, m: month };
                         if (isAbsOn(filteredGM[0].id, pgf.y, pgf.m, pgf.d)) {
@@ -2311,7 +2312,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
         pickerDay !== null && isEdit && (() => {
             const pd = pickerDay && typeof pickerDay === "object" ? pickerDay : { d: pickerDay, y: year, m: month };
             const dw2 = dow(pd.y, pd.m, pd.d), gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
-            const gMed = getGardeMed2(pd.y, pd.m, pd.d);
+            const gMed = djAff(getGardeMed2(pd.y, pd.m, pd.d), dKey(pd.y, pd.m, pd.d)); /* v10.163 */
             return (React.createElement(Ov, { onClose: () => setPickerDay(null) },
                 React.createElement("div", { style: S.mHd },
                     React.createElement("div", null,
@@ -2338,7 +2339,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                         const others = gvEffDays.map(({ y: gy, m: gm, d: gd }) => {
                             if (gy === pd.y && gm === pd.m && gd === pd.d)
                                 return null;
-                            const mB = getGardeMed2(gy, gm, gd);
+                            const mB = djAff(getGardeMed2(gy, gm, gd), dKey(gy, gm, gd)); /* v10.163 : nom du jour de CETTE garde */
                             if (!mB || mB.id === gMed.id)
                                 return null;
                             const blockA = gvIsAbs(gMed.id, gy, gm, gd);
@@ -2371,7 +2372,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                     })(),
                     React.createElement("button", { style: { width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 11, fontWeight: 700 }, onClick: () => { removeGarde(typeof pickerDay === "object" ? pickerDay.d : pickerDay, pd && pd.y, pd && pd.m); setPickerDay(null); } }, "Retirer la garde + repos"))),
                 React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, gMed ? "Changer :" : "Assigner :"),
-                React.createElement(GardeCandidateList, { meds: medecins.filter(m => m.garde === true), isAbsDay: mid => isMedAvailable(medecins.find(x => x.id === mid), pd.y, pd.m, pd.d, gardeSlot) === "blocked" || gvIsAbs(mid, pd.y, pd.m, pd.d), isAbsNext: mid => { const nx = new Date(pd.y, pd.m, pd.d + 1); return gvIsAbs(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, tourNext: mid => { const nx = new Date(pd.y, pd.m, pd.d + 1); const ny = nx.getFullYear(), nm = nx.getMonth(), nd = nx.getDate(); if (isWE(ny, nm, nd))
+                React.createElement(GardeCandidateList, { meds: medecins.filter(m => m.garde === true).map(m => djAff(m, dKey(pd.y, pd.m, pd.d))), isAbsDay: mid => isMedAvailable(medecins.find(x => x.id === mid), pd.y, pd.m, pd.d, gardeSlot) === "blocked" || gvIsAbs(mid, pd.y, pd.m, pd.d), isAbsNext: mid => { const nx = new Date(pd.y, pd.m, pd.d + 1); return gvIsAbs(mid, nx.getFullYear(), nx.getMonth(), nx.getDate()); }, tourNext: mid => { const nx = new Date(pd.y, pd.m, pd.d + 1); const ny = nx.getFullYear(), nm = nx.getMonth(), nd = nx.getDate(); if (isWE(ny, nm, nd))
                         return null; const t = ["M", "AM"].map(sl => getEntry(mid, ny, nm, nd, sl)).find(e => e && (e.acteId === "TOUR_HC" || e.acteId === "TOUR_USIC")); return t ? (t.acteId === "TOUR_HC" ? "HC" : "USIC") : null; }, prefOf: mid => { const dkP = dKey(pd.y, pd.m, pd.d); return ((gardeWish || {})[dkP] || {})[mid] ? "wish" : (((gardeAvoid || {})[dkP] || {})[mid] ? "avoid" : null); }, currentId: gMed ? gMed.id : null, onPick: mid => { applyGarde(mid, pd.y, pd.m, pd.d); setPickerDay(null); }, maxHeight: 360 })));
         })()));
 }
@@ -4991,6 +4992,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Le vrai nom du junior dans les modales")," (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."]}),
   HP({children:[HE("b",null,"Une seule barre de défilement sur ordinateur")," (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."]}),
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
   HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre. Depuis la v10.158 : la fin de l'étape 1 de Construire referme d'elle-même les demandes (la période se verrouille), les semaines de tour d'une période à venir restent invisibles des non-éditeurs tant que le tour n'est pas validé (tuile 2), et valider l'étape 5 ouvre automatiquement la dérogation des intermédiaires — la dévalider la referme."]}),
@@ -14395,7 +14397,7 @@ function CardioPlanning() {
         })(),
         modal === "daySwap" && mData && (function () {
             var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d;
-            var med = medecins.find(function (m) { return m.id === medId; });
+            var med = djAff(medecins.find(function (m) { return m.id === medId; }), dKey(y2, m2, d2)); /* v10.163 : le junior EN POSTE ce jour-là, pas le rôle */
             var wkC = wKey(y2, m2, d2), wmC = tourMed[wkC] || { HC: [], USIC: [] };
             /* v10.157 : deux cas. Tourneur de la SEMAINE : dérogation + remplaçant (inchangé).
                Remplaçant DU JOUR : pas de dérogation à poser — ses cases TOUR_x passent au
@@ -14420,10 +14422,10 @@ function CardioPlanning() {
                     else if (cellHasAny(e, ["TOUR_HC", "TOUR_USIC"]))
                         blockedBy.push("déjà de tour ce jour"); /* v10.157 */
                 });
-                return { m: mc, blocked: blockedBy.length > 0, reason: blockedBy[0] || "" };
+                return { m: djAff(mc, dkC), blocked: blockedBy.length > 0, reason: blockedBy[0] || "" }; /* v10.163 */
             });
             var doDaySwap = function (replId) {
-                var repl = medecins.find(function (m2) { return m2.id === replId; });
+                var repl = djAff(medecins.find(function (m2) { return m2.id === replId; }), dkC); /* v10.163 : le toast aussi */
                 if (isTourWkS) {
                     // 1. dérogation du tourneur (jour entier ou slot)
                     setTourDerog(function (p) {
@@ -14518,7 +14520,7 @@ function CardioPlanning() {
         })(),
         modal === "prefs" && mData && (function () {
             var medId = mData.medId, y2 = mData.y, m2 = mData.m, d2 = mData.d;
-            var med = medecins.find(function (mm) { return mm.id === medId; });
+            var med = djAff(medecins.find(function (mm) { return mm.id === medId; }), dKey(y2, m2, d2)); /* v10.163 */
             var wk3 = wKey(y2, m2, d2);
             var dk3 = dKey(y2, m2, d2);
             var tgl = function (setter, key) { return setter(function (p) { var n = __assign({}, p); var o = __assign({}, (n[key] || {})); if (o[medId])
@@ -15200,7 +15202,7 @@ function CardioPlanning() {
         modal === "vacColler" && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(VacCollerModal, { onClose: function () { return setModal(null); }, onValider: function (lignes) { setVacs(function (v) { return v.filter(function (x) { return !lignes.some(function (n2) { return n2.an === x.an; }); }).concat(lignes); }); setModal(null); toast(lignes.length + " période(s) enregistrée(s)", "info"); } })),
         modal === "restaure" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
-            React.createElement(RestoreModal, { med: medecins.find(function (m) { return m.id === mData.medId; }), backups: backupList, y: mData.y, m: mData.m, d: mData.d, onDiff: function (id, df, dt) { return diffMedPeriod(id, mData.medId, df, dt); }, onGo: function (id, df, dt) { restoreMedPeriod(id, mData.medId, df, dt); setModal(null); }, onClose: function () { return setModal(null); } })),
+            React.createElement(RestoreModal, { med: djAff(medecins.find(function (m) { return m.id === mData.medId; }), dKey(mData.y, mData.m, mData.d)), backups: backupList, y: mData.y, m: mData.m, d: mData.d, onDiff: function (id, df, dt) { return diffMedPeriod(id, mData.medId, df, dt); }, onGo: function (id, df, dt) { restoreMedPeriod(id, mData.medId, df, dt); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(PeriodModal, { medecins: medsAff, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, finPer: (function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm); return "".concat(e.getFullYear(), "-").concat(String(e.getMonth() + 1).padStart(2, "0"), "-").concat(String(e.getDate()).padStart(2, "0")); })(), allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) {
                     clearPeriodActs(perSlots(p));

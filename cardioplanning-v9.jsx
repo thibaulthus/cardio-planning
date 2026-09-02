@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.162 — 02/09/2026";
+const APP_VERSION="v10.163 — 02/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -727,7 +727,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
         {/* v9.82 : même présentation que la modale de l'onglet Gardes — échange et retrait
             visibles d'emblée, un seul clic chacun. Une seule façon de faire dans les deux écrans. */}
         <div style={{color:"var(--txt2)",fontSize:12,marginTop:-6,marginBottom:8}}>Le repos post-garde est posé automatiquement.</div>
-        {(()=>{const pgf2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const cgm=getGardeMed2(pgf2.y,pgf2.m,pgf2.d);return cgm?(
+        {(()=>{const pgf2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const cgm=djAff(getGardeMed2(pgf2.y,pgf2.m,pgf2.d),dKey(pgf2.y,pgf2.m,pgf2.d));return cgm?(
           <div style={{marginBottom:12,padding:"8px 10px",background:"var(--garde-bg)",borderRadius:7,border:"1px solid #86efac"}}>
             <div style={{fontSize:10,color:"#16a34a",fontWeight:700,marginBottom:5}}>✓ Garde assignée</div>
             <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
@@ -742,13 +742,13 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
           </div>):null;})()}
         {gardeSwapOpen&&(()=>{
           const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};
-          const medA=getGardeMed2(pgf.y,pgf.m,pgf.d);
+          const medA=djAff(getGardeMed2(pgf.y,pgf.m,pgf.d),dKey(pgf.y,pgf.m,pgf.d));   /* v10.163 */
           if(!medA)return null;
           const A={y:pgf.y,m:pgf.m,d:pgf.d,medId:medA.id};
           const JG=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
           const others=effectiveDays.map(({y:gy,m:gm,d:gd})=>{
             if(gy===pgf.y&&gm===pgf.m&&gd===pgf.d)return null;
-            const mB=getGardeMed2(gy,gm,gd);
+            const mB=djAff(getGardeMed2(gy,gm,gd),dKey(gy,gm,gd));   /* v10.163 : nom du jour de CETTE garde */
             if(!mB||mB.id===medA.id)return null;
             const blockA=isAbsOn(medA.id,gy,gm,gd);      // A absent le jour de B
             const blockB=isAbsOn(mB.id,pgf.y,pgf.m,pgf.d); // B absent le jour de A
@@ -778,7 +778,8 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
           </div>);
         })()}
         {(()=>{
-          const filteredGM=gardePickMeds.filter(m=>!gardeSearch||m.init.toUpperCase().startsWith(gardeSearch));
+          const dkPick=(()=>{const p2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};return dKey(p2.y,p2.m,p2.d);})();
+          const filteredGM=gardePickMeds.map(m=>djAff(m,dkPick)).filter(m=>!gardeSearch||m.init.toUpperCase().startsWith(gardeSearch));   /* v10.163 : la recherche porte sur les vraies initiales */
           const onEnter=e=>{if(e.key==="Enter"&&filteredGM.length===1){const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};if(isAbsOn(filteredGM[0].id,pgf.y,pgf.m,pgf.d)){toast("Absent / FMC ce jour — utilisez « Assigner quand même »","warn");return;}applyGarde(filteredGM[0].id,pgf.y,pgf.m,pgf.d);setPickGardeDayFull(null);}};
           return(<>
         <input
@@ -2076,7 +2077,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
       {pickerDay!==null&&isEdit&&(()=>{
         const pd=pickerDay&&typeof pickerDay==="object"?pickerDay:{d:pickerDay,y:year,m:month};
         const dw2=dow(pd.y,pd.m,pd.d), gardeSlot=(dw2===6||dw2===0)?"JOUR":"N";
-        const gMed=getGardeMed2(pd.y,pd.m,pd.d);
+        const gMed=djAff(getGardeMed2(pd.y,pd.m,pd.d),dKey(pd.y,pd.m,pd.d));   /* v10.163 */
         return(
           <Ov onClose={()=>setPickerDay(null)}>
             <div style={S.mHd}>
@@ -2098,7 +2099,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
                   const A={y:pd.y,m:pd.m,d:pd.d,medId:gMed.id};
                   const others=gvEffDays.map(({y:gy,m:gm,d:gd})=>{
                     if(gy===pd.y&&gm===pd.m&&gd===pd.d)return null;
-                    const mB=getGardeMed2(gy,gm,gd);
+                    const mB=djAff(getGardeMed2(gy,gm,gd),dKey(gy,gm,gd));   /* v10.163 : nom du jour de CETTE garde */
                     if(!mB||mB.id===gMed.id)return null;
                     const blockA=gvIsAbs(gMed.id,gy,gm,gd);
                     const blockB=gvIsAbs(mB.id,pd.y,pd.m,pd.d);
@@ -2136,7 +2137,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
             )}
             <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>{gMed?"Changer :":"Assigner :"}</div>
             <GardeCandidateList
-              meds={medecins.filter(m=>m.garde===true)}
+              meds={medecins.filter(m=>m.garde===true).map(m=>djAff(m,dKey(pd.y,pd.m,pd.d)))}
               isAbsDay={mid=>isMedAvailable(medecins.find(x=>x.id===mid),pd.y,pd.m,pd.d,gardeSlot)==="blocked"||gvIsAbs(mid,pd.y,pd.m,pd.d)}
               isAbsNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);return gvIsAbs(mid,nx.getFullYear(),nx.getMonth(),nx.getDate());}}
               tourNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);const ny=nx.getFullYear(),nm=nx.getMonth(),nd=nx.getDate();if(isWE(ny,nm,nd))return null;const t=["M","AM"].map(sl=>getEntry(mid,ny,nm,nd,sl)).find(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));return t?(t.acteId==="TOUR_HC"?"HC":"USIC"):null;}}
@@ -4700,6 +4701,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Le vrai nom du junior dans les modales")," (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."]}),
   HP({children:[HE("b",null,"Une seule barre de défilement sur ordinateur")," (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."]}),
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
   HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre. Depuis la v10.158 : la fin de l'étape 1 de Construire referme d'elle-même les demandes (la période se verrouille), les semaines de tour d'une période à venir restent invisibles des non-éditeurs tant que le tour n'est pas validé (tuile 2), et valider l'étape 5 ouvre automatiquement la dérogation des intermédiaires — la dévalider la referme."]}),
@@ -12147,7 +12149,7 @@ header::-webkit-scrollbar { display: none; }
       })()}
       {modal==="daySwap"&&mData&&(()=>{
         const{medId,y:y2,m:m2,d:d2}=mData;
-        const med=medecins.find(m=>m.id===medId);
+        const med=djAff(medecins.find(m=>m.id===medId),dKey(y2,m2,d2));   /* v10.163 : le junior EN POSTE ce jour-là, pas le rôle */
         const wkC=wKey(y2,m2,d2),wmC=tourMed[wkC]||{HC:[],USIC:[]};
         /* v10.157 : deux cas. Tourneur de la SEMAINE : dérogation + remplaçant (inchangé).
            Remplaçant DU JOUR : pas de dérogation à poser — ses cases TOUR_x passent au
@@ -12170,10 +12172,10 @@ header::-webkit-scrollbar { display: none; }
             if(a)blockedBy.push(a==="ABSENCE"?"absent":a==="TP"?"temps partiel":a==="GARDE"?"garde":a==="REPOS_GARDE"?"repos de garde":"formation");
             else if(cellHasAny(e,["TOUR_HC","TOUR_USIC"]))blockedBy.push("déjà de tour ce jour");   /* v10.157 */
           });
-          return {m:mc,blocked:blockedBy.length>0,reason:blockedBy[0]||""};
+          return {m:djAff(mc,dkC),blocked:blockedBy.length>0,reason:blockedBy[0]||""};   /* v10.163 */
         });
         const doDaySwap=(replId)=>{
-          const repl=medecins.find(m2=>m2.id===replId);
+          const repl=djAff(medecins.find(m2=>m2.id===replId),dkC);   /* v10.163 : le toast aussi */
           if(isTourWkS){
           // 1. dérogation du tourneur (jour entier ou slot)
           setTourDerog(p=>{
@@ -12250,7 +12252,7 @@ header::-webkit-scrollbar { display: none; }
       })()}
       {modal==="prefs"&&mData&&(()=>{
         const {medId,y:y2,m:m2,d:d2}=mData;
-        const med=medecins.find(mm=>mm.id===medId);
+        const med=djAff(medecins.find(mm=>mm.id===medId),dKey(y2,m2,d2));   /* v10.163 */
         const wk3=wKey(y2,m2,d2);
         const dk3=dKey(y2,m2,d2);
         const tgl=(setter,key)=>setter(p=>{const n={...p};const o={...(n[key]||{})};if(o[medId])delete o[medId];else o[medId]=true;if(Object.keys(o).length===0)delete n[key];else n[key]=o;return n;});
@@ -12878,7 +12880,7 @@ header::-webkit-scrollbar { display: none; }
           onValider={lignes=>{setVacs(v=>v.filter(x=>!lignes.some(n2=>n2.an===x.an)).concat(lignes));setModal(null);toast(lignes.length+" période(s) enregistrée(s)","info");}}/>
       </Ov>}
       {modal==="restaure"&&mData&&<Ov onClose={()=>setModal(null)}>
-        <RestoreModal med={medecins.find(m=>m.id===mData.medId)} backups={backupList}
+        <RestoreModal med={djAff(medecins.find(m=>m.id===mData.medId),dKey(mData.y,mData.m,mData.d))} backups={backupList}
           y={mData.y} m={mData.m} d={mData.d}
           onDiff={(id,df,dt)=>diffMedPeriod(id,mData.medId,df,dt)}
           onGo={(id,df,dt)=>{restoreMedPeriod(id,mData.medId,df,dt);setModal(null);}}
