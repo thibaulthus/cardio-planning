@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.160 — 02/09/2026";
+const APP_VERSION="v10.162 — 02/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -957,6 +957,19 @@ const GRID_FIT=["planning","chl","chb","plateau","angio","attache","internes"]; 
    boutons sont retirés pour tous, à sa demande. Les onglets restent dans le
    code : Construire les embarque, les supprimer le casserait. */
 const HIDDEN_TABS=["tourmedical","garde"];
+/* v10.161 : sur ordinateur, quand un onglet à grille est affiché, la PAGE ne défile plus du
+   tout — seule la barre interne du tableau reste. Motif (ses captures du 02/09) : la page
+   gardait toujours un peu de jeu (arrondis, bandeaux qui vont et viennent) ; en défilant vite
+   à la molette, le navigateur attrapait la barre EXTÉRIEURE — le bandeau de la période partait
+   vers le haut et un grand vide restait en bas. On coupe donc le défilement de la page
+   (overflow caché + retour en haut) tant qu'une grille « fit » est à l'écran ; il est rendu
+   sur téléphone, dans les onglets en cartes, et quand la fenêtre est trop basse (repli legacy). */
+const pageVerrou=(on)=>{
+  const de=document.documentElement,v=on?"hidden":"";
+  if(de.style.overflowY!==v)de.style.overflowY=v;
+  if(on&&(window.scrollY||window.pageYOffset))window.scrollTo(0,0);
+};
+let fitMontes=0;   /* v10.162 : nombre de grilles « fit » à l'écran */
 function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,memX=null,centre=null}){
   const ref=React.useRef(null);
   React.useLayoutEffect(()=>{
@@ -1015,13 +1028,14 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
        sur téléphone : il est mesuré et déduit ici aussi, comme sur ordinateur. */
     let barH=0;document.querySelectorAll('[data-botbar="1"]').forEach(b=>{barH=Math.max(barH,b.offsetHeight||0);});
     const legacy="calc(100vh - "+(mh+barH)+"px)";
-    if(window.innerWidth<760){if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
+    if(window.innerWidth<760){pageVerrou(false);if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
     /* v10.48, son retour Edge : « on perd de la place en bas ». Plus de marges
        au doigt mouillé — les bandeaux fixés en bas (hors-ligne, PIN médecin ou
        administratif) sont MESURÉS, et la boucle devient symétrique : elle
        absorbe le débordement de la page ET reprend la place inutilisée tant
        que le tableau a encore des lignes à montrer. Le tableau ne peut donc
        qu'y gagner, jamais rétrécir. */
+    pageVerrou(true);   /* v10.161 : la page ne défile plus ; retour en haut avant la mesure */
     const de=document.documentElement;
     const top=el.getBoundingClientRect().top+(window.scrollY||window.pageYOffset||0);
     let h=window.innerHeight-top-barH-14;
@@ -1030,11 +1044,23 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     const over=de.scrollHeight-de.clientHeight;   /* lu APRÈS la pose : la mise en page vient d'être refaite */
     if(over>0)h-=over;                                          /* la page déborde encore : absorber */
     else if(over<0&&el.scrollHeight-el.clientHeight>1){const gain=(-over)-barH-2;if(gain>0)h+=gain;} /* place perdue ET tableau coupé : la reprendre, en s'arrêtant AU-DESSUS des bandeaux fixés (ils ne pèsent pas dans la hauteur de page) */
-    if(h<380){if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
+    if(h<380){pageVerrou(false);if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
     const v=h+"px";
     if(el.style.maxHeight!==v)el.style.maxHeight=v;
   },[fit,mh]);
   React.useLayoutEffect(()=>{doFit();});
+  /* v10.162 : le déverrouillage au démontage passait par l'effet PASSIF — au changement
+     d'onglet, React l'exécute APRÈS le verrou posé par la grille suivante, qui se retrouvait
+     donc déverrouillée : la double barre revenait dès le premier changement d'onglet (son
+     retour du 02/09). Ici, effet de MISE EN PAGE : son nettoyage passe AVANT les effets du
+     nouvel onglet. On compte les grilles « fit » à l'écran et on ne rend le défilement de la
+     page que quand il n'en reste plus aucune — donc en quittant les grilles pour un onglet
+     en cartes, jamais entre deux grilles. */
+  React.useLayoutEffect(()=>{
+    if(!fit)return;
+    fitMontes++;
+    return ()=>{fitMontes--;if(fitMontes<=0)pageVerrou(false);};
+  },[fit]);
   React.useEffect(()=>{
     if(!fit)return;
     window.addEventListener("resize",doFit);
@@ -4674,6 +4700,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Une seule barre de défilement sur ordinateur")," (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."]}),
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
   HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre. Depuis la v10.158 : la fin de l'étape 1 de Construire referme d'elle-même les demandes (la période se verrouille), les semaines de tour d'une période à venir restent invisibles des non-éditeurs tant que le tour n'est pas validé (tuile 2), et valider l'étape 5 ouvre automatiquement la dérogation des intermédiaires — la dévalider la referme."]}),
   HP({children:[HE("b",null,"Garde int., aller-retour")," (v10.145) : éteindre 🎓 Garde int. ramène le cadre là où il était avant de l'allumer — à condition qu'on n'ait rien fait entre-temps. Un défilement, un changement d'onglet ou de période, et le cadre reste où il est."]}),
@@ -10646,7 +10673,7 @@ nav::-webkit-scrollbar { display: none; }
 header::-webkit-scrollbar { display: none; }
 
 @media print {
-  html { font-size: 90% !important; }
+  html { font-size: 90% !important; overflow: visible !important; }   /* v10.161 : le verrou de page ne gêne pas l'impression */
 
   /* Forcer toutes les variables CSS en mode clair */
   html, :root {
