@@ -166,7 +166,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.163 — 02/09/2026";
+var APP_VERSION = "v10.164 — 03/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -4034,10 +4034,28 @@ function TourTab(_a) {
         // Semaines triées : les plus contraintes d'abord (moins de disponibles)
         var weeksByConstraint = __spreadArray([], weeksT, true).sort(function (a, b) { return availCount[a.key] - availCount[b.key]; });
         var isAvoid = function (medId, wk4) { return !!((tourAvoid || {})[wk4] || {})[medId]; };
+        /* ═══ v10.164 : RÈGLES D'ENCHAÎNEMENT DU TOUR ═══ (voir la source) */
+        var idxOfW = {};
+        weeksT.forEach(function (w, i) { idxOfW[w.key] = i; });
+        var semAvant = (function () {
+            var o = {};
+            if (!weeksT.length)
+                return o;
+            var p0 = weeksT[0].key.split("-").map(Number);
+            for (var k = 1; k <= 3; k++) {
+                var d = new Date(p0[0], p0[1], p0[2] - 7 * k);
+                var wm = (tourMed || {})[d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate()] || {};
+                (function (kk) {
+                    (wm.HC || []).concat(wm.USIC || []).forEach(function (mid) { (o[String(mid)] = o[String(mid)] || []).push(-kk); });
+                })(k);
+            }
+            return o;
+        })();
         var attempt = function (opts) {
             var useBlocks = opts.useBlocks;
             var relaxedWeeks = [];
             var avoidViol = [];
+            var dblViol = [], sur4Viol = []; /* v10.164 */
             var quota = {};
             tourMeds.forEach(function (m) { quota[m.id] = cfgExcl[m.id] ? 0 : (cfgWeeks[m.id] || 0); });
             var hcCount = {}, usicCount = {};
@@ -4063,6 +4081,40 @@ function TourTab(_a) {
                 };
                 return check("eep", mns.eep) && check("pace", mns.pace) && check("ett", mns.ett) && check("coro", mns.coro);
             };
+            /* v10.164 : les quatre juges de l'enchaînement (voir la source) */
+            var semsDe = function (mid) { var l = (semAvant[String(mid)] || []).slice(); weeksT.forEach(function (w, i) { if (assignedThisWeek[w.key].includes(mid))
+                l.push(i); }); return l; };
+            var chaSet = function (mid) { var s = {}; semsDe(mid).forEach(function (x) { s[x] = 1; }); return s; };
+            var cha3 = function (s, a, b) { for (var k = a; k <= b; k++)
+                if (s[k] && s[k + 1] && s[k + 2])
+                    return true; return false; };
+            var cha4 = function (s, a, b) { for (var k = a; k <= b; k++) {
+                var c = 0;
+                for (var j = k; j < k + 4; j++)
+                    if (s[j])
+                        c++;
+                if (c >= 3)
+                    return true;
+            } return false; };
+            var chaJuge = function (mid, i, sur4) {
+                var s = chaSet(mid);
+                s[i] = 1;
+                if (cha3(s, i - 2, i))
+                    return { ok: false, dbl: false };
+                if (sur4 && cha4(s, i - 3, i))
+                    return { ok: false, dbl: false };
+                return { ok: true, dbl: !!(s[i - 1] || s[i + 1]) };
+            };
+            var chaBloc = function (mid, i) { var s = chaSet(mid); s[i] = 1; s[i + 1] = 1; return !cha3(s, i - 2, i + 1) && !cha4(s, i - 3, i + 1); };
+            var chaLegal = function (mid, sur4) {
+                var l = semsDe(mid);
+                if (!l.length)
+                    return true;
+                var s = {};
+                l.forEach(function (x) { s[x] = 1; });
+                var mn = Math.min.apply(null, l), mx = Math.max.apply(null, l);
+                return !cha3(s, mn, mx) && !(sur4 && cha4(s, mn - 3, mx));
+            };
             // Phase 1 : blocs de 2 semaines consécutives (préférences)
             var placeBlock = function (m, unit) {
                 for (var i2 = 0; i2 < weeksT.length - 1; i2++) {
@@ -4075,6 +4127,8 @@ function TourTab(_a) {
                         continue;
                     if (assign[w1.key][unit].length >= 2 || assign[w2.key][unit].length >= 2)
                         continue;
+                    if (!chaBloc(m.id, i2))
+                        continue; /* v10.164 : un bloc ne doit pas créer 3 sur 4 */
                     if (!specOK(w1.key, [m.id], idealMins) || !specOK(w2.key, [m.id], idealMins))
                         continue;
                     assign[w1.key][unit].push(m.id);
@@ -4107,29 +4161,50 @@ function TourTab(_a) {
                         var baseC = tourMeds.filter(function (m) { return quota[m.id] > 0
                             && !assignedThisWeek[w.key].includes(m.id)
                             && !horsW(m.id, w.key); }); /* v10.153 */
-                        var noAv = baseC.filter(function (m) { return !isAvoid(m.id, w.key); });
-                        var usedAvoid = false;
-                        var cands = noAv.filter(function (m) { return specOK(w.key, [m.id], idealMins); });
-                        if (cands.length === 0) {
-                            cands = baseC.filter(function (m) { return specOK(w.key, [m.id], idealMins); });
-                            if (cands.length > 0)
-                                usedAvoid = true;
-                        }
-                        if (cands.length === 0) {
-                            cands = noAv.filter(function (m) { return specOK(w.key, [m.id], hardMins); });
-                            if (cands.length > 0 && !relaxedWeeks.includes(w.label))
-                                relaxedWeeks.push(w.label);
-                        }
-                        if (cands.length === 0) {
-                            cands = baseC.filter(function (m) { return specOK(w.key, [m.id], hardMins); });
-                            if (cands.length > 0) {
-                                usedAvoid = true;
-                                if (!relaxedWeeks.includes(w.label))
-                                    relaxedWeeks.push(w.label);
+                        /* ═══ v10.164 : CINQ VIVIERS D'ENCHAÎNEMENT (voir la source) ═══ */
+                        var jg = {}, jg3 = {}, iW = idxOfW[w.key];
+                        baseC.forEach(function (m2) { jg[m2.id] = chaJuge(m2.id, iW, true); jg3[m2.id] = chaJuge(m2.id, iW, false); });
+                        var prefU = function (m2) { return unit === "HC" ? !!cfgPref2HC[m2.id] : !!cfgPref2USIC[m2.id]; };
+                        var prefTout = function (m2) { return !!cfgPref2HC[m2.id] || !!cfgPref2USIC[m2.id]; };
+                        var viviers = [
+                            baseC.filter(function (m2) { return jg[m2.id].ok && jg[m2.id].dbl && prefU(m2); }),
+                            baseC.filter(function (m2) { return jg[m2.id].ok && !jg[m2.id].dbl; }),
+                            baseC.filter(function (m2) { return jg[m2.id].ok && jg[m2.id].dbl && !prefU(m2) && prefTout(m2); }),
+                            baseC.filter(function (m2) { return jg[m2.id].ok && jg[m2.id].dbl && !prefTout(m2); }),
+                            baseC.filter(function (m2) { return !jg[m2.id].ok && jg3[m2.id].ok; })
+                        ];
+                        var echelle = function (V) {
+                            var nA = V.filter(function (m2) { return !isAvoid(m2.id, w.key); });
+                            var c2 = nA.filter(function (m2) { return specOK(w.key, [m2.id], idealMins); });
+                            if (c2.length)
+                                return { c: c2, av: false, rel: false };
+                            c2 = V.filter(function (m2) { return specOK(w.key, [m2.id], idealMins); });
+                            if (c2.length)
+                                return { c: c2, av: true, rel: false };
+                            c2 = nA.filter(function (m2) { return specOK(w.key, [m2.id], hardMins); });
+                            if (c2.length)
+                                return { c: c2, av: false, rel: true };
+                            c2 = V.filter(function (m2) { return specOK(w.key, [m2.id], hardMins); });
+                            if (c2.length)
+                                return { c: c2, av: true, rel: true };
+                            return null;
+                        };
+                        var pris = null, rang = -1;
+                        for (var vi = 0; vi < viviers.length && !pris; vi++) {
+                            if (!viviers[vi].length)
+                                continue;
+                            var e2 = echelle(viviers[vi]);
+                            if (e2) {
+                                pris = e2;
+                                rang = vi;
                             }
                         }
-                        if (cands.length === 0)
+                        if (!pris)
                             return "break";
+                        var cands = pris.c;
+                        var usedAvoid = pris.av;
+                        if (pris.rel && !relaxedWeeks.includes(w.label))
+                            relaxedWeeks.push(w.label);
                         /* v10.154 : tension = quota restant / semaines encore ouvertes au médecin —
                            les plus contraints sont servis d'abord, les plus larges restent en réserve
                            pour les semaines difficiles. */
@@ -4170,6 +4245,10 @@ function TourTab(_a) {
                         var m = cands[0];
                         if (usedAvoid && isAvoid(m.id, w.key))
                             avoidViol.push(m.init + " (" + w.label + ")");
+                        if (rang === 3)
+                            dblViol.push(m.init + " (sem. " + w.label + ")"); /* v10.164 */
+                        if (rang === 4)
+                            sur4Viol.push(m.init + " (sem. " + w.label + ")"); /* v10.164 */
                         assign[w.key][unit].push(m.id);
                         assignedThisWeek[w.key].push(m.id);
                         if (unit === "HC")
@@ -4189,8 +4268,9 @@ function TourTab(_a) {
             var unfilled = weeksT.filter(function (w) { return assign[w.key].HC.length < 2 || assign[w.key].USIC.length < 2; }).length;
             var leftoverTotal = tourMeds.reduce(function (s, m) { return s + (quota[m.id] || 0); }, 0);
             var imbalance = tourMeds.reduce(function (s, m) { return s + Math.abs(hcCount[m.id] - usicCount[m.id]); }, 0);
-            var score = unfilled * 1000 + relaxedWeeks.length * 100 + avoidViol.length * 40 + leftoverTotal * 10 + imbalance;
-            return { assign: assign, quota: quota, unfilled: unfilled, score: score, hcCount: hcCount, usicCount: usicCount, assignedThisWeek: assignedThisWeek, specOK: specOK, relaxedWeeks: relaxedWeeks, avoidViol: avoidViol };
+            /* v10.164 : le score tient compte des semaines doublées et des concessions 3-sur-4 */
+            var score = unfilled * 1000 + relaxedWeeks.length * 100 + avoidViol.length * 40 + sur4Viol.length * 30 + dblViol.length * 15 + leftoverTotal * 10 + imbalance;
+            return { assign: assign, quota: quota, unfilled: unfilled, score: score, hcCount: hcCount, usicCount: usicCount, assignedThisWeek: assignedThisWeek, specOK: specOK, relaxedWeeks: relaxedWeeks, avoidViol: avoidViol, dblViol: dblViol, sur4Viol: sur4Viol, chaLegal: chaLegal };
         };
         // ═══ Paliers de relaxation progressive ═══
         var idealMins = { coro: cfgMinCoro, pace: cfgMinPace, eep: cfgMinEEP, ett: cfgMinETT };
@@ -4209,7 +4289,7 @@ function TourTab(_a) {
         ];
         // Réparation par échanges, appliquée au meilleur essai du palier
         var repairResult = function (r) {
-            var assign = r.assign, quota = r.quota, hcCount = r.hcCount, usicCount = r.usicCount, assignedThisWeek = r.assignedThisWeek, specOK = r.specOK, relaxedWeeks = r.relaxedWeeks;
+            var assign = r.assign, quota = r.quota, hcCount = r.hcCount, usicCount = r.usicCount, assignedThisWeek = r.assignedThisWeek, specOK = r.specOK, relaxedWeeks = r.relaxedWeeks, chaLegal = r.chaLegal, sur4Viol = r.sur4Viol; /* v10.164 */
             for (var pass = 0; pass < 2; pass++) {
                 weeksT.forEach(function (w) {
                     ["HC", "USIC"].forEach(function (unit) {
@@ -4248,7 +4328,16 @@ function TourTab(_a) {
                                             assignedThisWeek[w.key].push(m2id);
                                             var okIdeal = specOK(w.key, [], idealMins) && specOK(w2.key, [], idealMins);
                                             var okHard = okIdeal || (specOK(w.key, [], hardMins) && specOK(w2.key, [], hardMins));
-                                            if (okHard) {
+                                            /* v10.164 : l'échange respecte l'enchaînement (voir la source) */
+                                            var okCha4 = chaLegal(c.id, true) && chaLegal(m2id, true);
+                                            var okCha3 = chaLegal(c.id, false) && chaLegal(m2id, false);
+                                            if (okHard && okCha3) {
+                                                if (!okCha4) {
+                                                    if (!chaLegal(c.id, true))
+                                                        sur4Viol.push(c.init + " (sem. " + w2.label + ")");
+                                                    else
+                                                        sur4Viol.push(((tourMeds.filter(function (x) { return x.id === m2id; })[0] || {}).init || "?") + " (sem. " + w.label + ")");
+                                                }
                                                 if (!okIdeal) {
                                                     if (!relaxedWeeks.includes(w.label))
                                                         relaxedWeeks.push(w.label);
@@ -4305,7 +4394,7 @@ function TourTab(_a) {
             r.unfilled = weeksT.filter(function (w) { return assign[w.key].HC.length < 2 || assign[w.key].USIC.length < 2; }).length;
             var leftoverTotal = tourMeds.reduce(function (s, m) { return s + (quota[m.id] || 0); }, 0);
             var imbalance = tourMeds.reduce(function (s, m) { return s + Math.abs(hcCount[m.id] - usicCount[m.id]); }, 0);
-            r.score = r.unfilled * 1000 + relaxedWeeks.length * 100 + leftoverTotal * 10 + imbalance;
+            r.score = r.unfilled * 1000 + relaxedWeeks.length * 100 + sur4Viol.length * 30 + (r.dblViol || []).length * 15 + leftoverTotal * 10 + imbalance; /* v10.164 */
             return r;
         };
         var best = null, bestStage = stages[0];
@@ -4328,6 +4417,60 @@ function TourTab(_a) {
             if (best.unfilled === 0)
                 break; // palier suffisant : toutes les semaines pleines
         }
+        /* ═══ v10.164 : PASSE DES SOUHAITS 🚫 « PAS DE TOUR » (voir la source) ═══ */
+        var avoidRep = [], avoidReste = [];
+        (function () {
+            var A = best.assign, ATW = best.assignedThisWeek, LEG = best.chaLegal, SOK = best.specOK;
+            var initDe = function (mid) { return ((tourMeds.filter(function (x) { return String(x.id) === String(mid); })[0] || {}).init || "?"); };
+            var minsDe = function (wk) { var w0 = weeksT.filter(function (x) { return x.key === wk; })[0]; return w0 && best.relaxedWeeks.includes(w0.label) ? hardMins : idealMins; };
+            var viol = [];
+            weeksT.forEach(function (w) { ["HC", "USIC"].forEach(function (u) { (A[w.key][u] || []).forEach(function (mid) { if (isAvoid(mid, w.key))
+                viol.push({ mid: mid, wk: w.key, u: u, lab: w.label }); }); }); });
+            viol.forEach(function (v) {
+                if ((A[v.wk][v.u] || []).indexOf(v.mid) < 0)
+                    return;
+                var fait = false;
+                weeksT.forEach(function (w2) {
+                    if (fait || w2.key === v.wk)
+                        return;
+                    ["HC", "USIC"].forEach(function (u2) {
+                        if (fait)
+                            return;
+                        A[w2.key][u2].slice().forEach(function (m2) {
+                            if (fait || String(m2) === String(v.mid))
+                                return;
+                            if (isAvoid(v.mid, w2.key) || isAvoid(m2, v.wk))
+                                return;
+                            if (horsW(v.mid, w2.key) || horsW(m2, v.wk))
+                                return;
+                            if (ATW[w2.key].includes(v.mid) || ATW[v.wk].includes(m2))
+                                return;
+                            A[v.wk][v.u] = A[v.wk][v.u].filter(function (x) { return x !== v.mid; });
+                            ATW[v.wk] = ATW[v.wk].filter(function (x) { return x !== v.mid; });
+                            A[w2.key][u2] = A[w2.key][u2].filter(function (x) { return x !== m2; });
+                            ATW[w2.key] = ATW[w2.key].filter(function (x) { return x !== m2; });
+                            A[v.wk][v.u].push(m2);
+                            ATW[v.wk].push(m2);
+                            A[w2.key][u2].push(v.mid);
+                            ATW[w2.key].push(v.mid);
+                            if (LEG(v.mid, true) && LEG(m2, true) && SOK(v.wk, [], minsDe(v.wk)) && SOK(w2.key, [], minsDe(w2.key)))
+                                fait = true;
+                            else {
+                                A[v.wk][v.u] = A[v.wk][v.u].filter(function (x) { return x !== m2; });
+                                ATW[v.wk] = ATW[v.wk].filter(function (x) { return x !== m2; });
+                                A[w2.key][u2] = A[w2.key][u2].filter(function (x) { return x !== v.mid; });
+                                ATW[w2.key] = ATW[w2.key].filter(function (x) { return x !== v.mid; });
+                                A[v.wk][v.u].push(v.mid);
+                                ATW[v.wk].push(v.mid);
+                                A[w2.key][u2].push(m2);
+                                ATW[w2.key].push(m2);
+                            }
+                        });
+                    });
+                });
+                (fait ? avoidRep : avoidReste).push(initDe(v.mid) + " (sem. " + v.lab + ")");
+            });
+        })();
         persistCfg();
         setTourMed(function (p) {
             var n = __assign({}, p);
@@ -4388,10 +4531,21 @@ function TourTab(_a) {
             L.push("✓ Surspécialités : l'idéal (" + minsLabel(idealMins) + ") est respecté chaque semaine.");
         if (lowCoroW.length > 0)
             L.push("⚠ Moins de " + cfgMinCoro + " coro disponibles (hors tour, hors absents) : sem. " + lowCoroW.join(", ") + ".");
-        if (best.avoidViol && best.avoidViol.length > 0)
-            L.push("⚠ Préférences 🚫 « pas de tour » non respectées : " + best.avoidViol.join(", ") + ".");
+        /* v10.164 : décompte des 🚫 relu sur l'affectation finale (voir la source) */
+        if (avoidReste.length > 0)
+            L.push("⚠ Préférences 🚫 « pas de tour » non respectées, sans échange possible : " + avoidReste.join(", ") + (avoidRep.length > 0 ? " — " + avoidRep.length + " autre(s) réparée(s) par échange à deux." : "."));
+        else if (avoidRep.length > 0)
+            L.push("✓ Préférences 🚫 « pas de tour » : toutes respectées — " + avoidRep.length + " réparée(s) par échange à deux (" + avoidRep.join(", ") + ").");
         else
             L.push("✓ Préférences 🚫 « pas de tour » : toutes respectées.");
+        if (best.sur4Viol && best.sur4Viol.length > 0)
+            L.push("⚠ 3 semaines de tour sur 4 : concession sur " + best.sur4Viol.join(", ") + " — sans elle la semaine restait incomplète. Jamais 3 semaines d'affilée.");
+        else
+            L.push("✓ Enchaînement : jamais 3 semaines de tour d'affilée, jamais 3 sur 4 — les 3 dernières semaines de la période précédente comprises.");
+        if (best.dblViol && best.dblViol.length > 0)
+            L.push("⚠ Semaines doublées non souhaitées (2 d'affilée sans préférence cochée) : " + best.dblViol.join(", ") + ".");
+        else
+            L.push("✓ Aucune semaine doublée imposée : les 2 semaines d'affilée ne vont qu'à ceux qui les demandent.");
         if (leftover.length > 0)
             L.push("⚠ N'ont pas reçu toutes leurs semaines (nombre restant entre parenthèses) : " + leftover.join(", ") + ".");
         else
@@ -4916,7 +5070,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159)."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
