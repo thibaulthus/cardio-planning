@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.165 — 03/09/2026";
+const APP_VERSION="v10.166 — 03/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -4212,6 +4212,31 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         (fait?avoidRep:avoidReste).push(initDe(v.mid)+" (sem. "+v.lab+")");
       });
     })();
+    /* ═══ v10.166 : TEMPS PARTIELS EN HC PENDANT LES VACANCES SCOLAIRES ═══
+       Passe finale, jamais bloquante. Sur une semaine de vacances (3 jours ouvrés au moins dans
+       le calendrier saisi dans Paramètres), un temps partiel posé en USIC est permuté avec un
+       médecin HC de la MÊME semaine : les quatre restent de tour, donc quotas, enchaînements,
+       souhaits et surspécialités ne bougent pas. On ne touche ni à un autre temps partiel, ni
+       à une semaine qui prolonge la même unité sur la semaine voisine (bloc de deux). */
+    const vacFait=[],vacReste=[];
+    (()=>{
+      const semVac=(wk)=>{const[vy,vm,vd]=wk.split("-").map(Number);let n=0;for(let i=0;i<5;i++){if(vacContient(new Date(vy,vm,vd+i)))n++;}return n>=3;};
+      const enUnite=(mid,i,u)=>{const wx=weeksT[i];if(!wx)return false;return ((best.assign[wx.key]||{})[u]||[]).map(String).includes(String(mid));};
+      const medDe=(mid)=>tourMeds.find(m=>String(m.id)===String(mid));
+      weeksT.forEach((w,i)=>{
+        if(!semVac(w.key))return;
+        const a=best.assign[w.key];if(!a)return;
+        (a.USIC||[]).slice().forEach(tp=>{
+          const mTP=medDe(tp);if(!mTP||!mTP.partTime)return;
+          if(enUnite(tp,i-1,"USIC")||enUnite(tp,i+1,"USIC"))return;
+          const x=(a.HC||[]).find(h=>{const mX=medDe(h);return !!mX&&!mX.partTime&&!enUnite(h,i-1,"HC")&&!enUnite(h,i+1,"HC");});
+          if(x===undefined){vacReste.push(mTP.init+" (sem. "+w.label+")");return;}
+          a.HC=a.HC.map(h=>h===x?tp:h);a.USIC=a.USIC.map(u=>u===tp?x:u);
+          if(best.hcCount&&best.usicCount){best.hcCount[tp]++;best.hcCount[x]--;best.usicCount[tp]--;best.usicCount[x]++;}
+          vacFait.push(mTP.init+" en HC, "+medDe(x).init+" en USIC (sem. "+w.label+")");
+        });
+      });
+    })();
     /* v10.165 : le décompte final est RELU sur l'affectation retenue — la réparation des
        semaines et la passe des souhaits 🚫 ont pu défaire ou refaire des binômes. */
     const thFin=thPenalites(weeksT,best.assign,thAlg,thBasc,jrIds);
@@ -4281,6 +4306,9 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     else L.push("✓ Binômes : depuis le "+intFmtD(thLo)+", chacun des "+thTot+" couples de tourneurs a passé au moins une semaine avec l'autre.");
     if(thFin.jr.length>0)L.push("⚠ Semaine de bascule d'interne confiée à un junior : "+thFin.jr.map(x5=>((tourMeds.filter(y5=>String(y5.id)===String(x5.split("|")[0]))[0]||{}).init||"?")+" (sem. "+x5.split("|")[1]+")").join(", ")+" — faute d'un sénior disponible ; le junior arrive précisément ce lundi-là.");
     else L.push("✓ Semaines de bascule d'interne : tenues par des séniors, et réparties entre ceux qui en ont fait le moins.");
+    /* v10.166 : temps partiels en HC pendant les vacances scolaires */
+    if(vacFait.length)L.push("✓ 🏖 Temps partiels en HC pendant les vacances scolaires : "+vacFait.join(" · ")+".");
+    if(vacReste.length)L.push("🏖 Resté(s) en USIC pendant les vacances scolaires, faute de permutation possible dans la semaine : "+vacReste.join(", ")+".");
     if(leftover.length>0)L.push("⚠ N'ont pas reçu toutes leurs semaines (nombre restant entre parenthèses) : "+leftover.join(", ")+".");
     else L.push("✓ Chacun a reçu son nombre de semaines.");
     if(actBloq.length>0)L.push("✋ Écartés certaines semaines par une activité déjà posée à la main dans le planning : "+actBloq.join(" · ")+".");
@@ -4874,7 +4902,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport. Depuis la v10.165 elle veille en plus à l'ÉQUITÉ DES BINÔMES : un binôme, ce sont les 2 médecins d'une même unité sur une même semaine, HC et USIC confondus — le décompte est commun. À égalité de charge, l'algorithme sert celui qui a le moins tourné avec le médecin déjà posé dans l'unité, et les 60 essais retiennent la répartition la mieux ventilée. Le bouton 🤝 Binômes, ouvert à tout le monde en lecture, montre le tableau croisé des semaines passées ensemble : un 0 en ambre est un couple jamais formé. Les SEMAINES DE BASCULE D'INTERNE — celles dont le lundi ouvre un semestre, dates prises dans l'onglet Équipe et jamais écrites en dur — sont réparties entre ceux qui en ont fait le moins, et confiées à un junior seulement en dernier recours, avec un ⚠ au rapport : le junior arrive précisément ce lundi-là. Le décompte porte sur une fenêtre glissante de deux ans, à partir de la date réglée dans Paramètres (par défaut le 02/11/2026), et ne décide jamais du NOMBRE de semaines dû à chacun."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport. Depuis la v10.165 elle veille en plus à l'ÉQUITÉ DES BINÔMES : un binôme, ce sont les 2 médecins d'une même unité sur une même semaine, HC et USIC confondus — le décompte est commun. À égalité de charge, l'algorithme sert celui qui a le moins tourné avec le médecin déjà posé dans l'unité, et les 60 essais retiennent la répartition la mieux ventilée. Le bouton 🤝 Binômes, ouvert à tout le monde en lecture, montre le tableau croisé des semaines passées ensemble : un 0 en ambre est un couple jamais formé. Les SEMAINES DE BASCULE D'INTERNE — celles dont le lundi ouvre un semestre, dates prises dans l'onglet Équipe et jamais écrites en dur — sont réparties entre ceux qui en ont fait le moins, et confiées à un junior seulement en dernier recours, avec un ⚠ au rapport : le junior arrive précisément ce lundi-là. Le décompte porte sur une fenêtre glissante de deux ans, à partir de la date réglée dans Paramètres (par défaut le 02/11/2026), et ne décide jamais du NOMBRE de semaines dû à chacun. Depuis la v10.166, le remplaçant junior d'un temps partiel en USIC est choisi sur le tour et le planning tels qu'ils sont à cet instant — jamais un junior déjà de tour cette semaine-là — et les journées de remplacement sont réparties entre les juniors, une journée comptant pour une : trois semaines, trois juniors, un jour chacun. Enfin, pendant les vacances scolaires (saisies dans Paramètres), un temps partiel posé en USIC est permuté avec un médecin HC de la même semaine quand c'est possible — jamais au prix d'une règle : si rien ne convient, il reste en USIC et le rapport le dit."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -9232,12 +9260,20 @@ function CardioPlanning(){
     if(offDows.length===0)return;
     const weekList=Array.isArray(weekKeyOrList)?weekKeyOrList:[weekKeyOrList];
     const juniors=medecins.filter(m=>m.statut==="junior"&&m.tourMed&&m.id!==medId);
-    // compteur de remplacements existants (entrées plan TOUR_USIC réelles) par junior — partagé entre toutes les semaines traitées
+    /* v10.166 : TOUT est lu sur l'état COURANT, par les pointeurs. Cette fonction est appelée
+       en différé après une répartition ou un échange ⇄, par une version d'elle-même fabriquée
+       AVANT : elle gardait en poche l'ancien tour et l'ancien planning, et jugeait « ce junior
+       est-il déjà de tour cette semaine ? » sur la période d'avant. */
+    const planC=planRef.current||{},tourC=tourMedRef.current||{};
+    /* compteur de remplacements existants par junior, compté par JOURNÉE — comme les nouveaux.
+       Compté par demi-journée (matin + après-midi = 2) contre 1 pour un nouveau, un junior tout
+       juste choisi restait « le moins chargé » et reprenait la semaine suivante. */
     const replCount={};juniors.forEach(j=>{replCount[j.id]=0;});
-    Object.keys(plan).forEach(k=>{
-      const dm2=plan[k]||{};
+    const joursVus={};
+    Object.keys(planC).forEach(k=>{
+      const dm2=planC[k]||{},jk=k.split("|")[0];
       juniors.forEach(j=>{
-        if(cellHasAny(dm2[j.id],["TOUR_USIC"]))replCount[j.id]++;
+        if(cellHasAny(dm2[j.id],["TOUR_USIC"])&&!joursVus[jk+"|"+j.id]){joursVus[jk+"|"+j.id]=1;replCount[j.id]++;}
       });
     });
     const newDerog={},planPatch={},choices=[];
@@ -9250,11 +9286,11 @@ function CardioPlanning(){
       newDerog[dk2]=medId;
       ["M","AM"].forEach(sl=>{planPatch[sk(dy,dm3,dd,sl)]=planPatch[sk(dy,dm3,dd,sl)]||{};planPatch[sk(dy,dm3,dd,sl)][medId]={acteId:"TP",salle:null,pt:1};});   /* v10.118 */
       // junior dispo ce jour : pas absent, pas déjà tourneur cette semaine
-      const wmW=tourMed[weekKey]||{HC:[],USIC:[]};
+      const wmW=tourC[weekKey]||{HC:[],USIC:[]};   /* v10.166 : le tour COURANT */
       const busyIds=[...(wmW.HC||[]),...(wmW.USIC||[])];
       const avail=juniors.filter(j=>{
         if(busyIds.includes(j.id))return false;
-        return !["M","AM"].some(sl=>cellHasAny((plan[sk(dy,dm3,dd,sl)]||{})[j.id],ABS_IDS.concat(["GARDE","REPOS_GARDE"])));
+        return !["M","AM"].some(sl=>cellHasAny((planC[sk(dy,dm3,dd,sl)]||{})[j.id],ABS_IDS.concat(["GARDE","REPOS_GARDE"])));   /* v10.166 */
       });
       const shuffled=avail.map(j=>({j,r:Math.random()})).sort((a,b)=>a.r-b.r).map(x=>x.j);
       shuffled.sort((a,b)=>replCount[a.id]-replCount[b.id]);
@@ -9279,7 +9315,7 @@ function CardioPlanning(){
       return next;
     });
     if(choices.length>0)toast("Temps partiel USIC : "+choices.join(" · "),"info");
-  },[medecins,plan,tourMed]);
+  },[medecins]);   /* v10.166 : plan et tour lus par pointeurs */
   const cleanTPForWeek=useCallback((medId,weekKey)=>{
     const med=medecins.find(m=>m.id===medId);
     if(!med||!med.partTime)return;
@@ -9504,6 +9540,7 @@ function CardioPlanning(){
   const [vUnlock,setVUnlock]=useState(false);
   const vRef=useRef({deb:verrouJ,passe:false,ed:false});
   const planRef=useRef(plan);planRef.current=plan;   /* v10.146 : lu par setEntry/addEntry pour juger la nature d'une écriture */
+  const tourMedRef=useRef(tourMed);tourMedRef.current=tourMed;   /* v10.166 : lu par applyTPForWeek — toujours le tour COURANT */
   vRef.current={deb:verrouJ,passe:isEdit&&vUnlock,ed:isEdit,arch:perArchivee,clos:perClose};
   /* un seul message par geste : les operations de masse appellent l'ecriture en boucle */
   const vTRef=useRef(0);
