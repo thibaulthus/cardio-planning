@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.164 — 03/09/2026";
+const APP_VERSION="v10.165 — 03/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -3508,7 +3508,7 @@ function AbsModal({medecins,onApply,onRemove,onClose,initMedId=null,initDate=nul
 /* ════════════════════════════════════════════════════════════
    MAIN APP
 ════════════════════════════════════════════════════════════ */
-function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,medecins,getEntries,isEdit:isEditIn,edReel,build,secrDif,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast}){
+function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg=null,medecins,getEntries,isEdit:isEditIn,edReel,build,secrDif,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast}){
   /* v10.159 : deux niveaux de droits dans la tuile Tour.
      — edReel (vrais éditeurs) : répartition automatique, 🗑 Retirer, rapport ;
      — isEdit (le geste MANUEL — attribution, échanges) : les éditeurs toujours,
@@ -3529,6 +3529,17 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
      partaient du 1er lundi >= 1er du mois et s'arretaient au dernier jour du dernier
      mois — juste tant qu'aucune extension ne deplacait une borne. */
   const weeksT=perWeeksList(perT.startY,perT.startM);
+  /* v10.165 : LE DÉCOMPTE — binômes déjà formés et semaines de bascule déjà faites, sur la
+     fenêtre glissante de deux ans. Deux lectures : `thTab` pour le tableau 🤝 (tout ce qui
+     est connu, période affichée comprise), `thAlg` pour la répartition automatique — les
+     semaines de la période en sont retirées, puisqu'elle va les réécrire entièrement. */
+  const thLo=thBorneBasse(tourHistDeb);
+  const thBasc=thBascules(intCfg,thLo,intDecal(intISO(new Date()),800));
+  const thExcl=(()=>{const o={};weeksT.forEach(w=>{o[w.key]=1;});return o;})();
+  const thTab=thCompte(thSemaines(tourHist,tourMed,tourHistDeb,null),thBasc);
+  const thAlg=thCompte(thSemaines(tourHist,tourMed,tourHistDeb,thExcl),thBasc);
+  const [binOpen,setBinOpen]=React.useState(false);
+  const [binPartis,setBinPartis]=React.useState(false);
   /* v10.128 : verrou des semaines passées (jugées sur leur vendredi, vSemBloque) */
   const wLock=(wk)=>!!vRef&&vSemBloque(vRef,wk);
   const wChk=(wk)=>{if(!vRef)return true;if(vSemBloque(vRef,wk)){if(vToast)vToast(false);return false;}if(vSemAvertit(vRef,wk)&&vToast)vToast(true);return true;};
@@ -3821,6 +3832,10 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     const weeksByConstraint=[...weeksT].sort((a,b)=>availCount[a.key]-availCount[b.key]);
 
     const isAvoid=(medId,wk4)=>!!((tourAvoid||{})[wk4]||{})[medId];
+    /* v10.165 : un junior arrive précisément le lundi d'une bascule — un binôme
+       entièrement neuf ce jour-là n'est pas souhaitable. Jamais interdit pour autant,
+       sinon la semaine resterait incomplète : simplement servi en dernier. */
+    const jrIds={};tourMeds.forEach(m=>{if((m.statut||"senior")==="junior")jrIds[String(m.id)]=1;});
     /* ═══ v10.164 : RÈGLES D'ENCHAÎNEMENT DU TOUR ═══
        Jamais 3 semaines de tour consécutives, jamais 3 dans une fenêtre glissante de 4.
        UN SEUL juge (semsDe / chaJuge / chaBloc / chaLegal, définis dans attempt car ils
@@ -3852,6 +3867,14 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       const hcCount={},usicCount={};tourMeds.forEach(m=>{hcCount[m.id]=0;usicCount[m.id]=0;});
       const assign={};weeksT.forEach(w=>{assign[w.key]={HC:[],USIC:[]};});
       const assignedThisWeek={};weeksT.forEach(w=>{assignedThisWeek[w.key]=[];});
+      /* v10.165 : compteurs VIVANTS de cet essai — l'historique, augmenté au fil des poses.
+         Ils ne servent qu'aux critères de tri ; les pénalités du score sont recalculées à
+         neuf en fin d'essai, quand plus rien ne bouge. */
+      const paires=Object.assign({},thAlg.P);
+      const bascN=Object.assign({},thAlg.B);
+      const thNote=(wk,unit,mid)=>{
+        (assign[wk][unit]||[]).forEach(x=>{if(String(x)!==String(mid)){const c=thPaireCle(x,mid);paires[c]=(paires[c]||0)+1;}});
+        if(thSemBasc(wk,thBasc))bascN[String(mid)]=(bascN[String(mid)]||0)+1;};
       const specOK=(wKey,extraAssigned,mns)=>{
         const busy=[...assignedThisWeek[wKey],...extraAssigned];
         // Séniors présents (présence majoritaire, fériés exclus — v10.156), indépendamment du tour
@@ -3902,6 +3925,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
           if(!specOK(w1.key,[m.id],idealMins)||!specOK(w2.key,[m.id],idealMins))continue;
           assign[w1.key][unit].push(m.id);assignedThisWeek[w1.key].push(m.id);
           assign[w2.key][unit].push(m.id);assignedThisWeek[w2.key].push(m.id);
+          thNote(w1.key,unit,m.id);thNote(w2.key,unit,m.id);   /* v10.165 */
           if(unit==="HC")hcCount[m.id]+=2;else usicCount[m.id]+=2;
           quota[m.id]-=2;
           return true;
@@ -3934,6 +3958,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                   incomplètes en effectif juste, et une semaine incomplète se comble à la
                   main de la même façon. Les 3 semaines d'AFFILÉE ne cèdent jamais. */
             const jg={},jg3={},iW=idxOfW[w.key];
+            const bascW=thSemBasc(w.key,thBasc);   /* v10.165 : semaine de bascule d'interne */
             baseC.forEach(m2=>{jg[m2.id]=chaJuge(m2.id,iW,true);jg3[m2.id]=chaJuge(m2.id,iW,false);});
             const prefU=(m2)=>unit==="HC"?!!cfgPref2HC[m2.id]:!!cfgPref2USIC[m2.id];
             const prefTout=(m2)=>!!cfgPref2HC[m2.id]||!!cfgPref2USIC[m2.id];
@@ -3983,8 +4008,29 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
             cands.sort((a,b)=>{
               const wA=((tourWish||{})[w.key]||{})[a.id]?0:1,wB=((tourWish||{})[w.key]||{})[b.id]?0:1;
               if(wA!==wB)return wA-wB;
-              const tA=quota[a.id]/dispoDe[a.id],tB=quota[b.id]/dispoDe[b.id];
+              /* v10.165 : sur une semaine de bascule, un sénior avant un junior */
+              if(bascW){
+                const jA=jrIds[String(a.id)]?1:0,jB=jrIds[String(b.id)]?1:0;
+                if(jA!==jB)return jA-jB;
+              }
+              /* v10.165 : la tension est ARRONDIE AU DIXIÈME. C'est parce qu'elle était un
+                 nombre à virgule que les critères suivants ne tombaient jamais à égalité —
+                 et que les mêmes noms se retrouvaient toujours ensemble. */
+              const tA=Math.round(10*quota[a.id]/dispoDe[a.id])/10,tB=Math.round(10*quota[b.id]/dispoDe[b.id])/10;
               if(tA!==tB)return tB-tA;
+              /* v10.165 : à égalité, celui qui a fait le moins de semaines de bascule */
+              if(bascW){
+                const bA=bascN[String(a.id)]||0,bB=bascN[String(b.id)]||0;
+                if(bA!==bB)return bA-bB;
+              }
+              /* v10.165 : puis celui qui a le moins tourné avec le médecin déjà posé dans
+                 cette unité cette semaine — le critère qui ventile les binômes. */
+              const dejaU=assign[w.key][unit]||[];
+              if(dejaU.length){
+                const pA=dejaU.reduce((s,x)=>s+(paires[thPaireCle(x,a.id)]||0),0);
+                const pB=dejaU.reduce((s,x)=>s+(paires[thPaireCle(x,b.id)]||0),0);
+                if(pA!==pB)return pA-pB;
+              }
               if(quota[b.id]!==quota[a.id])return quota[b.id]-quota[a.id];
               // Surspécialistes d'abord : consommer leur quota tant que la semaine a de la marge
               const spA=a.surSpec&&(idealMins[a.surSpec]||0)>0?0:1;
@@ -4000,6 +4046,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
             if(rang===3)dblViol.push(m.init+" (sem. "+w.label+")");        /* v10.164 : 2 semaines subies */
             if(rang===4)sur4Viol.push(m.init+" (sem. "+w.label+")");       /* v10.164 : concession du 3-sur-4 */
             assign[w.key][unit].push(m.id);assignedThisWeek[w.key].push(m.id);
+            thNote(w.key,unit,m.id);   /* v10.165 */
             if(unit==="HC")hcCount[m.id]++;else usicCount[m.id]++;
             quota[m.id]--;
           }
@@ -4011,8 +4058,13 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       const imbalance=tourMeds.reduce((s,m)=>s+Math.abs(hcCount[m.id]-usicCount[m.id]),0);
       /* v10.164 : les 60 essais préfèrent désormais aussi les répartitions qui imposent le
          moins de semaines doublées et le moins de concessions au 3-sur-4. */
-      const score=unfilled*1000+relaxedWeeks.length*100+avoidViol.length*40+sur4Viol.length*30+dblViol.length*15+leftoverTotal*10+imbalance;
-      return{assign,quota,unfilled,score,hcCount,usicCount,assignedThisWeek,specOK,relaxedWeeks,avoidViol,dblViol,sur4Viol,chaLegal};
+      /* v10.165 : deux termes d'équité, pour que les 60 essais retiennent la répartition
+         la mieux ventilée. Poids volontairement modestes : ils départagent des
+         répartitions par ailleurs équivalentes, jamais au prix d'une semaine
+         incomplète (1000) ni d'une surspécialité relâchée (100). */
+      const thP=thPenalites(weeksT,assign,thAlg,thBasc,jrIds);
+      const score=unfilled*1000+relaxedWeeks.length*100+avoidViol.length*40+sur4Viol.length*30+dblViol.length*15+leftoverTotal*10+imbalance+thP.bin*2+thP.bas*5;
+      return{assign,quota,unfilled,score,hcCount,usicCount,assignedThisWeek,specOK,relaxedWeeks,avoidViol,dblViol,sur4Viol,chaLegal,thP};
     };
 
     // ═══ Paliers de relaxation progressive ═══
@@ -4098,7 +4150,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       r.unfilled=weeksT.filter(w=>assign[w.key].HC.length<2||assign[w.key].USIC.length<2).length;
       const leftoverTotal=tourMeds.reduce((s,m)=>s+(quota[m.id]||0),0);
       const imbalance=tourMeds.reduce((s,m)=>s+Math.abs(hcCount[m.id]-usicCount[m.id]),0);
-      r.score=r.unfilled*1000+relaxedWeeks.length*100+sur4Viol.length*30+(r.dblViol||[]).length*15+leftoverTotal*10+imbalance;   /* v10.164 */
+      r.thP=thPenalites(weeksT,assign,thAlg,thBasc,jrIds);   /* v10.165 : la réparation a déplacé des médecins */
+      r.score=r.unfilled*1000+relaxedWeeks.length*100+sur4Viol.length*30+(r.dblViol||[]).length*15+leftoverTotal*10+imbalance+r.thP.bin*2+r.thP.bas*5;   /* v10.164, v10.165 */
       return r;
     };
     let best=null,bestStage=stages[0];
@@ -4159,6 +4212,9 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         (fait?avoidRep:avoidReste).push(initDe(v.mid)+" (sem. "+v.lab+")");
       });
     })();
+    /* v10.165 : le décompte final est RELU sur l'affectation retenue — la réparation des
+       semaines et la passe des souhaits 🚫 ont pu défaire ou refaire des binômes. */
+    const thFin=thPenalites(weeksT,best.assign,thAlg,thBasc,jrIds);
     persistCfg();
     setTourMed(p=>{const n={...p};weeksT.forEach(w=>{n[w.key]=best.assign[w.key];});
       // Purge : dérogations journalières, remplacements Tour et TP de la période — repartir propre
@@ -4217,6 +4273,14 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     else L.push("✓ Enchaînement : jamais 3 semaines de tour d'affilée, jamais 3 sur 4 — les 3 dernières semaines de la période précédente comprises.");
     if(best.dblViol&&best.dblViol.length>0)L.push("⚠ Semaines doublées non souhaitées (2 d'affilée sans préférence cochée) : "+best.dblViol.join(", ")+".");
     else L.push("✓ Aucune semaine doublée imposée : les 2 semaines d'affilée ne vont qu'à ceux qui les demandent.");
+    /* v10.165 : équité des binômes et des semaines de bascule */
+    const thAct=tourMeds.filter(m=>!cfgExcl[m.id]);
+    let thZero=0,thTot=0;
+    for(let i5=0;i5<thAct.length;i5++)for(let j5=i5+1;j5<thAct.length;j5++){thTot++;if(!thFin.P[thPaireCle(thAct[i5].id,thAct[j5].id)])thZero++;}
+    if(thZero>0)L.push("🤝 Binômes jamais formés depuis le "+intFmtD(thLo)+" : "+thZero+" sur "+thTot+" — le tableau 🤝 les montre en un coup d'œil ; ils se combleront au fil des périodes.");
+    else L.push("✓ Binômes : depuis le "+intFmtD(thLo)+", chacun des "+thTot+" couples de tourneurs a passé au moins une semaine avec l'autre.");
+    if(thFin.jr.length>0)L.push("⚠ Semaine de bascule d'interne confiée à un junior : "+thFin.jr.map(x5=>((tourMeds.filter(y5=>String(y5.id)===String(x5.split("|")[0]))[0]||{}).init||"?")+" (sem. "+x5.split("|")[1]+")").join(", ")+" — faute d'un sénior disponible ; le junior arrive précisément ce lundi-là.");
+    else L.push("✓ Semaines de bascule d'interne : tenues par des séniors, et réparties entre ceux qui en ont fait le moins.");
     if(leftover.length>0)L.push("⚠ N'ont pas reçu toutes leurs semaines (nombre restant entre parenthèses) : "+leftover.join(", ")+".");
     else L.push("✓ Chacun a reçu son nombre de semaines.");
     if(actBloq.length>0)L.push("✋ Écartés certaines semaines par une activité déjà posée à la main dans le planning : "+actBloq.join(" · ")+".");
@@ -4250,6 +4314,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
             setLastReport(null);
             toast("Attributions de la période supprimées — remplaçants juniors et TP de dérogation retirés","info");
           }} title="Effacer toutes les attributions de la période" style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}}>🗑 Retirer</button>}
+          {/* v10.165 : ouvert à tous les niveaux — c'est une lecture, pas un geste */}
+          <button onClick={()=>setBinOpen(true)} title="Qui a tourné avec qui — semaines passées ensemble et semaines de bascule d'interne" style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>🤝 Binômes</button>
       </div>
       {edReel&&lastReport&&<div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 12px",marginBottom:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",fontSize:11,color:"var(--txt2)"}}>
         <span style={{flexShrink:0}}>ℹ️</span>
@@ -4365,6 +4431,51 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         );
       })}
 
+      {/* v10.165 : tableau des binômes — lecture seule, ouvert à tous les niveaux */}
+      {binOpen&&(
+        <Ov onClose={()=>setBinOpen(false)}>
+          <div style={{...S.modal,maxWidth:840,maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={S.mTit2}>🤝 Qui a tourné avec qui</div>
+              <button onClick={()=>setBinOpen(false)} style={S.xBtn}>×</button>
+            </div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>{"Nombre de semaines passées dans la même unité, HC et USIC confondus — du "+intFmtD(thLo)+" au "+intFmtD(thTab.haut||thLo)+". Un 0 en ambre signale un binôme jamais formé. La colonne 🎓 compte les semaines de bascule d'interne, celles dont le lundi ouvre un semestre."}</div>
+            <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--txt2)",marginBottom:8,cursor:"pointer"}}>
+              <input type="checkbox" checked={binPartis} onChange={e=>setBinPartis(e.target.checked)} style={{width:14,height:14,cursor:"pointer"}}/>
+              {"Afficher aussi les médecins partis"}
+            </label>
+            {(()=>{
+              const LB=medecins.filter(mz=>(mz.role||"medecin")==="medecin"&&mz.tourMed&&(binPartis||!medParti(mz)));
+              if(LB.length<2)return <div style={{fontSize:11,color:"var(--txt3)"}}>{"Il faut au moins deux tourneurs pour former un binôme."}</div>;
+              return(
+                <div style={{overflowX:"auto",border:"1px solid var(--border)",borderRadius:8}}>
+                  <table style={{borderCollapse:"collapse",fontSize:11}}>
+                    <thead>
+                      <tr>
+                        <th style={{...S.thFix,position:"sticky",left:0,top:0,zIndex:30,minWidth:54,textAlign:"left",padding:"5px 8px"}}>{""}</th>
+                        {LB.map(mb=><th key={"bh"+mb.id} style={{...S.thFix,padding:"5px 6px",minWidth:34,fontSize:10,color:mb.color}}>{mb.init}</th>)}
+                        <th style={{...S.thFix,padding:"5px 6px",minWidth:34,fontSize:10}}>{"🎓"}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {LB.map((ma,ia)=>(
+                        <tr key={"br"+ma.id} style={{borderTop:"1px solid var(--border2)"}}>
+                          <td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,padding:"4px 8px",fontWeight:800,color:ma.color,background:"var(--td-fix)",whiteSpace:"nowrap"}}>{ma.init+(medParti(ma)?" 🚪":"")}</td>
+                          {LB.map((mb,ib)=>{
+                            const nb=thTab.P[thPaireCle(ma.id,mb.id)]||0;
+                            const vide=ib>=ia;
+                            return <td key={"bc"+ma.id+"-"+mb.id} style={{padding:"4px 6px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:(!vide&&nb===0)?800:600,color:vide?"var(--txt3)":(nb===0?"#b45309":"var(--txt)"),background:vide?"var(--bg2)":(nb===0?"rgba(227,179,65,.22)":"transparent")}}>{vide?(ib===ia?"—":""):String(nb)}</td>;
+                          })}
+                          <td style={{padding:"4px 6px",textAlign:"center",fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"#1d4ed8"}}>{String(thTab.B[String(ma.id)]||0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>);
+            })()}
+          </div>
+        </Ov>
+      )}
       {/* Modale d'échange */}
       {swapOpen&&(
         <Ov onClose={()=>setSwapOpen(false)}>
@@ -4763,7 +4874,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport. Depuis la v10.165 elle veille en plus à l'ÉQUITÉ DES BINÔMES : un binôme, ce sont les 2 médecins d'une même unité sur une même semaine, HC et USIC confondus — le décompte est commun. À égalité de charge, l'algorithme sert celui qui a le moins tourné avec le médecin déjà posé dans l'unité, et les 60 essais retiennent la répartition la mieux ventilée. Le bouton 🤝 Binômes, ouvert à tout le monde en lecture, montre le tableau croisé des semaines passées ensemble : un 0 en ambre est un couple jamais formé. Les SEMAINES DE BASCULE D'INTERNE — celles dont le lundi ouvre un semestre, dates prises dans l'onglet Équipe et jamais écrites en dur — sont réparties entre ceux qui en ont fait le moins, et confiées à un junior seulement en dernier recours, avec un ⚠ au rapport : le junior arrive précisément ce lundi-là. Le décompte porte sur une fenêtre glissante de deux ans, à partir de la date réglée dans Paramètres (par défaut le 02/11/2026), et ne décide jamais du NOMBRE de semaines dû à chacun."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
@@ -4858,7 +4969,7 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
   HP({children:[HE("b",null,"Les périodes à venir")," (v10.146) : fermées à tous sauf l'éditeur, badge « 🚧 En préparation ». Dès qu'il ouvre la demande de congés dans Construire, badge « 🏖️ Congés ouverts » : chacun pose congés, FMC et préférences, et rien d'autre, jusqu'à ce qu'il referme la demande. À la diffusion du planning, la période s'ouvre comme la période en cours. L'éditeur peut déroger pour un profil dans Paramètres. Les semaines de tour, elles, restent invisibles tant que l'éditeur n'a pas validé le tour dans Construire (v10.158)."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
-  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période."]}),
+  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période. Une exception voulue : le décompte des binômes de tour. Au moment de l'archivage, les semaines de tour de la période sont recopiées dans une petite ardoise permanente qui, elle, ne part jamais avec une période — sans quoi le tableau 🤝 repartirait de zéro à chaque archivage. Elle se purge d'elle-même au-delà de deux ans."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait. Depuis la v10.128, les journées verrouillées de la plage choisie sont sautées, comme pour toute opération de période — le bilan les compte à part (🔒), et le message final les rappelle."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
@@ -7982,6 +8093,96 @@ const AR_LU=AR_FAM.filter(f=>f.lu).map(f=>f.ch);
    juniors (djs, aplatis en "medId|deb" pour que la fusion à un niveau d'arFusion
    reste correcte). Relues comme AR_LU, jamais purgeables par clé de jour. */
 const AR_XTRA=["sems","djs","meds"];   /* v10.151 : + l'annuaire (fiches allégées) */
+
+/* ═══════════ v10.165 — ARDOISE DU TOUR, BINÔMES ET SEMAINES DE BASCULE ═══════════
+   `tourHist` est une ARDOISE PERMANENTE : à l'archivage, les semaines de tour de la
+   période partante y sont recopiées AVANT que la famille tourMed d'AR_FAM ne les
+   retire des données actives. Elle est donc VOLONTAIREMENT ABSENTE d'AR_FAM ci-dessus
+   — une famille archivable disparaîtrait avec la période qu'elle a justement pour rôle
+   de survivre. Sa purge est glissante : deux ans, jamais avant le départ du décompte
+   réglé dans Paramètres. Comme elle se nourrit de tourMed, les attributions faites à la
+   main et les échanges ⇄ y comptent au même titre que la répartition automatique.
+   Le décompte ne décide que d'AVEC QUI l'on tourne : il ne touche jamais au nombre de
+   semaines dû à chacun.
+   Écrit en ES5 pur : texte identique dans les deux fichiers. */
+var TH_DEB_DEF="2026-11-02";   /* départ par défaut : un lundi, premier lundi de la période nov-févr */
+/* clé de semaine (mois technique, sans zéro de tête) -> date claire comparable */
+function thWkIso(k){var p=String(k).split("-");
+  return p.length===3?intISO2(+p[0],+p[1],+p[2]):"";}
+/* borne basse réellement couverte : la fenêtre glisse sur deux ans, sans jamais remonter
+   avant le départ réglé — avant lui le tour était un essai, il ne prouve rien. */
+function thBorneBasse(deb){var d=String(deb||TH_DEB_DEF);
+  var g=intDecal(intISO(new Date()),-730);
+  return g>d?g:d;}
+/* les semaines du décompte : ardoise + tour vivant (le vivant gagne, mêmes clés), dans
+   la fenêtre, moins les semaines exclues — celles qu'une répartition va réécrire. */
+function thSemaines(hist,vivant,deb,excl){
+  var lo=thBorneBasse(deb),out={};
+  var pose=function(src){Object.keys(src||{}).forEach(function(k){
+    var iso=thWkIso(k);
+    if(!iso||iso<lo)return;
+    if(excl&&excl[k])return;
+    var w=src[k]||{};
+    out[k]={HC:(w.HC||[]).slice(),USIC:(w.USIC||[]).slice()};});};
+  pose(hist);pose(vivant);
+  return out;}
+/* une paire, toujours écrite dans le même sens : le décompte est COMMUN aux deux unités
+   — une semaine ensemble est une semaine ensemble, en HC comme en USIC. */
+function thPaireCle(a,b){var x=String(a),y=String(b);return x<y?x+"|"+y:y+"|"+x;}
+/* la semaine « difficile » : celle dont le lundi couvre un début de semestre d'interne */
+function thSemBasc(k,basc){var iso=thWkIso(k);if(!iso)return false;
+  var f=intDecal(iso,6),i;
+  for(i=0;i<(basc||[]).length;i++)if(basc[i]>=iso&&basc[i]<=f)return true;
+  return false;}
+function thEcartJ(a,b){var p=String(a).split("-"),q=String(b).split("-");
+  return Math.round(Math.abs(new Date(+p[0],+p[1]-1,+p[2])-new Date(+q[0],+q[1]-1,+q[2]))/86400000);}
+/* LES DATES DE BASCULE, jamais écrites en dur : d'abord celles que porte intCfg.sems via
+   djSemsList — la même liste que les internes et les Docteurs Juniors, bascule déplacée à
+   la main comprise ; puis, pour la part de fenêtre antérieure au plus ancien semestre
+   enregistré, le repli par la règle (2 mai et 2 novembre reportés au lundi). Une date de
+   règle à moins de 45 jours d'une date déjà retenue est ignorée : une bascule déplacée ne
+   doit pas produire DEUX semaines difficiles. */
+function thBascules(intCfg,lo,hi){
+  var out=[],l=djSemsList(intCfg,hi),cand=[],i,j,y,pres;
+  for(i=0;i<l.length;i++)if(l[i].deb>=lo&&l[i].deb<=hi)out.push(l[i].deb);
+  for(y=(+String(lo).slice(0,4))-1;y<=(+String(hi).slice(0,4))+1;y++){cand.push(intPrise(y,5));cand.push(intPrise(y,11));}
+  for(i=0;i<cand.length;i++){
+    if(cand[i]<lo||cand[i]>hi)continue;
+    pres=false;
+    for(j=0;j<out.length;j++)if(thEcartJ(out[j],cand[i])<=45)pres=true;
+    if(!pres)out.push(cand[i]);}
+  out.sort();
+  return out;}
+/* le décompte lui-même : paires formées, semaines de bascule par médecin, borne haute
+   réellement atteinte (celle qu'annonce l'en-tête du tableau 🤝). */
+function thCompte(sems,basc){
+  var P={},B={},haut="";
+  Object.keys(sems||{}).forEach(function(k){
+    var iso=thWkIso(k);if(!iso)return;
+    if(iso>haut)haut=iso;
+    var w=sems[k]||{},bs=thSemBasc(k,basc),tous=[],l,c,u,i,j;
+    for(u=0;u<2;u++){l=(u===0?w.HC:w.USIC)||[];
+      for(i=0;i<l.length;i++){tous.push(l[i]);
+        for(j=i+1;j<l.length;j++){c=thPaireCle(l[i],l[j]);P[c]=(P[c]||0)+1;}}}
+    if(bs)for(i=0;i<tous.length;i++)B[String(tous[i])]=(B[String(tous[i])]||0)+1;});
+  return {P:P,B:B,haut:haut};}
+/* PÉNALITÉS D'ÉQUITÉ d'une affectation, recalculées À NEUF et jamais tenues à jour au fil
+   des poses : la réparation des semaines incomplètes et la passe des souhaits 🚫 déplacent
+   des médecins longtemps après le tirage. Pour chaque binôme formé, le nombre de fois
+   qu'il s'était DÉJÀ formé ; pour chaque pose sur une semaine de bascule, le nombre de
+   bascules déjà faites, un junior comptant lourd. Tout vaut zéro quand chaque binôme est
+   neuf : le raccourci « score parfait, on arrête les essais » reste donc vivant. */
+function thPenalites(weeksT,assign,base,basc,jrIds){
+  var P=Object.assign({},base.P),B=Object.assign({},base.B),bin=0,bas=0,jr=[];
+  weeksT.forEach(function(w){
+    var a=assign[w.key]||{},bs=thSemBasc(w.key,basc),tous=[],l,c,k2,u,i,j;
+    for(u=0;u<2;u++){l=(u===0?a.HC:a.USIC)||[];
+      for(i=0;i<l.length;i++){tous.push(l[i]);
+        for(j=i+1;j<l.length;j++){c=thPaireCle(l[i],l[j]);bin+=(P[c]||0);P[c]=(P[c]||0)+1;}}}
+    if(bs)for(i=0;i<tous.length;i++){k2=String(tous[i]);
+      bas+=(B[k2]||0);B[k2]=(B[k2]||0)+1;
+      if(jrIds&&jrIds[k2]){bas+=10;jr.push(k2+"|"+w.label);}}});
+  return {bin:bin,bas:bas,jr:jr,P:P,B:B};}
 /* Copie, AVANT le retrait de la v10.88, les semestres ENTIÈREMENT clos et les noms de
    juniors correspondants dans l'annexe de CHAQUE période archivée qu'ils recouvrent
    (un semestre chevauche deux périodes : le consulter doit marcher depuis chacune).
@@ -8322,6 +8523,8 @@ function CardioPlanning(){
   const [csActsGlobal,setCsActsGlobal]=useState(["CS_CHL","CS_CHB","DOBU","DOBU_CHB","ETO_CHL","PM_CS","DEFIB_CS","RYTHMO_CHB"]); // activités proposables dans l'onglet Reports (réglé dans Paramètres)
   const [tourDerog,setTourDerog]=useState({});   // {dateKey:{medId:true}} affecté au tour cette semaine mais ne tourne PAS ce jour
   const [tourPtOte,setTourPtOte]=useState({});   /* v10.155 : témoin {weekKey:{medId:true}} — la prise du tour a réellement retiré des cases de planning type (ou TP) à ce médecin cette semaine-là ; le retrait ne repeint que si le témoin existe */
+  const [tourHist,setTourHist]=useState({});   /* v10.165 : ARDOISE des semaines de tour archivées — même forme que tourMed. Hors AR_FAM : elle doit survivre à l'archivage qui la nourrit. */
+  const [tourHistDeb,setTourHistDeb]=useState(TH_DEB_DEF);   /* v10.165 : départ du décompte des binômes, réglé dans Paramètres */
   const [tourReport,setTourReport]=useState(null); // rapport persistant de la dernière répartition auto du tour
   const [astReport,setAstReport]=useState(null);
   /* v10.35 : sauvegarde sur SON ordinateur. Tout est LOCAL a l'appareil
@@ -8697,6 +8900,8 @@ function CardioPlanning(){
           if(data.csActsGlobal)setCsActsGlobal(JSON.parse(data.csActsGlobal));
           if(data.tourDerog)setTourDerog(JSON.parse(data.tourDerog));
           if(data.tourPtOte)setTourPtOte(JSON.parse(data.tourPtOte));   /* v10.155 */
+          if(data.tourHist)setTourHist(JSON.parse(data.tourHist));   /* v10.165 */
+          if(data.tourHistDeb)setTourHistDeb(data.tourHistDeb);   /* v10.165 */
           if(data.tourReport!==undefined&&data.tourReport!=="")setTourReport(data.tourReport);
           if(data.astReport!==undefined&&data.astReport!=="")setAstReport(data.astReport);
           /* v9.89 : le champ ABSENT signifie « jamais configuré » (on déduit alors les
@@ -9156,6 +9361,8 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({csActsGlobal:JSON.stringify(csActsGlobal)});},[csActsGlobal]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourDerog:JSON.stringify(tourDerog)});},[tourDerog]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourPtOte:JSON.stringify(tourPtOte)});},[tourPtOte]);   /* v10.155 */
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourHist:JSON.stringify(tourHist)});},[tourHist]);   /* v10.165 */
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourHistDeb:tourHistDeb||TH_DEB_DEF});},[tourHistDeb]);   /* v10.165 */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourReport:tourReport||""});},[tourReport]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astReport:astReport||""});},[astReport]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleReg:JSON.stringify(salleReg)});},[salleReg]);
@@ -10791,7 +10998,7 @@ function CardioPlanning(){
     window.location.reload();};
   const verRetablir=()=>{if(!window.confirm("Déclarer CETTE version ("+APP_VERSION+") comme version en service ?\n\nÀ n'utiliser qu'après un retour volontaire à une version antérieure : toutes les copies plus récentes passeront à leur tour en lecture seule."))return;
     if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
-  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast};
+  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast};
   const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
@@ -11756,6 +11963,15 @@ header::-webkit-scrollbar { display: none; }
               </div>
               <div style={{fontSize:9,color:"var(--txt3)",marginTop:5}}>Utilisées dans la distribution du tour (tuile 2 de Construire) pour la surspécialité de chaque praticien et le décompte des disponibles.</div>
             </div>
+            {/* v10.165 : départ du décompte des binômes — réglable, jamais en dur dans le code */}
+            <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+              <div style={{fontSize:11,color:"var(--txt2)",fontWeight:700,marginBottom:6}}>{"🤝 Équité des binômes — départ du décompte"}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <input type="date" value={tourHistDeb||TH_DEB_DEF} onChange={e=>setTourHistDeb(e.target.value||TH_DEB_DEF)} style={{...S.fi,width:160}}/>
+                <button onClick={()=>setTourHistDeb(TH_DEB_DEF)} style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"}}>{"Date par défaut"}</button>
+              </div>
+              <div style={{fontSize:9,color:"var(--txt3)",marginTop:5}}>{"Le tableau 🤝 et la répartition automatique ne comptent rien avant cette date : les tours antérieurs étaient un essai. La fenêtre glisse ensuite sur deux ans. Ce décompte ne décide que d'AVEC QUI l'on tourne — jamais du nombre de semaines dû à chacun."}</div>
+            </div>
           </div>}
 
           <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]}/>
@@ -11945,7 +12161,7 @@ header::-webkit-scrollbar { display: none; }
                 </div>
                 {docDet&&(()=>{ /* v10.101 : le détail du poids, par famille de données */
                   const EQ="Équipe & internes",AC="Activités & salles",TO="Tour médical",SO="Souhaits ⭐🚫",AS="Astreinte",RE="Reports";
-                  const FAMN={planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2:EQ,medecinsV2Order:EQ,medecins:EQ,intCfg:EQ,medPins:EQ,actesV2:AC,actesV2Order:AC,actes:AC,salleReg:AC,tourMed:TO,tourDerog:TO,tourPtOte:TO,tourMins:TO,tourMinsHard:TO,tourCfg:TO,tourReport:TO,tourWish:SO,tourAvoid:SO,gardeWish:SO,gardeAvoid:SO,astreinte:AS,astReport:AS,notes:"Notes",build:"Construire",csRep:RE,csBlanches:RE,csActsSel:RE,csActsGlobal:RE,journal:"Journal"};
+                  const FAMN={planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2:EQ,medecinsV2Order:EQ,medecins:EQ,intCfg:EQ,medPins:EQ,actesV2:AC,actesV2Order:AC,actes:AC,salleReg:AC,tourMed:TO,tourDerog:TO,tourPtOte:TO,tourHist:TO,tourHistDeb:TO,tourMins:TO,tourMinsHard:TO,tourCfg:TO,tourReport:TO,tourWish:SO,tourAvoid:SO,gardeWish:SO,gardeAvoid:SO,astreinte:AS,astReport:AS,notes:"Notes",build:"Construire",csRep:RE,csBlanches:RE,csActsSel:RE,csActsGlobal:RE,journal:"Journal"};
                   const g={};Object.keys(docDet).forEach(k=>{const f=FAMN[k]||"Réglages divers";g[f]=(g[f]||0)+docDet[k];});
                   const rows=Object.keys(g).map(f=>({f,b:g[f]})).sort((a,b)=>b.b-a.b);
                   return <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
@@ -12032,6 +12248,8 @@ header::-webkit-scrollbar { display: none; }
                   if(data.actes)setActes(data.actes);
                   if(data.tourDerog)setTourDerog(data.tourDerog);
                   if(data.tourPtOte)setTourPtOte(data.tourPtOte);   /* v10.155 */
+                  if(data.tourHist)setTourHist(data.tourHist);   /* v10.165 */
+                  if(data.tourHistDeb)setTourHistDeb(data.tourHistDeb);   /* v10.165 */
                   if(data.salleReg)setSalleReg(data.salleReg);
                   setImpWait(null);toast("Sauvegarde restaurée");
                 }}>↩ Restaurer</button>
@@ -12106,6 +12324,16 @@ header::-webkit-scrollbar { display: none; }
                    reposant la valeur calculée au rendu — le serveur a pu livrer des
                    modifications entre l'affichage et le clic (leçon v10.3). */
                 const okP=(pid)=>!!pid&&list.indexOf(pid)>=0;
+                /* v10.165 : L'ARDOISE D'ABORD. Les semaines de tour des périodes archivées
+                   sont recopiées ici AVANT qu'AR_FAM ne les retire, sinon le décompte des
+                   binômes perdrait tout à chaque archivage. Purge glissante dans la foulée :
+                   ce qui précède la fenêtre de deux ans s'en va. */
+                setTourHist(o=>{
+                  const n3=Object.assign({},o||{});
+                  Object.keys(tourMed||{}).forEach(k=>{const pid=arPerTechSem(k);if(pid&&list.indexOf(pid)>=0)n3[k]=tourMed[k];});
+                  const lo3=thBorneBasse(tourHistDeb),g3={};
+                  Object.keys(n3).forEach(k=>{if(thWkIso(k)>=lo3)g3[k]=n3[k];});
+                  return g3;});
                 setTourMed(o=>arPurge(o,arPerTechSem,okP));
                 setTourDerog(o=>arPurge(o,arPerClair,okP));
                 setTourPtOte(o=>arPurge(o,arPerTechSem,okP));   /* v10.155 */
