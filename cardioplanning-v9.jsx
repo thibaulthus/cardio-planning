@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.166 — 03/09/2026";
+const APP_VERSION="v10.167 — 04/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -3747,6 +3747,21 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
   const [cfgWeeks,setCfgWeeks]=React.useState({}); // {medId: nWeeks}
   const [cfgPref2HC,setCfgPref2HC]=React.useState({}); // {medId: bool}
   const [cfgPref2USIC,setCfgPref2USIC]=React.useState({}); // {medId: bool}
+  /* v10.167 : SEMAINES À ÉVITER DANS UNE UNITÉ (garde alternée). Réglage de la modale ⚙️,
+     période par période : l'unité évitée (cfgEvitU) et les semaines concernées (cfgEvitW, par
+     clé de lundi). Jamais une interdiction — un tri, un rattrapage, un avertissement. */
+  const [cfgEvitU,setCfgEvitU]=React.useState({}); // {medId:"USIC"|"HC"}
+  const [cfgEvitW,setCfgEvitW]=React.useState({}); // {medId:{weekKey:1}}
+  const evitCfg=(eu,ew,medId,wk,unit)=>!!eu&&eu[medId]===unit&&!!((ew||{})[medId]||{})[wk];
+  const evitSaved=(medId,wk,unit)=>evitCfg((savedCfg||{}).evitU,(savedCfg||{}).evitW,medId,wk,unit);
+  const evitRythme=(medId,dep)=>{const o={};weeksT.forEach((w2,i2)=>{if(i2%2===dep)o[w2.key]=1;});setCfgEvitW(p=>({...p,[medId]:o}));};
+  const evitBascule=(medId,idx)=>{setCfgEvitW(p=>{const cur={...((p||{})[medId]||{})};weeksT.forEach((w2,i2)=>{if(i2>=idx){if(cur[w2.key])delete cur[w2.key];else cur[w2.key]=1;}});return{...p,[medId]:cur};});};
+  const setEvitUnit=(medId,u)=>{
+    const avait=!!cfgEvitU[medId];
+    setCfgEvitU(p=>{const n={...p};if(u)n[medId]=u;else delete n[medId];return n;});
+    if(u&&!avait)evitRythme(medId,0);   /* première ouverture : une sur deux dès le 1er lundi */
+    if(!u)setCfgEvitW(p=>{const n={...p};delete n[medId];return n;});
+  };
   const totalSlots=weeksT.length*4; // 2 HC + 2 USIC per week
   const activeMeds=tourMeds.filter(m=>!cfgExcl[m.id]);
   const nominalW=activeMeds.length>0?Math.ceil(totalSlots/activeMeds.length):0;
@@ -3764,6 +3779,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       setCfgExcl(savedCfg.excl||{});
       setCfgPref2HC(savedCfg.p2hc||{});
       setCfgPref2USIC(savedCfg.p2usic||{});
+      setCfgEvitU(savedCfg.evitU||{});setCfgEvitW(savedCfg.evitW||{});   /* v10.167 */
     }else{
       const ph={},pu={};
       tourMeds.forEach(m=>{ph[m.id]=!!m.pref2HC;pu[m.id]=!!m.pref2USIC;});
@@ -3771,6 +3787,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       setCfgExcl(excl);
       setCfgWeeks(recalcWeeks(excl));
       setCfgPref2HC(ph);setCfgPref2USIC(pu);
+      setCfgEvitU({});setCfgEvitW({});   /* v10.167 : une nouvelle période part vide */
     }
     // Minimums : TOUJOURS repris des réglages (modifiables ponctuellement ensuite)
     if(tourMins){
@@ -3786,7 +3803,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       weeks:weeks!==undefined?weeks:cfgWeeks,
       excl:excl!==undefined?excl:cfgExcl,
       p2hc:p2h!==undefined?p2h:cfgPref2HC,
-      p2usic:p2u!==undefined?p2u:cfgPref2USIC
+      p2usic:p2u!==undefined?p2u:cfgPref2USIC,
+      evitU:cfgEvitU,evitW:cfgEvitW   /* v10.167 */
     }}));
   };
   const closeAutoModal=()=>{persistCfg();setAutoModal(false);};
@@ -3832,6 +3850,10 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     const weeksByConstraint=[...weeksT].sort((a,b)=>availCount[a.key]-availCount[b.key]);
 
     const isAvoid=(medId,wk4)=>!!((tourAvoid||{})[wk4]||{})[medId];
+    /* v10.167 : semaine à éviter dans CETTE unité (garde alternée) — lue sur l'état vivant de la
+       modale ; evitCompte relit une affectation entière pour le score des essais. */
+    const evite=(mid,wk4,unit)=>evitCfg(cfgEvitU,cfgEvitW,mid,wk4,unit);
+    const evitCompte=(A)=>{let n=0;weeksT.forEach(w2=>{["HC","USIC"].forEach(u2=>{((A[w2.key]||{})[u2]||[]).forEach(mid=>{if(evite(mid,w2.key,u2))n++;});});});return n;};
     /* v10.165 : un junior arrive précisément le lundi d'une bascule — un binôme
        entièrement neuf ce jour-là n'est pas souhaitable. Jamais interdit pour autant,
        sinon la semaine resterait incomplète : simplement servi en dernier. */
@@ -3920,6 +3942,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
           if(assignedThisWeek[w1.key].includes(m.id)||assignedThisWeek[w2.key].includes(m.id))continue;
           if(horsW(m.id,w1.key)||horsW(m.id,w2.key))continue;   /* v10.153 */
           if(isAvoid(m.id,w1.key)||isAvoid(m.id,w2.key))continue;
+          if(evite(m.id,w1.key,unit)||evite(m.id,w2.key,unit))continue;   /* v10.167 */
           if(assign[w1.key][unit].length>=2||assign[w2.key][unit].length>=2)continue;
           if(!chaBloc(m.id,i2))continue;   /* v10.164 : un bloc ne doit pas créer 3 sur 4 */
           if(!specOK(w1.key,[m.id],idealMins)||!specOK(w2.key,[m.id],idealMins))continue;
@@ -4006,6 +4029,10 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
               dispoDe[c.id]=Math.max(1,n2);
             });
             cands.sort((a,b)=>{
+              /* v10.167 : sur une semaine qu'il évite dans CETTE unité, le médecin passe en tout
+                 dernier — avant même le ⭐, pour qu'un souhait de tourner le pousse vers l'autre unité */
+              const eA=evite(a.id,w.key,unit)?1:0,eB=evite(b.id,w.key,unit)?1:0;
+              if(eA!==eB)return eA-eB;
               const wA=((tourWish||{})[w.key]||{})[a.id]?0:1,wB=((tourWish||{})[w.key]||{})[b.id]?0:1;
               if(wA!==wB)return wA-wB;
               /* v10.165 : sur une semaine de bascule, un sénior avant un junior */
@@ -4063,7 +4090,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
          répartitions par ailleurs équivalentes, jamais au prix d'une semaine
          incomplète (1000) ni d'une surspécialité relâchée (100). */
       const thP=thPenalites(weeksT,assign,thAlg,thBasc,jrIds);
-      const score=unfilled*1000+relaxedWeeks.length*100+avoidViol.length*40+sur4Viol.length*30+dblViol.length*15+leftoverTotal*10+imbalance+thP.bin*2+thP.bas*5;
+      const score=unfilled*1000+relaxedWeeks.length*100+avoidViol.length*40+sur4Viol.length*30+evitCompte(assign)*20+dblViol.length*15+leftoverTotal*10+imbalance+thP.bin*2+thP.bas*5;   /* v10.167 : +20 par semaine évitée non tenue */
       return{assign,quota,unfilled,score,hcCount,usicCount,assignedThisWeek,specOK,relaxedWeeks,avoidViol,dblViol,sur4Viol,chaLegal,thP};
     };
 
@@ -4151,7 +4178,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       const leftoverTotal=tourMeds.reduce((s,m)=>s+(quota[m.id]||0),0);
       const imbalance=tourMeds.reduce((s,m)=>s+Math.abs(hcCount[m.id]-usicCount[m.id]),0);
       r.thP=thPenalites(weeksT,assign,thAlg,thBasc,jrIds);   /* v10.165 : la réparation a déplacé des médecins */
-      r.score=r.unfilled*1000+relaxedWeeks.length*100+sur4Viol.length*30+(r.dblViol||[]).length*15+leftoverTotal*10+imbalance+r.thP.bin*2+r.thP.bas*5;   /* v10.164, v10.165 */
+      r.score=r.unfilled*1000+relaxedWeeks.length*100+sur4Viol.length*30+evitCompte(assign)*20+(r.dblViol||[]).length*15+leftoverTotal*10+imbalance+r.thP.bin*2+r.thP.bas*5;   /* v10.164, v10.165, v10.167 */
       return r;
     };
     let best=null,bestStage=stages[0];
@@ -4229,11 +4256,44 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
         (a.USIC||[]).slice().forEach(tp=>{
           const mTP=medDe(tp);if(!mTP||!mTP.partTime)return;
           if(enUnite(tp,i-1,"USIC")||enUnite(tp,i+1,"USIC"))return;
-          const x=(a.HC||[]).find(h=>{const mX=medDe(h);return !!mX&&!mX.partTime&&!enUnite(h,i-1,"HC")&&!enUnite(h,i+1,"HC");});
+          if(evite(tp,w.key,"HC")){vacReste.push(mTP.init+" (sem. "+w.label+")");return;}   /* v10.167 : il évite le HC cette semaine */
+          const x=(a.HC||[]).find(h=>{const mX=medDe(h);return !!mX&&!mX.partTime&&!evite(h,w.key,"USIC")&&!enUnite(h,i-1,"HC")&&!enUnite(h,i+1,"HC");});   /* v10.167 : ni un partenaire qui évite l'USIC */
           if(x===undefined){vacReste.push(mTP.init+" (sem. "+w.label+")");return;}
           a.HC=a.HC.map(h=>h===x?tp:h);a.USIC=a.USIC.map(u=>u===tp?x:u);
           if(best.hcCount&&best.usicCount){best.hcCount[tp]++;best.hcCount[x]--;best.usicCount[tp]--;best.usicCount[x]++;}
           vacFait.push(mTP.init+" en HC, "+medDe(x).init+" en USIC (sem. "+w.label+")");
+        });
+      });
+    })();
+    /* ═══ v10.167 : RATTRAPAGE DES SEMAINES À ÉVITER (garde alternée) ═══
+       Même moule que la passe 🏖 : un médecin resté dans l'unité qu'il évite cette semaine est
+       permuté avec un médecin de l'AUTRE unité de la même semaine — les quatre restent de tour,
+       rien d'autre ne bouge. Trois garde-fous : pas un partenaire qui évite lui-même l'unité
+       d'arrivée, pas un temps partiel renvoyé en USIC pendant les vacances scolaires (ce serait
+       défaire la passe 🏖), pas un bloc de deux semaines cassé. Ce qui reste est nommé au rapport. */
+    const evitFait=[],evitReste=[];
+    (()=>{
+      const semVac=(wk)=>{const[vy,vm,vd]=wk.split("-").map(Number);let n=0;for(let i=0;i<5;i++){if(vacContient(new Date(vy,vm,vd+i)))n++;}return n>=3;};
+      const enUnite=(mid,i,u)=>{const wx=weeksT[i];if(!wx)return false;return ((best.assign[wx.key]||{})[u]||[]).map(String).includes(String(mid));};
+      const medDe=(mid)=>tourMeds.find(m=>String(m.id)===String(mid));
+      weeksT.forEach((w,i)=>{
+        const a=best.assign[w.key];if(!a)return;
+        [["USIC","HC"],["HC","USIC"]].forEach(([u,o])=>{
+          (a[u]||[]).slice().forEach(mid=>{
+            if(!evite(mid,w.key,u))return;
+            const mM=medDe(mid);if(!mM)return;
+            const lib=mM.init+" en "+u+" (sem. "+w.label+")";
+            if(enUnite(mid,i-1,u)||enUnite(mid,i+1,u)){evitReste.push(lib);return;}
+            const x=(a[o]||[]).find(h=>{const mX=medDe(h);return !!mX&&!evite(h,w.key,u)&&!enUnite(h,i-1,o)&&!enUnite(h,i+1,o)
+              &&!(o==="USIC"&&mM.partTime&&semVac(w.key))&&!(u==="USIC"&&mX.partTime&&semVac(w.key));});
+            if(x===undefined){evitReste.push(lib);return;}
+            a[o]=a[o].map(h=>h===x?mid:h);a[u]=a[u].map(y=>y===mid?x:y);
+            if(best.hcCount&&best.usicCount){
+              if(o==="HC"){best.hcCount[mid]++;best.usicCount[mid]--;best.hcCount[x]--;best.usicCount[x]++;}
+              else{best.usicCount[mid]++;best.hcCount[mid]--;best.usicCount[x]--;best.hcCount[x]++;}
+            }
+            evitFait.push(mM.init+" en "+o+", "+medDe(x).init+" en "+u+" (sem. "+w.label+")");
+          });
         });
       });
     })();
@@ -4309,6 +4369,10 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
     /* v10.166 : temps partiels en HC pendant les vacances scolaires */
     if(vacFait.length)L.push("✓ 🏖 Temps partiels en HC pendant les vacances scolaires : "+vacFait.join(" · ")+".");
     if(vacReste.length)L.push("🏖 Resté(s) en USIC pendant les vacances scolaires, faute de permutation possible dans la semaine : "+vacReste.join(", ")+".");
+    /* v10.167 : semaines à éviter dans une unité (garde alternée) */
+    if(evitReste.length)L.push("⚠ 🔁 Semaines à éviter non tenues, faute de permutation possible dans la semaine : "+evitReste.join(", ")+(evitFait.length?" — "+evitFait.length+" autre(s) rattrapée(s) par permutation HC↔USIC.":"."));
+    else if(evitFait.length)L.push("✓ 🔁 Semaines à éviter : toutes tenues — "+evitFait.length+" rattrapée(s) par permutation HC↔USIC ("+evitFait.join(" · ")+").");
+    else if(Object.keys(cfgEvitU).length)L.push("✓ 🔁 Semaines à éviter (garde alternée) : toutes tenues dès le tirage.");
     if(leftover.length>0)L.push("⚠ N'ont pas reçu toutes leurs semaines (nombre restant entre parenthèses) : "+leftover.join(", ")+".");
     else L.push("✓ Chacun a reçu son nombre de semaines.");
     if(actBloq.length>0)L.push("✋ Écartés certaines semaines par une activité déjà posée à la main dans le planning : "+actBloq.join(" · ")+".");
@@ -4426,6 +4490,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                     const dis=blocked||!!actM||inOther||wLock(w.key);
                     const avoidW=!!((tourAvoid||{})[w.key]||{})[m.id];
                     const wishW=!!((tourWish||{})[w.key]||{})[m.id];
+                    const evitW2=evitSaved(m.id,w.key,unit);   /* v10.167 : semaine à éviter dans cette unité */
                     return(
                       <button key={m.id} disabled={dis||!isEdit} title={actM?"Activité posée à la main : "+actM:""}
                         style={{padding:"4px 6px",borderRadius:6,border:"none",cursor:dis||!isEdit?"default":"pointer",textAlign:"center",minWidth:62,overflow:"hidden",
@@ -4433,6 +4498,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                            outline:on?"2px solid "+(SPEC_COLORS[m.surSpec]||"#388bfd"):m.surSpec&&!blocked?"2px solid "+(SPEC_COLORS[m.surSpec]||"var(--border)"):"1px solid var(--border)"}}
                         onClick={()=>{if(dis||!isEdit)return;if(!wChk(w.key))return;
                         const wasOn=on;
+                        if(!wasOn&&evitW2)toast(m.init+" évite l'unité "+unit+" la semaine du "+w.label+" (garde alternée) — posé quand même.","warn");   /* v10.167 */
                         setTourMed(p=>{const cur={...(p[w.key]||{HC:[],USIC:[]})};const l=cur[unit]||[];if(!wasOn&&l.length>=2){toast("Maximum 2 médecins par unité","info");return p;}cur[unit]=wasOn?l.filter(x=>x!==m.id):[...l,m.id];return{...p,[w.key]:cur};});
                         if(!wasOn){
                           clearWeekActivities([{medId:m.id,weekKey:w.key}]);
@@ -4441,7 +4507,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                           if(unit==="USIC"&&m.partTime)cleanTPForWeek(m.id,w.key);
                           setTimeout(()=>reapplyPTWeek(m.id,w.key),60);
                         }}}>
-                        <div style={{fontWeight:800,fontSize:11,lineHeight:1.15}} title={avoidW?"Préfère ne pas tourner cette semaine":wishW?"Souhaite tourner cette semaine":""}>{m.init}{avoidW?" 🚫":wishW?" ⭐":""}</div>
+                        <div style={{fontWeight:800,fontSize:11,lineHeight:1.15}} title={avoidW?"Préfère ne pas tourner cette semaine":wishW?"Souhaite tourner cette semaine":evitW2?"Semaine à éviter en "+unit+" (garde alternée)":""}>{m.init}{avoidW?" 🚫":wishW?" ⭐":""}{evitW2?" 🔁":""}</div>
                         <div style={{fontSize:8.5,color:blocked?"inherit":m.surSpec&&!on?(SPEC_COLORS[m.surSpec]):"inherit"}}>
                           {blocked?"indispo":actM?"occupé":inOther?"≠":wLock(w.key)?"🔒":""}
                         </div>
@@ -4572,6 +4638,9 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                 if(((tourAvoid||{})[swapDstKey]||{})[swapSrcMed])warns.push(mS.init+" a une préférence 🚫 \"pas de tour\" sur la semaine du "+lD+".");
                 if(((tourAvoid||{})[swapSrcKey]||{})[swapDstMed])warns.push(mD.init+" a une préférence 🚫 \"pas de tour\" sur la semaine du "+lS+".");
               }
+              /* v10.167 : unité d'ARRIVÉE évitée (garde alternée) — vaut aussi pour l'échange HC ⇄ USIC d'une même semaine */
+              if(evitSaved(swapSrcMed,swapDstKey,uD))warns.push(mS.init+" évite l'unité "+uD+" la semaine du "+lD+" (garde alternée).");
+              if(evitSaved(swapDstMed,swapSrcKey,uS))warns.push(mD.init+" évite l'unité "+uS+" la semaine du "+lS+" (garde alternée).");
               return(
               <div style={{marginTop:12}}>
                 <div style={{padding:"10px 12px",borderRadius:9,border:"2px solid #388bfd",background:"rgba(56,139,253,.08)",fontSize:14,fontWeight:800,color:"var(--txt)",textAlign:"center"}}>
@@ -4631,12 +4700,20 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                     <th style={{textAlign:"center",padding:"5px 8px",fontSize:10,color:"var(--txt3)"}}>Semaines</th>
                     <th style={{textAlign:"center",padding:"5px 8px",fontSize:10,color:"var(--txt3)"}}>2 sem. HC</th>
                     <th style={{textAlign:"center",padding:"5px 8px",fontSize:10,color:"var(--txt3)"}}>2 sem. USIC</th>
+                    <th style={{textAlign:"center",padding:"5px 8px",fontSize:10,color:"var(--txt3)"}} title="Unité à éviter certaines semaines (garde alternée)">Éviter</th>
                     <th style={{textAlign:"center",padding:"5px 8px",fontSize:10,color:"var(--txt3)"}}>Spéc.</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {tourMeds.map(m=>(
-                    <tr key={m.id} style={{borderBottom:"1px solid var(--border2)",opacity:cfgExcl[m.id]?.45:1}}>
+<tbody>
+                  {tourMeds.map(m=>{
+                    /* v10.167 : deux lignes par médecin — la seconde, ouverte dès qu'une unité est
+                       choisie dans « Éviter », porte les boutons de rythme et les pastilles de semaines. */
+                    const evU=cfgEvitU[m.id]||"";
+                    const evW=cfgEvitW[m.id]||{};
+                    const evC=evU==="HC"?"#388bfd":"#a371f7";
+                    const evBtn={fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,cursor:"pointer"};
+                    return [
+                    <tr key={"m"+m.id} style={{borderBottom:evU?"none":"1px solid var(--border2)",opacity:cfgExcl[m.id]?.45:1}}>
                       <td style={{padding:"5px 8px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:6}}>
                           <div style={{width:26,height:26,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{m.init}</div>
@@ -4663,12 +4740,37 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                           onChange={e=>setCfgPref2USIC(p=>({...p,[m.id]:e.target.checked}))}
                           style={{width:15,height:15,cursor:"pointer"}}/>
                       </td>
+                      <td style={{textAlign:"center",padding:"4px"}}>
+                        <select value={evU} disabled={!!cfgExcl[m.id]} onChange={e=>setEvitUnit(m.id,e.target.value)} title="Unité à éviter certaines semaines (garde alternée)"
+                          style={{padding:"3px 4px",borderRadius:6,border:"1px solid "+(evU?evC:"var(--border)"),background:"var(--inp)",color:evU?evC:"var(--txt3)",fontSize:11,fontWeight:evU?800:400,cursor:"pointer"}}>
+                          <option value="">—</option>
+                          <option value="USIC">USIC</option>
+                          <option value="HC">HC</option>
+                        </select>
+                      </td>
                       <td style={{textAlign:"center",padding:"4px",fontSize:9,color:"var(--txt3)"}}>
                         {(m.statut==="junior")&&<span style={{color:"#f59e0b",fontWeight:700}}>Jr </span>}
                         {({coro:"Coro",pace:"Pace",eep:"EEP",ett:"ETT"})[m.surSpec]||"—"}
                       </td>
-                    </tr>
-                  ))}
+                    </tr>,
+                    evU?<tr key={"e"+m.id} style={{borderBottom:"1px solid var(--border2)",opacity:cfgExcl[m.id]?.45:1}}>
+                      <td colSpan={7} style={{padding:"0 8px 7px 42px"}}>
+                        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                          <span style={{fontSize:10,fontWeight:800,color:evC}}>🔁 {evU} évité :</span>
+                          <button onClick={()=>evitRythme(m.id,0)} style={evBtn}>{"une sur deux dès le "+((weeksT[0]||{}).label||"")}</button>
+                          <button onClick={()=>evitRythme(m.id,1)} style={evBtn}>{"dès le "+((weeksT[1]||{}).label||"")}</button>
+                        </div>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:5}}>
+                          {weeksT.map((w2,i2)=>{
+                            const on=!!evW[w2.key];
+                            return <button key={w2.key} onClick={()=>evitBascule(m.id,i2)}
+                              title={(on?"Semaine évitée en "+evU:"Semaine ordinaire")+" — un clic inverse le rythme d'ici la fin de la période"}
+                              style={{fontSize:10,padding:"2px 7px",borderRadius:10,border:"1px solid "+(on?evC:"var(--border)"),background:on?evC:"var(--bg2)",color:on?"#fff":"var(--txt3)",fontWeight:on?800:600,cursor:"pointer"}}>{w2.label}</button>;
+                          })}
+                        </div>
+                      </td>
+                    </tr>:null];
+                  })}
                 </tbody>
               </table>
             </div>
@@ -4902,7 +5004,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
-  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport. Depuis la v10.165 elle veille en plus à l'ÉQUITÉ DES BINÔMES : un binôme, ce sont les 2 médecins d'une même unité sur une même semaine, HC et USIC confondus — le décompte est commun. À égalité de charge, l'algorithme sert celui qui a le moins tourné avec le médecin déjà posé dans l'unité, et les 60 essais retiennent la répartition la mieux ventilée. Le bouton 🤝 Binômes, ouvert à tout le monde en lecture, montre le tableau croisé des semaines passées ensemble : un 0 en ambre est un couple jamais formé. Les SEMAINES DE BASCULE D'INTERNE — celles dont le lundi ouvre un semestre, dates prises dans l'onglet Équipe et jamais écrites en dur — sont réparties entre ceux qui en ont fait le moins, et confiées à un junior seulement en dernier recours, avec un ⚠ au rapport : le junior arrive précisément ce lundi-là. Le décompte porte sur une fenêtre glissante de deux ans, à partir de la date réglée dans Paramètres (par défaut le 02/11/2026), et ne décide jamais du NOMBRE de semaines dû à chacun. Depuis la v10.166, le remplaçant junior d'un temps partiel en USIC est choisi sur le tour et le planning tels qu'ils sont à cet instant — jamais un junior déjà de tour cette semaine-là — et les journées de remplacement sont réparties entre les juniors, une journée comptant pour une : trois semaines, trois juniors, un jour chacun. Enfin, pendant les vacances scolaires (saisies dans Paramètres), un temps partiel posé en USIC est permuté avec un médecin HC de la même semaine quand c'est possible — jamais au prix d'une règle : si rien ne convient, il reste en USIC et le rapport le dit."]}),
+  HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport. Depuis la v10.165 elle veille en plus à l'ÉQUITÉ DES BINÔMES : un binôme, ce sont les 2 médecins d'une même unité sur une même semaine, HC et USIC confondus — le décompte est commun. À égalité de charge, l'algorithme sert celui qui a le moins tourné avec le médecin déjà posé dans l'unité, et les 60 essais retiennent la répartition la mieux ventilée. Le bouton 🤝 Binômes, ouvert à tout le monde en lecture, montre le tableau croisé des semaines passées ensemble : un 0 en ambre est un couple jamais formé. Les SEMAINES DE BASCULE D'INTERNE — celles dont le lundi ouvre un semestre, dates prises dans l'onglet Équipe et jamais écrites en dur — sont réparties entre ceux qui en ont fait le moins, et confiées à un junior seulement en dernier recours, avec un ⚠ au rapport : le junior arrive précisément ce lundi-là. Le décompte porte sur une fenêtre glissante de deux ans, à partir de la date réglée dans Paramètres (par défaut le 02/11/2026), et ne décide jamais du NOMBRE de semaines dû à chacun. Depuis la v10.166, le remplaçant junior d'un temps partiel en USIC est choisi sur le tour et le planning tels qu'ils sont à cet instant — jamais un junior déjà de tour cette semaine-là — et les journées de remplacement sont réparties entre les juniors, une journée comptant pour une : trois semaines, trois juniors, un jour chacun. Enfin, pendant les vacances scolaires (saisies dans Paramètres), un temps partiel posé en USIC est permuté avec un médecin HC de la même semaine quand c'est possible — jamais au prix d'une règle : si rien ne convient, il reste en USIC et le rapport le dit. Depuis la v10.167, un médecin peut ÉVITER UNE UNITÉ CERTAINES SEMAINES (garde alternée) : colonne « Éviter » de la modale ⚙️ — choisir USIC ou HC ouvre sa ligne, pré-remplie une semaine sur deux dès le premier lundi de la période ; le second bouton change de pied, et un clic sur une pastille inverse le rythme d'ici la fin de la période. Réglage propre à chaque période : une nouvelle période part vide. Sur une semaine évitée, le médecin passe en dernier dans le tri de l'unité évitée — jamais interdit, jamais de semaine incomplète — et la passe de permutation HC↔USIC le rattrape s'il y a atterri quand même ; sinon le rapport le nomme 🔁. Se cumule avec le 🚫 « pas de tour ». Dans le tableau du tour et la modale d'échange ⇄, le 🔁 et un avertissement signalent la pose dans l'unité évitée, sans l'empêcher."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
