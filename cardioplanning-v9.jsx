@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.168 — 04/09/2026";
+const APP_VERSION="v10.169 — 04/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -4581,7 +4581,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       {/* v10.165 : tableau des binômes — lecture seule, ouvert à tous les niveaux */}
       {binOpen&&(
         <Ov onClose={()=>setBinOpen(false)}>
-          <div style={{...S.modal,maxWidth:840,maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{...S.modal,width:"96vw",maxWidth:"96vw",maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>   {/* v10.169 : le tableau tenait dans 840 px et se coupait */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={S.mTit2}>🤝 Qui a tourné avec qui</div>
               <button onClick={()=>setBinOpen(false)} style={S.xBtn}>×</button>
@@ -4596,7 +4596,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
               if(LB.length<2)return <div style={{fontSize:11,color:"var(--txt3)"}}>{"Il faut au moins deux tourneurs pour former un binôme."}</div>;
               return(
                 <div style={{overflowX:"auto",border:"1px solid var(--border)",borderRadius:8}}>
-                  <table style={{borderCollapse:"collapse",fontSize:11}}>
+                  <table style={{borderCollapse:"collapse",fontSize:11,width:"100%"}}>   {/* v10.169 : toute la largeur disponible */}
                     <thead>
                       <tr>
                         <th style={{...S.thFix,position:"sticky",left:0,top:0,zIndex:30,minWidth:54,textAlign:"left",padding:"5px 8px"}}>{""}</th>
@@ -5159,7 +5159,7 @@ const HELP_SECTIONS=[
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les périodes passées si elle monte."]}),
   HT({children:"💻 Copie sur mon ordinateur"}),
   HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui contiennent l'intégralité des données (toutes périodes) et permettent de tout remettre en place via l'encart 📂 Importer, juste en dessous. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
-  HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). La date de dernière sauvegarde et le compteur sont propres à ",HE("b",null,"chaque ordinateur"),"."]}))},
+  HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). Depuis la v10.169, la date de la dernière sauvegarde est PARTAGÉE entre vos appareils : un ordinateur qui n'a jamais servi à sauvegarder ne réclame plus une sauvegarde dès sa première ouverture. Le compteur de cases modifiées, lui, reste propre à ",HE("b",null,"chaque ordinateur")," et repart de zéro dès qu'une sauvegarde est faite, d'où qu'elle vienne."]}))},
 
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
   HP({children:["Une case ",HE("b",null,"hachurée")," veut toujours dire la même chose, quel que soit l'onglet : ",HE("b",null,"cette personne n'est pas disponible ce jour-là"),". Ce n'est pas un effet d'affichage mais un ",HE("b",null,"verrou")," : la case ne s'ouvre pas au clic, le planning type ne s'y applique pas, et les répartitions automatiques passent la personne. Couverte sur ",HE("b",null,"toute")," la période affichée, sa colonne disparaît même des grilles."]}),
@@ -6800,7 +6800,7 @@ function ExportRappel({nModifs,seuil,dernier,onAller,onPlusTard}){
   if(!parTemps&&!parCases)return null;
   const motif=parCases
     ?(nModifs+" case"+(nModifs>1?"s":"")+" modifiée"+(nModifs>1?"s":"")+" depuis votre dernière sauvegarde")
-    :(dernier?("dernière sauvegarde il y a "+jours+" jours"):"aucune sauvegarde sur cet ordinateur");
+    :(dernier?("dernière sauvegarde il y a "+jours+" jours"):"aucune sauvegarde connue");
   return(
     <div style={{display:"flex",alignItems:"center",gap:9,flexWrap:"wrap",padding:"7px 11px",marginBottom:10,borderRadius:8,
       border:"1px solid #f59e0b",background:"rgba(245,158,11,.13)"}}>
@@ -6842,7 +6842,7 @@ function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,
         <button disabled={occupe} onClick={()=>onExport("donnees")} style={{fontSize:11,padding:"5px 13px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontWeight:700,cursor:occupe?"default":"pointer",opacity:occupe?.6:1}}>🗄 Les données brutes</button>
       </div>
 
-      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6}}>{dernier?("Dernière sauvegarde : "+dat(dernier)):"Aucune sauvegarde faite depuis cet ordinateur."}</div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6}}>{dernier?("Dernière sauvegarde : "+dat(dernier)):"Aucune sauvegarde connue."}</div>
       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
         <span style={{fontSize:11,color:"var(--txt3)"}}>Me le rappeler au bout de</span>
         <input type="number" min="20" max="5000" step="10" value={seuil} onChange={e=>setSeuil(Math.max(20,parseInt(e.target.value)||EXP_SEUIL))}
@@ -8719,6 +8719,15 @@ function CardioPlanning(){
   const [expSnooze,setExpSnooze]=useState(false);
   const [expSeuil,setExpSeuil]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expSeuil"))||EXP_SEUIL;}catch(e){return EXP_SEUIL;}});
   const [expLast,setExpLast]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expLast"))||0;}catch(e){return 0;}});
+  /* v10.169 : la date de la DERNIÈRE SAUVEGARDE est partagée par Firebase. Sans elle, un appareil
+     qui n'a jamais sauvegardé se croyait à 999 jours et réclamait une sauvegarde dès sa première
+     ouverture. Le compteur de cases, lui, reste local : il ne compte que ce qui a été fait ICI. */
+  const [expLastFB,setExpLastFB]=useState(0);
+  useEffect(()=>{
+    if(!expLastFB||expLastFB<=expLast)return;
+    setExpLast(expLastFB);setExpN(0);setExpSnooze(false);
+    try{localStorage.setItem("cp6_expLast",String(expLastFB));localStorage.setItem("cp6_expN","0");}catch(e){}
+  },[expLastFB,expLast]);
   const [expN,setExpN]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expN"))||0;}catch(e){return 0;}});
   const expBump=useCallback((n)=>{if(!n)return;setExpN(v=>{const t=v+n;try{localStorage.setItem("cp6_expN",String(t));}catch(e){}return t;});},[]);
   useEffect(()=>{try{localStorage.setItem("cp6_expSeuil",String(expSeuil));}catch(e){}},[expSeuil]);
@@ -9085,6 +9094,7 @@ function CardioPlanning(){
           if(data.tourPtOte)setTourPtOte(JSON.parse(data.tourPtOte));   /* v10.155 */
           if(data.tourHist)setTourHist(JSON.parse(data.tourHist));   /* v10.165 */
           if(data.tourHistDeb)setTourHistDeb(data.tourHistDeb);   /* v10.165 */
+          if(data.expLast)setExpLastFB(parseInt(data.expLast)||0);   /* v10.169 : dernière sauvegarde, tous appareils confondus */
           if(data.tourReport!==undefined&&data.tourReport!=="")setTourReport(data.tourReport);
           if(data.astReport!==undefined&&data.astReport!=="")setAstReport(data.astReport);
           /* v9.89 : le champ ABSENT signifie « jamais configuré » (on déduit alors les
@@ -11068,8 +11078,9 @@ function CardioPlanning(){
       const nom="planning-"+expPer.sy+"-"+String(expPer.sm+1).padStart(2,"0");
       if(kind==="tableau")expTelecharge(nom+".xls",expTable(expPer,src));
       else expTelecharge(nom+"-donnees.json",JSON.stringify(src),"application/json;charset=utf-8");
-      const t=Date.now();setExpLast(t);setExpN(0);setExpSnooze(false);
+      const t=Date.now();setExpLast(t);setExpN(0);setExpSnooze(false);setExpLastFB(t);
       try{localStorage.setItem("cp6_expLast",String(t));localStorage.setItem("cp6_expN","0");}catch(e){}
+      saveToFirebase({expLast:String(t)});   /* v10.169 : les autres appareils la reprennent */
       toast("Sauvegarde téléchargée","info");
     }catch(e){console.log("export:",e);toast("Échec de la sauvegarde","warn");}
     setExpBusy(false);

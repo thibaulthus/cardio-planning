@@ -166,7 +166,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.168 — 04/09/2026";
+var APP_VERSION = "v10.169 — 04/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -5019,7 +5019,7 @@ function TourTab(_a) {
         }),
         /* v10.165 : tableau des binômes — lecture seule, ouvert à tous les niveaux */
         binOpen && (React.createElement(Ov, { onClose: function () { return setBinOpen(false); } },
-            React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 840, maxHeight: "88vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } },
+            React.createElement("div", { style: __assign(__assign({}, S.modal), { width: "96vw", maxWidth: "96vw", maxHeight: "88vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } }, /* v10.169 : le tableau tenait dans 840 px et se coupait */
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                     React.createElement("div", { style: S.mTit2 }, "\uD83E\uDD1D Qui a tourn\u00E9 avec qui"),
                     React.createElement("button", { onClick: function () { return setBinOpen(false); }, style: S.xBtn }, "\u00D7")),
@@ -5032,7 +5032,7 @@ function TourTab(_a) {
                     if (LB.length < 2)
                         return React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Il faut au moins deux tourneurs pour former un binôme.");
                     return (React.createElement("div", { style: { overflowX: "auto", border: "1px solid var(--border)", borderRadius: 8 } },
-                        React.createElement("table", { style: { borderCollapse: "collapse", fontSize: 11 } },
+                        React.createElement("table", { style: { borderCollapse: "collapse", fontSize: 11, width: "100%" } }, /* v10.169 : toute la largeur disponible */
                             React.createElement("thead", null,
                                 React.createElement("tr", null,
                                     React.createElement("th", { style: __assign(__assign({}, S.thFix), { position: "sticky", left: 0, top: 0, zIndex: 30, minWidth: 54, textAlign: "left", padding: "5px 8px" }) }, ""),
@@ -5559,7 +5559,7 @@ const HELP_SECTIONS=[
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les périodes passées si elle monte."]}),
   HT({children:"💻 Copie sur mon ordinateur"}),
   HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui contiennent l'intégralité des données (toutes périodes) et permettent de tout remettre en place via l'encart 📂 Importer, juste en dessous. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
-  HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). La date de dernière sauvegarde et le compteur sont propres à ",HE("b",null,"chaque ordinateur"),"."]}))},
+  HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). Depuis la v10.169, la date de la dernière sauvegarde est PARTAGÉE entre vos appareils : un ordinateur qui n'a jamais servi à sauvegarder ne réclame plus une sauvegarde dès sa première ouverture. Le compteur de cases modifiées, lui, reste propre à ",HE("b",null,"chaque ordinateur")," et repart de zéro dès qu'une sauvegarde est faite, d'où qu'elle vienne."]}))},
 
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
   HP({children:["Une case ",HE("b",null,"hachurée")," veut toujours dire la même chose, quel que soit l'onglet : ",HE("b",null,"cette personne n'est pas disponible ce jour-là"),". Ce n'est pas un effet d'affichage mais un ",HE("b",null,"verrou")," : la case ne s'ouvre pas au clic, le planning type ne s'y applique pas, et les répartitions automatiques passent la personne. Couverte sur ",HE("b",null,"toute")," la période affichée, sa colonne disparaît même des grilles."]}),
@@ -7257,7 +7257,7 @@ function ExportRappel(_a) {
         return null;
     var motif = parCases
         ? (nModifs + " case" + (nModifs > 1 ? "s" : "") + " modifiée" + (nModifs > 1 ? "s" : "") + " depuis votre dernière sauvegarde")
-        : (dernier ? ("dernière sauvegarde il y a " + jours + " jours") : "aucune sauvegarde sur cet ordinateur");
+        : (dernier ? ("dernière sauvegarde il y a " + jours + " jours") : "aucune sauvegarde connue");
     return (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", padding: "7px 11px", marginBottom: 10, borderRadius: 8,
             border: "1px solid #f59e0b", background: "rgba(245,158,11,.13)" } },
         React.createElement("span", { style: { fontSize: 14 } }, "\uD83D\uDCBE"),
@@ -7286,7 +7286,7 @@ function ExportCard(_a) {
         React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 } },
             React.createElement("button", { disabled: occupe, onClick: function () { return onExport("tableau"); }, style: { fontSize: 11, padding: "5px 13px", borderRadius: 6, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.10)", color: "#b45309", fontWeight: 800, cursor: occupe ? "default" : "pointer", opacity: occupe ? .6 : 1 } }, "\uD83D\uDCCA Le tableau (Excel / Sheets)"),
             React.createElement("button", { disabled: occupe, onClick: function () { return onExport("donnees"); }, style: { fontSize: 11, padding: "5px 13px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", fontWeight: 700, cursor: occupe ? "default" : "pointer", opacity: occupe ? .6 : 1 } }, "\uD83D\uDDC4 Les donn\u00E9es brutes")),
-        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 6 } }, dernier ? ("Dernière sauvegarde : " + dat(dernier)) : "Aucune sauvegarde faite depuis cet ordinateur."),
+        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 6 } }, dernier ? ("Dernière sauvegarde : " + dat(dernier)) : "Aucune sauvegarde connue."),
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
             React.createElement("span", { style: { fontSize: 11, color: "var(--txt3)" } }, "Me le rappeler au bout de"),
             React.createElement("input", { type: "number", min: "20", max: "5000", step: "10", value: seuil, onChange: function (e) { return setSeuil(Math.max(20, parseInt(e.target.value) || EXP_SEUIL)); }, style: __assign(__assign({}, S.fi), { width: 80, padding: "3px 6px", textAlign: "center" }) }),
@@ -9447,6 +9447,22 @@ function CardioPlanning() {
     catch (e) {
         return 0;
     } }), expLast = _60[0], setExpLast = _60[1];
+    /* v10.169 : la date de la DERNIÈRE SAUVEGARDE est partagée par Firebase. Sans elle, un appareil
+       qui n'a jamais sauvegardé se croyait à 999 jours et réclamait une sauvegarde dès sa première
+       ouverture. Le compteur de cases, lui, reste local : il ne compte que ce qui a été fait ICI. */
+    var _cnfb = React.useState(0), expLastFB = _cnfb[0], setExpLastFB = _cnfb[1];
+    useEffect(function () {
+        if (!expLastFB || expLastFB <= expLast)
+            return;
+        setExpLast(expLastFB);
+        setExpN(0);
+        setExpSnooze(false);
+        try {
+            localStorage.setItem("cp6_expLast", String(expLastFB));
+            localStorage.setItem("cp6_expN", "0");
+        }
+        catch (e) { }
+    }, [expLastFB, expLast]);
     var _61 = useState(function () { try {
         return parseInt(localStorage.getItem("cp6_expN")) || 0;
     }
@@ -10109,6 +10125,8 @@ function CardioPlanning() {
                         setTourHist(JSON.parse(data_1.tourHist)); /* v10.165 */
                     if (data_1.tourHistDeb)
                         setTourHistDeb(data_1.tourHistDeb); /* v10.165 */
+                    if (data_1.expLast)
+                        setExpLastFB(parseInt(data_1.expLast) || 0); /* v10.169 : dernière sauvegarde, tous appareils confondus */
                     if (data_1.tourReport !== undefined && data_1.tourReport !== "")
                         setTourReport(data_1.tourReport);
                     if (data_1.astReport !== undefined && data_1.astReport !== "")
@@ -13188,11 +13206,13 @@ function CardioPlanning() {
                     setExpLast(t);
                     setExpN(0);
                     setExpSnooze(false);
+                    setExpLastFB(t);
                     try {
                         localStorage.setItem("cp6_expLast", String(t));
                         localStorage.setItem("cp6_expN", "0");
                     }
                     catch (e) { }
+                    saveToFirebase({ expLast: String(t) }); /* v10.169 : les autres appareils la reprennent */
                     toast("Sauvegarde téléchargée", "info");
                     return [3 /*break*/, 6];
                 case 5:
