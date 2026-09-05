@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.169 — 04/09/2026";
+const APP_VERSION="v10.170 — 05/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1080,7 +1080,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     </div>
   );
 }
-function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null}){
+function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -1124,6 +1124,13 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
     const rank=k=>{const i=ord.indexOf(k);return i<0?9999:i;};
     return _allCols.map((c,i)=>({c,i})).sort((a,b)=>(rank(a.c)-rank(b.c))||(a.i-b.i)).map(x=>x.c);
   })();
+  /* v10.170 : colonnes de reprise (↩) masquées sur CET appareil (cp6_colHide). Les salles
+     restent toujours visibles ; l'ordre partagé ↔ n'en sait rien ; l'impression suit l'écran. */
+  const _cache=colHide||[];
+  const sallesVues=allSalles.filter(s=>!_cache.includes(s));
+  const _nMasq=allSalles.length-sallesVues.length;
+  const _masquables=allSalles.filter(s=>s==="CHB-BIP"||String(s).indexOf("RECAP:")===0)
+    .map(s=>({k:s,lab:s==="CHB-BIP"?"BIP":((actes.find(a2=>a2.id===s.slice(6))||{}).label||s.slice(6))}));
   const wdays=printWk?svEffDays.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):svEffDays; // keep full {y,m,d} objects
   const siteColor=site==="CHL"?"#388bfd":site==="ANGIO"?"#76a5af":"#3fb950";
 
@@ -1229,6 +1236,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
         {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↔</button>}
+        {onHide&&_masquables.length>0&&<button onClick={()=>onHide(_masquables)} title="Colonnes affichées" style={{...S.arr,fontSize:13,width:30,color:_nMasq?"var(--today-c)":"var(--txt2)",border:`1px solid ${_nMasq?"var(--today-c)":"var(--border)"}`}}>👁</button>}
         {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
@@ -1244,7 +1252,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
             <tr>
               <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:42}}>Jour</th>
               <th style={{...S.thFix,position:"sticky",top:0,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
-              {allSalles.map(salle=><th key={salle} style={{...S.th,minWidth:80,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:10,color:"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{salle==="CHB-BIP"?"BIP":String(salle).indexOf("RECAP:")===0?((actes.find(a2=>a2.id===salle.slice(6))||{}).short||salle.slice(6)):salle}</div></th>)}
+              {sallesVues.map(salle=><th key={salle} style={{...S.th,minWidth:80,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:10,color:"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{salle==="CHB-BIP"?"BIP":String(salle).indexOf("RECAP:")===0?((actes.find(a2=>a2.id===salle.slice(6))||{}).short||salle.slice(6)):salle}</div></th>)}
             </tr>
           </thead>
           <tbody>
@@ -1256,7 +1264,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
                   <td colSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,background:"var(--bg-we)"}}>
                     <div style={{fontWeight:800,color:"#92400e",fontSize:11,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<span style={{fontSize:7,color:"#92400e",fontWeight:600,marginLeft:2}}>{MOIS[wM].slice(0,4)}</span>} {JOURSC[dSV]}</div>
                   </td>
-                  {allSalles.map(s=><td key={s} style={{...S.td,...S.tdWE}}/>)}
+                  {sallesVues.map(s=><td key={s} style={{...S.td,...S.tdWE}}/>)}
                 </tr>
               );
               return["M","AM"].map((sl,si)=>(
@@ -1266,7 +1274,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
                     <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dSV]}</div>
                   </td>}
                   <td style={{...S.tdFix,position:"sticky",left:42,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--td-fix)",borderRight:"2px solid var(--border)",minWidth:24,padding:"2px"}}>{SLOTS[sl]}</td>
-                  {allSalles.map(salle=>renderCell(salle,d,sl,wY,wM))}
+                  {sallesVues.map(salle=>renderCell(salle,d,sl,wY,wM))}
                 </tr>
               ));
             })}
@@ -1278,7 +1286,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null}){
+function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1287,6 +1295,12 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
     return base;
   },[year,month,showFull,PCFG.len,PCFG.startM]);
   const wdays=printWk?atvEffDays2.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):atvEffDays2; // keep full objects
+  /* v10.170 : colonnes masquées sur CET appareil (cp6_colHide). Toutes le sont ici : PT Cardio
+     mélange salles et activités. Les effectifs IDE comptent toujours toutes les colonnes. */
+  const _cache=colHide||[];
+  const rowsVus=rows.filter(r=>!_cache.includes(r.key));
+  const _nMasq=rows.length-rowsVus.length;
+  const _masquables=rows.map(r=>({k:r.key,lab:r.label}));
 
   function getOcc(row,d,sl,ry,rm){
     if(!ry)ry=year; if(!rm&&rm!==0)rm=month;
@@ -1485,6 +1499,7 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
         {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
         {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
         {/* v9.91 : PT Cardio a déjà son bouton d'ordre (orderCtl) — le second, ajouté par erreur en v9.74, est retiré */}
+        {onHide&&_masquables.length>0&&<button onClick={()=>onHide(_masquables)} title="Colonnes affichées" style={{...S.arr,fontSize:13,width:30,color:_nMasq?"var(--today-c)":"var(--txt2)",border:`1px solid ${_nMasq?"var(--today-c)":"var(--border)"}`}}>👁</button>}
         {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
         <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
@@ -1501,7 +1516,7 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
             <tr>
               <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:42}}>Jour</th>
               <th style={{...S.thFix,position:"sticky",top:0,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
-              {rows.map(row=><th key={row.label} style={{...S.th,minWidth:105,maxWidth:150,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:13,color:darkMode?lightenHex(row.color,.55):row.color,fontFamily:"'JetBrains Mono',monospace"}}>{row.label}</div></th>)}
+              {rowsVus.map(row=><th key={row.label} style={{...S.th,minWidth:105,maxWidth:150,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:13,color:darkMode?lightenHex(row.color,.55):row.color,fontFamily:"'JetBrains Mono',monospace"}}>{row.label}</div></th>)}
             </tr>
           </thead>
           <tbody>
@@ -1513,7 +1528,7 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
                     <td colSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,background:"var(--bg-we)"}}>
                       <div style={{fontWeight:800,color:"#92400e",fontSize:11,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<span style={{fontSize:7,color:"#92400e",fontWeight:600,marginLeft:2}}>{MOIS[wM].slice(0,4)}</span>} {JOURSC[dAT]}</div>
                     </td>
-                    {rows.map(r=><td key={r.label} style={{...S.td,...S.tdWE}}/>)}
+                    {rowsVus.map(r=><td key={r.label} style={{...S.td,...S.tdWE}}/>)}
                   </tr>
                 );
                 return["M","AM"].map((sl,si)=>(
@@ -1523,7 +1538,7 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
                     <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dAT]}</div>
                   </td>}
                   <td style={{...S.tdFix,position:"sticky",left:42,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:"var(--td-fix)",borderRight:"2px solid var(--border)",minWidth:ideActive?46:24,padding:"2px"}}>{SLOTS[sl]}{ideActive&&<div style={{marginTop:2}}>{idePill(wY,wM,d,sl)}</div>}</td>
-                  {rows.map(row=>renderActCell(row,d,sl,wY,wM))}
+                  {rowsVus.map(row=>renderActCell(row,d,sl,wY,wM))}
                 </tr>
               ));
             })}
@@ -5041,6 +5056,7 @@ const HELP_SECTIONS=[
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
   HP({children:[HE("b",null,"iPhone / iPad (Safari)")," : ouvrez le planning dans Safari, touchez le bouton Partager (le carré avec une flèche vers le haut), faites défiler et choisissez ",HE("b",null,"« Sur l'écran d'accueil »"),", puis Ajouter. L'icône CardioPlanning apparaît et s'ouvre en plein écran, comme une vraie application."]}),
   HP({children:[HE("b",null,"Android (Chrome)")," : ouvrez le planning dans Chrome, menu ⋮ en haut à droite, puis ",HE("b",null,"« Ajouter à l'écran d'accueil »")," (ou « Installer l'application » si Chrome le propose) et validez."]}),
+  HP({children:[HE("b",null,"👁 Colonnes affichées")," (v10.170) : dans CHL, CHB, PT Angio et PT Cardio, le bouton 👁 (entre ↔ et 🖨️) ouvre la liste des colonnes que l'on peut masquer — les colonnes de reprise ↩ des onglets de salles, toutes les colonnes de PT Cardio — avec une case par colonne et ↩ Tout afficher pour revenir. Le bouton prend un liseré tant qu'au moins une colonne est masquée. Réglage mémorisé sur cet appareil seulement, comme le thème : rien n'est écrit dans Firebase et l'ordre partagé ↔ ne bouge pas. Une colonne masquée puis supprimée est oubliée, une colonne nouvelle apparaît toujours. L'impression suit l'écran : une colonne masquée ne s'imprime pas."]}),
   HP({children:[HE("b",null,"🌓 Clair ou sombre")," : le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto et affiche le mode retenu. Auto suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil) ; Jour et Nuit sont mémorisés sur cet appareil seulement — chacun règle le sien, rien n'est partagé."]}),
   HP({last:true,children:["Dans les deux cas, l'icône ouvre toujours la dernière version : c'est le site lui-même, aucune mise à jour manuelle à faire. Astuce : refaites simplement l'ajout si vous changez de téléphone."]}))},
 
@@ -5085,8 +5101,8 @@ const HELP_SECTIONS=[
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
   HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible. Éditeur et intermédiaires : un appui sur l'initiale en tête de colonne la suit (cadre à la couleur du médecin, autres colonnes estompées) ; un second appui relâche."]}),
   HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip. Les anciens onglets Tour et Gardes vivent ici, entiers, dans les tuiles 2 et 3."]}),
-  HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour. Le bouton ↔ règle l'",HE("b",null,"ordre des colonnes"),", de gauche à droite, site par site (↩ Ordre par défaut pour revenir en arrière)."]}),
-  HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise."]}),
+  HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour. Le bouton ↔ règle l'",HE("b",null,"ordre des colonnes"),", de gauche à droite, site par site (↩ Ordre par défaut pour revenir en arrière). Le bouton 👁 masque ou réaffiche les colonnes de reprise ↩ sur cet appareil seulement ; les salles restent toujours visibles."]}),
+  HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise. Le bouton 👁 masque ou réaffiche des colonnes sur cet appareil seulement — toutes celles de PT Cardio, les colonnes de reprise de PT Angio."]}),
   HTab({t:"🎓 Internes",children:["le planning des internes, par semestre de 6 mois : demi-journées, colonne de garde, jauge et statistiques. Onglet facultatif, activé dans Paramètres."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
   HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et sa fenêtre d'application — appliquer ou retirer, par mois ou par semaines. Les semaines entièrement passées ne s'affichent plus ; nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée."]}),
@@ -8675,6 +8691,12 @@ function CardioPlanning(){
   const [hlTick,setHlTick]=useState(0);   /* v10.118 : re-rendu du liseré */
   const [planFilter,setPlanFilter]=useState([]);
   const [showFull,setShowFull]=useState(false);
+  /* v10.170 : colonnes masquées par onglet ({CHL:[...],CHB:[...],ANGIO:[...],PT:[...]}), propres à
+     cet appareil comme le thème — mémoire du navigateur, jamais Firebase. */
+  const [colHide,setColHide]=useState(()=>{const v=ld("cp6_colHide",{});return v&&typeof v==="object"?v:{};});
+  useEffect(()=>{sv("cp6_colHide",colHide);},[colHide]);
+  const [hideModal,setHideModal]=useState(null);
+  const colHideToggle=(site,k)=>setColHide(p=>{const cur=(p&&p[site])||[];return {...p,[site]:cur.includes(k)?cur.filter(x=>x!==k):cur.concat([k])};});
   const viewPeriod=true;const setViewPeriod=()=>{};
   const snapToPeriodStart=React.useCallback((y,m)=>{
     const p=perStart(y,m);
@@ -11455,12 +11477,12 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
+      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
+        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -11471,12 +11493,12 @@ header::-webkit-scrollbar { display: none; }
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
       {tab==="plateau"&&<ActTabView issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfgAff}
-        rows={ptRows} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
+        rows={ptRows} colHide={colHide["PT"]||null} onHide={(cols)=>{setHideModal({site:"PT",cols});setModal("colHide");}} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -13497,6 +13519,24 @@ header::-webkit-scrollbar { display: none; }
           <button style={{...S.icnBtn,width:"100%",marginTop:10}} onClick={()=>{setColOrder(p=>({...p,[colModal.site]:[]}));setModal(null);setColModal(null);}}>↩ Ordre par défaut</button>
         </div>
       </div>}
+      {modal==="colHide"&&hideModal&&(()=>{
+        const cur=colHide[hideModal.site]||[];
+        const nomSite=hideModal.site==="PT"?"PT Cardio":hideModal.site==="ANGIO"?"PT Angio":hideModal.site;
+        const ferme=()=>{setModal(null);setHideModal(null);};
+        return <div style={S.ov} onClick={ferme}>
+          <div style={{...S.mb,width:330}} onClick={e=>e.stopPropagation()}>
+            <div style={S.mHd}><div style={S.mTit2}>👁 Colonnes affichées — {nomSite}</div><button style={S.xBtn} onClick={ferme}>×</button></div>
+            <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>Réglage propre à cet appareil : chacun choisit ce qu'il voit, rien n'est partagé.{hideModal.site!=="PT"&&" Les salles restent toujours visibles."}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
+              {(hideModal.cols||[]).map(c=>{const vu=!cur.includes(c.k);return(
+                <label key={c.k} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 6px",border:"1px solid var(--border)",borderRadius:6,background:"var(--bg2)",cursor:"pointer",opacity:vu?1:.55}}>
+                  <input type="checkbox" checked={vu} onChange={()=>colHideToggle(hideModal.site,c.k)}/>
+                  <span style={{flex:1,fontSize:12,fontWeight:700}}>{c.lab}</span>
+                </label>);})}
+            </div>
+            <button style={{...S.icnBtn,width:"100%",marginTop:10}} onClick={()=>setColHide(p=>({...p,[hideModal.site]:[]}))}>↩ Tout afficher</button>
+          </div>
+        </div>;})()}
       {modal==="ptOrder"&&<div style={S.ov} onClick={()=>setModal(null)}>
         <div style={{...S.mb,width:330}} onClick={e=>e.stopPropagation()}>
           <div style={S.mHd}><div style={S.mTit2}>↔ Ordre des colonnes — PT Cardio</div><button style={S.xBtn} onClick={()=>setModal(null)}>×</button></div>
