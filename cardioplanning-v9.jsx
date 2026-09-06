@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.183 — 06/09/2026";
+const APP_VERSION="v10.184 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1086,19 +1086,18 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
       }
       if(el.style.maxHeight!==lg)el.style.maxHeight=lg;return;
     }
-    /* v10.48, son retour Edge : « on perd de la place en bas ». Plus de marges
-       au doigt mouillé — les bandeaux fixés en bas (hors-ligne, PIN médecin ou
-       administratif) sont MESURÉS, et la boucle devient symétrique : elle
-       absorbe le débordement de la page ET reprend la place inutilisée tant
-       que le tableau a encore des lignes à montrer. Le tableau ne peut donc
-       qu'y gagner, jamais rétrécir. */
+    /* v10.48 : les bandeaux fixés en bas (hors-ligne, PIN médecin ou administratif) sont MESURÉS, jamais
+       estimés. (La boucle « absorber le débordement de page » de cette version a été retirée en v10.184.) */
     pageVerrou(true);   /* v10.161 : la page ne défile plus ; retour en haut avant la mesure */
     /* v10.181 : SOUS ZOOM, aucune unité n'est supposée. Le rapport de la v10.180 (Edge 151) montrait un
        tableau posé à 527 px mesuré 650 px à l'écran (ni ×1 ni ×1,1) et un « débordement » de la page sans
        rapport avec la réalité — c'est lui qui rabotait la grille à 110 % et la débordait à 120 %. On mesure
        donc le rapport RÉEL entre la hauteur posée (offsetHeight) et la hauteur vue (rect), on cale le bas du
-       tableau sur le bord de la fenêtre avec les seules mesures visuelles, et on relit une fois pour ajuster. */
-    if(ZOOM.f!==1){
+       tableau sur le bord de la fenêtre avec les seules mesures visuelles, et on relit une fois pour ajuster.
+       v10.184 : cette mesure vaut pour TOUS les zooms, 100 % compris. La boucle v10.48 (qui relisait le
+       débordement de page déclaré par le navigateur) retranchait 129 px fantômes sur son PC — un élément
+       invisible compté dans scrollHeight — et laissait une bande vide en bas ; elle est retirée. */
+    {
       const r0=el.getBoundingClientRect();
       const k=(r0.height>0&&el.offsetHeight>0)?(r0.height/el.offsetHeight):ZOOM.f;
       let barV=0;document.querySelectorAll('[data-botbar="1"]').forEach(b=>{barV=Math.max(barV,b.getBoundingClientRect().height||0);});
@@ -1113,21 +1112,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
       if(el.style.maxHeight!==vz)el.style.maxHeight=vz;
       const l="zoom "+ZOOM.z+" | fenetre "+window.innerWidth+"x"+window.innerHeight+" | k "+k.toFixed(3)+" | rect.top "+Math.round(r0.top)+" bas1 "+Math.round(r1.bottom)+" lim "+Math.round(lim)+" | offsetH "+el.offsetHeight+" scrollH "+el.scrollHeight+" | barV "+Math.round(barV)+" | pose "+vz;
       if(l!==doFit._last){doFit._last=l;jlog("MESURE",[l]);}
-      return;
     }
-    const de=document.documentElement;
-    const top=el.getBoundingClientRect().top+(window.scrollY||window.pageYOffset||0);
-    let h=(window.innerHeight-top)/ZOOM.f-barH-14;   /* v10.179 : top est en pixels de fenêtre, la hauteur posée en pixels de page */
-    const v0=Math.max(260,h)+"px";
-    if(el.style.maxHeight!==v0)el.style.maxHeight=v0;
-    const over=de.scrollHeight-de.clientHeight;   /* lu APRÈS la pose : la mise en page vient d'être refaite */
-    if(over>0)h-=over;                                          /* la page déborde encore : absorber */
-    else if(over<0&&el.scrollHeight-el.clientHeight>1){const gain=(-over)-barH-2;if(gain>0)h+=gain;} /* place perdue ET tableau coupé : la reprendre, en s'arrêtant AU-DESSUS des bandeaux fixés (ils ne pèsent pas dans la hauteur de page) */
-    if(h<380){pageVerrou(false);if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
-    const v=h+"px";
-    if(el.style.maxHeight!==v)el.style.maxHeight=v;
-    /* v10.183 : à 100 %, la boucle laisse ~80 px en bas sur son PC — on journalise pour voir d'où vient le débordement lu */
-    {const r=el.getBoundingClientRect();const l="zoom 100 | fenetre "+window.innerWidth+"x"+window.innerHeight+" | html client "+de.clientHeight+" scroll "+de.scrollHeight+" | rect.top "+Math.round(top)+" bas "+Math.round(r.bottom)+" | offsetH "+el.offsetHeight+" scrollH "+el.scrollHeight+" | barH "+barH+" over "+over+" | pose "+v;if(l!==doFit._last){doFit._last=l;jlog("MESURE",[l]);}}
   },[fit,mh]);
   React.useLayoutEffect(()=>{doFit();});
   /* v10.162 : le déverrouillage au démontage passait par l'effet PASSIF — au changement
