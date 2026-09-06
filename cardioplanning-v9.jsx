@@ -3,7 +3,13 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 // In CodeSandbox: data is kept in memory only (no persistence)
 // In production (Netlify): Firebase syncs automatically
 const db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseDB : null;
-const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", "main") : null;
+/* v10.175 : BAC À SABLE — un second cahier Firebase (planning/bac), copie du vrai, où l'éditeur teste
+   sans risque. Le drapeau est propre au navigateur (cp6_bac) ; l'application entière lit et écrit dans
+   le cahier désigné ici, et nulle part ailleurs. Dans le bac : ni sauvegarde, ni restauration, ni
+   archivage, ni signalement ; tout le reste (verrous, notifications, Construire) est identique. */
+var BAC=(function(){try{return localStorage.getItem("cp6_bac")==="1";}catch(e){return false;}})();
+var PLAN_ID=BAC?"bac":"main";
+const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", PLAN_ID) : null;
 /* v10.135 : garde-fou de version. Le 28/08, après un plantage, le cache a resservi une
    v9.22 — une copie de juillet qui aurait écrit avec ses règles d'alors, sans verrou du
    passé. Désormais la version la plus récente inscrit son numéro dans Firebase (appVer) ;
@@ -49,7 +55,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.174 — 06/09/2026";
+const APP_VERSION="v10.175 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -5326,6 +5332,12 @@ const HELP_SECTIONS=[
   HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui contiennent l'intégralité des données (toutes périodes) et permettent de tout remettre en place via l'encart 📂 Importer, juste en dessous. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
   HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). Depuis la v10.169, la date de la dernière sauvegarde est PARTAGÉE entre vos appareils : un ordinateur qui n'a jamais servi à sauvegarder ne réclame plus une sauvegarde dès sa première ouverture. Le compteur de cases modifiées, lui, reste propre à ",HE("b",null,"chaque ordinateur")," et repart de zéro dès qu'une sauvegarde est faite, d'où qu'elle vienne."]}))},
 
+ {id:"bac",icon:"🧪",title:"Bac à sable — tester sans risque",body:()=>HE("div",null,
+  HP({children:["Un espace de test à part, réservé à l'éditeur (Paramètres → 🧪 Bac à sable). En y entrant, l'application recopie le planning réel dans un cahier Firebase distinct, puis se recharge dessus : tout ce que vous y faites reste dans cette copie. Le bac est propre au navigateur qui l'a activé — vos collègues continuent de voir le vrai planning, et d'y travailler."]}),
+  HP({children:[HE("b",null,"Ce qui s'y comporte comme dans le vrai")," : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."]}),
+  HP({children:[HE("b",null,"Ce qui est désactivé")," : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."]}),
+  HP({children:[HE("b",null,"Le bandeau orange"),", en bas de l'écran, rappelle où vous êtes et porte trois commandes. ",HE("b",null,"Connecté comme"),", pour passer d'un profil à l'autre sans PIN — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation. ",HBtn({kind:"ghost",children:"↺ Remettre à zéro"}),", qui remplace le bac par une copie fraîche du planning réel. ",HBtn({kind:"ghost",children:"🚪 Sortir du bac"}),", qui ramène au vrai planning. L'écran d'accueil (PIN) affiche le même rappel, avec son bouton Sortir."]})
+ )},
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
   HP({children:["Une case ",HE("b",null,"hachurée")," veut toujours dire la même chose, quel que soit l'onglet : ",HE("b",null,"cette personne n'est pas disponible ce jour-là"),". Ce n'est pas un effet d'affichage mais un ",HE("b",null,"verrou")," : la case ne s'ouvre pas au clic, le planning type ne s'y applique pas, et les répartitions automatiques passent la personne. Couverte sur ",HE("b",null,"toute")," la période affichée, sa colonne disparaît même des grilles."]}),
   HP({children:["Deux situations produisent une hachure : une ",HE("b",null,"désactivation posée à la main")," (ci-dessous), et un ",HE("b",null,"rôle de Dr Junior dont le nom du semestre n'a pas encore été saisi")," (section suivante). Dans les deux cas, le contenu déjà posé n'est pas effacé : il reste sous les hachures."]}),
@@ -9306,12 +9318,13 @@ function CardioPlanning(){
     }catch(e){console.log("backup list:",e);return [];}
   },[]);
   const makeBackup=useCallback(async(manual)=>{
+    if(BAC){if(manual)toast("🧪 Bac à sable : pas de sauvegarde ici","warn");return false;}   /* v10.175 */
     try{
-      const cur=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};
+      const cur=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data()||{};
       const ts=Date.now();
       const payload={...cur,_ts:ts};
       await window.firebaseDB.collection("backups").doc("b"+ts).set(payload);
-      await window.firebaseDB.collection("planning").doc("main").set({_lastBackupAt:ts},{merge:true});
+      await window.firebaseDB.collection("planning").doc(PLAN_ID).set({_lastBackupAt:ts},{merge:true});
       // Purge au-delà de 10
       const items=await refreshBackupList();
       for(const it of items.slice(BK_KEEP)){
@@ -9397,7 +9410,7 @@ function CardioPlanning(){
     refreshArchList();
     (async()=>{
       try{
-        const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};
+        const d=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data()||{};
         let bytes=0;const det={};
         Object.keys(d).forEach(k=>{
           const v=d[k];
@@ -9415,6 +9428,7 @@ function CardioPlanning(){
      qu'aux cases du médecin choisi, sur les dates choisies : ce qui a été fait ailleurs
      est préservé. C'est le filet qui manquait maintenant qu'effacer une période est facile. */
   const restoreMedPeriod=useCallback(async(id,medId,dateFrom,dateTo)=>{
+    if(BAC){toast("🧪 Bac à sable : pas de restauration ici","warn");return 0;}   /* v10.175 */
     try{
       const d=await window.firebaseDB.collection("backups").doc(id).get();
       const data=d.data();
@@ -9454,21 +9468,23 @@ function CardioPlanning(){
     }catch(e){console.log("restore ciblee:",e);toast("Échec de la restauration","warn");return 0;}
   },[plan]);
   const restoreBackup=useCallback(async(id)=>{
+    if(BAC){toast("🧪 Bac à sable : pas de restauration ici","warn");return;}   /* v10.175 */
     try{
       const d=await window.firebaseDB.collection("backups").doc(id).get();
       const data=d.data();
       if(!data){toast("Sauvegarde introuvable","warn");return;}
       const{_ts,...rest}=data;
       planPending.current={};planSynced.current=null;
-      await window.firebaseDB.collection("planning").doc("main").set(rest); // remplacement complet : une restauration EST l'état intégral
+      await window.firebaseDB.collection("planning").doc(PLAN_ID).set(rest); // remplacement complet : une restauration EST l'état intégral
       toast("Sauvegarde restaurée — rechargez la page si besoin","info");
     }catch(e){console.log("restore:",e);toast("Échec de la restauration","warn");}
   },[]);
   useEffect(()=>{
     // Au chargement : backup auto si la dernière date de plus de 72 h
+    if(BAC)return;   /* v10.175 : jamais depuis le bac à sable */
     const t=setTimeout(async()=>{
       try{
-        const d=await window.firebaseDB.collection("planning").doc("main").get();
+        const d=await window.firebaseDB.collection("planning").doc(PLAN_ID).get();
         const last=(d.data()||{})._lastBackupAt||0;
         if(Date.now()-last>24*3600*1000)await makeBackup(false);   /* v10.0 : une par jour au lieu d'une tous les 3 jours */
         else refreshBackupList();
@@ -11292,6 +11308,23 @@ function CardioPlanning(){
     setExpBusy(false);
   },[expSrc,expPer,plan,notes,tourMed,tourDerog,medecins,actes,salleReg,planningType]);
 
+  /* v10.175 : BAC À SABLE — copie, entrée, sortie, changement de profil sans PIN. La copie lit le vrai
+     planning et écrit le bac : c'est le seul endroit du code qui nomme les deux cahiers ; partout ailleurs,
+     l'application ne connaît que PLANNING_DOC / PLAN_ID. Le changement de profil refait ce que fait le PIN
+     (mêmes setAccessMode / setEditMedId / setIsCadre), la vérification du code en moins. */
+  const bacCopie=async()=>{const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};await window.firebaseDB.collection("planning").doc("bac").set(d);};
+  const bacEntrer=async()=>{if(!window.confirm("Entrer dans le bac à sable ?\n\nLe planning réel est recopié dans un espace de test à part, puis l'application se recharge. Rien de ce que vous y ferez ne touchera au vrai planning."))return;
+    try{await bacCopie();localStorage.setItem("cp6_bac","1");window.location.reload();}catch(e){toast("Échec de la copie vers le bac à sable","warn");}};
+  const bacRaz=async()=>{if(!window.confirm("Remettre le bac à sable à zéro ?\n\nSon contenu est remplacé par une copie fraîche du planning réel, puis l'application se recharge."))return;
+    try{await bacCopie();window.location.reload();}catch(e){toast("Échec de la remise à zéro","warn");}};
+  const bacSortir=()=>{try{localStorage.removeItem("cp6_bac");}catch(e){}window.location.reload();};
+  const bacProfil=accessMode==="edit"?"edit":accessMode==="view"?"view":accessMode==="medecinEdit"?"med:"+editMedId:accessMode==="adminEdit"?(isCadre?"cadre":"admin"):accessMode==="interneEdit"?"interne":"edit";
+  const bacConnecter=(v)=>{setPinInput("");setPinError(false);
+    if(v==="edit"||v==="view"){setIsCadre(false);setAccessMode(v);setTab("planning");return;}
+    if(v.indexOf("med:")===0){const id=parseInt(v.slice(4));const m=medecins.find(x=>x.id===id);if(!m)return;setEditMedId(id);setIsCadre(false);setAccessMode("medecinEdit");setTab(m.role==="attache"?"attache":"planning");return;}
+    if(v==="admin"||v==="cadre"){if(!adminName)setAdminName("Bac");setIsCadre(v==="cadre");setAccessMode("adminEdit");setTab("planning");return;}
+    if(v==="interne"){if(!interneName)setInterneName("Bac");setAccessMode("interneEdit");setTab("planning");}};
+
   /* ── Login ── */
   // Show loading while Firebase connects (so medPins are available for login)
   if(accessMode==="ask"&&fbStatus==="connecting"&&!PLANNING_DOC) return(
@@ -11306,6 +11339,7 @@ function CardioPlanning(){
         <div style={{fontSize:32,marginBottom:8}}>♥</div>
         <div style={{fontWeight:800,fontSize:20,color:"var(--txt)",marginBottom:4}}>CardioPlanning</div>
         <div style={{color:"var(--txt2)",fontSize:13,marginBottom:20}}>CHL & CHB</div>
+        {BAC&&<div style={{fontSize:11,fontWeight:700,color:"#c2410c",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>🧪 Bac à sable — espace de test<button onClick={bacSortir} style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6,border:"1px solid #c2410c",background:"none",color:"#c2410c",cursor:"pointer"}}>Sortir</button></div>}{/* v10.175 */}
         <button style={{width:"100%",padding:"11px",borderRadius:9,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontSize:14,marginBottom:14,fontWeight:600}} onClick={()=>setAccessMode("view")}>👁 Consulter</button>
         <div style={{color:"var(--txt3)",fontSize:12,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           — édition —
@@ -11388,7 +11422,7 @@ function CardioPlanning(){
       mode:(accessMode==="edit"?"éditeur":accessMode==="medecinEdit"?"médecin "+(authorRef.current||"?"):accessMode==="adminEdit"?"administratif "+(authorRef.current||"?"):accessMode==="interneEdit"?"interne "+(authorRef.current||"?"):"consultation")+(VER_STALE.on?" — version périmée":""),
       appareil:(narrow?"téléphone":"ordinateur")+" "+window.innerWidth+"×"+window.innerHeight+(inst?", installée sur l'écran d'accueil":", dans le navigateur"),
       reseau:(netOff||navigator.onLine===false)?"hors ligne":"en ligne",theme:darkMode?"nuit":"jour",navigateur:String(navigator.userAgent||"?").slice(0,200)};};
-  const sigEnvoyer=async(texte)=>{const ts=Date.now();await window.firebaseDB.collection("signalements").doc("s"+ts).set({ts,auteur:authorRef.current||"?",texte:String(texte||"").slice(0,2000),ctx:sigCtx(),journal:JOURNAL.slice(),prec:JOURNAL_PREC.slice(),traite:false});toast("Signalement envoyé — merci");refreshSig();};
+  const sigEnvoyer=async(texte)=>{if(BAC){toast("🧪 Bac à sable : pas de signalement d'ici","warn");return;}const ts=Date.now();await window.firebaseDB.collection("signalements").doc("s"+ts).set({ts,auteur:authorRef.current||"?",texte:String(texte||"").slice(0,2000),ctx:sigCtx(),journal:JOURNAL.slice(),prec:JOURNAL_PREC.slice(),traite:false});toast("Signalement envoyé — merci");refreshSig();};
   const sigNouv=isEdit?sigList.filter(s=>!s.traite).length:0;
   /* v10.132 : bandeaux du Planning et des Attachés (sa capture iPhone du 28/08) — sous 760 px,
      les icônes impression / clair-sombre / préférences se replient sous ⋯ et ressortent
@@ -11506,14 +11540,30 @@ header::-webkit-scrollbar { display: none; }
       {netOff&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
         📴 Hors ligne — dernier planning reçu · lecture seule
       </div>}
-      {isMedEdit&&botOn&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+      {isMedEdit&&botOn&&!BAC&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(djAff(medecins.find(m=>m.id===editMedId),djTodayIso)||{nom:""}).nom}{/* v10.150 : le junior en poste, pas le rôle */}
       </div>}
-      {isInterne&&botOn&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e9f9f",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+      {isInterne&&botOn&&!BAC&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e9f9f",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         🎓 Accès interne — {interneName||"?"}
       </div>}
-      {isAdminEdit&&botOn&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
+      {isAdminEdit&&botOn&&!BAC&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#7c3aed",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         🗝 {isCadre?"Édition cadre":"Édition secrétaire"} — {adminName||"?"}
+      </div>}
+
+      {BAC&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#c2410c",color:"#fff",textAlign:"center",fontSize:12,padding:"6px 8px",zIndex:520,fontWeight:700,display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"center",gap:8}}>{/* v10.175 : bandeau du bac à sable — remplace les bandeaux de profil, qu'il porte lui-même */}
+        <span>🧪 BAC À SABLE — rien ici n'est réel</span>
+        <label style={{display:"flex",alignItems:"center",gap:4,fontWeight:600}}>Connecté comme
+          <select value={bacProfil} onChange={e=>bacConnecter(e.target.value)} style={{fontSize:12,padding:"2px 4px",borderRadius:6,border:"none",color:"#c2410c",fontWeight:700}}>
+            <option value="edit">Éditeur</option>
+            <option value="view">Consultation</option>
+            {medecins.filter(m=>!medParti(m)).map(m=><option key={m.id} value={"med:"+m.id}>{m.role==="attache"?"Attaché "+m.nom:"Dr "+m.nom+" — "+(m.niveau==="editeur"?"éditeur":m.niveau==="inter"?"intermédiaire":"basique")}</option>)}
+            <option value="admin">Secrétaire</option>
+            <option value="cadre">Cadre</option>
+            <option value="interne">Interne</option>
+          </select>
+        </label>
+        <button onClick={bacRaz} style={{fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,.6)",background:"none",color:"#fff",cursor:"pointer"}}>↺ Remettre à zéro</button>
+        <button onClick={bacSortir} style={{fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6,border:"none",background:"#fff",color:"#c2410c",cursor:"pointer"}}>🚪 Sortir du bac</button>
       </div>}
 
       {/* HEADER */}
@@ -12556,11 +12606,21 @@ header::-webkit-scrollbar { display: none; }
               <div style={{fontSize:11,color:"var(--txt3)",marginTop:4}}>Les salles créées ici restent disponibles même si aucune activité ne les utilise. Renommer propage aux activités et au planning.</div>
             </div>
 
+          {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.175 : bac à sable */}
+            <div style={{fontWeight:700,color:"#c2410c",fontSize:13,marginBottom:6}}>🧪 Bac à sable</div>
+            {BAC
+              ?<div style={{fontSize:11,color:"var(--txt2)"}}>Vous êtes dans le bac à sable : ce que vous voyez est une copie du planning réel, prise à l'entrée ou à la dernière remise à zéro. Les verrous, les notifications et Construire s'y comportent exactement comme dans le vrai ; sauvegardes, restauration, archivage et signalements sont désactivés. Le bandeau orange, en bas, permet de changer de profil sans PIN, de repartir d'une copie fraîche, ou de sortir.</div>
+              :<div>
+                <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un espace de test à part, copie du planning réel au moment où vous y entrez. Tout s'y comporte comme dans le vrai — verrous, notifications, Construire — mais rien de ce que vous y faites ne touche au planning réel. Le bac est propre à ce navigateur : vos collègues ne le voient pas.</div>
+                <button onClick={bacEntrer} style={{width:"100%",padding:"9px",borderRadius:8,border:"1.5px solid #c2410c",background:"rgba(194,65,12,.10)",color:"#c2410c",fontWeight:800,cursor:"pointer",fontSize:13}}>🧪 Entrer dans le bac à sable</button>
+              </div>}
+          </div>}
           <div style={{...S.card,marginBottom:10}}>{/* v10.137 : Sauvegarde & archivage, carte à part */}
             <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
               Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois.
             </div>
+            {BAC&&<div style={{fontSize:11,fontWeight:700,color:"#c2410c",marginBottom:10}}>🧪 Bac à sable : sauvegardes, restauration et archivage sont désactivés ici — les boutons répondent par un simple message.</div>}{/* v10.175 */}
             {docSize!==null&&(()=>{
               const LIMIT=1048576;
               const pct=Math.min(100,Math.round(docSize/LIMIT*100));
@@ -12686,6 +12746,7 @@ header::-webkit-scrollbar { display: none; }
                  paramétrée par la liste. Le découpage est recalculé AU CLIC pour être
                  annoncé dans la confirmation avant le moindre retrait. */
               const archiverPers=async(list)=>{
+                if(BAC){toast("🧪 Bac à sable : pas d'archivage ici","warn");return;}   /* v10.175 */
                 const libs=list.map(perLib);
                 const anxL=arDecoupe({tourMed,tourDerog,tourPtOte,notes,tourWish,tourAvoid,gardeWish,gardeAvoid,astreinte,secrNotif,build,csRep,csBlanches},list);
         /* v10.125 : semestres d'internes clos et noms de juniors — copiés dans
@@ -12806,6 +12867,7 @@ header::-webkit-scrollbar { display: none; }
                       <span key={pid} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,fontWeight:700,padding:"3px 7px",borderRadius:12,border:"1px solid #7c3aed",background:"rgba(124,58,237,.07)",color:"#7c3aed"}}>
                         🗄 {perLib(pid)}
                         <button title="Désarchiver : remettre cette période dans les données actives" onClick={async()=>{
+                            if(BAC){toast("🧪 Bac à sable : pas de désarchivage ici","warn");return;}   /* v10.175 */
                             if(!window.confirm("Désarchiver la période "+perLib(pid)+" ? Elle sera remise dans les données actives, cases ET données datées (les valeurs actives existantes sont conservées en cas de doublon)."))return;
                             try{
                               const ref=window.firebaseDB.collection("archives").doc("per-"+pid);
@@ -13427,7 +13489,7 @@ header::-webkit-scrollbar { display: none; }
                 {/* v9.92 : un seul bouton remplace « Pose et retrait Abs », « Effacer activités » et « Effacer mois » */}
                 {canEditThisMed&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_perMode:true});setModal("periode");}}>📅 Modifier sur une période…</button>}
                 {/* v10.2 : réservé à l'éditeur — restaurer écrase le travail d'autrui sur la période */}
-                {isEdit&&<button style={{...S.qBtn,borderColor:"#16a34a",background:"#f0fdf4",color:"#166534"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_resMode:true});refreshBackupList();setModal("restaure");}}>↩ Restaurer depuis une sauvegarde…</button>}
+                {isEdit&&!BAC&&<button style={{...S.qBtn,borderColor:"#16a34a",background:"#f0fdf4",color:"#166534"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_resMode:true});refreshBackupList();setModal("restaure");}}>↩ Restaurer depuis une sauvegarde…</button>}
                 {isEdit&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setModal(null);openPtModal(medId);}}>▶ PT {med&&med.init}</button>}
                 {canEditThisMed&&!isAdminEdit&&med&&(med.tourMed||med.garde)&&<button style={{...S.qBtn,borderColor:"#7c3aed",background:"#f3e8ff",color:"#6d28d9"}}
                   onClick={()=>{setModal("prefs");}}>
