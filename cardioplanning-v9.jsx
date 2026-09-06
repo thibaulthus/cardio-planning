@@ -26,9 +26,9 @@ function toast(msg,type,act){if(TOAST_HUB.f)TOAST_HUB.f(msg,type,act);}
 /* v10.179 : ZOOM de l'application — un facteur par appareil (cp6_zoom), 110 % en nominal (son choix).
    Posé sur <html> avant même React. Les mesures faites en pixels de FENÊTRE (largeur « téléphone »
    < 760, hauteur des grilles pleine page) se divisent par ZOOM.f pour redevenir des pixels de page.
-   ZOOM.edit / ZOOM.all disent qui voit le bouton 🔍 ; l'application les pose à chaque rendu. */
+   v10.185 : le bouton 🔍 est proposé à tous, sans réglage. */
 var ZOOM_DEF=110,ZOOM_PAS=[100,110,120,130];   /* v10.183 : 110 % en nominal (son choix), une fois les grilles au point sur PC et iPhone (v10.181/182) */
-var ZOOM=(function(){var z=ZOOM_DEF;try{var v=parseInt(localStorage.getItem("cp6_zoom"),10);if(ZOOM_PAS.indexOf(v)>=0)z=v;}catch(e){}return {z:z,f:z/100,edit:false,all:false};})();
+var ZOOM=(function(){var z=ZOOM_DEF;try{var v=parseInt(localStorage.getItem("cp6_zoom"),10);if(ZOOM_PAS.indexOf(v)>=0)z=v;}catch(e){}return {z:z,f:z/100};})();
 function zoomApply(z){ZOOM.z=z;ZOOM.f=z/100;try{document.documentElement.style.zoom=String(ZOOM.f);}catch(e){}}
 zoomApply(ZOOM.z);
 function verNum(v){var m=String(v||"").match(/(\d+)\.(\d+)/);return m?parseInt(m[1],10)*1000+parseInt(m[2],10):0;}
@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.184 — 06/09/2026";
+const APP_VERSION="v10.185 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -683,10 +683,9 @@ function Chp({bg,c,children}){return <span style={{fontSize:9,background:bg,colo
 /* v10.174 : le 🐞 dans chaque onglet, à côté du bouton ☀️/🌓. Il ne connaît pas l'App et lui envoie
    un simple événement, que CardioPlanning écoute pour ouvrir la modale de signalement. */
 /* v10.179 : le bouton de zoom voisin du 🐞 — cycle 100 → 110 → 120 → 130 %, mémorisé sur l'appareil.
-   Visible de l'éditeur ; de tous quand la coche « Proposer le bouton 🔍 à tout le monde » est mise. */
+   Proposé à tous (v10.185). */
 function ZoomBtn(){
   const [,tick]=useState(0);
-  if(!(ZOOM.edit||ZOOM.all))return null;
   const suiv=ZOOM_PAS[(ZOOM_PAS.indexOf(ZOOM.z)+1)%ZOOM_PAS.length];
   return <button onClick={()=>{zoomApply(suiv);try{localStorage.setItem("cp6_zoom",String(suiv));}catch(e){}window.dispatchEvent(new Event("resize"));tick(t=>t+1);}} title={"Zoom "+ZOOM.z+" % — cliquer pour "+suiv+" % (réglage de cet appareil)"} style={{...S.arr,fontSize:10,width:46,fontWeight:800}}>{"🔍"+ZOOM.z}</button>;
 }
@@ -5361,7 +5360,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Zoom de l'application")," (v10.179) : tout l'affichage est à 110 % par défaut. Le bouton 🔍, à côté de 🐞, passe à 120, 130, puis 100 % — réglage mémorisé sur l'appareil, chacun le sien ; le zoom du navigateur (Ctrl + molette, pincement) reste possible par-dessus. L'impression reste à 100 %. Le bouton est d'abord réservé à l'éditeur ; une coche de Paramètres le propose à tous."]}),
+  HP({children:[HE("b",null,"Zoom de l'application")," (v10.179) : tout l'affichage est à 110 % par défaut. Le bouton 🔍, à côté de 🐞, passe à 120, 130, puis 100 % — réglage mémorisé sur l'appareil, chacun le sien ; le zoom du navigateur (Ctrl + molette, pincement) reste possible par-dessus. L'impression reste à 100 %. Le bouton est proposé à tous."]}),
   HP({children:[HE("b",null,"Le vrai nom du junior dans les modales")," (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."]}),
   HP({children:[HE("b",null,"Une seule barre de défilement sur ordinateur")," (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."]}),
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
@@ -8801,7 +8800,6 @@ function CardioPlanning(){
   const [isCadre,setIsCadre]=useState(false);
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
-  const [uiCfg,setUiCfg]=useState({});   /* v10.179 : réglages d'affichage partagés — zoomAll */
   const [intCfg,setIntCfg]=useState({sems:[],show:false,jaugeDef:true,sHC:2,sUS:2,sSam:1}); // v10.54 internes
   const [prefOn,setPrefOn]=useState(false);   // v10.81 : coloration des preferences — session seulement
   const [intGardeOn,setIntGardeOn]=useState(false); // v10.61 lot 3b : colonne garde int. du Planning — session seulement, cachée en nominal
@@ -9343,7 +9341,6 @@ function CardioPlanning(){
             if(data.adminPin!==undefined)setAdminPin(data.adminPin);
           if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
-          if(data.uiCfg){try{setUiCfg(JSON.parse(data.uiCfg)||{});}catch(e){}}
           if(data.intCfg){try{setIntCfg(pv=>({...pv,...JSON.parse(data.intCfg)}));}catch(e){}}
           if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
           if(data.specColors){try{setSpecColors(JSON.parse(data.specColors)||{});}catch(e){}}
@@ -9905,7 +9902,6 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({intCfg:JSON.stringify(intCfg)});},[intCfg]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({uiCfg:JSON.stringify(uiCfg)});},[uiCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({specColors:JSON.stringify(specColors)});},[specColors]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({vacs:JSON.stringify(vacs),vacRule:vacRule?1:0});},[vacs,vacRule]);
@@ -9978,7 +9974,6 @@ function CardioPlanning(){
   useEffect(()=>{setNotif(null);},[tab]);
   const acteById=useCallback(id=>actes.find(a=>a.id===id),[actes]);
   const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"&&(((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")!=="attache"))&&!netOff;  /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
-  ZOOM.edit=isEdit;ZOOM.all=(uiCfg&&uiCfg.zoomAll===true);   /* v10.179 : qui voit le bouton 🔍 */
   /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
      une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
   const verrouDeb=useMemo(()=>verrouDebut(),[PCFG.len,PCFG.startM,vacs]);
@@ -12541,14 +12536,6 @@ header::-webkit-scrollbar { display: none; }
           </div>}
 
           <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]}/>
-          <div style={{...S.card,marginBottom:10}}>{/* v10.179 */}
-            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔍 Zoom de l'application</div>
-            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--txt)",cursor:"pointer"}}>
-              <input type="checkbox" checked={uiCfg.zoomAll===true} onChange={e=>setUiCfg(p=>({...(p||{}),zoomAll:e.target.checked}))} style={{width:15,height:15}}/>
-              {"Proposer le bouton 🔍 à tout le monde"}
-            </label>
-            <div style={{fontSize:9,color:"var(--txt3)",marginTop:5}}>{"Le bouton 🔍, à côté de 🐞 dans chaque onglet, règle la taille de tout l'affichage (100, 110, 120 ou 130 %) sur l'appareil où l'on clique ; l'application est à 110 % par défaut. Tant que la coche n'est pas mise, l'éditeur seul le voit."}</div>
-          </div>
           <div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔔 Notifications aux secrétaires</div>
             <div>
