@@ -166,7 +166,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.171 — 06/09/2026";
+var APP_VERSION = "v10.172 — 06/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -3340,7 +3340,32 @@ function semRange(base,abs){
   }
   return {deb,fin};
 }
-function PeriodModal({ medecins, initMedId, initDate, year, month, mois = [], finPer = null, allowActs = true, compter, onPose, onRetraitAbs, onEffacer, onClose }) {
+/* v10.172 : les cases (y,m,d,sl) qu'une pose d'absence ou de FMC va écrire, depuis un
+   périmètre { dateFrom, dateTo, slotDebut, slotFin } : les jours du milieu sont entiers,
+   seules les extrémités peuvent être partielles, un week-end ou un férié n'a que sa case
+   JOUR. sansWE (« la semaine » de FMC) saute week-ends et fériés. */
+function absCases(p){
+  const a=p.dateFrom.split("-").map(Number),b=p.dateTo.split("-").map(Number);
+  const deb=new Date(a[0],a[1]-1,a[2]),fin=new Date(b[0],b[1]-1,b[2]);
+  const sD=p.slotDebut||"M",sF=p.slotFin||"AM",out=[];
+  for(let t=new Date(deb);t.getTime()<=fin.getTime();t.setDate(t.getDate()+1)){
+    const y=t.getFullYear(),m=t.getMonth(),d=t.getDate();
+    if(isWE(y,m,d)){if(!p.sansWE)out.push({y,m,d,sl:"JOUR"});continue;}
+    const estDeb=t.getTime()===deb.getTime(),estFin=t.getTime()===fin.getTime();
+    let sls=["M","AM"];
+    if(estDeb&&estFin)sls=sD===sF?[sD]:["M","AM"];
+    else if(estDeb)sls=sD==="AM"?["AM"]:["M","AM"];
+    else if(estFin)sls=sF==="M"?["M"]:["M","AM"];
+    sls.forEach(sl=>out.push({y,m,d,sl}));
+  }
+  return out;
+}
+/* « mar. 8/9 matin » — libellé court d'une case, pour les listes de la pose */
+function absLib(c){
+  const dw=new Date(c.y,c.m,c.d).getDay();
+  return JOURSL[dw].slice(0,3).toLowerCase()+". "+c.d+"/"+(c.m+1)+(c.sl==="M"?" matin":c.sl==="AM"?" après-midi":"");
+}
+function PeriodModal({ medecins, initMedId, initDate, year, month, mois = [], finPer = null, allowActs = true, compter, bilan = null, onPose, onRetraitAbs, onEffacer, onClose }) {
     const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const [action, setAction] = useState("poser"); // poser | retirer
     const [cible, setCible] = useState("abs"); // abs | activites | tout   (si retirer)
@@ -3377,8 +3402,12 @@ function PeriodModal({ medecins, initMedId, initDate, year, month, mois = [], fi
     const semBase = (() => { const s = initDate || df || fmt(new Date()); const p2 = s.split("-").map(Number); return new Date(p2[0], (p2[1] || 1) - 1, p2[2] || 1); })();
     /* v10.114 : pour une ABSENCE (pose, ou retrait ciblé absences/FMC), la semaine
        embarque les week-ends et les fériés accolés — sa règle du 25/08/2026. */
-    const semAbs = action === "poser" || cible === "abs";
-    const { deb: semDeb, fin: semFin } = semRange(semBase, semAbs);
+    /* v10.172 : la semaine d'une FMC va du lundi au vendredi, sans week-end ni férié (congrès
+       le week-end : « 2 jours » / « 3 jours » depuis la case). */
+    const fmcSem = action === "poser" && absType === "FORMATION" && semEntier;
+    const semAbs = (action === "poser" && absType !== "FORMATION") || (action === "retirer" && cible === "abs");
+    const { deb: semDeb, fin: semFin0 } = semRange(semBase, semAbs);
+    const semFin = fmcSem ? new Date(semDeb.getFullYear(), semDeb.getMonth(), semDeb.getDate() + 4) : semFin0;
     const rDf = moisEntier ? moisDeb : semEntier ? fmt(semDeb) : df, rDt = moisEntier ? moisFin : semEntier ? fmt(semFin) : dt;
     const rDeb = (moisEntier || semEntier) ? "M" : slDeb, rFin = (moisEntier || semEntier) ? "AM" : slFin;
     const nbJours = (() => {
@@ -3403,12 +3432,19 @@ function PeriodModal({ medecins, initMedId, initDate, year, month, mois = [], fi
                 : `${MOIS[mDeb.m]} → ${MOIS[mFin.m]} ${mFin.y}${iFin === moisList.length - 1 && finPer ? " (jusqu'à la fin de la période)" : ""} · ${nbJours} jours`)
             : `du ${rDf} ${rDeb === "M" ? "matin" : "après-midi"} au ${rDt} ${rFin === "M" ? "matin" : "après-midi"} · ${nbJours} jour${nbJours > 1 ? "s" : ""}`);
     /* les demi-journées d'extrémité : un jour au milieu de la période est toujours entier */
+    const perim = () => ({ medId, dateFrom: rDf, dateTo: rDt, slotDebut: rDeb, slotFin: rFin, slots: ["M", "AM"] });
     const lancer = () => {
         if (!ok)
             return;
-        const p = { medId, dateFrom: rDf, dateTo: rDt, slotDebut: rDeb, slotFin: rFin, slots: ["M", "AM"] };
+        const p = perim();
         if (action === "poser") {
-            onPose(Object.assign(Object.assign({}, p), { absType }));
+            /* v10.172 : ce que la plage rencontre, avant d'écrire — tour, gardes, cases occupées */
+            const r = bilan ? bilan(Object.assign(Object.assign({}, p), { absType, sansWE: fmcSem })) : null;
+            if (r && (r.b.tour.length || r.b.occ.length || r.b.gardes.length)) {
+                setConfirm({ abs: r });
+                return;
+            }
+            onPose(Object.assign(Object.assign({}, p), { absType, sansWE: fmcSem }));
             return;
         }
         if (cible === "abs") {
@@ -3439,6 +3475,58 @@ function PeriodModal({ medecins, initMedId, initDate, year, month, mois = [], fi
             slotDebut: rDeb, slotFin: rFin })
         : { n: 0, det: [] };
     const nEff = rEff.n;
+    if (confirm && confirm.abs)
+        return (() => {
+    /* v10.172 : avant de poser, la liste de ce que la plage rencontre — même règles que la
+       modale de case : un jour de tour refuse la pose, une garde est conservée d'office, le
+       reste se garde ou se remplace. */
+    const r = confirm.abs, b = r.b, isFmc = absType === "FORMATION";
+    const ul = { margin: "3px 0 0 16px", padding: 0, fontSize: 11, fontWeight: 600, lineHeight: 1.5 };
+    const go = (garder) => { setConfirm(null); onPose(Object.assign(Object.assign({}, perim()), { absType, sansWE: fmcSem, cases: r.cases, skip: garder ? b.occKeys : null })); };
+    return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
+        React.createElement("div", { style: S.mHd },
+            React.createElement("div", { style: Object.assign(Object.assign({}, S.mTit2), { color: b.tour.length ? "#991b1b" : "var(--txt)" }) }, b.tour.length ? "🚫 Pose refusée" : "Avant de poser")),
+        React.createElement("div", { style: { fontSize: 12.5, lineHeight: 1.6, color: "var(--txt)" } },
+            React.createElement("b", null, libAction),
+            " pour ",
+            React.createElement("b", null, med ? med.prenom + " " + med.nom : "—"),
+            React.createElement("br", null),
+            "sur ",
+            React.createElement("b", null, libPeriode),
+            "."),
+        b.tour.length > 0 && React.createElement("div", { style: { marginTop: 9, padding: "7px 9px", borderRadius: 7, border: "1px solid #dc2626", background: "rgba(220,38,38,.10)" } },
+            React.createElement("div", { style: { fontSize: 11.5, fontWeight: 800, color: "#dc2626" } },
+                "Une ",
+                isFmc ? "formation" : "absence",
+                " ne recouvre jamais un jour de tour"),
+            React.createElement("ul", { style: Object.assign(Object.assign({}, ul), { color: "#991b1b" }) }, b.tour.map((t, i) => React.createElement("li", { key: "t" + i }, t))),
+            React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginTop: 4 } },
+                "\u00C9changez d'abord ce",
+                b.tour.length > 1 ? "s jours" : " jour",
+                " (\u21C4 depuis la case du Planning), puis revenez poser.")),
+        b.gardes.length > 0 && React.createElement("div", { style: { marginTop: 9, padding: "7px 9px", borderRadius: 7, border: "1px solid #93c47d", background: "rgba(147,196,125,.12)" } },
+            React.createElement("div", { style: { fontSize: 11.5, fontWeight: 800, color: "#3f6f2b" } },
+                "\u270B Conserv\u00E9",
+                b.gardes.length > 1 ? "s" : "",
+                " d'office \u2014 une garde s'\u00E9change, elle ne s'efface pas"),
+            React.createElement("ul", { style: Object.assign(Object.assign({}, ul), { color: "var(--txt2)" }) }, b.gardes.map((t, i) => React.createElement("li", { key: "g" + i }, t)))),
+        b.occ.length > 0 && !b.tour.length && React.createElement("div", { style: { marginTop: 9, padding: "7px 9px", borderRadius: 7, border: "1px solid #f59e0b", background: "rgba(245,158,11,.12)" } },
+            React.createElement("div", { style: { fontSize: 11.5, fontWeight: 800, color: "#b45309" } },
+                "\u26A0 ",
+                b.occ.length,
+                " case",
+                b.occ.length > 1 ? "s" : "",
+                " d\u00E9j\u00E0 occup\u00E9e",
+                b.occ.length > 1 ? "s" : ""),
+            React.createElement("ul", { style: Object.assign(Object.assign({}, ul), { color: "#854f0b" }) }, b.occ.map((t, i) => React.createElement("li", { key: "c" + i }, t)))),
+        React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 13, flexWrap: "wrap" } },
+            React.createElement("button", { style: segBtn(false), onClick: () => setConfirm(null) }, "\u2190 Retour"),
+            !b.tour.length && b.occ.length > 0 && React.createElement("button", { style: Object.assign(Object.assign({}, segBtn(true)), { borderColor: "#16a34a", background: "#f0fdf4", color: "#166534" }), onClick: () => go(true) },
+                "Garder ce",
+                b.occ.length > 1 ? "s " + b.occ.length + " cases" : "tte case"),
+            !b.tour.length && b.occ.length > 0 && React.createElement("button", { style: segBtn(true, true), onClick: () => go(false) }, "Remplacer tout"),
+            !b.tour.length && !b.occ.length && React.createElement("button", { style: segBtn(true), onClick: () => go(false) }, "Poser"))));
+})();
     if (confirm)
         return (React.createElement("div", { style: { minWidth: 320, maxWidth: 400 } },
             React.createElement("div", { style: S.mHd },
@@ -3536,7 +3624,7 @@ function PeriodModal({ medecins, initMedId, initDate, year, month, mois = [], fi
                 React.createElement("div", { style: { fontSize: 10.5, fontWeight: 600, color: "var(--txt3)", marginTop: 2 } },
                     nbJours,
                     " jours",
-                    semAbs ? " — week-ends et fériés accolés inclus" : "",
+                    semAbs ? " — week-ends et fériés accolés inclus" : fmcSem ? " — du lundi au vendredi, sans week-end ni férié" : "",
                     " \u2014 contient le ",
                     JOURSL[semBase.getDay()].toLowerCase(),
                     " ",
@@ -5545,6 +5633,7 @@ const HELP_SECTIONS=[
   HP({children:["Chaque jour de semaine a deux créneaux (M matin, AM après-midi) plus la nuit N pour la garde ; le week-end une seule case JOUR. Cliquez sur une case (en mode édition) pour ouvrir la modale :"]}),
   HP({children:["• choisir l'",HE("b",null,"activité")," (seules celles autorisées pour ce médecin apparaissent), la ",HE("b",null,"salle")," si l'activité en demande une, ajouter une ",HE("b",null,"note")," 📝."]}),
   HP({children:["• ",HE("b",null,"retirer")," : rouvrir la case et choisir Retirer."]}),
+  HP({children:["• ",HE("b",null,"absence ou FMC")," : depuis la v10.172, le clic sur ABS ou FMC ne pose plus tout de suite — une ligne propose la ",HE("b",null,"durée"),", dates réelles affichées sous chaque bouton. Absence : ce créneau, cette journée, 1, 2 ou 3 semaines (du samedi précédent au dimanche, fériés accolés compris). FMC : ce créneau, cette journée, 2 ou 3 jours calendaires, la semaine du lundi au vendredi — et la FMC se pose désormais aussi le week-end, pour les congrès. Si la plage est vide, le clic pose et ferme ; sinon un encart liste ce qu'elle rencontre : un ",HE("b",null,"jour de tour"),' refuse la pose (le jour s\'échange d\'abord, ⇄), une ',HE("b",null,"garde"),' et son repos sont conservés d\'office (une garde s\'échange, elle ne s\'efface pas), et les autres cases occupées — activité, planning type, choix ouvert — se ',HE("b",null,"gardent ou se remplacent"),", au choix. Le retour ↶ défait la pose entière d'un coup."]}),
   HP({children:["Repères visuels : cases grisées = bloquées par une semaine de tour · fond jaune pâle = week-end · fond et contour verts = semaine d'astreinte · ",HBadg({txt:"G",color:"#93c47d"})," garde · ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde · cases ",HE("b",null,"hachurées")," = personne indisponible (section ⏸)."]}),
   HP({children:["Les activités cochées « reprise » affichent le nom du médecin seul dans les onglets concernés."]}),
   HT({children:"📝 Les notes"}),
@@ -5554,7 +5643,7 @@ const HELP_SECTIONS=[
   HP({children:["Tant qu'il n'est pas tranché, le médecin reste ",HE("b",null,"disponible")," pour ces activités : il n'occupe aucune salle, ne consomme aucune IDE, et reste proposé dans les fenêtres — c'est tout l'intérêt, notamment pour le bip. Un compteur violet à part, en haut du Planning, dit combien il en reste à trancher."]}),
   HP({children:["Trancher, c'est ",HE("b",null,"poser quelque chose de ferme")," : attribuer une salle depuis un onglet de salle, ou cliquer « ✓ c'est celle-ci » dans la modale de case (pour les activités sans salle). Les autres branches disparaissent alors — mais elles sont gardées en mémoire : la modale propose ",HE("b",null,"↩ rétablir"),", et retirer l'activité rétablit le choix tout seul. Une croix par branche permet aussi d'en supprimer une, ou tout le choix."]}),
   HT({children:"📅 Modifier sur une période"}),
-  HP({children:["Depuis la modale d'une case, ",HBtn({kind:"ghost",children:"📅 Modifier sur une période…"})," évite de cliquer case par case. On choisit des dates (ou « la semaine », « le mois entier », qui affichent les dates réelles), puis ce qu'on fait : poser ou retirer une ",HE("b",null,"absence / FMC"),", retirer ",HE("b",null,"les activités"),", ou ",HE("b",null,"tout"),". Pour une absence ou une FMC, « la semaine » embarque aussi le ",HE("b",null,"week-end précédent, le week-end suivant et les fériés accolés")," — une semaine de vacances va du samedi au dimanche d'après (l'encart affiche les dates exactes)."]}),
+  HP({children:["Depuis la modale d'une case, ",HBtn({kind:"ghost",children:"📅 Modifier sur une période…"})," évite de cliquer case par case. On choisit des dates (ou « la semaine », « le mois entier », qui affichent les dates réelles), puis ce qu'on fait : poser ou retirer une ",HE("b",null,"absence / FMC"),", retirer ",HE("b",null,"les activités"),", ou ",HE("b",null,"tout"),". Pour une absence ou une FMC, « la semaine » embarque aussi le ",HE("b",null,"week-end précédent, le week-end suivant et les fériés accolés")," — une semaine de vacances va du samedi au dimanche d'après (l'encart affiche les dates exactes) ; celle d'une FMC va du lundi au vendredi. Avant d'écrire, la pose applique les mêmes règles que depuis la case : jour de tour refusé, garde conservée, cases occupées à garder ou à remplacer (v10.172)."]}),
   HP({last:true,children:["Pour « tout », deux degrés : « Tout sauf gardes et tour » ou « Absolument tout » — chacun retire un peu plus que le précédent. Une garde et son repos partent ",HE("b",null,"toujours ensemble"),". Avant de valider, la confirmation annonce le ",HE("b",null,"nombre réel")," de demi-journées concernées et le détail par activité : effacer 3 activités ou 120 ne se décide pas de la même façon. Chacun peut le faire sur sa propre ligne, dans les mêmes limites que case par case."]}))},
 
  {id:"periodes",icon:"📆",title:"Les périodes de l'application",body:()=>HE("div",null,
@@ -12265,44 +12354,44 @@ function CardioPlanning() {
         }, 0);
     }, []);
     /* ── applyAbsence ── */
+    /* v10.172 : accepte aussi une liste explicite de cases (absCases) et des clés à laisser
+       telles quelles (« garder »). Une garde, un repos de garde ou un tour réel ne se
+       recouvrent JAMAIS : la garde s'échange, le tour aussi — le jour s'échange avant. */
     var applyAbsence = useCallback(function (_a) {
-        var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, slots = _a.slots, _b = _a.absType, absType = _b === void 0 ? "ABSENCE" : _b, _c = _a.slotsParJour, slotsParJour = _c === void 0 ? null : _c;
-        var _d = parseDate(dateFrom), fy = _d[0], fm = _d[1], fd = _d[2];
-        var fromT = new Date(fy, fm, fd).getTime(), toT = new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime();
+        var medId = _a.medId, dateFrom = _a.dateFrom, dateTo = _a.dateTo, slots = _a.slots, _b = _a.absType, absType = _b === void 0 ? "ABSENCE" : _b, _c = _a.slotsParJour, slotsParJour = _c === void 0 ? null : _c, _d = _a.cases, cases = _d === void 0 ? null : _d, _e = _a.skip, skip = _e === void 0 ? null : _e;
+        var liste = cases || (function () {
+            var out = [];
+            var _f = parseDate(dateFrom), fy = _f[0], fm = _f[1], fd = _f[2], _g = parseDate(dateTo), ty = _g[0], tm = _g[1], td = _g[2];
+            var _loop_abs = function (t) {
+                var cy = t.getFullYear(), cm = t.getMonth(), d = t.getDate();
+                (isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : slots)).forEach(function (sl) { return out.push({ y: cy, m: cm, d: d, sl: sl }); });
+            };
+            for (var t = new Date(fy, fm, fd); t.getTime() <= new Date(ty, tm, td).getTime(); t.setDate(t.getDate() + 1)) {
+                _loop_abs(t);
+            }
+            return out;
+        })();
         var vSkip = false, vWarn = false;
         setPlan(function (p) {
             var next = __assign({}, p);
-            var cy = fy, cm = fm;
-            while (new Date(cy, cm, 1).getTime() <= new (Date.bind.apply(Date, __spreadArray([void 0], parseDate(dateTo), false)))().getTime()) {
-                var _loop_10 = function (d) {
-                    var t = new Date(cy, cm, d).getTime();
-                    if (t < fromT || t > toT)
-                        return "continue";
-                    /* v10.106 : jour clos — saute pour tout le monde sauf l'editeur, averti */
-                    if (vBloque(vRef, cy, cm, d, "abs")) {
-                        vSkip = true;
-                        return "continue";
-                    }
-                    if (vAvertit(vRef, cy, cm, d))
-                        vWarn = true;
-                    (isWE(cy, cm, d) ? ["JOUR"] : (slotsParJour ? slotsParJour(cy, cm, d) : slots)).forEach(function (sl) {
-                        var _a;
-                        var k = sk(cy, cm, d, sl);
-                        var dm = __assign({}, (next[k] || {}));
-                        dm[medId] = { acteId: absType || "ABSENCE", salle: null };
-                        next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
-                    });
-                };
-                for (var d = 1; d <= dIM(cy, cm); d++) {
-                    _loop_10(d);
+            liste.forEach(function (c) {
+                var _a;
+                /* v10.106 : jour clos — saute pour tout le monde sauf l'editeur, averti */
+                if (vBloque(vRef, c.y, c.m, c.d, "abs")) {
+                    vSkip = true;
+                    return;
                 }
-                if (cm === 11) {
-                    cy++;
-                    cm = 0;
-                }
-                else
-                    cm++;
-            }
+                if (vAvertit(vRef, c.y, c.m, c.d))
+                    vWarn = true;
+                var k = sk(c.y, c.m, c.d, c.sl);
+                if (skip && skip.indexOf(k) >= 0)
+                    return;
+                var dm = __assign({}, (next[k] || {}));
+                if (cellHasAny(dm[medId], ["GARDE", "REPOS_GARDE", "TOUR_HC", "TOUR_USIC"]))
+                    return;
+                dm[medId] = { acteId: absType || "ABSENCE", salle: null };
+                next = __assign(__assign({}, next), (_a = {}, _a[k] = dm, _a));
+            });
             return next;
         });
         if (vSkip || vWarn)
@@ -12720,6 +12809,46 @@ function CardioPlanning() {
             return ["M", "AM"];
         };
         return out;
+    };
+    /* v10.172 : ce qu'une pose d'absence rencontrerait sur ses cases, AVANT d'écrire.
+       tour : jours de tour (semaine attribuée HC/USIC, ou remplacement réel) — la pose est
+       refusée, le jour s'échange d'abord (⇄). gardes : garde et repos de garde — conservés
+       d'office. occ : le reste (activité, planning type, choix ouvert, l'autre type d'absence)
+       — à garder ou à remplacer, au choix. Lit l'état brut, sans le masque du tour. */
+    var absBilan = function (medId, cases, absType) {
+        var tour = [], gardes = [], occ = [], occKeys = [], vuT = {};
+        cases.forEach(function (c) {
+            var k = sk(c.y, c.m, c.d, c.sl), raw = cellEs((planAff[k] || {})[medId]).filter(function (e) { return e && e.acteId; });
+            var dk = c.y + "-" + c.m + "-" + c.d;
+            var unite = null;
+            if (!isWE(c.y, c.m, c.d) && (c.sl === "M" || c.sl === "AM")) {
+                var wm = tourMedAff[wKey(c.y, c.m, c.d)] || {};
+                var dg = ((tourDerogAff || {})[dKey(c.y, c.m, c.d)] || {})[medId];
+                if (!(dg === true || (dg && dg[c.sl]))) {
+                    if ((wm.HC || []).includes(medId))
+                        unite = "HC";
+                    else if ((wm.USIC || []).includes(medId))
+                        unite = "USIC";
+                }
+            }
+            var tr = raw.find(function (e) { return e.acteId === "TOUR_HC" || e.acteId === "TOUR_USIC"; });
+            if (tr)
+                unite = tr.acteId === "TOUR_HC" ? "HC" : "USIC";
+            if (unite) {
+                if (!vuT[dk]) {
+                    vuT[dk] = 1;
+                    tour.push(absLib({ y: c.y, m: c.m, d: c.d, sl: "JOUR" }) + " — Tour " + unite);
+                }
+                return;
+            }
+            raw.filter(function (e) { return e.acteId === "GARDE" || e.acteId === "REPOS_GARDE"; }).forEach(function (e) { return gardes.push(absLib(c) + " — " + (e.acteId === "GARDE" ? "Garde" : "Repos de garde")); });
+            var autres = raw.filter(function (e) { return ["GARDE", "REPOS_GARDE", absType].indexOf(e.acteId) < 0; });
+            if (autres.length) {
+                occKeys.push(k);
+                occ.push(absLib(c) + " — " + autres.map(function (e) { var a = acteById(e.acteId); return (a ? a.short : e.acteId) + (e.salle ? " (" + e.salle + ")" : "") + (e.pt ? " · planning type" : "") + (e.cond ? " · choix ouvert" : ""); }).join(" + "));
+            }
+        });
+        return { tour: tour, gardes: gardes, occ: occ, occKeys: occKeys };
     };
     /* v9.92 : l'effacement d'activités sur une période, extrait de l'ancien écran pour être
        partagé. Conserve la même liste qu'avant, et remplace aussi « Effacer mois » : le mois
@@ -15422,7 +15551,7 @@ function CardioPlanning() {
                 if (isNight)
                     return a.id === "GARDE" && canGarde;
                 if (we)
-                    return a.id === "ABSENCE" || (a.id === "GARDE" && canGarde);
+                    return a.id === "ABSENCE" || a.id === "FORMATION" || (a.id === "GARDE" && canGarde); /* v10.172 : FMC le week-end (congrès) */
                 if (SYS.includes(a.id))
                     return a.id === "ABSENCE";
                 // Check if medecin is authorized for this activity
@@ -15771,7 +15900,10 @@ function CardioPlanning() {
                         return roomOccupants;
                     })() : [];
                     var salleWarn = fixedSalleOcc.length > 0 && !fixedSalleOcc.find(function (m) { return m.id === medId; });
-                    return (React.createElement("button", { key: a.id, style: __assign(__assign({}, S.actTog), { background: a.color, color: "#111", border: "2px solid ".concat(salleWarn ? "#f59e0b" : on ? "#333" : a.color), fontWeight: 900, opacity: on ? 1 : 0.75 }), title: salleWarn ? "\u26A0 ".concat(a.fixedSalle, " occup\u00E9e par ").concat(fixedSalleOcc.map(function (m) { return m.init; }).join(", ")) : undefined, onClick: function () { if (a.fixedSalle) {
+                    return (React.createElement("button", { key: a.id, style: __assign(__assign({}, S.actTog), { background: a.color, color: "#111", border: "2px solid ".concat(salleWarn ? "#f59e0b" : on ? "#333" : a.color), fontWeight: 900, opacity: on ? 1 : 0.75 }), title: salleWarn ? "\u26A0 ".concat(a.fixedSalle, " occup\u00E9e par ").concat(fixedSalleOcc.map(function (m) { return m.init; }).join(", ")) : undefined, onClick: function () { if (a.id === "ABSENCE" || a.id === "FORMATION") {
+                            setMData(function (p) { return (__assign(__assign({}, p), { _absDur: a.id, _absConf: null, _pickSalle: null })); });
+                            return;
+                        } /* v10.172 */ if (a.fixedSalle) {
                             doAdd(a.id, a.fixedSalle);
                         }
                         else if (a.hasSalle)
@@ -15787,6 +15919,104 @@ function CardioPlanning() {
                             fixedSalleOcc.map(function (m) { return m.init; }).join(", "),
                             " d\u00E9j\u00E0 assign\u00E9")));
                 }))),
+                (mData && mData._absDur && canEditThisMed && (function () {
+    /* v10.172 : ligne de DURÉE après le clic sur ABS ou FMC — on ne pose plus tout de
+       suite. Absence : ce créneau, cette journée, 1/2/3 semaines (samedi précédent →
+       dimanche, fériés accolés — semRange). FMC : ce créneau, cette journée, 2 ou 3
+       jours calendaires, la semaine du lundi au vendredi sans week-end ni férié.
+       Avant d'écrire, absBilan dit ce que la plage rencontre : un jour de TOUR refuse
+       la pose (le jour s'échange d'abord), une GARDE ou un repos de garde sont conservés
+       d'office, le reste se garde ou se remplace — au choix, cases listées. */
+    var aid = mData._absDur, isFmc = aid === "FORMATION", cf = mData._absConf;
+    var jour = new Date(y2, m2, d2);
+    var iso = function (t) { return "".concat(t.getFullYear(), "-").concat(String(t.getMonth() + 1).padStart(2, "0"), "-").concat(String(t.getDate()).padStart(2, "0")); };
+    var plusJ = function (t, n) { return new Date(t.getFullYear(), t.getMonth(), t.getDate() + n); };
+    var opts = [];
+    if (!we)
+        opts.push({ t: "Ce créneau", s: absLib({ y: y2, m: m2, d: d2, sl: slot }), p: { dateFrom: iso(jour), dateTo: iso(jour), slotDebut: slot, slotFin: slot } });
+    opts.push({ t: "Cette journée", s: absLib({ y: y2, m: m2, d: d2, sl: "JOUR" }), p: { dateFrom: iso(jour), dateTo: iso(jour), slotDebut: "M", slotFin: "AM" } });
+    var libJ = function (t) { return absLib({ y: t.getFullYear(), m: t.getMonth(), d: t.getDate(), sl: "JOUR" }); };
+    if (isFmc) {
+        [2, 3].forEach(function (n) { var f = plusJ(jour, n - 1); opts.push({ t: n + " jours", s: libJ(jour) + " → " + libJ(f), p: { dateFrom: iso(jour), dateTo: iso(f), slotDebut: "M", slotFin: "AM" } }); });
+        var r = semRange(jour, false), ven = plusJ(r.deb, 4);
+        opts.push({ t: "La semaine", s: libJ(r.deb) + " → " + libJ(ven) + " · sans week-end ni férié", p: { dateFrom: iso(r.deb), dateTo: iso(ven), slotDebut: "M", slotFin: "AM", sansWE: true } });
+    }
+    else {
+        [1, 2, 3].forEach(function (n) {
+            var r = semRange(jour, true), f = semRange(plusJ(jour, 7 * (n - 1)), true);
+            opts.push({ t: n + " semaine" + (n > 1 ? "s" : ""), s: libJ(r.deb) + " → " + libJ(f.fin), p: { dateFrom: iso(r.deb), dateTo: iso(f.fin), slotDebut: "M", slotFin: "AM" } });
+        });
+    }
+    var choisir = function (o) {
+        var cases = absCases(o.p), b = absBilan(medId, cases, aid);
+        if (b.tour.length || b.occ.length || b.gardes.length) {
+            setMData(function (p) { return (__assign(__assign({}, p), { _absConf: { o: o, cases: cases, b: b } })); });
+            return;
+        }
+        applyAbsence({ medId: medId, absType: aid, cases: cases });
+        setModal(null);
+    };
+    var poser = function (garder) { applyAbsence({ medId: medId, absType: aid, cases: cf.cases, skip: garder ? cf.b.occKeys : null }); setModal(null); };
+    var col = isFmc ? "#4d7c0f" : "#b91c1c", bgc = isFmc ? "rgba(163,230,53,.14)" : "rgba(224,102,102,.14)", bdc = isFmc ? "#a3e635" : "#fca5a5";
+    var bb = { padding: "6px 9px", borderRadius: 6, border: "1px solid var(--border)", cursor: "pointer", background: "var(--bg2)", color: "var(--txt)", fontSize: 11, fontWeight: 800, textAlign: "left", lineHeight: 1.35 };
+    var ul = { margin: "3px 0 0 16px", padding: 0, fontSize: 10.5, fontWeight: 600, lineHeight: 1.5 };
+    var retour = function (fn) { return React.createElement("button", { style: __assign(__assign({}, bb), { color: "var(--txt2)" }), onClick: fn }, "\u2190 Retour"); };
+    var nomM = med ? med.init : "";
+    return (React.createElement("div", { style: { marginTop: 9, padding: 10, background: bgc, borderRadius: 8, border: "1px solid " + bdc } }, !cf ? React.createElement(React.Fragment, null,
+        React.createElement("div", { style: { fontSize: 11, color: col, fontWeight: 800, marginBottom: 7 } },
+            isFmc ? "Formation" : "Absence",
+            " de ",
+            nomM,
+            " : sur quelle dur\u00E9e ?"),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 5 } }, opts.map(function (o, i) { return React.createElement("button", { key: "o" + i, style: bb, onClick: function () { return choisir(o); } },
+            o.t,
+            React.createElement("span", { style: { display: "block", fontSize: 10, fontWeight: 600, color: "var(--txt3)" } }, o.s)); })),
+        React.createElement("div", { style: { marginTop: 6 } }, retour(function () { return setMData(function (p) { return (__assign(__assign({}, p), { _absDur: null })); }); }))) : React.createElement(React.Fragment, null,
+        React.createElement("div", { style: { fontSize: 11, color: col, fontWeight: 800, marginBottom: 6 } },
+            isFmc ? "Formation" : "Absence",
+            " de ",
+            nomM,
+            " \u2014 ",
+            cf.o.t.toLowerCase(),
+            " \u00B7 ",
+            cf.o.s),
+        cf.b.tour.length > 0 && React.createElement("div", { style: { marginBottom: 7, padding: "6px 8px", borderRadius: 6, border: "1px solid #dc2626", background: "rgba(220,38,38,.10)" } },
+            React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#dc2626" } },
+                "\uD83D\uDEAB ",
+                nomM,
+                " est de tour \u2014 une ",
+                isFmc ? "formation" : "absence",
+                " ne recouvre jamais un jour de tour"),
+            React.createElement("ul", { style: __assign(__assign({}, ul), { color: "#991b1b" }) }, cf.b.tour.map(function (t, i) { return React.createElement("li", { key: "t" + i }, t); })),
+            React.createElement("div", { style: { fontSize: 10.5, color: "var(--txt2)", marginTop: 4 } },
+                "\u00C9changez d'abord ce",
+                cf.b.tour.length > 1 ? "s jours" : " jour",
+                " (\u21C4 depuis la case), puis reposez l'",
+                isFmc ? "a formation" : "absence",
+                ".")),
+        cf.b.gardes.length > 0 && React.createElement("div", { style: { marginBottom: 7, padding: "6px 8px", borderRadius: 6, border: "1px solid #93c47d", background: "rgba(147,196,125,.12)" } },
+            React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#3f6f2b" } },
+                "\u270B Conserv\u00E9",
+                cf.b.gardes.length > 1 ? "s" : "",
+                " d'office \u2014 une garde s'\u00E9change, elle ne s'efface pas"),
+            React.createElement("ul", { style: __assign(__assign({}, ul), { color: "var(--txt2)" }) }, cf.b.gardes.map(function (t, i) { return React.createElement("li", { key: "g" + i }, t); }))),
+        cf.b.occ.length > 0 && !cf.b.tour.length && React.createElement("div", { style: { marginBottom: 7, padding: "6px 8px", borderRadius: 6, border: "1px solid #f59e0b", background: "rgba(245,158,11,.12)" } },
+            React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#b45309" } },
+                "\u26A0 ",
+                cf.b.occ.length,
+                " case",
+                cf.b.occ.length > 1 ? "s" : "",
+                " d\u00E9j\u00E0 occup\u00E9e",
+                cf.b.occ.length > 1 ? "s" : ""),
+            React.createElement("ul", { style: __assign(__assign({}, ul), { color: "#854f0b" }) }, cf.b.occ.map(function (t, i) { return React.createElement("li", { key: "c" + i }, t); }))),
+        React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap" } },
+            retour(function () { return setMData(function (p) { return (__assign(__assign({}, p), { _absConf: null })); }); }),
+            !cf.b.tour.length && cf.b.occ.length > 0 && React.createElement("button", { style: __assign(__assign({}, bb), { borderColor: "#16a34a", color: "#166534" }), onClick: function () { return poser(true); } },
+                "Garder ce",
+                cf.b.occ.length > 1 ? "s " + cf.b.occ.length + " cases" : "tte case"),
+            !cf.b.tour.length && cf.b.occ.length > 0 && React.createElement("button", { style: __assign(__assign({}, bb), { borderColor: "#dc2626", color: "#dc2626" }), onClick: function () { return poser(false); } }, "Remplacer tout"),
+            !cf.b.tour.length && !cf.b.occ.length && React.createElement("button", { style: __assign(__assign({}, bb), { borderColor: col, color: col }), onClick: function () { return poser(false); } }, "Poser")))));
+})()),
                 mData && mData._pickSalle && canEditThisMed && (function () {
                     var a = acteById(mData._pickSalle);
                     if (!a)
@@ -15940,7 +16170,7 @@ function CardioPlanning() {
         modal === "restaure" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
             React.createElement(RestoreModal, { med: djAff(medecins.find(function (m) { return m.id === mData.medId; }), dKey(mData.y, mData.m, mData.d)), backups: backupList, y: mData.y, m: mData.m, d: mData.d, onDiff: function (id, df, dt) { return diffMedPeriod(id, mData.medId, df, dt); }, onGo: function (id, df, dt) { restoreMedPeriod(id, mData.medId, df, dt); setModal(null); }, onClose: function () { return setModal(null); } })),
         modal === "periode" && mData && React.createElement(Ov, { onClose: function () { return setModal(null); } },
-            React.createElement(PeriodModal, { medecins: medsAff, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, finPer: (function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm); return "".concat(e.getFullYear(), "-").concat(String(e.getMonth() + 1).padStart(2, "0"), "-").concat(String(e.getDate()).padStart(2, "0")); })(), allowActs: !isAdminEdit, compter: countPeriodActs, onPose: function (p) { applyAbsence(perSlots(p)); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) {
+            React.createElement(PeriodModal, { medecins: medsAff, initMedId: mData.medId, initDate: "".concat(mData.y, "-").concat(String(mData.m + 1).padStart(2, "0"), "-").concat(String(mData.d).padStart(2, "0")), year: year, month: month, mois: ptPeriodMonths, finPer: (function () { var p = perStart(year, month); var e = perEnd(p.sy, p.sm); return "".concat(e.getFullYear(), "-").concat(String(e.getMonth() + 1).padStart(2, "0"), "-").concat(String(e.getDate()).padStart(2, "0")); })(), allowActs: !isAdminEdit, compter: countPeriodActs, bilan: function (p) { var cases = absCases(p); return { cases: cases, b: absBilan(p.medId, cases, p.absType) }; }, onPose: function (p) { applyAbsence({ medId: p.medId, absType: p.absType, cases: p.cases || absCases(p), skip: p.skip || null }); setModal(null); }, onRetraitAbs: function (p) { removeAbsence(perSlots(p)); setModal(null); }, onEffacer: function (p) {
                     clearPeriodActs(perSlots(p));
                     /* v10.13 : le TOUR ne vit pas dans le planning mais dans une liste de semaines —
                        il fallait donc le retirer à part, sinon il restait en place. */
