@@ -187,7 +187,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.185 — 06/09/2026";
+var APP_VERSION = "v10.186 — 06/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -13967,7 +13967,7 @@ function CardioPlanning() {
                 React.createElement("div", null,
                     /* v10.176 : le mot « CardioPlanning » retiré — ~110 px rendus au nav sur téléphone ; les témoins (👁, période, Firebase) grandissent à sa place */
                     React.createElement("div", { style: { fontSize: 13, color: "#484f58", display: "flex", alignItems: "center", gap: 5 } },
-                        !isEdit && React.createElement("span", { title: "Lecture seule", style: { color: "#e3b341", fontSize: 16 } }, "\uD83D\uDC41"),
+                        !isAnyEdit && accessMode !== "interneEdit" && React.createElement("span", { title: "Lecture seule", style: { color: "#e3b341", fontSize: 16 } }, "\uD83D\uDC41"),
                         perClose && React.createElement("span", { title: perArchivee ? "Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier." : "Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session.", style: { background: perArchivee ? "#0e7490" : "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 9, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perArchivee ? "🗄 PÉRIODE ARCHIVÉE" : "🔒 PÉRIODE CLOSE"),
                         perFut && perFut !== "dif" && React.createElement("span", { title: perFut === "phase1" ? "La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période" + (perFutFin ? " (jusqu'au " + finLib(perFutFin) + " à titre indicatif)" : "") + ". Le reste attend la diffusion du planning." : "Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning.", style: { background: perFut === "phase1" ? "#0e7490" : "#b45309", color: "#fff", fontWeight: 800, fontSize: 9, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perFut === "phase1" ? "🏖️ CONGÉS OUVERTS" : "🚧 EN PRÉPARATION"),
                         "   ",

@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.185 — 06/09/2026";
+const APP_VERSION="v10.186 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -11681,7 +11681,7 @@ header::-webkit-scrollbar { display: none; }
             {/* v10.176 : le mot « CardioPlanning » retiré — ~110 px rendus au nav sur téléphone ; les témoins (👁, période, Firebase) grandissent à sa place */}
             <div style={{fontSize:13,color:"#484f58",display:"flex",alignItems:"center",gap:5}}>
               {/* v10.152 : « CHL & CHB » retiré — sur téléphone, chaque pixel de cette rangée manque au nav */}
-              {!isEdit&&<span title="Lecture seule" style={{color:"#e3b341",fontSize:16}}>👁</span>}
+              {!isAnyEdit&&accessMode!=="interneEdit"&&<span title="Lecture seule" style={{color:"#e3b341",fontSize:16}}>👁</span>}{/* v10.186 : réservé aux profils qui ne peuvent rien écrire — un médecin basique ou intermédiaire le voyait aussi (retour HV) */}
               {/* v10.106 : l'indicateur vit dans le BLOC DE TITRE, pas dans la rangée de
                   l'en-tête — celle-ci est un flex de hauteur fixe où tout ajout vole sa
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
