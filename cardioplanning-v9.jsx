@@ -62,7 +62,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.177 — 06/09/2026";
+const APP_VERSION="v10.178 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1223,7 +1223,8 @@ function SiteView({onCellHistory=null,issMap={},printWk=null,onPrint=null,site,y
       });
     });
     /* v10.53 : initiales devant chaque note — deux occupants ne se confondent plus */
-    const noteTips=occ.map(({med})=>{const n=notes[nk(med.id,ry,rm,d,sl)];return n?(med.init+" : "+n):null;}).filter(Boolean).join("  |  ");
+    const _nInt=[];grps.forEach(g=>(g.imeds||[]).forEach(m=>{if(!_nInt.find(x=>x.id===m.id))_nInt.push(m);}));   /* v10.178 : la note d'un interne aussi */
+    const noteTips=occ.map(x=>x.med).concat(_nInt).map(med=>{const n=notes[nk(med.id,ry,rm,d,sl)];return n?(med.init+" : "+n):null;}).filter(Boolean).join("  |  ");
     return(
       <td key={`${salle}-${d}-${sl}`} title={noteTips||undefined}
         style={{...S.td,...(conflict?conflBg(darkMode):{}),...(isTdRC?{background:"var(--bg-td)"}:{}),padding:2,cursor:isEdit?"pointer":"default"}}
@@ -1241,10 +1242,10 @@ function SiteView({onCellHistory=null,issMap={},printWk=null,onPrint=null,site,y
                 </div>;
               })}
               {(g.imeds||[]).map((m,mi)=>(
-                <div key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</div>
+                <div key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</div>
               ))}
             </div>
-            <ActPill a={g.acte} night={darkMode} hasNote={g.meds.some(m=>!!notes[nk(m.id,ry,rm,d,sl)])}/>
+            <ActPill a={g.acte} night={darkMode} hasNote={g.meds.concat(g.imeds||[]).some(m=>!!notes[nk(m.id,ry,rm,d,sl)])}/>
           </div>
         ))}
         </div>
@@ -1448,7 +1449,7 @@ function ActTabView({onCellHistory=null,issMap={},title,titleColor,rows,year,mon
        deux salles d'une même activité, non. */
     const _grpsA=salleGroups(row,occ);
     /* v10.53 : notes par médecin — infobulle « INIT : note » sur la case */
-    const _nMeds=[];_grpsA.forEach(g=>(g.meds||[]).forEach(m=>{if(m&&m.id!==IDE_MED.id&&!_nMeds.find(x=>x.id===m.id))_nMeds.push(m);}));
+    const _nMeds=[];_grpsA.forEach(g=>(g.meds||[]).concat(g.imeds||[]).forEach(m=>{if(m&&m.id!==IDE_MED.id&&!_nMeds.find(x=>x.id===m.id))_nMeds.push(m);}));   /* v10.178 : internes compris */
     const noteTips=_nMeds.map(m=>{const n=notes[nk(m.id,ry,rm,d,sl)];return n?(m.init+" : "+n):null;}).filter(Boolean).join("  |  ");
     const _idsA={};_grpsA.forEach(g=>{if(g.acte&&g.acte.id)_idsA[g.acte.id]=1;});
     const conflA=Object.keys(_idsA).length>1;
@@ -1503,7 +1504,7 @@ function ActTabView({onCellHistory=null,issMap={},title,titleColor,rows,year,mon
                 </span>;
               })}
               {imeds.map((m,mi)=>(
-                <span key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</span>
+                <span key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</span>
               ))}
             </div>}
             {(lieu||showIde||noSalle)&&
@@ -2511,9 +2512,9 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
               {(isInt?canInt:((!selfOnly||med.id===selfOnly)&&okAct(actes.find(a2=>a2.id===acteId))))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acteId)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
               {(()=>{/* v10.53 : note liée à CE médecin (jamais à la ligne IDE) */
-                if(med.id===IDE_MED.id||isInt)return null;
+                if(med.id===IDE_MED.id)return null;   /* v10.178 : un interne a sa note aussi */
                 const _nk=nk(med.id,y2,m2,d,sl);
-                const _cn=!!setNotes&&(!selfOnly||med.id===selfOnly)&&(canNotes||okAct(acte));
+                const _cn=!!setNotes&&(isInt?canInt:((!selfOnly||med.id===selfOnly)&&(canNotes||okAct(acte))));
                 if(!_cn&&!notes[_nk])return null;
                 return <input value={notes[_nk]||""} readOnly={!_cn} onChange={_cn?(e=>{const v=e.target.value;setNotes(p=>({...p,[_nk]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
             </div>
@@ -2844,9 +2845,9 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
               {!isInt&&isRecapCol&&acte.hasSalle&&!acte.fixedSalle&&(!selfOnly||med.id===selfOnly)&&(!adminOnly||acte[okKey]===true)&&<button onClick={()=>{setSelMedId(med.id);setStep("salle");}}
                 style={{background:"transparent",border:"1px solid var(--border)",color:"var(--txt2)",borderRadius:5,cursor:"pointer",fontSize:9,fontWeight:800,padding:"2px 7px",whiteSpace:"nowrap"}}>salle…</button>}
               {(isInt?canInt:((!selfOnly||med.id===selfOnly)&&(!adminOnly||acte[okKey]===true)))&&<button onClick={()=>removeEntry(med.id,y2,m2,d,sl,acte.id)} style={{background:"none",border:"none",color:"var(--txt2)",cursor:"pointer",fontSize:15,lineHeight:1}}>×</button>}
-              {(()=>{if(isInt)return null;/* v10.53 : note liée à CE médecin, mêmes règles que la coche du rôle */
+              {(()=>{/* v10.53 : note liée à CE médecin, mêmes règles que la coche du rôle ; v10.178 : un interne aussi */
                 const _nk=nk(med.id,y2,m2,d,sl);
-                const _cn=!!setNotes&&(!selfOnly||med.id===selfOnly)&&(!adminOnly||canNotes||acte[okKey]===true);
+                const _cn=!!setNotes&&(isInt?canInt:((!selfOnly||med.id===selfOnly)&&(!adminOnly||canNotes||acte[okKey]===true)));
                 if(!_cn&&!notes[_nk])return null;
                 return <input value={notes[_nk]||""} readOnly={!_cn} onChange={_cn?(e=>{const v=e.target.value;setNotes(p=>({...p,[_nk]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
             </div>
@@ -5378,7 +5379,7 @@ const HELP_SECTIONS=[
   HP({children:["C'est l'onglet ",HE("b",null,"Activités")," qui décide, avec la coche ",HChip({txt:"🎓 Internes",bg:"#0e9f9f"})," : une activité cochée peut leur être posée. Une ",HE("b",null,"seconde coche")," dit s'ils peuvent la poser ",HE("b",null,"eux-mêmes")," (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur, un intermédiaire ou un cadre. Les activités ",HE("b",null,"à salle")," ne sont jamais posées par eux — elles le sont depuis leur onglet ou depuis les onglets de salle, avec choix de la salle."]}),
   HP({children:["Sur un ",HE("b",null,"lundi"),", poser HC, USIC ou une activité sans salle propose de ",HE("b",null,"remplir la semaine")," : le remplissage saute les repos de garde, absences et FMC déjà posés. Le ",HE("b",null,"samedi")," n'a qu'une case, pour le HC du samedi matin."]}),
   HP({children:[HE("b",null,"Absence et FMC")," (v10.177) : après le clic, la fenêtre demande la ",HE("b",null,"durée"),". Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du ",HE("b",null,"lundi au vendredi")," de la semaine cliquée, sans week-end. FMC : ce créneau, 1, 2 ou 3 jours, à la suite du jour cliqué. Ce sont des journées entières : elles remplacent ce qui s'y trouve, repos de garde compris ; les jours hors semestre sont sautés."]}),
-  HP({children:[HE("b",null,"Activité avec salle")," (v10.177) : la salle choisie, un écran ",HE("b",null,"✓ Valider")," affiche l'interne, l'activité et la salle, avec une ",HE("b",null,"note facultative"),". Rien n'est écrit avant ✓ ; la note est visible au survol de la case (📝) dans Internes et dans les onglets de salles. À chaque étape — durée, semaine, salle, validation — ",HE("b",null,"← Retour")," revient en arrière sans rien poser."]}),
+  HP({children:[HE("b",null,"Activité avec salle")," (v10.177) : la salle choisie, un écran ",HE("b",null,"✓ Valider")," affiche l'interne, l'activité et la salle, avec une ",HE("b",null,"note facultative"),". Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille orange, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ",HE("b",null,"← Retour")," revient en arrière sans rien poser."]}),
   HT({children:"Les gardes"}),
   HP({children:["La colonne ",HE("b",null,"Garde")," de l'onglet fonctionne comme celle des médecins, ",HE("b",null,"sans répartition automatique"),". La garde se pose sur la nuit et le ",HBadg({txt:"RG",color:"#ffe599"})," repos est posé tout seul le lendemain — sauté, avec un avertissement, si l'interne est absent ou en FMC ce jour-là. ⇄ échange deux gardes directement, dans la liste de celles du semestre."]}),
   HP({children:["Un ",HE("b",null,"interne extérieur")," au service se saisit au nom libre : il apparaît dans la colonne, sans repos chez nous. Un jour ",HE("b",null,"sans personne de garde")," est signalé en rouge. Dans le Planning, la colonne « 🎓 Garde int. » s'affiche à la demande depuis la ligne Filtre, en ",HE("b",null,"lecture seule"),", et se remasque à chaque ouverture."]}),
@@ -7940,7 +7941,10 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
         {contenu.map((c,i)=>{
           const a=acteById(c.acteId)||{short:c.acteId,color:"#8b949e",label:c.acteId};
           const reposAuto=c.acteId==="REPOS_GARDE"&&gardeV;
-          return <div key={i} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4,fontSize:12}}>
+          /* v10.178 : note d'une activité à salle — lisible et modifiable ici, comme dans les modales de CHL, CHB et PT */
+          const nkC=c.sl!=="JOUR"?nk(mid,y,m,d,c.sl):null;
+          const noteV=nkC?((notes||{})[nkC]||""):"";
+          return <div key={i} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4,fontSize:12,flexWrap:"wrap"}}>
             <span style={{background:a.color,color:intTxt(a.color),borderRadius:4,padding:"2px 8px",fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{a.short}</span>
             <span style={{fontSize:10,color:"var(--txt3)"}}>{c.sl==="JOUR"?"journée":c.sl==="M"?"matin":"après-midi"}</span>
             {c.salle&&<span style={{fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",border:"1px solid var(--border)",background:"var(--bg)",color:"var(--txt2)",borderRadius:4,padding:"1px 5px"}}>{c.salle}</span>}
@@ -7948,6 +7952,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
               ?<span style={{fontSize:10,color:"var(--txt3)"}}>posé par la garde de la veille — retirez la garde pour l'enlever</span>
               :!posable(c.acteId)?<span style={{fontSize:10,color:"var(--txt3)"}}>posé par le service</span>
               :<button onClick={()=>retire(c)} style={{width:18,height:18,borderRadius:9,border:"1px solid #fecdd3",background:"#fff1f2",color:"#dc2626",fontSize:10,fontWeight:800,cursor:"pointer",lineHeight:1,padding:0}}>×</button>}
+            {nkC&&(c.salle||noteV)&&(canNote||noteV)&&<input value={noteV} readOnly={!canNote} onChange={canNote?(e=>{const v=e.target.value;setNotes(n=>({...n,[nkC]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:canNote?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>}
           </div>;
         })}
       </div>}
@@ -8352,8 +8357,7 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
                   const noteC=inR?((notes||{})[nk(c.id,o.y,o.m,o.d,sl)]||null):null;   /* v10.177 : note posée avec une activité à salle */
                   return <td key={c.id} {...histProps(onCellHistory,c.id,o.y,o.m,o.d,sl)} title={noteC||undefined} onClick={(canEdit&&inR)?()=>{if(_gvLpF){_gvLpF=false;return;}setSel({med:c,y:o.y,m:o.m,d:o.d,slot0:sl});}:undefined}
                     style={{...S.td,...(we?S.tdWE:{}),...(inR?{cursor:canEdit?"pointer":"default"}:horsSem)}}>
-                    {a&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}><Badge a={a} salle={e.salle} hideSalle={!e.salle}/></div>}
-                    {noteC&&<span style={{fontSize:8,lineHeight:1}}>📝</span>}
+                    {a&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}><Badge a={a} salle={e.salle} hideSalle={!e.salle} hasNote={!!noteC}/></div>}
                   </td>;
                 })}
               </tr>
