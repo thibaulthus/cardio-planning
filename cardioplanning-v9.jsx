@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.173 — 06/09/2026";
+const APP_VERSION="v10.174 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -5194,7 +5194,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"Vos préférences de tour")," : même bouton, dans la même fenêtre — la préférence porte alors sur la ",HE("b",null,"semaine entière")," (⭐ je souhaite tourner, 🚫 pas cette semaine)."]}),
   HP({children:["• ",HE("b",null,"Les revoir, les retirer")," : le bouton ",HBtn({kind:"ghost",children:"⭐"})," de la barre du Planning colore les cases concernées — bande bleue « je souhaite tourner », bande rouge « je préfère éviter », ⭐ ou 🚫 sur les jours de garde — avec sa légende au-dessus du tableau. Dans la fenêtre de la case, la ligne de préférence se clique pour la retirer."]}),
   HP({children:["• ",HE("b",null,"Vos propres activités")," : modifier le contenu de vos cases (activité, salle, note)."]}),
-  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞 (Aide, ou ⋯ dans Planning et Attachés) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
+  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞 en haut à gauche, à côté des flèches ↶↷, sur toutes les pages (v10.174) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
@@ -5244,7 +5244,7 @@ const HELP_SECTIONS=[
   HP({children:["La case patients ",HE("b",null,"vide"),", c'est toute la consultation qui part d'un bloc ; un ",HE("b",null,"nombre"),", c'est vous qui divisez. Les ",HE("b",null,"après-midis des semaines de tour")," peuvent reprendre une partie des patients — jamais le matin — et la part posée crée alors réellement la consultation dans le planning, avec choix de salle. Le reste peut partir « ↪ en liste d'attente », gérée par les secrétaires. Un badge « ⚠ report incomplet » reste affiché tant que le compte n'est pas à zéro."]}),
   HP({last:true,children:["En bas, « ",HE("b",null,"Demi-journées off par semaine")," » montre les créneaux libres hors semaines de tour : de quoi ouvrir une consultation, une fois tous les reports traités (export CSV). Les flèches ↶↷ couvrent aussi les reports, y compris pour les administratifs."]}))},
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
-  HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible. Éditeur et intermédiaires : un appui sur l'initiale en tête de colonne la suit (cadre à la couleur du médecin, autres colonnes estompées) ; un second appui relâche."]}),
+  HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = votre propre semaine d'astreinte (visible par vous seul depuis la v10.174 — qui est d'astreinte se lit dans l'onglet Astreinte), fond jaune pâle = week-end. Filtre par médecins possible. Éditeur et intermédiaires : un appui sur l'initiale en tête de colonne la suit (cadre à la couleur du médecin, autres colonnes estompées) ; un second appui relâche."]}),
   HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip. Les anciens onglets Tour et Gardes vivent ici, entiers, dans les tuiles 2 et 3."]}),
   HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour. Le bouton ↔ règle l'",HE("b",null,"ordre des colonnes"),", de gauche à droite, site par site (↩ Ordre par défaut pour revenir en arrière). Le bouton 👁 masque ou réaffiche les colonnes de reprise ↩ sur cet appareil seulement ; les salles restent toujours visibles."]}),
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise. Le bouton 👁 masque ou réaffiche des colonnes sur cet appareil seulement — toutes celles de PT Cardio, les colonnes de reprise de PT Angio."]}),
@@ -6794,7 +6794,7 @@ function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDa
           const ouv=!!ouvert[m.id];
           const allKeys=acts.reduce((l,a)=>l.concat(grp[a].map(e=>e.k)),[]);
           return(
-            <div key={m.id} style={{border:"1px solid "+(nTot?"#f59e0b":"var(--border)"),borderRadius:10,background:"var(--card)",opacity:nTot?1:.55,gridColumn:ouv?"1 / -1":"auto"}}>
+            <div key={m.id} style={{border:"1px solid "+(nTot?"#f59e0b":"var(--border)"),borderRadius:10,background:"var(--card)",opacity:nTot?1:.55,gridColumn:(ouv&&nTot>0)?"1 / -1":"auto"}}>   {/* v10.174 : pleine largeur seulement s'il y a des lignes */}
               <div onClick={()=>setOuvert(o=>({...o,[m.id]:!o[m.id]}))} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer"}}>
                 <span style={{fontWeight:800,fontSize:13,color:"var(--txt)"}}>{(m.prenom?m.prenom+" ":"")+(m.nom||m.init||"")}</span>
                 {nTot>0
@@ -11365,6 +11365,9 @@ function CardioPlanning(){
      code éditeur anonyme, l'administratif et les internes. Le centrage suit toujours ce PIN ;
      le pointillé, seulement si sa tuile est allumée dans Paramètres. */
   const selfMedId=accessMode==="medecinEdit"&&editMedId!=null?editMedId:null;
+  /* v10.174 : le fond vert d'astreinte ne se montre qu'à l'intéressé, sur sa propre colonne —
+     qui veut savoir qui est d'astreinte va dans l'onglet Astreinte. */
+  const astSelf=selfMedId===null?null:(y3,m3,d3)=>{const v=getAstreinteForDay(y3,m3,d3);return v!==null&&String(v)===String(selfMedId)?v:null;};
   const selfLis=selfMedId!==null&&(colSelf.off||[]).map(String).indexOf(String(selfMedId))<0?selfMedId:null;
   const lisCur=lisStyle(colSelf.col||"#7c3aed",colSelf.op===undefined?1:colSelf.op);   /* v10.133 */
   /* v10.140 : colonne suivie — éditeur et niveau intermédiaire seulement. Un appui sur l'initiale suit ce
@@ -11389,7 +11392,8 @@ function CardioPlanning(){
      Garde int. reste à côté. Sur ordinateur, rien ne bouge. Les mêmes boutons servent aux deux onglets. */
   const btnPrint=<button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>;
   const btnDark=<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>;
-  const btnSig=<button onClick={()=>setModal("signal")} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button>;   /* v10.142 */
+  /* v10.142 ; v10.174 : un seul bouton, dans l'en-tête, visible sur toutes les pages */
+  const btnSig=<button onClick={()=>setModal("signal")} title="Signaler un problème" style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.1)",color:"#f0f6fc",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>🐞</button>;
   const btnFull=<button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>;
   const btnPref=canPref?<button onClick={()=>setPrefOn(v=>!v)} title="Afficher les préférences de tour et de garde" style={{...S.arr,fontSize:14,width:30,color:prefOn?"var(--today-c)":"var(--txt2)",border:`1px solid ${prefOn?"var(--today-c)":"var(--border)"}`}}>⭐</button>:null;
   const btnMore=<button data-keep="1" onClick={()=>setMoreOpen(v=>!v)} title="Autres outils" style={{...S.arr,fontSize:15,width:30,color:moreOpen?"var(--today-c)":"var(--txt2)",border:`1px solid ${moreOpen?"var(--today-c)":"var(--border)"}`}}>⋯</button>;
@@ -11514,6 +11518,7 @@ header::-webkit-scrollbar { display: none; }
           <span onClick={()=>{setPinInput("");setPinError(false);setIsCadre(false);setAccessMode("ask");}} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
           {/* v10.27 : l'administratif y a droit aussi — c'est lui qui remplit le plus
               souvent les semaines blanches et les reports. */}
+          {btnSig}
           {(isEdit||isMedEdit||isAdminEdit)&&<div style={{display:"flex",gap:3}}>
             <button onClick={doUndo} disabled={!canUndo} title="Annuler (retour arrière)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canUndo?"rgba(255,255,255,.1)":"transparent",color:canUndo?"#f0f6fc":"#484f58",cursor:canUndo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↶</button>
@@ -11627,10 +11632,10 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={nextM} style={S.arr}>›</button>
             </div>
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-              {iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}{btnPref}</React.Fragment>)}
+              {iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnFull}{btnPref}</React.Fragment>)}
             </div>
           </div>
-          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnPref}</React.Fragment>)}
+          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnPref}</React.Fragment>)}
           {prefOn&&<div style={{display:"flex",flexWrap:"wrap",gap:"4px 10px",alignItems:"center",marginBottom:8,fontSize:10,color:"var(--txt3)"}}>
             <span style={{fontWeight:700,textTransform:"uppercase"}}>Préférences :</span>
             <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"rgba(56,139,253,.20)",border:"1px solid #388bfd"}}></span>souhaite tourner</span>
@@ -11646,7 +11651,7 @@ header::-webkit-scrollbar { display: none; }
               {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             </div>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:getAstreinteForDay} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -11725,10 +11730,10 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<IssuePanel iss={attIssues} open={plIssOpen} setOpen={setPlIssOpen} onGo={goIssue}/>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}><button onClick={prevM} style={S.arr}>‹</button><h2 style={S.mTit}>{"👔 Attachés — "+(MOIS[perStart(year,month).sm]+" — "+MOIS[(perStart(year,month).sm+PCFG.len-1)%12]+" "+perStart(year,month).sy)}</h2><button onClick={nextM} style={S.arr}>›</button></div>
-            <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}</React.Fragment>)}</div>
+            <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnFull}</React.Fragment>)}</div>
           </div>
-          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}</React.Fragment>)}
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={getAstreinteForDay} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {trayFold(<React.Fragment>{btnPrint}{btnDark}</React.Fragment>)}
+          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={astSelf} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -11824,7 +11829,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
       {tab==="internes"&&<InternesView intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
-      {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
+      {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
         const astToday=new Date();

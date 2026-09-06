@@ -166,7 +166,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.173 — 06/09/2026";
+var APP_VERSION = "v10.174 — 06/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -5609,7 +5609,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"Vos préférences de tour")," : même bouton, dans la même fenêtre — la préférence porte alors sur la ",HE("b",null,"semaine entière")," (⭐ je souhaite tourner, 🚫 pas cette semaine)."]}),
   HP({children:["• ",HE("b",null,"Les revoir, les retirer")," : le bouton ",HBtn({kind:"ghost",children:"⭐"})," de la barre du Planning colore les cases concernées — bande bleue « je souhaite tourner », bande rouge « je préfère éviter », ⭐ ou 🚫 sur les jours de garde — avec sa légende au-dessus du tableau. Dans la fenêtre de la case, la ligne de préférence se clique pour la retirer."]}),
   HP({children:["• ",HE("b",null,"Vos propres activités")," : modifier le contenu de vos cases (activité, salle, note)."]}),
-  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞 (Aide, ou ⋯ dans Planning et Attachés) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
+  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞 en haut à gauche, à côté des flèches ↶↷, sur toutes les pages (v10.174) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
@@ -5659,7 +5659,7 @@ const HELP_SECTIONS=[
   HP({children:["La case patients ",HE("b",null,"vide"),", c'est toute la consultation qui part d'un bloc ; un ",HE("b",null,"nombre"),", c'est vous qui divisez. Les ",HE("b",null,"après-midis des semaines de tour")," peuvent reprendre une partie des patients — jamais le matin — et la part posée crée alors réellement la consultation dans le planning, avec choix de salle. Le reste peut partir « ↪ en liste d'attente », gérée par les secrétaires. Un badge « ⚠ report incomplet » reste affiché tant que le compte n'est pas à zéro."]}),
   HP({last:true,children:["En bas, « ",HE("b",null,"Demi-journées off par semaine")," » montre les créneaux libres hors semaines de tour : de quoi ouvrir une consultation, une fois tous les reports traités (export CSV). Les flèches ↶↷ couvrent aussi les reports, y compris pour les administratifs."]}))},
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
-  HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = semaine d'astreinte du médecin, fond jaune pâle = week-end. Filtre par médecins possible. Éditeur et intermédiaires : un appui sur l'initiale en tête de colonne la suit (cadre à la couleur du médecin, autres colonnes estompées) ; un second appui relâche."]}),
+  HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = votre propre semaine d'astreinte (visible par vous seul depuis la v10.174 — qui est d'astreinte se lit dans l'onglet Astreinte), fond jaune pâle = week-end. Filtre par médecins possible. Éditeur et intermédiaires : un appui sur l'initiale en tête de colonne la suit (cadre à la couleur du médecin, autres colonnes estompées) ; un second appui relâche."]}),
   HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip. Les anciens onglets Tour et Gardes vivent ici, entiers, dans les tuiles 2 et 3."]}),
   HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour. Le bouton ↔ règle l'",HE("b",null,"ordre des colonnes"),", de gauche à droite, site par site (↩ Ordre par défaut pour revenir en arrière). Le bouton 👁 masque ou réaffiche les colonnes de reprise ↩ sur cet appareil seulement ; les salles restent toujours visibles."]}),
   HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise. Le bouton 👁 masque ou réaffiche des colonnes sur cet appareil seulement — toutes celles de PT Cardio, les colonnes de reprise de PT Angio."]}),
@@ -7258,7 +7258,7 @@ function SecrTab(_a) {
             var nTot = acts.reduce(function (s2, a) { return s2 + grp[a].length; }, 0);
             var ouv = !!ouvert[m.id];
             var allKeys = acts.reduce(function (l, a) { return l.concat(grp[a].map(function (e) { return e.k; })); }, []);
-            return (React.createElement("div", { key: m.id, style: { border: "1px solid " + (nTot ? "#f59e0b" : "var(--border)"), borderRadius: 10, background: "var(--card)", opacity: nTot ? 1 : .55, gridColumn: ouv ? "1 / -1" : "auto" } },
+            return (React.createElement("div", { key: m.id, style: { border: "1px solid " + (nTot ? "#f59e0b" : "var(--border)"), borderRadius: 10, background: "var(--card)", opacity: nTot ? 1 : .55, gridColumn: (ouv && nTot > 0) ? "1 / -1" : "auto" /* v10.174 : pleine largeur seulement s'il y a des lignes */ } },
                 React.createElement("div", { onClick: function () { return setOuvert(function (o) {
                         var _a;
                         return (__assign(__assign({}, o), (_a = {}, _a[m.id] = !o[m.id], _a)));
@@ -13560,6 +13560,9 @@ function CardioPlanning() {
        code éditeur anonyme, l'administratif et les internes. Le centrage suit toujours ce PIN ;
        le pointillé, seulement si sa tuile est allumée dans Paramètres. */
     var selfMedId = accessMode === "medecinEdit" && editMedId != null ? editMedId : null;
+    /* v10.174 : le fond vert d'astreinte ne se montre qu'à l'intéressé, sur sa propre colonne —
+       qui veut savoir qui est d'astreinte va dans l'onglet Astreinte. */
+    var astSelf = selfMedId === null ? null : function (y3, m3, d3) { var v = getAstreinteForDay(y3, m3, d3); return v !== null && String(v) === String(selfMedId) ? v : null; };
     var selfLis = selfMedId !== null && (colSelf.off || []).map(String).indexOf(String(selfMedId)) < 0 ? selfMedId : null;
     var lisCur = lisStyle(colSelf.col || "#7c3aed", colSelf.op === undefined ? 1 : colSelf.op); /* v10.133 */
     /* v10.140 : colonne suivie — éditeur et niveau intermédiaire seulement. Un appui sur l'initiale suit ce
@@ -13603,7 +13606,8 @@ function CardioPlanning() {
        Garde int. reste à côté. Sur ordinateur, rien ne bouge. Les mêmes boutons servent aux deux onglets. */
     var btnPrint = React.createElement("button", { onClick: function () { return setModal("print"); }, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F");
     var btnDark = React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓");
-    var btnSig = React.createElement("button", { onClick: function () { return setModal("signal"); }, title: "Signaler un probl\u00E8me", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDC1E"); /* v10.142 */
+    /* v10.142 ; v10.174 : un seul bouton, dans l'en-tête, visible sur toutes les pages */
+    var btnSig = React.createElement("button", { onClick: function () { return setModal("signal"); }, title: "Signaler un probl\u00E8me", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.1)", color: "#f0f6fc", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 } }, "\uD83D\uDC1E");
     var btnFull = React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️");
     var btnPref = canPref ? React.createElement("button", { onClick: function () { return setPrefOn(function (v) { return !v; }); }, title: "Afficher les pr\u00E9f\u00E9rences de tour et de garde", style: __assign(__assign({}, S.arr), { fontSize: 14, width: 30, color: prefOn ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(prefOn ? "var(--today-c)" : "var(--border)") }) }, "\u2B50") : null;
     var btnMore = React.createElement("button", { "data-keep": "1", onClick: function () { return setMoreOpen(function (v) { return !v; }); }, title: "Autres outils", style: __assign(__assign({}, S.arr), { fontSize: 15, width: 30, color: moreOpen ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(moreOpen ? "var(--today-c)" : "var(--border)") }) }, "\u22EF");
@@ -13687,6 +13691,7 @@ function CardioPlanning() {
         React.createElement("header", { style: S.hdr },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexShrink: 0 } },
                 React.createElement("span", { onClick: function () { setPinInput(""); setPinError(false); setIsCadre(false); setAccessMode("ask"); }, title: "Retour \u00E0 l'accueil", style: { fontSize: 20, color: "#f85149", cursor: "pointer" } }, "\u2665"),
+                btnSig,
                 (isEdit || isMedEdit || isAdminEdit) && React.createElement("div", { style: { display: "flex", gap: 3 } },
                     React.createElement("button", { onClick: doUndo, disabled: !canUndo, title: "Annuler (retour arri\u00E8re)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canUndo ? "rgba(255,255,255,.1)" : "transparent", color: canUndo ? "#f0f6fc" : "#484f58", cursor: canUndo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B6"),
                     React.createElement("button", { onClick: doRedo, disabled: !canRedo, title: "R\u00E9tablir (retour avant)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canRedo ? "rgba(255,255,255,.1)" : "transparent", color: canRedo ? "#f0f6fc" : "#484f58", cursor: canRedo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B7")),
@@ -13793,13 +13798,11 @@ function CardioPlanning() {
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } }, iconsFold(React.createElement(React.Fragment, null,
                         btnPrint,
                         btnDark,
-                        btnSig,
                         btnFull,
                         btnPref)))),
                 trayFold(React.createElement(React.Fragment, null,
                     btnPrint,
                     btnDark,
-                    btnSig,
                     btnPref)),
                 prefOn && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "4px 10px", alignItems: "center", marginBottom: 8, fontSize: 10, color: "var(--txt3)" } },
                     React.createElement("span", { style: { fontWeight: 700, textTransform: "uppercase" } }, "Pr\u00E9f\u00E9rences :"),
@@ -13823,7 +13826,7 @@ function CardioPlanning() {
                     filtOpen && React.createElement("div", { "data-keep": "1", style: { position: "absolute", top: "100%", left: 0, zIndex: 60, marginTop: 4, padding: 8, borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg)", boxShadow: "0 6px 18px rgba(0,0,0,.18)", display: "flex", flexWrap: "wrap", gap: 4, maxWidth: "min(92vw,520px)" } },
                         React.createElement("button", { onClick: function () { return setPlanFilter([]); }, style: { padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border)", background: planFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: planFilter.length === 0 ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: 600 } }, "Tous"),
                         medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); }))),
-                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, intGarde: intGardeOn ? (function (y2, m2, d2) { return intGardeDuJour(getEntries, intCfgAff, y2, m2, d2); }) : null, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, prefFor: prefOn ? prefFor : null, gardePref: gardePrefFor, getAstreinteForDay: prefOn ? null : getAstreinteForDay, memX: "planning", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
+                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: planIssues.map, intGarde: intGardeOn ? (function (y2, m2, d2) { return intGardeDuJour(getEntries, intCfgAff, y2, m2, d2); }) : null, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, prefFor: prefOn ? prefFor : null, gardePref: gardePrefFor, getAstreinteForDay: prefOn ? null : astSelf, memX: "planning", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
             tab === "tourmedical" && React.createElement(TourTab, __assign({}, tourProps)),
             tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medsAff, getEntries: getEntries, tourMed: tourMed, isEdit: (isEdit || isInterEdit) && !isAttEdit, edReel: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: function (per) { return openPtModal(null, "apply", per); }, onRemovePT: function (per) { return openPtModal(null, "remove", per); }, secrDif: secrCfg.dif || {}, onDiffuser: function (pid) { return setSecrCfg(function (c) {
                     var _a;
@@ -13901,13 +13904,11 @@ function CardioPlanning() {
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } }, iconsFold(React.createElement(React.Fragment, null,
                         btnPrint,
                         btnDark,
-                        btnSig,
                         btnFull)))),
                 trayFold(React.createElement(React.Fragment, null,
                     btnPrint,
-                    btnDark,
-                    btnSig)),
-                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: attIssues.map, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: getAstreinteForDay, memX: "attache", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
+                    btnDark)),
+                React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: attIssues.map, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: astSelf, memX: "attache", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit },
@@ -13987,7 +13988,6 @@ function CardioPlanning() {
             tab === "notifications" && React.createElement(SecrTab, { medecins: medsAff, acteById: acteById, secrNotif: secrNotif, setSecrNotif: setSecrNotif, secrAtts: secrCfg.atts || [], canAck: !netOff, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "aide" && React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 6 } },
-                    btnSig,
                     React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                 React.createElement(HelpView, null)),
             tab === "astreinte" && (function () {
