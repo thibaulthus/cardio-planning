@@ -119,6 +119,7 @@ var db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseDB 
    archivage, ni signalement ; tout le reste (verrous, notifications, Construire) est identique. */
 var BAC=(function(){try{return localStorage.getItem("cp6_bac")==="1";}catch(e){return false;}})();
 var PLAN_ID=BAC?"bac":"main";
+var JOURNAL_ID=BAC?"journalBac":"journal";   /* v10.176 : l'historique des cases du bac ne se mêle pas au vrai */
 var PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", PLAN_ID) : null;
 /* v10.135 : garde-fou de version. Le 28/08, après un plantage, le cache a resservi une
    v9.22 — une copie de juillet qui aurait écrit avec ses règles d'alors, sans verrou du
@@ -172,7 +173,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.175 — 06/09/2026";
+var APP_VERSION = "v10.176 — 06/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -787,10 +788,10 @@ function Chp(_a) {
    un simple événement, que CardioPlanning écoute pour ouvrir la modale de signalement. */
 function SigBtn() { return React.createElement("button", { onClick: function () { return window.dispatchEvent(new Event("cp-signal")); }, title: "Signaler un probl\u00E8me", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDC1E"); }
 function Ov(_a) {
-    var children = _a.children, onClose = _a.onClose;
+    var children = _a.children, onClose = _a.onClose, _b = _a.wide, wide = _b === void 0 ? false : _b; /* v10.176 : wide — la modale 🤝 restait dans les 500 px de S.mb */
     return React.createElement("div", { style: S.ov, onClick: function (e) { if (e.target === e.currentTarget)
             onClose(); } },
-        React.createElement("div", { style: S.mb }, children));
+        React.createElement("div", { style: wide ? __assign(__assign({}, S.mb), { width: "96vw", maxWidth: "96vw" }) : S.mb }, children));
 }
 function FF(_a) {
     var l = _a.l, v = _a.v, c = _a.c;
@@ -803,6 +804,16 @@ function FF(_a) {
    `onClick` lisait une variable inexistante sur ORDINATEUR (ReferenceError) et le clic ne
    faisait rien, alors que le téléphone fonctionnait. Ne pas supprimer. */
 let _gvLpF = false, _gvLpT = null;
+/* v10.176 : l'historique d'une case (clic droit / appui long) dans TOUS les onglets — les mêmes quatre
+   gestionnaires que GridV, en propriétés à étaler sur la case (Internes) ou sur le rond d'un occupant
+   (CHL, CHB, PT Cardio, PT Angio). Le clic qui suit un appui long est avalé par _gvLpF, comme dans GridV. */
+function histProps(onCellHistory, medId, y, m, d, sl) {
+    if (!onCellHistory)
+        return {};
+    return { onContextMenu: function (e) { e.preventDefault(); e.stopPropagation(); onCellHistory(medId, y, m, d, sl); },
+        onTouchStart: function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(medId, y, m, d, sl); }, 600); },
+        onTouchEnd: function () { return clearTimeout(_gvLpT); }, onTouchMove: function () { return clearTimeout(_gvLpT); } };
+}
 function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, meds, getEntries, acteById, onCell, isEdit, notes = {}, isVac, applyGarde, allMeds, viewPeriod, allDays4, showFull, showGarde = true, intGarde = null, gardeLocked = false, onCellHistory = null, getAstreinteForDay, prefFor = null, gardePref = null, printWk = null, memX = null, selfId = null, centreId = null, lis = LIS, suiviId = null, onSuivi = null }) {
     /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
        disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
@@ -1243,7 +1254,7 @@ function TableScroll(_a) {
        reprend ce sujet, au lieu des dix cadres identiques d'avant. */
     return (React.createElement("div", { ref: ref, onScroll: onScroll, style: __assign({ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - " + mh + "px)", borderRadius: 8, border: "1px solid var(--border)" }, (style || {})) }, children));
 }
-function SiteView({ issMap = {}, printWk = null, onPrint = null, site, year, month, prevM, nextM, actes, medecins, getEntries, salleOcc, allDays, isEdit, onPickSite, notes = {}, salleReg = [], darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, colOrder = null, onOrder = null, intCfg = null, colHide = null, onHide = null, narrow = false, moreOpen = false, setMoreOpen = null }) {
+function SiteView({ onCellHistory = null, issMap = {}, printWk = null, onPrint = null, site, year, month, prevM, nextM, actes, medecins, getEntries, salleOcc, allDays, isEdit, onPickSite, notes = {}, salleReg = [], darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, colOrder = null, onOrder = null, intCfg = null, colHide = null, onHide = null, narrow = false, moreOpen = false, setMoreOpen = null }) {
     const today = new Date();
     const ANGIO_SALLES_ALL = ["Angio-1", "Angio-2", "Angio-3"];
     const EXCL_SALLES = site === "CHL" ? [S_STIM, S_EEP, S_EE_CHB, ...ANGIO_SALLES_ALL] : site === "ANGIO" ? [] : [S_STIM, S_EEP, S_EE_CHL, ...ANGIO_SALLES_ALL];
@@ -1323,8 +1334,8 @@ function SiteView({ issMap = {}, printWk = null, onPrint = null, site, year, mon
             const semJb = intMedsDuJour(intCfg, ry, rm, d);
             const bipInt = semJb ? semJb.meds.flatMap(im => getEntries(im.id, ry, rm, d, sl).filter(e => e && e.acteId === _rId && !e.cond).map(e => ({ med: im, acte: bipActe, rs: e.salle, isInt: true }))) : [];
             const bipAll = bipOcc2.concat(bipInt);
-            return (React.createElement("td", { key: "bip" + d + sl, style: Object.assign(Object.assign({}, S.td), { borderLeft: "3px solid var(--border)", cursor: isEdit ? "pointer" : "default", padding: 2, verticalAlign: "middle", textAlign: "center" }), onClick: () => isEdit && onPickSite({ salle, siteActes: [bipActe], d, sl, y: ry, m: rm }) }, bipAll.map(({ med, acte, rs, isInt }, i) => (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 3, margin: "1px 0" } },
-                React.createElement("div", { title: isInt ? med.nom : ((med.prenom || "") + " " + (med.nom || "")).trim(), style: { width: 26, height: 26, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0, border: isInt ? "1.5px dashed rgba(255,255,255,.95)" : "none" } }, med.init),
+            return (React.createElement("td", { key: "bip" + d + sl, style: Object.assign(Object.assign({}, S.td), { borderLeft: "3px solid var(--border)", cursor: isEdit ? "pointer" : "default", padding: 2, verticalAlign: "middle", textAlign: "center" }), onClick: () => { if (_gvLpF) { _gvLpF = false; return; } if (isEdit) onPickSite({ salle, siteActes: [bipActe], d, sl, y: ry, m: rm }); } }, bipAll.map(({ med, acte, rs, isInt }, i) => (React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 3, margin: "1px 0" } },
+                React.createElement("div", __assign(histProps(onCellHistory, med.id, ry, rm, d, sl), { title: isInt ? med.nom : ((med.prenom || "") + " " + (med.nom || "")).trim(), style: { width: 26, height: 26, borderRadius: "50%", background: med.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0, border: isInt ? "1.5px dashed rgba(255,255,255,.95)" : "none" } }), med.init),
                 rs ? React.createElement(SallePill, { nom: rs, acte: acte, night: darkMode })
                     : (bipActe.hasSalle ? React.createElement("span", { style: { fontSize: 9, fontWeight: 800, background: "#fff3cd", color: "#8a6100", border: "1px solid #f59e0b88", borderRadius: 4, padding: "1px 4px", whiteSpace: "nowrap" } }, "\u26A0 sans salle") : null))))));
         }
@@ -1373,18 +1384,18 @@ function SiteView({ issMap = {}, printWk = null, onPrint = null, site, year, mon
             });
         /* v10.53 : initiales devant chaque note — deux occupants ne se confondent plus */
         const noteTips = occ.map(({ med }) => { const n = notes[nk(med.id, ry, rm, d, sl)]; return n ? (med.init + " : " + n) : null; }).filter(Boolean).join("  |  ");
-        return (React.createElement("td", { key: `${salle}-${d}-${sl}`, title: noteTips || undefined, style: Object.assign(Object.assign(Object.assign(Object.assign({}, S.td), (conflict ? conflBg(darkMode) : {})), (isTdRC ? { background: "var(--bg-td)" } : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? () => onPickSite({ salle, siteActes: salleActes, d, sl, y: ry, m: rm }) : undefined },
+        return (React.createElement("td", { key: `${salle}-${d}-${sl}`, title: noteTips || undefined, style: Object.assign(Object.assign(Object.assign(Object.assign({}, S.td), (conflict ? conflBg(darkMode) : {})), (isTdRC ? { background: "var(--bg-td)" } : {})), { padding: 2, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? () => { if (_gvLpF) { _gvLpF = false; return; } onPickSite({ salle, siteActes: salleActes, d, sl, y: ry, m: rm }); } : undefined },
             React.createElement("div", { style: { display: "flex", flexDirection: "column" } }, grps.map((g, gi) => (React.createElement("div", { key: gi, style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, padding: "2px 0",
                     borderTop: gi ? "1px dashed " + (conflict ? conflSep(darkMode) : "var(--border)") : "none" } },
                 React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } },
                     g.meds.map((m, mi) => {
                         /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
                         const iss = issMap[m.id + "|" + ry + "|" + rm + "|" + d + "|" + sl];
-                        return React.createElement("div", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim() + (iss ? " — " + iss : ""), style: { position: "relative", width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } },
+                        return React.createElement("div", __assign(histProps(onCellHistory, m.id, ry, rm, d, sl), { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim() + (iss ? " — " + iss : ""), style: { position: "relative", width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0 } }),
                             m.init,
                             iss && React.createElement("span", { style: { position: "absolute", top: -2, left: -2, width: 8, height: 8, borderRadius: "50%", background: "#f85149", border: "1.5px solid var(--bg2)" } }));
                     }),
-                    (g.imeds || []).map((m, mi) => (React.createElement("div", { key: "i" + mi, title: m.nom, style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0, border: "1.5px dashed rgba(255,255,255,.95)" } }, m.init)))),
+                    (g.imeds || []).map((m, mi) => (React.createElement("div", __assign(histProps(onCellHistory, m.id, ry, rm, d, sl), { key: "i" + mi, title: m.nom, style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0, border: "1.5px dashed rgba(255,255,255,.95)" } }), m.init)))),
                 React.createElement(ActPill, { a: g.acte, night: darkMode, hasNote: g.meds.some(m => !!notes[nk(m.id, ry, rm, d, sl)]) })))))));
     }
     /* v10.171 : sous 760 px, les outils se replient sous ⋯ (mécanisme de Planning, v10.132) ; 📅 reste. */
@@ -1444,7 +1455,7 @@ function SiteView({ issMap = {}, printWk = null, onPrint = null, site, year, mon
 }
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */ 
 
-function ActTabView({ issMap = {}, title, titleColor, rows, year, month, prevM, nextM, medecins, actes, getEntries, notes = {}, allDays, isEdit, onPickAct, darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, ideFeature, ideOn, setIdeOn, ideCfg, setIdeCfg, canIde, orderCtl, onOrder, printWk, onPrint, intCfg = null, colHide = null, onHide = null, narrow = false, moreOpen = false, setMoreOpen = null }) {
+function ActTabView({ onCellHistory = null, issMap = {}, title, titleColor, rows, year, month, prevM, nextM, medecins, actes, getEntries, notes = {}, allDays, isEdit, onPickAct, darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, ideFeature, ideOn, setIdeOn, ideCfg, setIdeCfg, canIde, orderCtl, onOrder, printWk, onPrint, intCfg = null, colHide = null, onHide = null, narrow = false, moreOpen = false, setMoreOpen = null }) {
     const today = new Date();
     const atvEffDays2 = useMemo(() => {
         const p = perStart(year, month);
@@ -1628,8 +1639,8 @@ function ActTabView({ issMap = {}, title, titleColor, rows, year, month, prevM, 
                     });
                 });
             });
-        return (React.createElement("td", { key: `${row.label}-${d}-${sl}`, title: noteTips || undefined, style: Object.assign(Object.assign(Object.assign(Object.assign({}, S.td), (conflA ? conflBg(darkMode) : {})), (isTd ? { background: "var(--bg-td)" } : {})), { padding: 3, maxWidth: 150, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? () => onPickAct({ row, d, sl, y: ry, m: rm }) : undefined },
-            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2, alignItems: "stretch" }, onClick: e => { e.stopPropagation(); if (isEdit)
+        return (React.createElement("td", { key: `${row.label}-${d}-${sl}`, title: noteTips || undefined, style: Object.assign(Object.assign(Object.assign(Object.assign({}, S.td), (conflA ? conflBg(darkMode) : {})), (isTd ? { background: "var(--bg-td)" } : {})), { padding: 3, maxWidth: 150, cursor: isEdit ? "pointer" : "default" }), onClick: isEdit ? () => { if (_gvLpF) { _gvLpF = false; return; } onPickAct({ row, d, sl, y: ry, m: rm }); } : undefined },
+            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2, alignItems: "stretch" }, onClick: e => { e.stopPropagation(); if (_gvLpF) { _gvLpF = false; return; } if (isEdit)
                     onPickAct({ row, d, sl, y: ry, m: rm }); } }, _grpsA.map((g, gi) => {
                 const monoActe = (row.ids || []).length === 1 && !row.multiActe;
                 const ideN = (g.n === null || g.n === undefined) ? (g.acte.ideN || 0) : g.n;
@@ -1656,12 +1667,12 @@ function ActTabView({ issMap = {}, title, titleColor, rows, year, month, prevM, 
                         meds.map((m, mi) => {
                             /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
                             const iss = issMap[m.id + "|" + ry + "|" + rm + "|" + d + "|" + sl];
-                            return React.createElement("span", { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim() + (iss ? " — " + iss : "") + (notes[nk(m.id, ry, rm, d, sl)] ? " — 📝 " + notes[nk(m.id, ry, rm, d, sl)] : ""), style: { position: "relative", width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 } },
+                            return React.createElement("span", __assign(histProps(onCellHistory, m.id, ry, rm, d, sl), { key: mi, title: ((m.prenom || "") + " " + (m.nom || "")).trim() + (iss ? " — " + iss : "") + (notes[nk(m.id, ry, rm, d, sl)] ? " — 📝 " + notes[nk(m.id, ry, rm, d, sl)] : ""), style: { position: "relative", width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 } }),
                                 m.init,
                                 notes[nk(m.id, ry, rm, d, sl)] && React.createElement("span", { style: { position: "absolute", top: -1, right: -1, width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" } }),
                                 iss && React.createElement("span", { style: { position: "absolute", top: -2, left: -2, width: 8, height: 8, borderRadius: "50%", background: "#f85149", border: "1.5px solid var(--bg2)" } }));
                         }),
-                        imeds.map((m, mi) => (React.createElement("span", { key: "i" + mi, title: m.nom, style: { width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0, border: "1.5px dashed rgba(255,255,255,.95)" } }, m.init)))),
+                        imeds.map((m, mi) => (React.createElement("span", __assign(histProps(onCellHistory, m.id, ry, rm, d, sl), { key: "i" + mi, title: m.nom, style: { width: 22, height: 22, borderRadius: "50%", background: m.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0, border: "1.5px dashed rgba(255,255,255,.95)" } }), m.init)))),
                     (lieu || showIde || noSalle) &&
                         React.createElement("span", { title: g.dif ? ("Départ différé" + (dc ? " — " + dc : "")) : undefined, style: Object.assign(Object.assign({}, pillCols((g.acte && g.acte.color) || "#888888", darkMode)), { display: "inline-flex", alignItems: "stretch", height: 22, borderRadius: 4, overflow: "hidden", fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 800, whiteSpace: "nowrap", cursor: g.dif ? "help" : "inherit" }) },
                             noSalle && React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 6px", background: "#fff3cd", color: "#8a6100" } }, "\u26A0 sans salle"),
@@ -5205,8 +5216,8 @@ function TourTab(_a) {
                             "/2")))); })));
         }),
         /* v10.165 : tableau des binômes — lecture seule, ouvert à tous les niveaux */
-        binOpen && (React.createElement(Ov, { onClose: function () { return setBinOpen(false); } },
-            React.createElement("div", { style: __assign(__assign({}, S.modal), { width: "96vw", maxWidth: "96vw", maxHeight: "88vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } }, /* v10.169 : le tableau tenait dans 840 px et se coupait */
+        binOpen && (React.createElement(Ov, { wide: true, onClose: function () { return setBinOpen(false); } },
+            React.createElement("div", { style: __assign(__assign({}, S.modal), { width: "100%", maxHeight: "88vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } }, /* v10.169 : le tableau tenait dans 840 px et se coupait */
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                     React.createElement("div", { style: S.mTit2 }, "\uD83E\uDD1D Qui a tourn\u00E9 avec qui"),
                     React.createElement("button", { onClick: function () { return setBinOpen(false); }, style: S.xBtn }, "\u00D7")),
@@ -5695,7 +5706,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
   HP({children:["🔐 ",HE("b",null,"Niveaux de droits")," : chaque médecin a un niveau dans sa fiche ✏️ (onglet Équipe), qui s'applique quand il se connecte avec son PIN personnel. ",HE("b",null,"Basique")," = sa propre ligne, plus ses activités dans CHL, CHB et les plateaux. ",HE("b",null,"Intermédiaire")," = le planning de tous les médecins, gardes et échanges, semaines de tour, planning type et attachés — sans Paramètres, Équipe ni Activités. ",HE("b",null,"Éditeur")," = accès complet. Récapitulatif dans Paramètres."]}),
   HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
-  HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case du Planning — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
+  HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case — dans le Planning et les Attachés, sur le rond du médecin dans CHL, CHB, PT Cardio et PT Angio, sur la case dans Internes (v10.176) — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
 
  {id:"cellules",icon:"🔲",title:"Les cellules du planning",body:()=>HE("div",null,
@@ -5755,7 +5766,7 @@ const HELP_SECTIONS=[
  {id:"bac",icon:"🧪",title:"Bac à sable — tester sans risque",body:()=>HE("div",null,
   HP({children:["Un espace de test à part, réservé à l'éditeur (Paramètres → 🧪 Bac à sable). En y entrant, l'application recopie le planning réel dans un cahier Firebase distinct, puis se recharge dessus : tout ce que vous y faites reste dans cette copie. Le bac est propre au navigateur qui l'a activé — vos collègues continuent de voir le vrai planning, et d'y travailler."]}),
   HP({children:[HE("b",null,"Ce qui s'y comporte comme dans le vrai")," : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."]}),
-  HP({children:[HE("b",null,"Ce qui est désactivé")," : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."]}),
+  HP({children:[HE("b",null,"Ce qui est désactivé")," : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles. L'historique des cases du bac est tenu à part, sans se mêler au vrai."]}),
   HP({children:[HE("b",null,"Le bandeau orange"),", en bas de l'écran, rappelle où vous êtes et porte trois commandes. ",HE("b",null,"Connecté comme"),", pour passer d'un profil à l'autre sans PIN — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation. ",HBtn({kind:"ghost",children:"↺ Remettre à zéro"}),", qui remplace le bac par une copie fraîche du planning réel. ",HBtn({kind:"ghost",children:"🚪 Sortir du bac"}),", qui ramène au vrai planning. L'écran d'accueil (PIN) affiche le même rappel, avec son bouton Sortir."]})
  )},
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
@@ -8782,7 +8793,7 @@ function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEn
                     autresGardes.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune autre garde pos\u00E9e sur la p\u00E9riode affich\u00E9e."))),
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", lineHeight: 1.5 } }, "Le repos du lendemain est pos\u00E9 automatiquement avec la garde et remplace ce qui s'y trouve ; il s'enl\u00E8ve en retirant la garde. Un interne peut \u00EAtre absent ou en FMC le jour de sa garde. Les repos des deux jours sont recalcul\u00E9s lors d'un \u00E9change.")));
 }
-function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, setEntry, isVac, year, month, allDays, viewPeriod, showFull, setShowFull, canEdit, canSalle = false, salleReg = [], intSelf = false, prevM, nextM, darkMode, setDarkMode }) {
+function InternesView({ onCellHistory = null, intCfg, setIntCfg = null, actes, acteById, getEntries, setEntry, isVac, year, month, allDays, viewPeriod, showFull, setShowFull, canEdit, canSalle = false, salleReg = [], intSelf = false, prevM, nextM, darkMode, setDarkMode }) {
     const [sel, setSel] = useState(null);
     const [gm, setGm] = useState(null);
     const [jaugeOn, setJaugeOn] = useState(intCfg.jaugeDef !== false); /* v10.65 : affichage en nominal réglé dans Paramètres */
@@ -8913,7 +8924,7 @@ function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, s
                                 }
                                 const e = inR ? cellEntree(c, o, sl) : null;
                                 const a = e ? acteById(e.acteId) : null;
-                                return React.createElement("td", { key: c.id, onClick: (canEdit && inR) ? () => setSel({ med: c, y: o.y, m: o.m, d: o.d, slot0: sl }) : undefined, style: Object.assign(Object.assign(Object.assign({}, S.td), (we ? S.tdWE : {})), (inR ? { cursor: canEdit ? "pointer" : "default" } : horsSem)) }, a && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } },
+                                return React.createElement("td", __assign(histProps(onCellHistory, c.id, o.y, o.m, o.d, sl), { key: c.id, onClick: (canEdit && inR) ? () => { if (_gvLpF) { _gvLpF = false; return; } setSel({ med: c, y: o.y, m: o.m, d: o.d, slot0: sl }); } : undefined, style: Object.assign(Object.assign(Object.assign({}, S.td), (we ? S.tdWE : {})), (inR ? { cursor: canEdit ? "pointer" : "default" } : horsSem)) }), a && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 1 } },
                                     React.createElement(Badge, { a: a, salle: e.salle, hideSalle: !e.salle })));
                             }))));
                     })))),
@@ -9402,7 +9413,7 @@ function CardioPlanning() {
         try {
             if (!window.firebaseDB || !window.firebaseDoc)
                 return;
-            var jdoc_1 = window.firebaseDoc(window.firebaseDB, "planning", "journal");
+            var jdoc_1 = window.firebaseDoc(window.firebaseDB, "planning", JOURNAL_ID);
             var eid_1 = "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
             var je_1 = { t: Date.now(), k: sk(y2, m2, d2, sl2), md: medId2, x: action, act: acteId2 || null, a: authorRef.current };
             if (updatePaths)
@@ -11814,7 +11825,7 @@ function CardioPlanning() {
                 switch (_a.label) {
                     case 0:
                         _a.trys.push([0, 4, , 5]);
-                        return [4 /*yield*/, window.firebaseDB.collection("planning").doc("journal").get()];
+                        return [4 /*yield*/, window.firebaseDB.collection("planning").doc(JOURNAL_ID).get()];
                     case 1:
                         d3 = _a.sent();
                         es_1 = (d3.data() || {}).entries || {};
@@ -11825,7 +11836,7 @@ function CardioPlanning() {
                             var k2 = _a[0];
                             kept_1[k2] = es_1[k2];
                         });
-                        return [4 /*yield*/, window.firebaseDB.collection("planning").doc("journal").set({ entries: kept_1 })];
+                        return [4 /*yield*/, window.firebaseDB.collection("planning").doc(JOURNAL_ID).set({ entries: kept_1 })];
                     case 2:
                         _a.sent();
                         _a.label = 3;
@@ -11846,7 +11857,7 @@ function CardioPlanning() {
                 switch (_a.label) {
                     case 0:
                         _a.trys.push([0, 2, , 3]);
-                        return [4 /*yield*/, window.firebaseDB.collection("planning").doc("journal").get()];
+                        return [4 /*yield*/, window.firebaseDB.collection("planning").doc(JOURNAL_ID).get()];
                     case 1:
                         d3 = _a.sent();
                         es = (d3.data() || {}).entries || {};
@@ -13843,13 +13854,13 @@ function CardioPlanning() {
                     React.createElement("button", { onClick: doUndo, disabled: !canUndo, title: "Annuler (retour arri\u00E8re)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canUndo ? "rgba(255,255,255,.1)" : "transparent", color: canUndo ? "#f0f6fc" : "#484f58", cursor: canUndo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B6"),
                     React.createElement("button", { onClick: doRedo, disabled: !canRedo, title: "R\u00E9tablir (retour avant)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canRedo ? "rgba(255,255,255,.1)" : "transparent", color: canRedo ? "#f0f6fc" : "#484f58", cursor: canRedo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B7")),
                 React.createElement("div", null,
-                    React.createElement("div", { style: { fontWeight: 800, fontSize: 14, color: "#f0f6fc" } }, "CardioPlanning"),
-                    React.createElement("div", { style: { fontSize: 8, color: "#484f58", display: "flex", alignItems: "center", gap: 4 } },
-                        !isEdit && React.createElement("span", { style: { color: "#e3b341", marginLeft: 5 } }, "\uD83D\uDC41"),
-                        perClose && React.createElement("span", { title: perArchivee ? "Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier." : "Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session.", style: { background: perArchivee ? "#0e7490" : "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perArchivee ? "🗄 PÉRIODE ARCHIVÉE" : "🔒 PÉRIODE CLOSE"),
-                        perFut && perFut !== "dif" && React.createElement("span", { title: perFut === "phase1" ? "La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période" + (perFutFin ? " (jusqu'au " + finLib(perFutFin) + " à titre indicatif)" : "") + ". Le reste attend la diffusion du planning." : "Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning.", style: { background: perFut === "phase1" ? "#0e7490" : "#b45309", color: "#fff", fontWeight: 800, fontSize: 9, marginLeft: 4, padding: "2px 6px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perFut === "phase1" ? "🏖️ CONGÉS OUVERTS" : "🚧 EN PRÉPARATION"),
+                    /* v10.176 : le mot « CardioPlanning » retiré — ~110 px rendus au nav sur téléphone ; les témoins (👁, période, Firebase) grandissent à sa place */
+                    React.createElement("div", { style: { fontSize: 13, color: "#484f58", display: "flex", alignItems: "center", gap: 5 } },
+                        !isEdit && React.createElement("span", { title: "Lecture seule", style: { color: "#e3b341", fontSize: 16 } }, "\uD83D\uDC41"),
+                        perClose && React.createElement("span", { title: perArchivee ? "Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier." : "Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session.", style: { background: perArchivee ? "#0e7490" : "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 10, padding: "3px 7px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perArchivee ? "🗄 PÉRIODE ARCHIVÉE" : "🔒 PÉRIODE CLOSE"),
+                        perFut && perFut !== "dif" && React.createElement("span", { title: perFut === "phase1" ? "La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période" + (perFutFin ? " (jusqu'au " + finLib(perFutFin) + " à titre indicatif)" : "") + ". Le reste attend la diffusion du planning." : "Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning.", style: { background: perFut === "phase1" ? "#0e7490" : "#b45309", color: "#fff", fontWeight: 800, fontSize: 10, padding: "3px 7px", borderRadius: 9, whiteSpace: "nowrap", letterSpacing: .2 } }, perFut === "phase1" ? "🏖️ CONGÉS OUVERTS" : "🚧 EN PRÉPARATION"),
                         "   ",
-                        React.createElement("span", { style: { marginLeft: 4, width: 6, height: 6, borderRadius: "50%", display: "inline-block",
+                        React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", display: "inline-block",
                                 background: netOff ? "#94a3b8" : fbStatus === "ok" ? "#4ade80" : fbStatus === "error" ? "#ef4444" : fbStatus === "offline" ? "#94a3b8" : "#f59e0b" }, title: netOff ? "Hors ligne — lecture seule" : fbStatus === "ok" ? "Firebase connecté" : fbStatus === "error" ? "Erreur Firebase" : fbStatus === "offline" ? "Mode local (CodeSandbox)" : "Connexion..." })))),
             React.createElement("nav", { style: S.nav }, orderedTabs.map(function (_a) {
                 var v = _a[0], l = _a[1];
@@ -13981,7 +13992,7 @@ function CardioPlanning() {
                     var _a;
                     return (__assign(__assign({}, c), { dif: __assign(__assign({}, (c.dif || {})), (_a = {}, _a[pid] = new Date().toLocaleDateString("fr-FR"), _a)) }));
                 }); }, onAnnulerDif: function (pid) { return setSecrCfg(function (c) { var d2 = __assign({}, (c.dif || {})); delete d2[pid]; return __assign(__assign({}, c), { dif: d2 }); }); }, tourProps: tourProps, gardeProps: gardeProps }),
-            tab === "chl" && React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["CHL"] || null, onHide: function (cols) { setHideModal({ site: "CHL", cols: cols }); setModal("colHide"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", intCfg: intCfgAff, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notesAff, onPickSite: function (_a) {
+            tab === "chl" && React.createElement(SiteView, { onCellHistory: isAnyEdit ? openCellHistory : null, issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["CHL"] || null, onHide: function (cols) { setHideModal({ site: "CHL", cols: cols }); setModal("colHide"); }, colOrder: colOrder["CHL"] || null, onOrder: function (cols) { setColModal({ site: "CHL", cols: cols }); setModal("colOrder"); }, site: "CHL", intCfg: intCfgAff, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notesAff, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     if (!vOuvre(y, m, d))
                         return;
@@ -13989,7 +14000,7 @@ function CardioPlanning() {
                     setModal("pickMedSite");
                 }, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
             tab === "chb" && React.createElement("div", null,
-                React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["CHB"] || null, onHide: function (cols) { setHideModal({ site: "CHB", cols: cols }); setModal("colHide"); }, colOrder: colOrder["CHB"] || null, onOrder: function (cols) { setColModal({ site: "CHB", cols: cols }); setModal("colOrder"); }, site: "CHB", intCfg: intCfgAff, darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, notes: notesAff, onPickSite: function (_a) {
+                React.createElement(SiteView, { onCellHistory: isAnyEdit ? openCellHistory : null, issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["CHB"] || null, onHide: function (cols) { setHideModal({ site: "CHB", cols: cols }); setModal("colHide"); }, colOrder: colOrder["CHB"] || null, onOrder: function (cols) { setColModal({ site: "CHB", cols: cols }); setModal("colOrder"); }, site: "CHB", intCfg: intCfgAff, darkMode: darkMode, setDarkMode: setDarkMode, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, notes: notesAff, onPickSite: function (_a) {
                         var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                         if (!vOuvre(y, m, d))
                             return;
@@ -14002,14 +14013,14 @@ function CardioPlanning() {
                         setMData({ salle: salle, siteActes: full, d: d, sl: sl, y: y, m: m });
                         setModal("pickMedSite");
                     }, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod })),
-            tab === "plateau" && React.createElement(ActTabView, { issMap: issAllMap, title: "\u2764\uFE0F PT Cardio", titleColor: "#e3b341", intCfg: intCfgAff, rows: ptRows, narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["PT"] || null, onHide: function (cols) { setHideModal({ site: "PT", cols: cols }); setModal("colHide"); }, orderCtl: isEdit, onOrder: function () { return setModal("ptOrder"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, actes: actes, getEntries: getEntries, allDays: allDays, notes: notesAff, ideFeature: true, ideOn: ideOn, setIdeOn: setIdeOn, ideCfg: ideCfg, setIdeCfg: setIdeCfg, canIde: isEdit || (isAdminEdit && isCadre), printWk: printWk, onPrint: function () { return setModal("print"); }, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
+            tab === "plateau" && React.createElement(ActTabView, { onCellHistory: isAnyEdit ? openCellHistory : null, issMap: issAllMap, title: "\u2764\uFE0F PT Cardio", titleColor: "#e3b341", intCfg: intCfgAff, rows: ptRows, narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["PT"] || null, onHide: function (cols) { setHideModal({ site: "PT", cols: cols }); setModal("colHide"); }, orderCtl: isEdit, onOrder: function () { return setModal("ptOrder"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, actes: actes, getEntries: getEntries, allDays: allDays, notes: notesAff, ideFeature: true, ideOn: ideOn, setIdeOn: setIdeOn, ideCfg: ideCfg, setIdeCfg: setIdeCfg, canIde: isEdit || (isAdminEdit && isCadre), printWk: printWk, onPrint: function () { return setModal("print"); }, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), showFull: showFull, setShowFull: setShowFull, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, onPickAct: function (_a) {
                     var row = _a.row, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     if (!vOuvre(y, m, d))
                         return;
                     setMData({ row: row, d: d, sl: sl, y: y, m: m });
                     setModal("pickMedAct");
                 } }),
-            tab === "angio" && React.createElement(SiteView, { issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["ANGIO"] || null, onHide: function (cols) { setHideModal({ site: "ANGIO", cols: cols }); setModal("colHide"); }, colOrder: colOrder["ANGIO"] || null, onOrder: function (cols) { setColModal({ site: "ANGIO", cols: cols }); setModal("colOrder"); }, site: "ANGIO", intCfg: intCfgAff, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notesAff, onPickSite: function (_a) {
+            tab === "angio" && React.createElement(SiteView, { onCellHistory: isAnyEdit ? openCellHistory : null, issMap: issAllMap, printWk: printWk, onPrint: function () { return setModal("print"); }, narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["ANGIO"] || null, onHide: function (cols) { setHideModal({ site: "ANGIO", cols: cols }); setModal("colHide"); }, colOrder: colOrder["ANGIO"] || null, onOrder: function (cols) { setColModal({ site: "ANGIO", cols: cols }); setModal("colOrder"); }, site: "ANGIO", intCfg: intCfgAff, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: isEdit || isAdminEdit || (isMedEdit && !isAttEdit), notes: notesAff, onPickSite: function (_a) {
                     var salle = _a.salle, siteActes = _a.siteActes, d = _a.d, sl = _a.sl, y = _a.y, m = _a.m;
                     if (!vOuvre(y, m, d))
                         return;
@@ -14139,7 +14150,7 @@ function CardioPlanning() {
                     React.createElement(SigBtn, null),
                     React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                 React.createElement(ReportsView, { salleReg: salleReg, medecins: medsAff, actes: actes, getEntries: getEntries, tourMed: tourMedVu, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminOkKey: roleOkKey, adminReports: isAdminEdit && adminCanReports, adminName: adminName, removeEntry: removeEntry, year: year, month: month, toast: toast, vRef: vRef, vToast: vToast })),
-            tab === "internes" && React.createElement(InternesView, { intCfg: intCfgAff, setIntCfg: setIntCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, setShowFull: setShowFull, canEdit: isEdit || (isInterEdit && !isAttEdit) || isAdminEdit || isInterne, canSalle: isEdit || (isInterEdit && !isAttEdit) || (isAdminEdit && isCadre), intSelf: isInterne, salleReg: salleReg, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
+            tab === "internes" && React.createElement(InternesView, { onCellHistory: isAnyEdit ? openCellHistory : null, intCfg: intCfgAff, setIntCfg: setIntCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, setShowFull: setShowFull, canEdit: isEdit || (isInterEdit && !isAttEdit) || isAdminEdit || isInterne, canSalle: isEdit || (isInterEdit && !isAttEdit) || (isAdminEdit && isCadre), intSelf: isInterne, salleReg: salleReg, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "notifications" && React.createElement(SecrTab, { medecins: medsAff, acteById: acteById, secrNotif: secrNotif, setSecrNotif: setSecrNotif, secrAtts: secrCfg.atts || [], canAck: !netOff, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "aide" && React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 6 } },
@@ -16059,7 +16070,7 @@ function CardioPlanning() {
                                 React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#dc2626", background: "#fef2f2", color: "#dc2626" }), onClick: function () { delP(tP === "wish" ? setTourWish : setTourAvoid, wkP); setMData(function (p) { return (__assign(__assign({}, p), { _prefGo: 0 })); }); toast("Préférence de tour retirée pour la semaine", "info"); } }, "Oui, retirer")))),
                         gP && ligneP(gP === "wish" ? "⭐ Souhaite être de garde ce jour" : "🚫 Préfère ne pas être de garde ce jour", gP === "wish" ? "#16a34a" : "#dc2626", function () { delP(gP === "wish" ? setGardeWish : setGardeAvoid, dkP); toast("Préférence de garde retirée", "info"); })));
                 })(),
-                canEditThisMed && (React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } },
+                canEditThisMed && !(mData && (mData._pend || mData._absDur || mData._pickSalle)) && (React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } }, /* v10.176 */
                     canEditThisMed && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _perMode: true }); setModal("periode"); } }, "\uD83D\uDCC5 Modifier sur une p\u00E9riode\u2026"),
                     isEdit && !BAC && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#16a34a", background: "#f0fdf4", color: "#166534" }), onClick: function () { setMData({ medId: medId, y: y2, m: m2, d: d2, slot: slot, _resMode: true }); refreshBackupList(); setModal("restaure"); } }, "\u21A9 Restaurer depuis une sauvegarde\u2026"),
                     isEdit && React.createElement("button", { style: __assign(__assign({}, S.qBtn), { borderColor: "#1d4ed8", background: "#eff6ff", color: "#1e40af" }), onClick: function () { setModal(null); openPtModal(medId); } },

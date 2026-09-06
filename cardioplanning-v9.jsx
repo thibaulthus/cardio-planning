@@ -9,6 +9,7 @@ const db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseD
    archivage, ni signalement ; tout le reste (verrous, notifications, Construire) est identique. */
 var BAC=(function(){try{return localStorage.getItem("cp6_bac")==="1";}catch(e){return false;}})();
 var PLAN_ID=BAC?"bac":"main";
+var JOURNAL_ID=BAC?"journalBac":"journal";   /* v10.176 : l'historique des cases du bac ne se mêle pas au vrai */
 const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", PLAN_ID) : null;
 /* v10.135 : garde-fou de version. Le 28/08, après un plantage, le cache a resservi une
    v9.22 — une copie de juillet qui aurait écrit avec ses règles d'alors, sans verrou du
@@ -55,7 +56,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.175 — 06/09/2026";
+const APP_VERSION="v10.176 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -668,7 +669,7 @@ function Chp({bg,c,children}){return <span style={{fontSize:9,background:bg,colo
 /* v10.174 : le 🐞 dans chaque onglet, à côté du bouton ☀️/🌓. Il ne connaît pas l'App et lui envoie
    un simple événement, que CardioPlanning écoute pour ouvrir la modale de signalement. */
 function SigBtn(){return <button onClick={()=>window.dispatchEvent(new Event("cp-signal"))} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button>;}
-function Ov({children,onClose}){return <div style={S.ov} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div style={S.mb}>{children}</div></div>;}
+function Ov({children,onClose,wide=false}){return <div style={S.ov} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div style={wide?{...S.mb,width:"96vw",maxWidth:"96vw"}:S.mb}>{children}</div></div>;}   /* v10.176 : wide — la modale 🤝 restait dans les 500 px de S.mb */
 function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v} onChange={e=>c(e.target.value)} style={{...S.fi,width:"100%"}}/></div>;}
 /* ════ GRID H ════ */
 /* v10.12 : ces deux variables servent à distinguer un APPUI LONG (téléphone) d'un clic.
@@ -678,6 +679,15 @@ function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v}
    ce qui interrompait le clic (ReferenceError) sans rien afficher. D'où : téléphone
    parfait, ordinateur muet, et clic droit intact puisqu'il ne les consulte pas. */
 let _gvLpF=false,_gvLpT=null;
+/* v10.176 : l'historique d'une case (clic droit / appui long) dans TOUS les onglets — les mêmes quatre
+   gestionnaires que GridV, en propriétés à étaler sur la case (Internes) ou sur le rond d'un occupant
+   (CHL, CHB, PT Cardio, PT Angio). Le clic qui suit un appui long est avalé par _gvLpF, comme dans GridV. */
+function histProps(onCellHistory,medId,y,m,d,sl){
+  if(!onCellHistory)return {};
+  return {onContextMenu:e=>{e.preventDefault();e.stopPropagation();onCellHistory(medId,y,m,d,sl);},
+    onTouchStart:()=>{_gvLpF=false;clearTimeout(_gvLpT);_gvLpT=setTimeout(()=>{_gvLpF=true;onCellHistory(medId,y,m,d,sl);},600);},
+    onTouchEnd:()=>clearTimeout(_gvLpT),onTouchMove:()=>clearTimeout(_gvLpT)};
+}
 
 function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null}){
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
@@ -1089,7 +1099,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     </div>
   );
 }
-function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+function SiteView({onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -1163,10 +1173,10 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
       const bipAll=bipOcc2.concat(bipInt);
       return(
         <td key={"bip"+d+sl} style={{...S.td,borderLeft:"3px solid var(--border)",cursor:isEdit?"pointer":"default",padding:2,verticalAlign:"middle",textAlign:"center"}}
-          onClick={()=>isEdit&&onPickSite({salle,siteActes:[bipActe],d,sl,y:ry,m:rm})}>
+          onClick={()=>{if(_gvLpF){_gvLpF=false;return;}if(isEdit)onPickSite({salle,siteActes:[bipActe],d,sl,y:ry,m:rm});}}>
           {bipAll.map(({med,acte,rs,isInt},i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
-              <div title={isInt?med.nom:((med.prenom||"")+" "+(med.nom||"")).trim()} style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0,border:isInt?"1.5px dashed rgba(255,255,255,.95)":"none"}}>{med.init}</div>
+              <div {...histProps(onCellHistory,med.id,ry,rm,d,sl)} title={isInt?med.nom:((med.prenom||"")+" "+(med.nom||"")).trim()} style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0,border:isInt?"1.5px dashed rgba(255,255,255,.95)":"none"}}>{med.init}</div>
               {rs?<SallePill nom={rs} acte={acte} night={darkMode}/>
                 :(bipActe.hasSalle?<span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>⚠ sans salle</span>:null)}
             </div>
@@ -1211,7 +1221,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
     return(
       <td key={`${salle}-${d}-${sl}`} title={noteTips||undefined}
         style={{...S.td,...(conflict?conflBg(darkMode):{}),...(isTdRC?{background:"var(--bg-td)"}:{}),padding:2,cursor:isEdit?"pointer":"default"}}
-        onClick={isEdit?()=>onPickSite({salle,siteActes:salleActes,d,sl,y:ry,m:rm}):undefined}>
+        onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}onPickSite({salle,siteActes:salleActes,d,sl,y:ry,m:rm});}:undefined}>
         <div style={{display:"flex",flexDirection:"column"}}>
         {grps.map((g,gi)=>(
           <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,padding:"2px 0",
@@ -1220,12 +1230,12 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
               {g.meds.map((m,mi)=>{
                 /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
                 const iss=issMap[m.id+"|"+ry+"|"+rm+"|"+d+"|"+sl];
-                return <div key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(iss?" — "+iss:"")} style={{position:"relative",width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{m.init}
+                return <div key={mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(iss?" — "+iss:"")} style={{position:"relative",width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{m.init}
                   {iss&&<span style={{position:"absolute",top:-2,left:-2,width:8,height:8,borderRadius:"50%",background:"#f85149",border:"1.5px solid var(--bg2)"}}/>}
                 </div>;
               })}
               {(g.imeds||[]).map((m,mi)=>(
-                <div key={"i"+mi} title={m.nom} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</div>
+                <div key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</div>
               ))}
             </div>
             <ActPill a={g.acte} night={darkMode} hasNote={g.meds.some(m=>!!notes[nk(m.id,ry,rm,d,sl)])}/>
@@ -1303,7 +1313,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+function ActTabView({onCellHistory=null,issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1452,9 +1462,9 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
     });
     return(
       <td key={`${row.label}-${d}-${sl}`} title={noteTips||undefined} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
-        onClick={isEdit?()=>onPickAct({row,d,sl,y:ry,m:rm}):undefined}>
+        onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}onPickAct({row,d,sl,y:ry,m:rm});}:undefined}>
         <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"stretch"}}
-          onClick={e=>{e.stopPropagation();if(isEdit)onPickAct({row,d,sl,y:ry,m:rm});}}>
+          onClick={e=>{e.stopPropagation();if(_gvLpF){_gvLpF=false;return;}if(isEdit)onPickAct({row,d,sl,y:ry,m:rm});}}>
         {_grpsA.map((g,gi)=>{
           const monoActe=(row.ids||[]).length===1&&!row.multiActe;
           const ideN=(g.n===null||g.n===undefined)?(g.acte.ideN||0):g.n;
@@ -1482,12 +1492,12 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
               {meds.map((m,mi)=>{
                 /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
                 const iss=issMap[m.id+"|"+ry+"|"+rm+"|"+d+"|"+sl];
-                return <span key={mi} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(iss?" — "+iss:"")+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{position:"relative",width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}{notes[nk(m.id,ry,rm,d,sl)]&&<span style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
+                return <span key={mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(iss?" — "+iss:"")+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{position:"relative",width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}{notes[nk(m.id,ry,rm,d,sl)]&&<span style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
                   {iss&&<span style={{position:"absolute",top:-2,left:-2,width:8,height:8,borderRadius:"50%",background:"#f85149",border:"1.5px solid var(--bg2)"}}/>}
                 </span>;
               })}
               {imeds.map((m,mi)=>(
-                <span key={"i"+mi} title={m.nom} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</span>
+                <span key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</span>
               ))}
             </div>}
             {(lieu||showIde||noSalle)&&
@@ -4748,8 +4758,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
 
       {/* v10.165 : tableau des binômes — lecture seule, ouvert à tous les niveaux */}
       {binOpen&&(
-        <Ov onClose={()=>setBinOpen(false)}>
-          <div style={{...S.modal,width:"96vw",maxWidth:"96vw",maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>   {/* v10.169 : le tableau tenait dans 840 px et se coupait */}
+        <Ov wide onClose={()=>setBinOpen(false)}>
+          <div style={{...S.modal,width:"100%",maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>   {/* v10.169 : le tableau tenait dans 840 px et se coupait */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={S.mTit2}>🤝 Qui a tourné avec qui</div>
               <button onClick={()=>setBinOpen(false)} style={S.xBtn}>×</button>
@@ -5275,7 +5285,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
   HP({children:["🔐 ",HE("b",null,"Niveaux de droits")," : chaque médecin a un niveau dans sa fiche ✏️ (onglet Équipe), qui s'applique quand il se connecte avec son PIN personnel. ",HE("b",null,"Basique")," = sa propre ligne, plus ses activités dans CHL, CHB et les plateaux. ",HE("b",null,"Intermédiaire")," = le planning de tous les médecins, gardes et échanges, semaines de tour, planning type et attachés — sans Paramètres, Équipe ni Activités. ",HE("b",null,"Éditeur")," = accès complet. Récapitulatif dans Paramètres."]}),
   HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
-  HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case du Planning — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
+  HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case — dans le Planning et les Attachés, sur le rond du médecin dans CHL, CHB, PT Cardio et PT Angio, sur la case dans Internes (v10.176) — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
 
  {id:"cellules",icon:"🔲",title:"Les cellules du planning",body:()=>HE("div",null,
@@ -5335,7 +5345,7 @@ const HELP_SECTIONS=[
  {id:"bac",icon:"🧪",title:"Bac à sable — tester sans risque",body:()=>HE("div",null,
   HP({children:["Un espace de test à part, réservé à l'éditeur (Paramètres → 🧪 Bac à sable). En y entrant, l'application recopie le planning réel dans un cahier Firebase distinct, puis se recharge dessus : tout ce que vous y faites reste dans cette copie. Le bac est propre au navigateur qui l'a activé — vos collègues continuent de voir le vrai planning, et d'y travailler."]}),
   HP({children:[HE("b",null,"Ce qui s'y comporte comme dans le vrai")," : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."]}),
-  HP({children:[HE("b",null,"Ce qui est désactivé")," : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."]}),
+  HP({children:[HE("b",null,"Ce qui est désactivé")," : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles. L'historique des cases du bac est tenu à part, sans se mêler au vrai."]}),
   HP({children:[HE("b",null,"Le bandeau orange"),", en bas de l'écran, rappelle où vous êtes et porte trois commandes. ",HE("b",null,"Connecté comme"),", pour passer d'un profil à l'autre sans PIN — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation. ",HBtn({kind:"ghost",children:"↺ Remettre à zéro"}),", qui remplace le bac par une copie fraîche du planning réel. ",HBtn({kind:"ghost",children:"🚪 Sortir du bac"}),", qui ramène au vrai planning. L'écran d'accueil (PIN) affiche le même rappel, avec son bouton Sortir."]})
  )},
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
@@ -8173,7 +8183,7 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
   </Ov>;
 }
 
-function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],intSelf=false,prevM,nextM,darkMode,setDarkMode}){
+function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],intSelf=false,prevM,nextM,darkMode,setDarkMode}){
   const [sel,setSel]=useState(null);
   const [gm,setGm]=useState(null);
   const [jaugeOn,setJaugeOn]=useState(intCfg.jaugeDef!==false); /* v10.65 : affichage en nominal réglé dans Paramètres */
@@ -8296,7 +8306,7 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
                   }
                   const e=inR?cellEntree(c,o,sl):null;
                   const a=e?acteById(e.acteId):null;
-                  return <td key={c.id} onClick={(canEdit&&inR)?()=>setSel({med:c,y:o.y,m:o.m,d:o.d,slot0:sl}):undefined}
+                  return <td key={c.id} {...histProps(onCellHistory,c.id,o.y,o.m,o.d,sl)} onClick={(canEdit&&inR)?()=>{if(_gvLpF){_gvLpF=false;return;}setSel({med:c,y:o.y,m:o.m,d:o.d,slot0:sl});}:undefined}
                     style={{...S.td,...(we?S.tdWE:{}),...(inR?{cursor:canEdit?"pointer":"default"}:horsSem)}}>
                     {a&&<div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",alignItems:"center",gap:1}}><Badge a={a} salle={e.salle} hideSalle={!e.salle}/></div>}
                   </td>;
@@ -8752,7 +8762,7 @@ function CardioPlanning(){
   const logCell=useCallback((action,medId2,y2,m2,d2,sl2,acteId2)=>{
     try{
       if(!window.firebaseDB||!window.firebaseDoc)return;
-      const jdoc=window.firebaseDoc(window.firebaseDB,"planning","journal");
+      const jdoc=window.firebaseDoc(window.firebaseDB,"planning",JOURNAL_ID);
       const eid="e"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
       const je={t:Date.now(),k:sk(y2,m2,d2,sl2),md:medId2,x:action,act:acteId2||null,a:authorRef.current};
       if(updatePaths)Promise.resolve(updatePaths(jdoc,[[["entries",eid],je]])).catch(()=>{if(setDoc)Promise.resolve(setDoc(jdoc,{entries:{[eid]:je}},{merge:true})).catch(()=>{});});
@@ -10178,18 +10188,18 @@ function CardioPlanning(){
   useEffect(()=>{ // purge du journal au-delà de 1200 entrées (éditeur uniquement, garde les 1000 plus récentes)
     if(!isEdit||!window.firebaseDB)return;
     (async()=>{try{
-      const d3=await window.firebaseDB.collection("planning").doc("journal").get();
+      const d3=await window.firebaseDB.collection("planning").doc(JOURNAL_ID).get();
       const es=(d3.data()||{}).entries||{};const ks=Object.keys(es);
       if(ks.length>1200){
         const kept={};ks.map(k2=>[k2,es[k2]&&es[k2].t||0]).sort((a,b)=>b[1]-a[1]).slice(0,1000).forEach(([k2])=>{kept[k2]=es[k2];});
-        await window.firebaseDB.collection("planning").doc("journal").set({entries:kept});
+        await window.firebaseDB.collection("planning").doc(JOURNAL_ID).set({entries:kept});
       }
     }catch(e){}})();
   },[isEdit]);
   const openCellHistory=useCallback((medId2,y2,m2,d2,sl2)=>{
     setHistModal({medId:medId2,y:y2,m:m2,d:d2,sl:sl2,loading:true,list:[]});
     (async()=>{try{
-      const d3=await window.firebaseDB.collection("planning").doc("journal").get();
+      const d3=await window.firebaseDB.collection("planning").doc(JOURNAL_ID).get();
       const es=(d3.data()||{}).entries||{};
       const key3=sk(y2,m2,d2,sl2);
       const list=Object.values(es).filter(e=>e&&e.k===key3&&String(e.md)===String(medId2)).sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,30);
@@ -11579,16 +11589,16 @@ header::-webkit-scrollbar { display: none; }
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canRedo?"rgba(255,255,255,.1)":"transparent",color:canRedo?"#f0f6fc":"#484f58",cursor:canRedo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↷</button>
           </div>}
           <div>
-            <div style={{fontWeight:800,fontSize:14,color:"#f0f6fc"}}>CardioPlanning</div>
-            <div style={{fontSize:8,color:"#484f58",display:"flex",alignItems:"center",gap:4}}>
+            {/* v10.176 : le mot « CardioPlanning » retiré — ~110 px rendus au nav sur téléphone ; les témoins (👁, période, Firebase) grandissent à sa place */}
+            <div style={{fontSize:13,color:"#484f58",display:"flex",alignItems:"center",gap:5}}>
               {/* v10.152 : « CHL & CHB » retiré — sur téléphone, chaque pixel de cette rangée manque au nav */}
-              {!isEdit&&<span style={{color:"#e3b341",marginLeft:5}}>👁</span>}
+              {!isEdit&&<span title="Lecture seule" style={{color:"#e3b341",fontSize:16}}>👁</span>}
               {/* v10.106 : l'indicateur vit dans le BLOC DE TITRE, pas dans la rangée de
                   l'en-tête — celle-ci est un flex de hauteur fixe où tout ajout vole sa
                   largeur au <nav>, ce qui rendait les onglets inatteignables sur téléphone. */}
-              {perClose&&<span title={perArchivee?"Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier.":"Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session."} style={{background:perArchivee?"#0e7490":"#7c3aed",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perArchivee?"🗄 PÉRIODE ARCHIVÉE":"🔒 PÉRIODE CLOSE"}</span>}
-              {perFut&&perFut!=="dif"&&<span title={perFut==="phase1"?"La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période"+(perFutFin?" (jusqu'au "+finLib(perFutFin)+" à titre indicatif)":"")+". Le reste attend la diffusion du planning.":"Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning."} style={{background:perFut==="phase1"?"#0e7490":"#b45309",color:"#fff",fontWeight:800,fontSize:9,marginLeft:4,padding:"2px 6px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perFut==="phase1"?"🏖️ CONGÉS OUVERTS":"🚧 EN PRÉPARATION"}</span>}{/* v10.152 : sans la date */}   {/* v10.146 */}
-              <span style={{marginLeft:4,width:6,height:6,borderRadius:"50%",display:"inline-block",
+              {perClose&&<span title={perArchivee?"Période archivée : retirée des données actives et relue ici en consultation. Désarchivez-la depuis Paramètres pour la modifier.":"Période close : elle précède la période en cours. Les modifications y sont bloquées pour tout le monde. L'éditeur peut lever le verrou depuis Paramètres, le temps d'une session."} style={{background:perArchivee?"#0e7490":"#7c3aed",color:"#fff",fontWeight:800,fontSize:10,padding:"3px 7px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perArchivee?"🗄 PÉRIODE ARCHIVÉE":"🔒 PÉRIODE CLOSE"}</span>}
+              {perFut&&perFut!=="dif"&&<span title={perFut==="phase1"?"La demande de congés est ouverte : chacun pose ses congés, FMC et préférences pour cette période"+(perFutFin?" (jusqu'au "+finLib(perFutFin)+" à titre indicatif)":"")+". Le reste attend la diffusion du planning.":"Période à venir : l'éditeur la prépare. Elle s'ouvrira à tous à la diffusion du planning."} style={{background:perFut==="phase1"?"#0e7490":"#b45309",color:"#fff",fontWeight:800,fontSize:10,padding:"3px 7px",borderRadius:9,whiteSpace:"nowrap",letterSpacing:.2}}>{perFut==="phase1"?"🏖️ CONGÉS OUVERTS":"🚧 EN PRÉPARATION"}</span>}{/* v10.152 : sans la date */}   {/* v10.146 */}
+              <span style={{width:10,height:10,borderRadius:"50%",display:"inline-block",
                 background:netOff?"#94a3b8":fbStatus==="ok"?"#4ade80":fbStatus==="error"?"#ef4444":fbStatus==="offline"?"#94a3b8":"#f59e0b"}}
                 title={netOff?"Hors ligne — lecture seule":fbStatus==="ok"?"Firebase connecté":fbStatus==="error"?"Erreur Firebase":fbStatus==="offline"?"Mode local (CodeSandbox)":"Connexion..."}/>
             </div>
@@ -11714,12 +11724,12 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
+      {tab==="chl"&&<SiteView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
+        <SiteView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -11729,13 +11739,13 @@ header::-webkit-scrollbar { display: none; }
           const full=bip&&(bip.salles||[]).includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
-      {tab==="plateau"&&<ActTabView issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfgAff}
+      {tab==="plateau"&&<ActTabView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfgAff}
         rows={ptRows} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["PT"]||null} onHide={(cols)=>{setHideModal({site:"PT",cols});setModal("colHide");}} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -11880,7 +11890,7 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
-      {tab==="internes"&&<InternesView intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="internes"&&<InternesView onCellHistory={isAnyEdit?openCellHistory:null} intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
@@ -13484,7 +13494,7 @@ header::-webkit-scrollbar { display: none; }
                     gP==="wish"?"#16a34a":"#dc2626",()=>{delP(gP==="wish"?setGardeWish:setGardeAvoid,dkP);toast("Préférence de garde retirée","info");})}
                 </div>);
             })()}
-            {canEditThisMed&&(
+            {canEditThisMed&&!(mData&&(mData._pend||mData._absDur||mData._pickSalle))&&(   /* v10.176 : masqués pendant le choix — ils prenaient la place pour rien */
               <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
                 {/* v9.92 : un seul bouton remplace « Pose et retrait Abs », « Effacer activités » et « Effacer mois » */}
                 {canEditThisMed&&<button style={{...S.qBtn,borderColor:"#1d4ed8",background:"#eff6ff",color:"#1e40af"}} onClick={()=>{setMData({medId,y:y2,m:m2,d:d2,slot,_perMode:true});setModal("periode");}}>📅 Modifier sur une période…</button>}
