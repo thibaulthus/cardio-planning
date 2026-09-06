@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.170 — 05/09/2026";
+const APP_VERSION="v10.171 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1080,7 +1080,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     </div>
   );
 }
-function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null}){
+function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -1227,7 +1227,17 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
     );
   }
 
+  /* v10.171 : sous 760 px, les outils se replient sous ⋯ (mécanisme de Planning, v10.132) ; 📅 reste. */
+  const outils=<React.Fragment>
+    {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↔</button>}
+    {onHide&&_masquables.length>0&&<button onClick={()=>onHide(_masquables)} title="Colonnes affichées" style={{...S.arr,fontSize:13,width:30,color:_nMasq?"var(--today-c)":"var(--txt2)",border:`1px solid ${_nMasq?"var(--today-c)":"var(--border)"}`}}>👁</button>}
+    {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
+    <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+  </React.Fragment>;
+  const btnFull=<button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>;
+  const btnMore=narrow&&setMoreOpen?<button data-keep="1" onClick={()=>setMoreOpen(v=>!v)} title="Autres outils" style={{...S.arr,fontSize:15,width:30,color:moreOpen?"var(--today-c)":"var(--txt2)",border:`1px solid ${moreOpen?"var(--today-c)":"var(--border)"}`}}>⋯</button>:null;
   const hdr=(
+    <React.Fragment>
     <div style={S.bar}>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <button onClick={prevM} style={S.arr}>‹</button>
@@ -1235,13 +1245,11 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
         <button onClick={nextM} style={S.arr}>›</button>
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-        {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↔</button>}
-        {onHide&&_masquables.length>0&&<button onClick={()=>onHide(_masquables)} title="Colonnes affichées" style={{...S.arr,fontSize:13,width:30,color:_nMasq?"var(--today-c)":"var(--txt2)",border:`1px solid ${_nMasq?"var(--today-c)":"var(--border)"}`}}>👁</button>}
-        {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
-        <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
-        <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
+        {!btnMore&&outils}{btnFull}{btnMore}
       </div>
     </div>
+    {btnMore&&moreOpen&&<div style={{display:"flex",gap:6,justifyContent:"flex-end",marginBottom:8}}>{outils}</div>}
+    </React.Fragment>
   );
 
     return(
@@ -1286,7 +1294,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null}){
+function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1487,7 +1495,20 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
     );
   }
 
+  /* v10.171 : sous 760 px, les outils (IDE et ⚙️ compris) se replient sous ⋯ (mécanisme de Planning, v10.132) ; 📅 reste. */
+  const outils=<React.Fragment>
+    {orderCtl&&<button onClick={onOrder} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↔</button>}
+    {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
+    {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
+    {/* v9.91 : PT Cardio a déjà son bouton d'ordre (orderCtl) — le second, ajouté par erreur en v9.74, est retiré */}
+    {onHide&&_masquables.length>0&&<button onClick={()=>onHide(_masquables)} title="Colonnes affichées" style={{...S.arr,fontSize:13,width:30,color:_nMasq?"var(--today-c)":"var(--txt2)",border:`1px solid ${_nMasq?"var(--today-c)":"var(--border)"}`}}>👁</button>}
+    {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
+    <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+  </React.Fragment>;
+  const btnFull=<button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>;
+  const btnMore=narrow&&setMoreOpen?<button data-keep="1" onClick={()=>setMoreOpen(v=>!v)} title="Autres outils" style={{...S.arr,fontSize:15,width:30,color:moreOpen?"var(--today-c)":"var(--txt2)",border:`1px solid ${moreOpen?"var(--today-c)":"var(--border)"}`}}>⋯</button>:null;
   let hdr=(
+    <React.Fragment>
     <div style={S.bar}>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <button onClick={prevM} style={S.arr}>‹</button>
@@ -1495,16 +1516,11 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
         <button onClick={nextM} style={S.arr}>›</button>
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-        {orderCtl&&<button onClick={onOrder} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↔</button>}
-        {ideFeature&&<button onClick={()=>setIdeOn(v=>!v)} title="Afficher les effectifs IDE" style={{...S.arr,width:"auto",padding:"0 8px",fontSize:11,fontWeight:800,color:ideOn?"#3fb950":"var(--txt2)",border:`1px solid ${ideOn?"#3fb950":"var(--border)"}`}}>🩺 IDE</button>}
-        {ideFeature&&ideOn&&canIde&&<button onClick={()=>setIdePanel(p=>!p)} title="Régler les effectifs par défaut" style={{...S.arr,fontSize:13,width:30,color:idePanel?"#3fb950":"var(--txt2)"}}>⚙️</button>}
-        {/* v9.91 : PT Cardio a déjà son bouton d'ordre (orderCtl) — le second, ajouté par erreur en v9.74, est retiré */}
-        {onHide&&_masquables.length>0&&<button onClick={()=>onHide(_masquables)} title="Colonnes affichées" style={{...S.arr,fontSize:13,width:30,color:_nMasq?"var(--today-c)":"var(--txt2)",border:`1px solid ${_nMasq?"var(--today-c)":"var(--border)"}`}}>👁</button>}
-        {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
-        <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
-        <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
+        {!btnMore&&outils}{btnFull}{btnMore}
       </div>
     </div>
+    {btnMore&&moreOpen&&<div style={{display:"flex",gap:6,justifyContent:"flex-end",marginBottom:8}}>{outils}</div>}
+    </React.Fragment>
   );
   hdr=<React.Fragment>{hdr}{ideExtra}</React.Fragment>;
 
@@ -5056,6 +5072,7 @@ const HELP_SECTIONS=[
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
   HP({children:[HE("b",null,"iPhone / iPad (Safari)")," : ouvrez le planning dans Safari, touchez le bouton Partager (le carré avec une flèche vers le haut), faites défiler et choisissez ",HE("b",null,"« Sur l'écran d'accueil »"),", puis Ajouter. L'icône CardioPlanning apparaît et s'ouvre en plein écran, comme une vraie application."]}),
   HP({children:[HE("b",null,"Android (Chrome)")," : ouvrez le planning dans Chrome, menu ⋮ en haut à droite, puis ",HE("b",null,"« Ajouter à l'écran d'accueil »")," (ou « Installer l'application » si Chrome le propose) et validez."]}),
+  HP({children:[HE("b",null,"⋯ aussi dans les onglets de salles")," (v10.171) : sous 760 px de large, CHL, CHB, PT Angio et PT Cardio replient leurs outils sous ⋯ comme Planning et Attachés — ↔, 👁, 🖨️, 🌓 et, sur PT Cardio, IDE et ⚙️ — et ne gardent en place que 📅 « ce jour / toute la période ». Un appui sur ⋯ sort les outils dans un plateau qui se referme au geste suivant ou au changement d'onglet. Sur ordinateur, rien ne bouge."]}),
   HP({children:[HE("b",null,"👁 Colonnes affichées")," (v10.170) : dans CHL, CHB, PT Angio et PT Cardio, le bouton 👁 (entre ↔ et 🖨️) ouvre la liste des colonnes que l'on peut masquer — les colonnes de reprise ↩ des onglets de salles, toutes les colonnes de PT Cardio — avec une case par colonne et ↩ Tout afficher pour revenir. Le bouton prend un liseré tant qu'au moins une colonne est masquée. Réglage mémorisé sur cet appareil seulement, comme le thème : rien n'est écrit dans Firebase et l'ordre partagé ↔ ne bouge pas. Une colonne masquée puis supprimée est oubliée, une colonne nouvelle apparaît toujours. L'impression suit l'écran : une colonne masquée ne s'imprime pas."]}),
   HP({children:[HE("b",null,"🌓 Clair ou sombre")," : le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto et affiche le mode retenu. Auto suit le réglage clair/sombre du téléphone, en direct (y compris s'il bascule au coucher du soleil) ; Jour et Nuit sont mémorisés sur cet appareil seulement — chacun règle le sien, rien n'est partagé."]}),
   HP({last:true,children:["Dans les deux cas, l'icône ouvre toujours la dernière version : c'est le site lui-même, aucune mise à jour manuelle à faire. Astuce : refaites simplement l'ajout si vous changez de téléphone."]}))},
@@ -11477,12 +11494,12 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
+      {tab==="chl"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
+        <SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -11493,12 +11510,12 @@ header::-webkit-scrollbar { display: none; }
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
       {tab==="plateau"&&<ActTabView issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" intCfg={intCfgAff}
-        rows={ptRows} colHide={colHide["PT"]||null} onHide={(cols)=>{setHideModal({site:"PT",cols});setModal("colHide");}} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
+        rows={ptRows} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["PT"]||null} onHide={(cols)=>{setHideModal({site:"PT",cols});setModal("colHide");}} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
