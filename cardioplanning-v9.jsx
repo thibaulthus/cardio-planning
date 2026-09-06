@@ -27,7 +27,7 @@ function toast(msg,type,act){if(TOAST_HUB.f)TOAST_HUB.f(msg,type,act);}
    Posé sur <html> avant même React. Les mesures faites en pixels de FENÊTRE (largeur « téléphone »
    < 760, hauteur des grilles pleine page) se divisent par ZOOM.f pour redevenir des pixels de page.
    ZOOM.edit / ZOOM.all disent qui voit le bouton 🔍 ; l'application les pose à chaque rendu. */
-var ZOOM_DEF=110,ZOOM_PAS=[100,110,120,130];
+var ZOOM_DEF=100,ZOOM_PAS=[100,110,120,130];   /* v10.180 : 100 % le temps de comprendre la mesure sous zoom (110 visé) */
 var ZOOM=(function(){var z=ZOOM_DEF;try{var v=parseInt(localStorage.getItem("cp6_zoom"),10);if(ZOOM_PAS.indexOf(v)>=0)z=v;}catch(e){}return {z:z,f:z/100,edit:false,all:false};})();
 function zoomApply(z){ZOOM.z=z;ZOOM.f=z/100;try{document.documentElement.style.zoom=String(ZOOM.f);}catch(e){}}
 zoomApply(ZOOM.z);
@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.179 — 06/09/2026";
+const APP_VERSION="v10.180 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1089,6 +1089,8 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     if(h<380){pageVerrou(false);if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
     const v=h+"px";
     if(el.style.maxHeight!==v)el.style.maxHeight=v;
+    /* v10.180 : sous zoom, les chiffres de la mesure vont au journal du 🐞 — la v10.179 tronquait la grille à 110 % et la débordait à 120 % */
+    if(ZOOM.f!==1){const r=el.getBoundingClientRect();const l="zoom "+ZOOM.z+" | fenetre "+window.innerWidth+"x"+window.innerHeight+" | html client "+de.clientWidth+"x"+de.clientHeight+" scroll "+de.scrollHeight+" | rect.top "+Math.round(top)+" h "+Math.round(r.height)+" bas "+Math.round(r.bottom)+" | el offsetH "+el.offsetHeight+" clientH "+el.clientHeight+" scrollH "+el.scrollHeight+" | barH "+barH+" over "+over+" | pose "+v+" | cssZoom "+(de.currentCSSZoom!==undefined?de.currentCSSZoom:"?");if(l!==doFit._last){doFit._last=l;jlog("MESURE",[l]);}}
   },[fit,mh]);
   React.useLayoutEffect(()=>{doFit();});
   /* v10.162 : le déverrouillage au démontage passait par l'effet PASSIF — au changement
@@ -5337,7 +5339,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
-  HP({children:[HE("b",null,"Zoom de l'application")," (v10.179) : tout l'affichage est à 110 % par défaut. Le bouton 🔍, à côté de 🐞, passe à 120, 130, puis 100 % — réglage mémorisé sur l'appareil, chacun le sien ; le zoom du navigateur (Ctrl + molette, pincement) reste possible par-dessus. L'impression reste à 100 %. Le bouton est d'abord réservé à l'éditeur ; une coche de Paramètres le propose à tous."]}),
+  HP({children:[HE("b",null,"Zoom de l'application")," (v10.179) : tout l'affichage est à 100 % par défaut pour l'instant (110 % prévu une fois la mesure des grilles au point). Le bouton 🔍, à côté de 🐞, passe à 120, 130, puis 100 % — réglage mémorisé sur l'appareil, chacun le sien ; le zoom du navigateur (Ctrl + molette, pincement) reste possible par-dessus. L'impression reste à 100 %. Le bouton est d'abord réservé à l'éditeur ; une coche de Paramètres le propose à tous."]}),
   HP({children:[HE("b",null,"Le vrai nom du junior dans les modales")," (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."]}),
   HP({children:[HE("b",null,"Une seule barre de défilement sur ordinateur")," (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."]}),
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
@@ -12523,7 +12525,7 @@ header::-webkit-scrollbar { display: none; }
               <input type="checkbox" checked={uiCfg.zoomAll===true} onChange={e=>setUiCfg(p=>({...(p||{}),zoomAll:e.target.checked}))} style={{width:15,height:15}}/>
               {"Proposer le bouton 🔍 à tout le monde"}
             </label>
-            <div style={{fontSize:9,color:"var(--txt3)",marginTop:5}}>{"Le bouton 🔍, à côté de 🐞 dans chaque onglet, règle la taille de tout l'affichage (100, 110, 120 ou 130 %) sur l'appareil où l'on clique ; l'application est à 110 % par défaut. Tant que la coche n'est pas mise, l'éditeur seul le voit."}</div>
+            <div style={{fontSize:9,color:"var(--txt3)",marginTop:5}}>{"Le bouton 🔍, à côté de 🐞 dans chaque onglet, règle la taille de tout l'affichage (100, 110, 120 ou 130 %) sur l'appareil où l'on clique ; l'application est à 100 % par défaut pour l'instant (110 % prévu). Tant que la coche n'est pas mise, l'éditeur seul le voit."}</div>
           </div>
           <div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔔 Notifications aux secrétaires</div>
