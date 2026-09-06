@@ -187,7 +187,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.181 — 06/09/2026";
+var APP_VERSION = "v10.182 — 06/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -1219,8 +1219,24 @@ function TableScroll(_a) {
         var legacy = "calc(100vh - " + (mh + barH) + "px)";
         if (window.innerWidth / ZOOM.f < 760) {
             pageVerrou(false);
-            if (el.style.maxHeight !== legacy)
-                el.style.maxHeight = legacy;
+            var lg = legacy;
+            /* v10.182 : sous zoom, Safari garde 100vh à la hauteur réelle de l'écran au lieu de la diviser par le
+               zoom — la grille devenait 10 % trop haute, la page défilait et le haut partait. On mesure donc, comme
+               sur ordinateur (v10.181) : rapport réel posé/vu (k), fenêtre moins bandeaux du bas, moins l'en-tête. */
+            if (ZOOM.f !== 1) {
+                var r0_1 = el.getBoundingClientRect();
+                var k_1 = (r0_1.height > 0 && el.offsetHeight > 0) ? (r0_1.height / el.offsetHeight) : ZOOM.f;
+                var barV_2 = 0;
+                document.querySelectorAll('[data-botbar="1"]').forEach(function (b) { barV_2 = Math.max(barV_2, b.getBoundingClientRect().height || 0); });
+                lg = Math.max(260, Math.round((window.innerHeight - barV_2) / k_1 - mh)) + "px";
+                var l_2 = "zoom " + ZOOM.z + " tel | fenetre " + window.innerWidth + "x" + window.innerHeight + " | k " + k_1.toFixed(3) + " | mh " + mh + " barV " + Math.round(barV_2) + " | pose " + lg;
+                if (l_2 !== doFit._last) {
+                    doFit._last = l_2;
+                    jlog("MESURE", [l_2]);
+                }
+            }
+            if (el.style.maxHeight !== lg)
+                el.style.maxHeight = lg;
             return;
         }
         /* v10.48, son retour Edge : « on perd de la place en bas ». Plus de marges

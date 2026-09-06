@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.181 — 06/09/2026";
+const APP_VERSION="v10.182 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1070,7 +1070,22 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
        sur téléphone : il est mesuré et déduit ici aussi, comme sur ordinateur. */
     let barH=0;document.querySelectorAll('[data-botbar="1"]').forEach(b=>{barH=Math.max(barH,b.offsetHeight||0);});
     const legacy="calc(100vh - "+(mh+barH)+"px)";
-    if(window.innerWidth/ZOOM.f<760){pageVerrou(false);if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
+    if(window.innerWidth/ZOOM.f<760){
+      pageVerrou(false);
+      let lg=legacy;
+      /* v10.182 : sous zoom, Safari garde 100vh à la hauteur réelle de l'écran au lieu de la diviser par le
+         zoom — la grille devenait 10 % trop haute, la page défilait et le haut partait. On mesure donc, comme
+         sur ordinateur (v10.181) : rapport réel posé/vu (k), fenêtre moins bandeaux du bas, moins l'en-tête. */
+      if(ZOOM.f!==1){
+        const r0=el.getBoundingClientRect();
+        const k=(r0.height>0&&el.offsetHeight>0)?(r0.height/el.offsetHeight):ZOOM.f;
+        let barV=0;document.querySelectorAll('[data-botbar="1"]').forEach(b=>{barV=Math.max(barV,b.getBoundingClientRect().height||0);});
+        lg=Math.max(260,Math.round((window.innerHeight-barV)/k-mh))+"px";
+        const l="zoom "+ZOOM.z+" tel | fenetre "+window.innerWidth+"x"+window.innerHeight+" | k "+k.toFixed(3)+" | mh "+mh+" barV "+Math.round(barV)+" | pose "+lg;
+        if(l!==doFit._last){doFit._last=l;jlog("MESURE",[l]);}
+      }
+      if(el.style.maxHeight!==lg)el.style.maxHeight=lg;return;
+    }
     /* v10.48, son retour Edge : « on perd de la place en bas ». Plus de marges
        au doigt mouillé — les bandeaux fixés en bas (hors-ligne, PIN médecin ou
        administratif) sont MESURÉS, et la boucle devient symétrique : elle
