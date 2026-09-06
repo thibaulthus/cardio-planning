@@ -659,6 +659,9 @@ function IssuePanel({iss,open,setOpen,onGo}){
 }
 function Av({med}){return <div style={{...S.av,background:med.color}}>{med.init}</div>;}
 function Chp({bg,c,children}){return <span style={{fontSize:9,background:bg,color:c,padding:"1px 4px",borderRadius:3,fontWeight:700}}>{children}</span>;}
+/* v10.174 : le 🐞 dans chaque onglet, à côté du bouton ☀️/🌓. Il ne connaît pas l'App et lui envoie
+   un simple événement, que CardioPlanning écoute pour ouvrir la modale de signalement. */
+function SigBtn(){return <button onClick={()=>window.dispatchEvent(new Event("cp-signal"))} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button>;}
 function Ov({children,onClose}){return <div style={S.ov} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div style={S.mb}>{children}</div></div>;}
 function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v} onChange={e=>c(e.target.value)} style={{...S.fi,width:"100%"}}/></div>;}
 /* ════ GRID H ════ */
@@ -1232,7 +1235,7 @@ function SiteView({issMap={},printWk=null,onPrint=null,site,year,month,prevM,nex
     {onOrder&&isEdit&&<button onClick={()=>onOrder(allSalles)} title="Ordre des colonnes" style={{...S.arr,fontSize:13,width:30}}>↔</button>}
     {onHide&&_masquables.length>0&&<button onClick={()=>onHide(_masquables)} title="Colonnes affichées" style={{...S.arr,fontSize:13,width:30,color:_nMasq?"var(--today-c)":"var(--txt2)",border:`1px solid ${_nMasq?"var(--today-c)":"var(--border)"}`}}>👁</button>}
     {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
-    <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+    <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
   </React.Fragment>;
   const btnFull=<button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>;
   const btnMore=narrow&&setMoreOpen?<button data-keep="1" onClick={()=>setMoreOpen(v=>!v)} title="Autres outils" style={{...S.arr,fontSize:15,width:30,color:moreOpen?"var(--today-c)":"var(--txt2)",border:`1px solid ${moreOpen?"var(--today-c)":"var(--border)"}`}}>⋯</button>:null;
@@ -1503,7 +1506,7 @@ function ActTabView({issMap={},title,titleColor,rows,year,month,prevM,nextM,mede
     {/* v9.91 : PT Cardio a déjà son bouton d'ordre (orderCtl) — le second, ajouté par erreur en v9.74, est retiré */}
     {onHide&&_masquables.length>0&&<button onClick={()=>onHide(_masquables)} title="Colonnes affichées" style={{...S.arr,fontSize:13,width:30,color:_nMasq?"var(--today-c)":"var(--txt2)",border:`1px solid ${_nMasq?"var(--today-c)":"var(--border)"}`}}>👁</button>}
     {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
-    <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+    <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
   </React.Fragment>;
   const btnFull=<button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>;
   const btnMore=narrow&&setMoreOpen?<button data-keep="1" onClick={()=>setMoreOpen(v=>!v)} title="Autres outils" style={{...S.arr,fontSize:15,width:30,color:moreOpen?"var(--today-c)":"var(--txt2)",border:`1px solid ${moreOpen?"var(--today-c)":"var(--border)"}`}}>⋯</button>:null;
@@ -1907,7 +1910,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
         </div>
         <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
           {onPrint&&<button onClick={onPrint} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>}
-          <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+          <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
           <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
         </div>
       </div>
@@ -4604,7 +4607,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
           <button onClick={nextPeriodT} style={S.arr}>›</button>
         </div>
         <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-          <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+          <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         </div>
       </div>
       <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
@@ -5093,7 +5096,7 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
           <button onClick={nextP} style={S.arr}>›</button>
         </div>
         <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-          <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+          <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         </div>
       </div>
         <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
@@ -5194,7 +5197,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"Vos préférences de tour")," : même bouton, dans la même fenêtre — la préférence porte alors sur la ",HE("b",null,"semaine entière")," (⭐ je souhaite tourner, 🚫 pas cette semaine)."]}),
   HP({children:["• ",HE("b",null,"Les revoir, les retirer")," : le bouton ",HBtn({kind:"ghost",children:"⭐"})," de la barre du Planning colore les cases concernées — bande bleue « je souhaite tourner », bande rouge « je préfère éviter », ⭐ ou 🚫 sur les jours de garde — avec sa légende au-dessus du tableau. Dans la fenêtre de la case, la ligne de préférence se clique pour la retirer."]}),
   HP({children:["• ",HE("b",null,"Vos propres activités")," : modifier le contenu de vos cases (activité, salle, note)."]}),
-  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞 en haut à gauche, à côté des flèches ↶↷, sur toutes les pages (v10.174) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
+  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞, à côté du bouton ☀️/🌓 dans chaque onglet (sur téléphone, dans le ⋯ de Planning et Attachés) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
@@ -6726,7 +6729,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
           <button onClick={()=>{const p=perNextB(bPer.sy,bPer.sm);if(p)allerA(p);}} style={S.arr}>›</button>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:"auto"}}>
-          <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+          <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
         </div>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8,margin:"8px 0 14px"}}>
@@ -6783,7 +6786,7 @@ function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDa
     <div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
         <h2 style={S.mTit}>🔔 Notifications</h2>
-        <div style={{marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
+        <div style={{marginLeft:"auto"}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
       </div>
       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>Les modifications du planning à reporter dans le logiciel de consultations, médecin par médecin. Chaque ligne se traite d'un ✓, sans code — chacun nettoie les tuiles de ses médecins.</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:8}}>
@@ -8213,7 +8216,7 @@ function InternesView({intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,
         <button onClick={()=>setStatsOpen(true)} title="Statistiques" style={{...S.arr,fontSize:13,width:30}}>📊</button>
         <button onClick={()=>setJaugeOn(v=>!v)} title="Jauge HC/USIC" style={{...S.arr,fontSize:13,width:30,color:jaugeOn?"#1d4ed8":"var(--txt2)",border:`1px solid ${jaugeOn?"#1d4ed8":"var(--border)"}`}}>🚦</button>
         <button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Tout le semestre"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>
-        <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+        <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
       </div>
     </div>
     <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 8px"}}>Jauge : internes en HC et en USIC sur le créneau, rouge sous le seuil (Paramètres). Case garde rouge : personne de garde ce jour. Samedi : une seule case (matin).{canEdit?" Cliquez la colonne 🌙 pour la garde (repos posé automatiquement le lendemain), une case pour le reste.":""}</div>
@@ -9758,6 +9761,8 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({periodCfg:JSON.stringify(periodCfg)});},[periodCfg]);
   useEffect(()=>{if(!isFirstLoad.current)flushPT(planningType);},[planningType]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({notes:JSON.stringify(notes)});},[notes]);
+  /* v10.174 : le 🐞 des onglets (SigBtn) demande l'ouverture de la modale de signalement */
+  useEffect(()=>{const f=()=>setModal("signal");window.addEventListener("cp-signal",f);return()=>window.removeEventListener("cp-signal",f);},[]);
   useEffect(()=>{if(!isFirstLoad.current)flushList("medecinsV2",medecins);},[medecins]);
   useEffect(()=>{if(!isFirstLoad.current)flushList("actesV2",actes);},[actes]);
   // ── Source de vérité : coche "Garde" de l'onglet Équipe → médecins autorisés des activités GARDE et REPOS_GARDE ──
@@ -11392,8 +11397,7 @@ function CardioPlanning(){
      Garde int. reste à côté. Sur ordinateur, rien ne bouge. Les mêmes boutons servent aux deux onglets. */
   const btnPrint=<button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>;
   const btnDark=<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>;
-  /* v10.142 ; v10.174 : un seul bouton, dans l'en-tête, visible sur toutes les pages */
-  const btnSig=<button onClick={()=>setModal("signal")} title="Signaler un problème" style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.1)",color:"#f0f6fc",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>🐞</button>;
+  const btnSig=<button onClick={()=>setModal("signal")} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button>;   /* v10.142 */
   const btnFull=<button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>;
   const btnPref=canPref?<button onClick={()=>setPrefOn(v=>!v)} title="Afficher les préférences de tour et de garde" style={{...S.arr,fontSize:14,width:30,color:prefOn?"var(--today-c)":"var(--txt2)",border:`1px solid ${prefOn?"var(--today-c)":"var(--border)"}`}}>⭐</button>:null;
   const btnMore=<button data-keep="1" onClick={()=>setMoreOpen(v=>!v)} title="Autres outils" style={{...S.arr,fontSize:15,width:30,color:moreOpen?"var(--today-c)":"var(--txt2)",border:`1px solid ${moreOpen?"var(--today-c)":"var(--border)"}`}}>⋯</button>;
@@ -11518,7 +11522,6 @@ header::-webkit-scrollbar { display: none; }
           <span onClick={()=>{setPinInput("");setPinError(false);setIsCadre(false);setAccessMode("ask");}} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
           {/* v10.27 : l'administratif y a droit aussi — c'est lui qui remplit le plus
               souvent les semaines blanches et les reports. */}
-          {btnSig}
           {(isEdit||isMedEdit||isAdminEdit)&&<div style={{display:"flex",gap:3}}>
             <button onClick={doUndo} disabled={!canUndo} title="Annuler (retour arrière)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canUndo?"rgba(255,255,255,.1)":"transparent",color:canUndo?"#f0f6fc":"#484f58",cursor:canUndo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↶</button>
@@ -11632,10 +11635,10 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={nextM} style={S.arr}>›</button>
             </div>
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-              {iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnFull}{btnPref}</React.Fragment>)}
+              {iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}{btnPref}</React.Fragment>)}
             </div>
           </div>
-          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnPref}</React.Fragment>)}
+          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnPref}</React.Fragment>)}
           {prefOn&&<div style={{display:"flex",flexWrap:"wrap",gap:"4px 10px",alignItems:"center",marginBottom:8,fontSize:10,color:"var(--txt3)"}}>
             <span style={{fontWeight:700,textTransform:"uppercase"}}>Préférences :</span>
             <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"rgba(56,139,253,.20)",border:"1px solid #388bfd"}}></span>souhaite tourner</span>
@@ -11711,7 +11714,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
               
               
-              <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+              <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
             </div>
           </div>
           {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
@@ -11730,16 +11733,16 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<IssuePanel iss={attIssues} open={plIssOpen} setOpen={setPlIssOpen} onGo={goIssue}/>}
           <div style={S.bar}>
             <div style={{display:"flex",alignItems:"center",gap:8}}><button onClick={prevM} style={S.arr}>‹</button><h2 style={S.mTit}>{"👔 Attachés — "+(MOIS[perStart(year,month).sm]+" — "+MOIS[(perStart(year,month).sm+PCFG.len-1)%12]+" "+perStart(year,month).sy)}</h2><button onClick={nextM} style={S.arr}>›</button></div>
-            <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnFull}</React.Fragment>)}</div>
+            <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}</React.Fragment>)}</div>
           </div>
-          {trayFold(<React.Fragment>{btnPrint}{btnDark}</React.Fragment>)}
+          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}</React.Fragment>)}
           {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={astSelf} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
       {tab==="activites"&&(
         <div>
-          <div style={S.bar}><h2 style={S.mTit}>⚙️ Activités <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2><div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
+          <div style={S.bar}><h2 style={S.mTit}>⚙️ Activités <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2><div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
       {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
         <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}} onClick={()=>{setMData({_new:true,id:"",label:"",short:"",color:"#3b82f6",bg:"#0c1a2e",hasSalle:false,salles:[],isSystem:false,site:"tous",medecinsAutorise:[]});setModal("editActe");}}>+ Nouvelle activité</button>
       </div>}
@@ -11777,7 +11780,7 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="equipe"&&accessMode!=="adminEdit"&&!isMedEdit&&(
         <div>
-          <div style={S.bar}><h2 style={S.mTit}>👥 Équipe</h2><div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
+          <div style={S.bar}><h2 style={S.mTit}>👥 Équipe</h2><div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>
       {isEdit&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
         <button style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.10)",color:"#16a34a",fontWeight:800,cursor:"pointer"}} onClick={()=>{setMData({_new:true,id:Date.now(),nom:"",prenom:"",init:"",color:"#3b82f6",garde:true,tourMed:true,role:"medecin"});setModal("editMed");}}>+ Ajouter</button>
         <span style={{fontSize:10,color:"var(--txt3)"}}>▲▼ sur une fiche : ordre d'affichage dans tous les plannings</span>
@@ -11826,10 +11829,10 @@ header::-webkit-scrollbar { display: none; }
         </div>
       )}
 
-      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
+      {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
       {tab==="internes"&&<InternesView intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
-      {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
+      {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
         const astToday=new Date();
@@ -11973,7 +11976,7 @@ header::-webkit-scrollbar { display: none; }
               <h2 style={{...S.mTit,margin:0}}><span style={{color:"#7c3aed"}}>📞</span> {pLabel}</h2>
               <button onClick={nextP} style={S.arr}>›</button>
                 <button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30,marginLeft:"auto"}}>🖨️</button>
-                <button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
+                <SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>
               </div>
             <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
               {isEdit&&<button onClick={runAstAuto} style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.10)",color:"#7c3aed",fontWeight:800,cursor:"pointer"}}>⚙️ Répartition auto</button>}
@@ -12213,7 +12216,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="stats"&&(isEdit||isInterEdit)&&<StatsTab medecins={medsAff} actes={actes} plan={plan} year={year} month={month} darkMode={darkMode} setDarkMode={setDarkMode} tourMed={tourMedVu}/>}
       {tab==="partage"&&accessMode!=="adminEdit"&&!isMedEdit&&(
         <div style={{maxWidth:500}} className={"pset "+psetFold.map(i=>"pf"+i).join(" ")} ref={psetRef} onClick={psetClick}>
-          <div data-noskip="1" style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
+          <div data-noskip="1" style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
           <div data-noskip="1"><SetQuick items={psetItems} replies={psetFold} onTout={psetTout}/></div>
           <h2 style={{...S.mTit,marginBottom:16}}>⚙️ Paramètres <span style={{fontSize:10,color:"var(--txt3)",fontWeight:400,marginLeft:8}}>{APP_VERSION}</span></h2>
 

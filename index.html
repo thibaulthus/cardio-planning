@@ -777,6 +777,9 @@ function Chp(_a) {
     var bg = _a.bg, c = _a.c, children = _a.children;
     return React.createElement("span", { style: { fontSize: 9, background: bg, color: c, padding: "1px 4px", borderRadius: 3, fontWeight: 700 } }, children);
 }
+/* v10.174 : le 🐞 dans chaque onglet, à côté du bouton ☀️/🌓. Il ne connaît pas l'App et lui envoie
+   un simple événement, que CardioPlanning écoute pour ouvrir la modale de signalement. */
+function SigBtn() { return React.createElement("button", { onClick: function () { return window.dispatchEvent(new Event("cp-signal")); }, title: "Signaler un probl\u00E8me", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDC1E"); }
 function Ov(_a) {
     var children = _a.children, onClose = _a.onClose;
     return React.createElement("div", { style: S.ov, onClick: function (e) { if (e.target === e.currentTarget)
@@ -1383,6 +1386,7 @@ function SiteView({ issMap = {}, printWk = null, onPrint = null, site, year, mon
         onOrder && isEdit && React.createElement("button", { onClick: () => onOrder(allSalles), title: "Ordre des colonnes", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\u2194"),
         onHide && _masquables.length > 0 && React.createElement("button", { onClick: () => onHide(_masquables), title: "Colonnes affich\u00E9es", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30, color: _nMasq ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${_nMasq ? "var(--today-c)" : "var(--border)"}` }) }, "\uD83D\uDC41"),
         onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
+        React.createElement(SigBtn, null),
         React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"));
     const btnFull = React.createElement("button", { onClick: () => setShowFull(f => !f), title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: Object.assign(Object.assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${showFull ? "var(--today-c)" : "var(--border)"}` }) }, showFull ? "📅" : "🗓️");
     const btnMore = narrow && setMoreOpen ? React.createElement("button", { "data-keep": "1", onClick: () => setMoreOpen(v => !v), title: "Autres outils", style: Object.assign(Object.assign({}, S.arr), { fontSize: 15, width: 30, color: moreOpen ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${moreOpen ? "var(--today-c)" : "var(--border)"}` }) }, "\u22EF") : null;
@@ -1669,6 +1673,7 @@ function ActTabView({ issMap = {}, title, titleColor, rows, year, month, prevM, 
         ideFeature && ideOn && canIde && React.createElement("button", { onClick: () => setIdePanel(p => !p), title: "R\u00E9gler les effectifs par d\u00E9faut", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30, color: idePanel ? "#3fb950" : "var(--txt2)" }) }, "\u2699\uFE0F"),
         onHide && _masquables.length > 0 && React.createElement("button", { onClick: () => onHide(_masquables), title: "Colonnes affich\u00E9es", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30, color: _nMasq ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${_nMasq ? "var(--today-c)" : "var(--border)"}` }) }, "\uD83D\uDC41"),
         onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
+        React.createElement(SigBtn, null),
         React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"));
     const btnFull = React.createElement("button", { onClick: () => setShowFull(f => !f), title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: Object.assign(Object.assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${showFull ? "var(--today-c)" : "var(--border)"}` }) }, showFull ? "📅" : "🗓️");
     const btnMore = narrow && setMoreOpen ? React.createElement("button", { "data-keep": "1", onClick: () => setMoreOpen(v => !v), title: "Autres outils", style: Object.assign(Object.assign({}, S.arr), { fontSize: 15, width: 30, color: moreOpen ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${moreOpen ? "var(--today-c)" : "var(--border)"}` }) }, "\u22EF") : null;
@@ -2131,6 +2136,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                 React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
                 onPrint && React.createElement("button", { onClick: onPrint, title: "Imprimer", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F"),
+                React.createElement(SigBtn, null),
                 React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"),
                 React.createElement("button", { onClick: () => setShowFull(f => !f), title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: Object.assign(Object.assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${showFull ? "var(--today-c)" : "var(--border)"}` }) }, showFull ? "📅" : "🗓️"))),
         React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
@@ -5057,6 +5063,7 @@ function TourTab(_a) {
                 React.createElement("h2", { style: S.mTit }, "🔄 Tour médical — " + perLabelT + " " + perT.startY),
                 React.createElement("button", { onClick: nextPeriodT, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
+                React.createElement(SigBtn, null),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
             edReel && React.createElement("button", { onClick: openAutoModal, title: "R\u00E9partition automatique", style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
@@ -5530,6 +5537,7 @@ function StatsTab(_a) {
                 React.createElement("h2", { style: S.mTit }, "📊 Stats — " + perLabelS + " " + per.startY),
                 React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
+                React.createElement(SigBtn, null),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
             React.createElement("button", { onClick: exportCSV, style: __assign(__assign({}, S.btnP), { fontSize: 11, padding: "3px 10px" }) }, "\uD83D\uDDA8\uFE0F Export")),
@@ -5609,7 +5617,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"Vos préférences de tour")," : même bouton, dans la même fenêtre — la préférence porte alors sur la ",HE("b",null,"semaine entière")," (⭐ je souhaite tourner, 🚫 pas cette semaine)."]}),
   HP({children:["• ",HE("b",null,"Les revoir, les retirer")," : le bouton ",HBtn({kind:"ghost",children:"⭐"})," de la barre du Planning colore les cases concernées — bande bleue « je souhaite tourner », bande rouge « je préfère éviter », ⭐ ou 🚫 sur les jours de garde — avec sa légende au-dessus du tableau. Dans la fenêtre de la case, la ligne de préférence se clique pour la retirer."]}),
   HP({children:["• ",HE("b",null,"Vos propres activités")," : modifier le contenu de vos cases (activité, salle, note)."]}),
-  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞 en haut à gauche, à côté des flèches ↶↷, sur toutes les pages (v10.174) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
+  HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞, à côté du bouton ☀️/🌓 dans chaque onglet (sur téléphone, dans le ⋯ de Planning et Attachés) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
@@ -7184,6 +7192,7 @@ function BuildTab(_a) {
                 React.createElement("button", { onClick: function () { var p = perNextB(bPer.sy, bPer.sm); if (p)
                         allerA(p); }, style: S.arr }, "\u203A")),
             React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" } },
+                React.createElement(SigBtn, null),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, margin: "8px 0 14px" } },
             React.createElement("div", { style: { flex: 1, height: 6, borderRadius: 3, background: "var(--bg3)", overflow: "hidden" } },
@@ -7250,6 +7259,7 @@ function SecrTab(_a) {
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } },
             React.createElement("h2", { style: S.mTit }, "\uD83D\uDD14 Notifications"),
             React.createElement("div", { style: { marginLeft: "auto" } },
+                React.createElement(SigBtn, null),
                 React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 10 } }, "Les modifications du planning \u00E0 reporter dans le logiciel de consultations, m\u00E9decin par m\u00E9decin. Chaque ligne se traite d'un \u2713, sans code \u2014 chacun nettoie les tuiles de ses m\u00E9decins."),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: 8 } }, meds.map(function (m) {
@@ -8828,6 +8838,7 @@ function InternesView({ intCfg, setIntCfg = null, actes, acteById, getEntries, s
                 React.createElement("button", { onClick: () => setStatsOpen(true), title: "Statistiques", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDCCA"),
                 React.createElement("button", { onClick: () => setJaugeOn(v => !v), title: "Jauge HC/USIC", style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30, color: jaugeOn ? "#1d4ed8" : "var(--txt2)", border: `1px solid ${jaugeOn ? "#1d4ed8" : "var(--border)"}` }) }, "\uD83D\uDEA6"),
                 React.createElement("button", { onClick: () => setShowFull(f => !f), title: showFull ? "Depuis aujourd'hui" : "Tout le semestre", style: Object.assign(Object.assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: `1px solid ${showFull ? "var(--today-c)" : "var(--border)"}` }) }, showFull ? "📅" : "🗓️"),
+                React.createElement(SigBtn, null),
                 React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", margin: "2px 0 8px" } },
             "Jauge : internes en HC et en USIC sur le cr\u00E9neau, rouge sous le seuil (Param\u00E8tres). Case garde rouge : personne de garde ce jour. Samedi : une seule case (matin).",
@@ -11215,6 +11226,8 @@ function CardioPlanning() {
         flushPT(planningType); }, [planningType]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ notes: JSON.stringify(notes) }); }, [notes]);
+    /* v10.174 : le 🐞 des onglets (SigBtn) demande l'ouverture de la modale de signalement */
+    useEffect(function () { var f = function () { return setModal("signal"); }; window.addEventListener("cp-signal", f); return function () { return window.removeEventListener("cp-signal", f); }; }, []);
     useEffect(function () { if (!isFirstLoad.current)
         flushList("medecinsV2", medecins); }, [medecins]);
     useEffect(function () { if (!isFirstLoad.current)
@@ -13606,8 +13619,7 @@ function CardioPlanning() {
        Garde int. reste à côté. Sur ordinateur, rien ne bouge. Les mêmes boutons servent aux deux onglets. */
     var btnPrint = React.createElement("button", { onClick: function () { return setModal("print"); }, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F");
     var btnDark = React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓");
-    /* v10.142 ; v10.174 : un seul bouton, dans l'en-tête, visible sur toutes les pages */
-    var btnSig = React.createElement("button", { onClick: function () { return setModal("signal"); }, title: "Signaler un probl\u00E8me", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.1)", color: "#f0f6fc", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 } }, "\uD83D\uDC1E");
+    var btnSig = React.createElement("button", { onClick: function () { return setModal("signal"); }, title: "Signaler un probl\u00E8me", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDC1E"); /* v10.142 */
     var btnFull = React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️");
     var btnPref = canPref ? React.createElement("button", { onClick: function () { return setPrefOn(function (v) { return !v; }); }, title: "Afficher les pr\u00E9f\u00E9rences de tour et de garde", style: __assign(__assign({}, S.arr), { fontSize: 14, width: 30, color: prefOn ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(prefOn ? "var(--today-c)" : "var(--border)") }) }, "\u2B50") : null;
     var btnMore = React.createElement("button", { "data-keep": "1", onClick: function () { return setMoreOpen(function (v) { return !v; }); }, title: "Autres outils", style: __assign(__assign({}, S.arr), { fontSize: 15, width: 30, color: moreOpen ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(moreOpen ? "var(--today-c)" : "var(--border)") }) }, "\u22EF");
@@ -13691,7 +13703,6 @@ function CardioPlanning() {
         React.createElement("header", { style: S.hdr },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexShrink: 0 } },
                 React.createElement("span", { onClick: function () { setPinInput(""); setPinError(false); setIsCadre(false); setAccessMode("ask"); }, title: "Retour \u00E0 l'accueil", style: { fontSize: 20, color: "#f85149", cursor: "pointer" } }, "\u2665"),
-                btnSig,
                 (isEdit || isMedEdit || isAdminEdit) && React.createElement("div", { style: { display: "flex", gap: 3 } },
                     React.createElement("button", { onClick: doUndo, disabled: !canUndo, title: "Annuler (retour arri\u00E8re)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canUndo ? "rgba(255,255,255,.1)" : "transparent", color: canUndo ? "#f0f6fc" : "#484f58", cursor: canUndo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B6"),
                     React.createElement("button", { onClick: doRedo, disabled: !canRedo, title: "R\u00E9tablir (retour avant)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canRedo ? "rgba(255,255,255,.1)" : "transparent", color: canRedo ? "#f0f6fc" : "#484f58", cursor: canRedo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B7")),
@@ -13798,11 +13809,13 @@ function CardioPlanning() {
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } }, iconsFold(React.createElement(React.Fragment, null,
                         btnPrint,
                         btnDark,
+                        btnSig,
                         btnFull,
                         btnPref)))),
                 trayFold(React.createElement(React.Fragment, null,
                     btnPrint,
                     btnDark,
+                    btnSig,
                     btnPref)),
                 prefOn && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "4px 10px", alignItems: "center", marginBottom: 8, fontSize: 10, color: "var(--txt3)" } },
                     React.createElement("span", { style: { fontWeight: 700, textTransform: "uppercase" } }, "Pr\u00E9f\u00E9rences :"),
@@ -13886,6 +13899,7 @@ function CardioPlanning() {
                         React.createElement("h2", { style: S.mTit }, "📋 Planning type — " + (MOIS[perStart(year, month).sm] + " — " + MOIS[(perStart(year, month).sm + PCFG.len - 1) % 12] + " " + perStart(year, month).sy)),
                         React.createElement("button", { onClick: nextM, style: S.arr }, "\u203A")),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
+                        React.createElement(SigBtn, null),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
                 isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 8 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", fontWeight: 800, cursor: "pointer" }, onClick: function () { return openPtModal(null); } }, "\uD83D\uDCCB Planning type"),
@@ -13904,10 +13918,12 @@ function CardioPlanning() {
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } }, iconsFold(React.createElement(React.Fragment, null,
                         btnPrint,
                         btnDark,
+                        btnSig,
                         btnFull)))),
                 trayFold(React.createElement(React.Fragment, null,
                     btnPrint,
-                    btnDark)),
+                    btnDark,
+                    btnSig)),
                 React.createElement(GridV, { onRemoveGarde: removeGardeDay, planIssues: attIssues.map, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: astSelf, memX: "attache", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
@@ -13915,6 +13931,7 @@ function CardioPlanning() {
                         "\u2699\uFE0F Activit\u00E9s ",
                         React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 400, marginLeft: 8 } }, APP_VERSION)),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
+                        React.createElement(SigBtn, null),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
                 isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer" }, onClick: function () { setMData({ _new: true, id: "", label: "", short: "", color: "#3b82f6", bg: "#0c1a2e", hasSalle: false, salles: [], isSystem: false, site: "tous", medecinsAutorise: [] }); setModal("editActe"); } }, "+ Nouvelle activit\u00E9")),
@@ -13942,6 +13959,7 @@ function CardioPlanning() {
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit }, "\uD83D\uDC65 \u00C9quipe"),
                     React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" } },
+                        React.createElement(SigBtn, null),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓"))),
                 isEdit && React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
                     React.createElement("button", { style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer" }, onClick: function () { setMData({ _new: true, id: Date.now(), nom: "", prenom: "", init: "", color: "#3b82f6", garde: true, tourMed: true, role: "medecin" }); setModal("editMed"); } }, "+ Ajouter"),
@@ -13982,12 +14000,14 @@ function CardioPlanning() {
                 React.createElement(InternesEquipe, { intCfg: intCfg, setIntCfg: setIntCfg, isEdit: isEdit }))),
             tab === "reports" && React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } },
+                    React.createElement(SigBtn, null),
                     React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                 React.createElement(ReportsView, { salleReg: salleReg, medecins: medsAff, actes: actes, getEntries: getEntries, tourMed: tourMedVu, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminOkKey: roleOkKey, adminReports: isAdminEdit && adminCanReports, adminName: adminName, removeEntry: removeEntry, year: year, month: month, toast: toast, vRef: vRef, vToast: vToast })),
             tab === "internes" && React.createElement(InternesView, { intCfg: intCfgAff, setIntCfg: setIntCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, setShowFull: setShowFull, canEdit: isEdit || (isInterEdit && !isAttEdit) || isAdminEdit || isInterne, canSalle: isEdit || (isInterEdit && !isAttEdit) || (isAdminEdit && isCadre), intSelf: isInterne, salleReg: salleReg, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "notifications" && React.createElement(SecrTab, { medecins: medsAff, acteById: acteById, secrNotif: secrNotif, setSecrNotif: setSecrNotif, secrAtts: secrCfg.atts || [], canAck: !netOff, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "aide" && React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 6 } },
+                    btnSig,
                     React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                 React.createElement(HelpView, null)),
             tab === "astreinte" && (function () {
@@ -14212,6 +14232,7 @@ function CardioPlanning() {
                             pLabel),
                         React.createElement("button", { onClick: nextP, style: S.arr }, "\u203A"),
                         React.createElement("button", { onClick: function () { return setModal("print"); }, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30, marginLeft: "auto" }) }, "\uD83D\uDDA8\uFE0F"),
+                        React.createElement(SigBtn, null),
                         React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                     React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10 } },
                         isEdit && React.createElement("button", { onClick: runAstAuto, style: { fontSize: 11, padding: "3px 12px", borderRadius: 6, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.10)", color: "#7c3aed", fontWeight: 800, cursor: "pointer" } }, "\u2699\uFE0F R\u00E9partition auto"),
@@ -14456,6 +14477,7 @@ function CardioPlanning() {
             tab === "stats" && (isEdit || isInterEdit) && React.createElement(StatsTab, { medecins: medsAff, actes: actes, plan: plan, year: year, month: month, darkMode: darkMode, setDarkMode: setDarkMode, tourMed: tourMedVu }),
             tab === "partage" && accessMode !== "adminEdit" && !isMedEdit && (React.createElement("div", { style: { maxWidth: 500 }, className: "pset " + psetFold.map(function (i) { return "pf" + i; }).join(" "), ref: psetRef, onClick: psetClick },
                 React.createElement("div", { "data-noskip": "1", style: { display: "flex", justifyContent: "flex-end", marginBottom: 6 } },
+                    React.createElement(SigBtn, null),
                     React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                 React.createElement("div", { "data-noskip": "1" },
                     React.createElement(SetQuick, { items: psetItems, replies: psetFold, onTout: psetTout })),
