@@ -49,7 +49,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.172 — 06/09/2026";
+const APP_VERSION="v10.173 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -2350,12 +2350,47 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
 }
 
 /* ════ PICK MED ACT MODAL (PT Cardio/Angio) ════ */
+/* v10.173 : écran de VALIDATION d'une pose de salle — partagé par la modale de case du
+   Planning (et Attachés) et par les modales des onglets CHL, CHB, PT Angio et PT Cardio.
+   Rien n'est écrit avant « ✓ Valider » : l'activité, sa salle et la note partent ensemble ;
+   « ← Retour » revient au choix, sans rien poser. Sans `titre`, l'en-tête reste celui de la
+   modale qui l'affiche (modale de case). */
+function ValidPose({titre=null,sous=null,med,acte,salle,note,canNote,setNote,onRetour,onValider,onClose}){
+  return(
+    <>
+      {titre&&<div style={S.mHd}>
+        <div><div style={S.mTit2}>{titre}</div>{sous&&<div style={{color:"var(--txt2)",fontSize:12,marginTop:2}}>{sous}</div>}</div>
+        <button onClick={onClose} style={S.xBtn}>×</button>
+      </div>}
+      <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>À poser — rien n'est écrit avant ✓ Valider</div>
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",marginBottom:10,flexWrap:"wrap"}}>
+        {med&&<div style={{display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
+          <span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>{med.prenom} {med.nom}</span>
+        </div>}
+        {acte&&<Badge a={acte} hideSalle={true}/>}
+        {salle&&<span style={{fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"var(--txt)",border:"1px solid var(--border)",background:"var(--bg)",borderRadius:4,padding:"3px 7px"}}>{salle}</span>}
+      </div>
+      <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>📝 Note</div>
+      {canNote
+        ?<textarea value={note||""} onChange={e=>setNote(e.target.value)} placeholder="Facultative — visible au survol de la case…" autoFocus
+            style={{width:"100%",padding:"6px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)",fontSize:12,fontFamily:"'Sora',sans-serif",resize:"vertical",minHeight:48,outline:"none"}}/>
+        :<div style={{fontSize:11,color:"var(--txt3)"}}>Votre profil ne peut pas écrire de note sur cette case.</div>}
+      <div style={{display:"flex",gap:6,marginTop:12}}>
+        <button onClick={onRetour} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:6,padding:"7px 12px",cursor:"pointer",color:"var(--txt2)",fontSize:12,fontWeight:700}}>← Retour</button>
+        <button onClick={onValider} style={{...S.btnP,flex:1}}>✓ Valider</button>
+      </div>
+    </>
+  );
+}
 function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailable,addEntry,removeEntry,patchAct,canDif=false,onClose,adminOnly=false,selfOnly=null,okKey="adminOk",notes={},setNotes=null,canNotes=false,intCfg=null,canInt=false}){
   /* v10.92 : la liste proposee porte le nom du junior EN POSTE CE JOUR-LA. */
   {const _dj=(mData&&mData.y!=null&&mData.m!=null&&mData.d!=null)?dKey(mData.y,mData.m,mData.d):null;
    if(_dj)medecins=(medecins||[]).map(m0=>djAff(m0,_dj));}
   const {row,d,sl,y:y2,m:m2}=mData;
   const [selMedId,setSelMedId]=useState(null);
+  const [pend,setPend]=useState(null);   /* v10.173 : pose en attente de ✓ Valider */
+  const poser=(mid,yy,mm,dd,ss,entry)=>setPend({mid,entry,note:(notes||{})[nk(mid,yy,mm,dd,ss)]||""});
   const [difFor,setDifFor]=useState(null);
   const [difH,setDifH]=useState("");
   const [difC,setDifC]=useState("");
@@ -2412,6 +2447,17 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
   const intPick=(canInt&&intDay&&intActes.length)?intDay.meds.filter(im=>im.salles===true&&!curOcc.find(x=>x.med.id===im.id)):[];
   // v9.53 : déjà dans la case, donc déjà listé au-dessus — inutile de le reproposer
   const pickMeds=eligMeds.filter(m=>!curOcc.find(x=>x.med.id===m.id));
+
+  /* v10.173 : une pose de salle se VALIDE — la note s'écrit au même moment, sans clic de plus */
+  if(pend){
+    const pMed=medecins.find(x=>x.id===pend.mid)||((intDay&&intDay.meds)||[]).find(x=>x.id===pend.mid)||null;
+    const pActe=actes.find(a=>a.id===pend.entry.acteId)||null;
+    const pNk=nk(pend.mid,y2,m2,d,sl);
+    const pCan=!!setNotes&&(!selfOnly||pend.mid===selfOnly)&&(canNotes||okAct(pActe));
+    return(<Ov onClose={onClose}><ValidPose titre={row.label+" — "+JOURSL[dow(y2,m2,d)]+" "+d+" "+MOIS[m2]} sous={SLOTL[sl]} med={pMed} acte={pActe} salle={pend.entry.salle} note={pend.note} canNote={pCan}
+      setNote={v=>setPend(p=>({...p,note:v}))} onRetour={()=>setPend(null)} onClose={onClose}
+      onValider={()=>{addEntry(pend.mid,y2,m2,d,sl,pend.entry);if(pCan&&(pend.note||"")!==((notes||{})[pNk]||""))setNotes(p=>({...p,[pNk]:pend.note}));onClose();}}/></Ov>);
+  }
 
   return(
     <Ov onClose={onClose}>
@@ -2529,8 +2575,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                     if(!row.multiActe&&!row.hasSalleChoice&&myActes.length===1){
                       const a=myActes[0];
                       const fs=a.fixedSalle||row.salle||null;
-                      addEntry(med.id,y2,m2,d,sl,{acteId:a.id,salle:fs});
-                      onClose();
+                      poser(med.id,y2,m2,d,sl,{acteId:a.id,salle:fs});
                     } else {
                       setSelMedId(med.id);
                     }
@@ -2563,8 +2608,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                     if(avail==="blocked")return;
                     if(!row.multiActe&&!row.hasSalleChoice&&intActes.length===1){
                       const a=intActes[0];
-                      addEntry(im.id,y2,m2,d,sl,{acteId:a.id,salle:a.fixedSalle||row.salle||null});
-                      onClose();
+                      poser(im.id,y2,m2,d,sl,{acteId:a.id,salle:a.fixedSalle||row.salle||null});
                     } else {
                       setSelMedId(im.id);
                     }
@@ -2598,7 +2642,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
               <div style={S.actGrd}>
                 {myEligActes.map(a=>(
                   <button key={a.id} style={{...S.actTog,background:a.color,color:"#111",outline:`1px solid ${a.color}55`}}
-                    onClick={()=>{ const fs=a.fixedSalle||row.salle||null; addEntry(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:fs}); onClose(); }}>
+                    onClick={()=>{ const fs=a.fixedSalle||row.salle||null; poser(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:fs}); }}>
                     <span style={{fontWeight:800,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>{a.short}</span>
                     <span style={{fontSize:10}}>{a.label}</span>
                   </button>
@@ -2612,7 +2656,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                 <div style={S.actGrd}>
                   {myEligActes.map(a=>(
                     <button key={a.id} style={{...S.actTog,background:a.color,color:"#111",outline:`1px solid ${a.color}55`}}
-                      onClick={()=>{ const fs=a.fixedSalle||row.salle||null; addEntry(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:fs}); onClose(); }}>
+                      onClick={()=>{ const fs=a.fixedSalle||row.salle||null; poser(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:fs}); }}>
                       <span style={{fontWeight:800,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>{a.short}</span>
                       <span style={{fontSize:10}}>{a.label}</span>
                     </button>
@@ -2651,7 +2695,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
                         {libre.map(s=>(
                           <button key={s} style={{padding:"5px 9px",borderRadius:5,border:"1px solid #3fb95088",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:"rgba(63,185,80,.15)",color:"#3fb950"}}
-                            onClick={()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId,salle:s}); onClose(); }}>{s} ✓</button>
+                            onClick={()=>{ poser(selMed.id,y2,m2,d,sl,{acteId,salle:s}); }}>{s} ✓</button>
                         ))}
                       </div>
                     </>
@@ -2663,7 +2707,7 @@ function PickMedActModal({mData,setMData,medecins,actes,getEntries,isMedAvailabl
                         {occupee.map(s=>(
                           <button key={s} style={{padding:"5px 9px",borderRadius:5,border:"1px solid #f59e0b44",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:"rgba(245,158,11,.15)",color:"#f59e0b"}}
                             title={`Occupée par ${occ[s].map(m=>m.init).join(", ")} — clic pour ajouter quand même`}
-                            onClick={()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId,salle:s}); onClose(); }}>{s} ⚠ {occ[s].map(m=>m.init).join(",")}</button>
+                            onClick={()=>{ poser(selMed.id,y2,m2,d,sl,{acteId,salle:s}); }}>{s} ⚠ {occ[s].map(m=>m.init).join(",")}</button>
                         ))}
                       </div>
                     </>
@@ -2687,6 +2731,8 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
   const {salle,siteActes,d,sl,y:y2,m:m2}=mData;
   const [step,setStep]=useState("med"); // med | acte | salle
   const [selMedId,setSelMedId]=useState(null);
+  const [pend,setPend]=useState(null);   /* v10.173 : pose en attente de ✓ Valider */
+  const poser=(mid,yy,mm,dd,ss,entry)=>setPend({mid,entry,note:(notes||{})[nk(mid,yy,mm,dd,ss)]||""});
   /* v10.62, lot Salles : internes du semestre — posables ici par l'éditeur, un
      intermédiaire ou un cadre, sur les seules activités cochées 🎓. Un interne posé
      avec un médecin est VOLONTAIRE (supervision) : il n'entre jamais dans le calcul
@@ -2737,6 +2783,17 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
   const pickMeds=medecins.filter(med=>!selfOnly||med.id===selfOnly)
     .filter(med=>!curOcc.find(x=>x.med.id===med.id))
     .filter(med=>siteActes.some(a=>!a.medecinsAutorise||!a.medecinsAutorise.length||a.medecinsAutorise.includes(authI(med))));
+
+  /* v10.173 : une pose de salle se VALIDE — la note s'écrit au même moment, sans clic de plus */
+  if(pend){
+    const pMed=medecins.find(x=>x.id===pend.mid)||((intDay&&intDay.meds)||[]).find(x=>x.id===pend.mid)||null;
+    const pActe=actes.find(a=>a.id===pend.entry.acteId)||null;
+    const pNk=nk(pend.mid,y2,m2,d,sl);
+    const pCan=!!setNotes&&(!selfOnly||pend.mid===selfOnly)&&(!adminOnly||canNotes||!!(pActe&&pActe[okKey]===true));
+    return(<Ov onClose={onClose}><ValidPose titre={(pend.entry.salle||salle)+" — "+JOURSL[dow(y2,m2,d)]+" "+d+" "+MOIS[m2]} sous={SLOTL[sl]} med={pMed} acte={pActe} salle={pend.entry.salle} note={pend.note} canNote={pCan}
+      setNote={v=>setPend(p=>({...p,note:v}))} onRetour={()=>setPend(null)} onClose={onClose}
+      onValider={()=>{addEntry(pend.mid,y2,m2,d,sl,pend.entry);if(pCan&&(pend.note||"")!==((notes||{})[pNk]||""))setNotes(p=>({...p,[pNk]:pend.note}));onClose();}}/></Ov>);
+  }
 
   return(
     <Ov onClose={onClose}>
@@ -2827,7 +2884,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
       )}
       {step==="acte"&&selMed&&(
         <>
-          {eligActes.length===1&&eligActes[0].fixedSalle&&(()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId:eligActes[0].id,salle:eligActes[0].fixedSalle}); onClose(); return null; })()}
+          {eligActes.length===1&&eligActes[0].fixedSalle&&(()=>{ poser(selMed.id,y2,m2,d,sl,{acteId:eligActes[0].id,salle:eligActes[0].fixedSalle}); return null; })()}
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
             <button onClick={()=>setStep("med")} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 9px",cursor:"pointer",color:"var(--txt2)",fontSize:12}}>← Retour</button>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -2851,10 +2908,9 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
                   /* une colonne de reprise ne demande une salle que si l'activité en a une */
                   /* v9.67.1 : TOUTE colonne de suivi dont l'activité déclare des salles passe par le choix de salle */
                   if(isRecapCol&&a.hasSalle&&!a.fixedSalle){setStep("salle");return;}
-                  if(isRecapCol){addEntry(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:a.fixedSalle||null});onClose();return;}
+                  if(isRecapCol){poser(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:a.fixedSalle||null});return;}
                   const fs=a.fixedSalle||salle;
-                  addEntry(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:fs});
-                  onClose();
+                  poser(selMed.id,y2,m2,d,sl,{acteId:a.id,salle:fs});
                 }}>
                 <span style={{fontWeight:800,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>{a.short}</span>
                 <span style={{fontSize:10}}>{a.label}</span>
@@ -2889,7 +2945,7 @@ function PickMedSiteModal({mData,medecins,actes,getEntries,isMedAvailable,addEnt
                     color:occupied?"#dc2626":"#111",
                     fontWeight:700,fontSize:13,
                     border:occupied?"1px solid #fca5a5":"1px solid #46bdc6"}}
-                  onClick={()=>{ addEntry(selMed.id,y2,m2,d,sl,{acteId:(recapId||"BIP"),salle:s}); onClose(); }}>
+                  onClick={()=>{ poser(selMed.id,y2,m2,d,sl,{acteId:(recapId||"BIP"),salle:s}); }}>
                   <span>{recapId==="BIP"?("Salle "+s.replace("CHB-","")):s}</span>
                   {occupied&&<span style={{fontSize:10,fontWeight:400,marginLeft:6}}>
                     — {salleOccs.map(m=>m.init).join(", ")} déjà assigné
@@ -3215,7 +3271,7 @@ function absLib(c){
   const dw=new Date(c.y,c.m,c.d).getDay();
   return JOURSL[dw].slice(0,3).toLowerCase()+". "+c.d+"/"+(c.m+1)+(c.sl==="M"?" matin":c.sl==="AM"?" après-midi":"");
 }
-function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null,allowActs=true,compter,bilan=null,onPose,onRetraitAbs,onEffacer,onClose}){
+function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null,allowActs=true,compter,bilan=null,onPose,onRetraitAbs,onEffacer,onClose,onRetour=null}){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const [action,setAction]=useState("poser");        // poser | retirer
   const [cible,setCible]=useState("abs");            // abs | activites | tout   (si retirer)
@@ -3321,7 +3377,7 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
     const ul={margin:"3px 0 0 16px",padding:0,fontSize:11,fontWeight:600,lineHeight:1.5};
     const go=(garder)=>{setConfirm(null);onPose({...perim(),absType,sansWE:fmcSem,cases:r.cases,skip:garder?b.occKeys:null});};
     return(
-      <div style={{minWidth:320,maxWidth:400}}>
+      <div style={{minWidth:320}}>
         <div style={S.mHd}><div style={{...S.mTit2,color:b.tour.length?"#991b1b":"var(--txt)"}}>{b.tour.length?"🚫 Pose refusée":"Avant de poser"}</div></div>
         <div style={{fontSize:12.5,lineHeight:1.6,color:"var(--txt)"}}>
           <b>{libAction}</b> pour <b>{med?med.prenom+" "+med.nom:"—"}</b><br/>sur <b>{libPeriode}</b>.
@@ -3348,7 +3404,7 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
       </div>);
   })();
   if(confirm) return(
-    <div style={{minWidth:320,maxWidth:400}}>
+    <div style={{minWidth:320}}>
       <div style={S.mHd}><div style={{...S.mTit2,color:"#991b1b"}}>⚠ Confirmer</div></div>
       <div style={{fontSize:12.5,lineHeight:1.6,color:"var(--txt)"}}>
         Vous allez <b>{libAction.toLowerCase()}</b> pour <b>{med?med.prenom+" "+med.nom:"—"}</b><br/>
@@ -3372,10 +3428,14 @@ function PeriodModal({medecins,initMedId,initDate,year,month,mois=[],finPer=null
   );
 
   return(
-    <div style={{minWidth:320,maxWidth:400}}>
+    <div style={{minWidth:320}}>
       <div style={S.mHd}>
         <div style={S.mTit2}>📅 Sur une période{med?" — "+med.prenom+" "+med.nom:""}</div>
-        <button onClick={onClose} style={S.xBtn}>×</button>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          {/* v10.173 : retour vers la modale de case d'où l'on vient */}
+          {onRetour&&<button onClick={onRetour} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 9px",cursor:"pointer",color:"var(--txt2)",fontSize:12}}>← Retour</button>}
+          <button onClick={onClose} style={S.xBtn}>×</button>
+        </div>
       </div>
 
       {!initMedId&&<div style={{marginBottom:10}}>
@@ -5211,13 +5271,13 @@ const HELP_SECTIONS=[
 
  {id:"cellules",icon:"🔲",title:"Les cellules du planning",body:()=>HE("div",null,
   HP({children:["Chaque jour de semaine a deux créneaux (M matin, AM après-midi) plus la nuit N pour la garde ; le week-end une seule case JOUR. Cliquez sur une case (en mode édition) pour ouvrir la modale :"]}),
-  HP({children:["• choisir l'",HE("b",null,"activité")," (seules celles autorisées pour ce médecin apparaissent), la ",HE("b",null,"salle")," si l'activité en demande une, ajouter une ",HE("b",null,"note")," 📝."]}),
+  HP({children:["• choisir l'",HE("b",null,"activité")," (seules celles autorisées pour ce médecin apparaissent), la ",HE("b",null,"salle")," si l'activité en demande une, ajouter une ",HE("b",null,"note")," 📝. Depuis la v10.173, une ",HE("b",null,"pose avec salle se valide"),' : après le choix de la salle, la modale reste ouverte, montre ce qui va être posé et le champ de note, puis « ✓ Valider » écrit l\'activité et la note ensemble — « ← Retour » ou × ne posent rien. Les activités sans salle, l\'absence, la FMC et la garde se posent toujours au clic. Le bouton « 📅 Modifier sur une période… » a lui aussi son « ← Retour » vers la modale de case.']}),
   HP({children:["• ",HE("b",null,"retirer")," : rouvrir la case et choisir Retirer."]}),
   HP({children:["• ",HE("b",null,"absence ou FMC")," : depuis la v10.172, le clic sur ABS ou FMC ne pose plus tout de suite — une ligne propose la ",HE("b",null,"durée"),", dates réelles affichées sous chaque bouton. Absence : ce créneau, cette journée, 1, 2 ou 3 semaines (du samedi précédent au dimanche, fériés accolés compris). FMC : ce créneau, cette journée, 2 ou 3 jours calendaires, la semaine du lundi au vendredi — et la FMC se pose désormais aussi le week-end, pour les congrès. Si la plage est vide, le clic pose et ferme ; sinon un encart liste ce qu'elle rencontre : un ",HE("b",null,"jour de tour"),' refuse la pose (le jour s\'échange d\'abord, ⇄), une ',HE("b",null,"garde"),' et son repos sont conservés d\'office (une garde s\'échange, elle ne s\'efface pas), et les autres cases occupées — activité, planning type, choix ouvert — se ',HE("b",null,"gardent ou se remplacent"),", au choix. Le retour ↶ défait la pose entière d'un coup."]}),
   HP({children:["Repères visuels : cases grisées = bloquées par une semaine de tour · fond jaune pâle = week-end · fond et contour verts = semaine d'astreinte · ",HBadg({txt:"G",color:"#93c47d"})," garde · ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde · cases ",HE("b",null,"hachurées")," = personne indisponible (section ⏸)."]}),
   HP({children:["Les activités cochées « reprise » affichent le nom du médecin seul dans les onglets concernés."]}),
   HT({children:"📝 Les notes"}),
-  HP({children:["Une note s'écrit depuis la modale de case, et aussi depuis les fenêtres des onglets ",HE("b",null,"CHL, CHB, PT Cardio et PT Angio"),", où chaque occupant a son propre champ. Elle est donc toujours ",HE("b",null,"rattachée à un médecin"),", ce qui compte quand deux personnes se succèdent dans la même salle : au survol de la case, les notes s'affichent préfixées des initiales (« ND : 4 cs · TH : 3 cs »). Un point orange sur la vignette signale qui en porte une."]}),
+  HP({children:["Une note s'écrit depuis la modale de case, et aussi depuis les fenêtres des onglets ",HE("b",null,"CHL, CHB, PT Cardio et PT Angio"),", où chaque occupant a son propre champ — et, depuis la v10.173, dès la pose : choisir le médecin et l'activité n'écrit plus tout de suite, un écran « À poser » présente le champ de note, puis « ✓ Valider » pose et ferme. Elle est donc toujours ",HE("b",null,"rattachée à un médecin"),", ce qui compte quand deux personnes se succèdent dans la même salle : au survol de la case, les notes s'affichent préfixées des initiales (« ND : 4 cs · TH : 3 cs »). Un point orange sur la vignette signale qui en porte une."]}),
   HT({children:"◇ Le choix ouvert"}),
   HP({children:["Un ",HE("b",null,"choix ouvert")," est une activité (une, deux ou trois) posée sans être tranchée : « ce sera l'une de celles-là ». Il se crée dans le ",HE("b",null,"planning type")," (fenêtre d'une case → « ◇ Transformer en choix ouvert »), et se reconnaît dans les grilles à son ",HE("b",null,"cadre pointillé violet"),"."]}),
   HP({children:["Tant qu'il n'est pas tranché, le médecin reste ",HE("b",null,"disponible")," pour ces activités : il n'occupe aucune salle, ne consomme aucune IDE, et reste proposé dans les fenêtres — c'est tout l'intérêt, notamment pour le bip. Un compteur violet à part, en haut du Planning, dit combien il en reste à trancher."]}),
@@ -13127,6 +13187,8 @@ header::-webkit-scrollbar { display: none; }
         const doGarde=()=>{ applyGarde(medId,y2,m2,d2); setModal(null); };
         const doAdd=(acteId,salle=null)=>{
           if(acteId==="GARDE"){doGarde();return;}
+          /* v10.173 : une pose AVEC salle se valide — l'écran ValidPose prend le relais */
+          if(salle){setMData(p=>({...p,_pend:{acteId,salle,note:notesAff[nk(medId,y2,m2,d2,slot)]||""},_pickSalle:null,_absDur:null,_absConf:null}));return;}
           /* v9.60 : une branche non tranchée n'est pas « déjà posée » — la reposer, c'est trancher */
           const _curA=getEntries(medId,y2,m2,d2,we?"JOUR":slot).filter(e2=>e2&&!e2.cond).map(e2=>e2.acteId);
           /* v9.67 : reposer avec une salle explicite = ATTRIBUER la salle (addEntry remplace, v9.63) */
@@ -13406,8 +13468,20 @@ header::-webkit-scrollbar { display: none; }
               </div>
             )}
 
-            {canEditThisMed&&<div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Ajouter</div>}
-            {canEditThisMed&&(
+            {mData&&mData._pend&&canEditThisMed&&(()=>{
+              /* v10.173 : pose de salle en attente de validation — l'activité, sa salle et la
+                 note ne s'écrivent qu'au ✓ Valider ; ← Retour ramène à la grille sans rien poser. */
+              const pd=mData._pend,pA=acteById(pd.acteId),pNk=nk(medId,y2,m2,d2,slot);
+              const pCan=!(estClos(y2,m2,d2)&&!isEdit)&&!(isAdminEdit&&!adminCanNotes&&!(pA&&pA[roleOkKey]===true));
+              return <ValidPose med={med} acte={pA} salle={pd.salle} note={pd.note} canNote={pCan}
+                setNote={v=>setMData(p=>({...p,_pend:{...p._pend,note:v}}))}
+                onRetour={()=>setMData(p=>({...p,_pend:null}))} onClose={()=>setModal(null)}
+                onValider={()=>{addEntry(medId,y2,m2,d2,we?"JOUR":slot,{acteId:pd.acteId,salle:pd.salle});
+                  if(pCan&&(pd.note||"")!==(notesAff[pNk]||""))setNotes(p=>({...p,[pNk]:pd.note}));
+                  setModal(null);}}/>;
+            })()}
+            {canEditThisMed&&!(mData&&mData._pend)&&<div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Ajouter</div>}
+            {canEditThisMed&&!(mData&&mData._pend)&&(
               <div style={S.actGrd}>
                 {eligible.filter(a=>a.id!=="GARDE").map(a=>{
                   const on=curIds.includes(a.id);
@@ -13554,12 +13628,12 @@ header::-webkit-scrollbar { display: none; }
               );
             })()}
 
-            <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
+            {!(mData&&mData._pend)&&<div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
               <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>📝 Note</div>
               <textarea value={notesAff[nk(medId,y2,m2,d2,slot)]||""} onChange={e=>setNotes(p=>({...p,[nk(medId,y2,m2,d2,slot)]:e.target.value}))}
                 placeholder="Note visible au survol..." readOnly={(estClos(y2,m2,d2)&&!isEdit)||!canEditThisMed||(isAdminEdit&&!adminCanNotes&&!entries.some(e2=>{const a2=acteById(e2.acteId);return a2&&a2[roleOkKey]===true;}))}
                 style={{width:"100%",padding:"6px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)",fontSize:12,fontFamily:"'Sora',sans-serif",resize:"vertical",minHeight:48,outline:"none"}}/>
-            </div>
+            </div>}
           </Ov>
         );
       })()}
@@ -13672,6 +13746,7 @@ header::-webkit-scrollbar { display: none; }
           year={year} month={month} mois={ptPeriodMonths} finPer={(()=>{const p=perStart(year,month);const e=perEnd(p.sy,p.sm);return `${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,"0")}-${String(e.getDate()).padStart(2,"0")}`;})()} allowActs={!isAdminEdit} compter={countPeriodActs}
           bilan={p=>{const cases=absCases(p);return {cases,b:absBilan(p.medId,cases,p.absType)};}}
           onPose={p=>{applyAbsence({medId:p.medId,absType:p.absType,cases:p.cases||absCases(p),skip:p.skip||null});setModal(null);}}
+          onRetour={()=>setModal("cell")}
           onRetraitAbs={p=>{removeAbsence(perSlots(p));setModal(null);}}
           onEffacer={p=>{
             clearPeriodActs(perSlots(p));
