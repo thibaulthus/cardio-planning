@@ -133,6 +133,14 @@ var VER_STALE={on:false,serveur:"",toast:null};
    Le contrôle 9 excluait « toast » des noms non déclarés ; il ne l'exclut plus. */
 var TOAST_HUB={f:null};
 function toast(msg,type,act){if(TOAST_HUB.f)TOAST_HUB.f(msg,type,act);}
+/* v10.179 : ZOOM de l'application — un facteur par appareil (cp6_zoom), 110 % en nominal (son choix).
+   Posé sur <html> avant même React. Les mesures faites en pixels de FENÊTRE (largeur « téléphone »
+   < 760, hauteur des grilles pleine page) se divisent par ZOOM.f pour redevenir des pixels de page.
+   ZOOM.edit / ZOOM.all disent qui voit le bouton 🔍 ; l'application les pose à chaque rendu. */
+var ZOOM_DEF=110,ZOOM_PAS=[100,110,120,130];
+var ZOOM=(function(){var z=ZOOM_DEF;try{var v=parseInt(localStorage.getItem("cp6_zoom"),10);if(ZOOM_PAS.indexOf(v)>=0)z=v;}catch(e){}return {z:z,f:z/100,edit:false,all:false};})();
+function zoomApply(z){ZOOM.z=z;ZOOM.f=z/100;try{document.documentElement.style.zoom=String(ZOOM.f);}catch(e){}}
+zoomApply(ZOOM.z);
 function verNum(v){var m=String(v||"").match(/(\d+)\.(\d+)/);return m?parseInt(m[1],10)*1000+parseInt(m[2],10):0;}
 function verMuet(){if(VER_STALE.toast)VER_STALE.toast("⛔ Version périmée — modification NON enregistrée. Mettez l'application à jour.","warn");return Promise.resolve();}
 var setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function () { return VER_STALE.on ? verMuet() : window.firebaseSetDoc.apply(null, arguments); } : null;
@@ -179,7 +187,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.178 — 06/09/2026";
+var APP_VERSION = "v10.179 — 06/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -792,7 +800,21 @@ function Chp(_a) {
 }
 /* v10.174 : le 🐞 dans chaque onglet, à côté du bouton ☀️/🌓. Il ne connaît pas l'App et lui envoie
    un simple événement, que CardioPlanning écoute pour ouvrir la modale de signalement. */
-function SigBtn() { return React.createElement("button", { onClick: function () { return window.dispatchEvent(new Event("cp-signal")); }, title: "Signaler un probl\u00E8me", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDC1E"); }
+/* v10.179 : le bouton de zoom voisin du 🐞 — cycle 100 → 110 → 120 → 130 %, mémorisé sur l'appareil.
+   Visible de l'éditeur ; de tous quand la coche « Proposer le bouton 🔍 à tout le monde » est mise. */
+function ZoomBtn() {
+    var _a = useState(0), tick = _a[1];
+    if (!(ZOOM.edit || ZOOM.all))
+        return null;
+    var suiv = ZOOM_PAS[(ZOOM_PAS.indexOf(ZOOM.z) + 1) % ZOOM_PAS.length];
+    return React.createElement("button", { onClick: function () { zoomApply(suiv); try {
+            localStorage.setItem("cp6_zoom", String(suiv));
+        }
+        catch (e) { } window.dispatchEvent(new Event("resize")); tick(function (t) { return t + 1; }); }, title: "Zoom " + ZOOM.z + " % — cliquer pour " + suiv + " % (réglage de cet appareil)", style: __assign(__assign({}, S.arr), { fontSize: 10, width: 46, fontWeight: 800 }) }, "🔍" + ZOOM.z);
+}
+function SigBtn() { return React.createElement(React.Fragment, null,
+    React.createElement(ZoomBtn, null),
+    React.createElement("button", { onClick: function () { return window.dispatchEvent(new Event("cp-signal")); }, title: "Signaler un probl\u00E8me", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDC1E")); }
 function Ov(_a) {
     var children = _a.children, onClose = _a.onClose, _b = _a.wide, wide = _b === void 0 ? false : _b; /* v10.176 : wide — la modale 🤝 restait dans les 500 px de S.mb */
     return React.createElement("div", { style: S.ov, onClick: function (e) { if (e.target === e.currentTarget)
@@ -1195,7 +1217,7 @@ function TableScroll(_a) {
         var barH = 0;
         document.querySelectorAll('[data-botbar="1"]').forEach(function (b) { barH = Math.max(barH, b.offsetHeight || 0); });
         var legacy = "calc(100vh - " + (mh + barH) + "px)";
-        if (window.innerWidth < 760) {
+        if (window.innerWidth / ZOOM.f < 760) {
             pageVerrou(false);
             if (el.style.maxHeight !== legacy)
                 el.style.maxHeight = legacy;
@@ -1210,7 +1232,7 @@ function TableScroll(_a) {
         pageVerrou(true); /* v10.161 : la page ne défile plus ; retour en haut avant la mesure */
         var de = document.documentElement;
         var top = el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0);
-        var h = window.innerHeight - top - barH - 14;
+        var h = (window.innerHeight - top) / ZOOM.f - barH - 14; /* v10.179 : top est en pixels de fenêtre, la hauteur posée en pixels de page */
         var v0 = Math.max(260, h) + "px";
         if (el.style.maxHeight !== v0)
             el.style.maxHeight = v0;
@@ -5741,6 +5763,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Zoom de l'application")," (v10.179) : tout l'affichage est à 110 % par défaut. Le bouton 🔍, à côté de 🐞, passe à 120, 130, puis 100 % — réglage mémorisé sur l'appareil, chacun le sien ; le zoom du navigateur (Ctrl + molette, pincement) reste possible par-dessus. L'impression reste à 100 %. Le bouton est d'abord réservé à l'éditeur ; une coche de Paramètres le propose à tous."]}),
   HP({children:[HE("b",null,"Le vrai nom du junior dans les modales")," (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."]}),
   HP({children:[HE("b",null,"Une seule barre de défilement sur ordinateur")," (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."]}),
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
@@ -9389,6 +9412,7 @@ function CardioPlanning() {
     var _g = useState(false), isCadre = _g[0], setIsCadre = _g[1];
     /* ── v9.35 : effectifs IDE ── */
     var _h = useState({ def: {}, ov: {} }), ideCfg = _h[0], setIdeCfg = _h[1];
+    var _uiCfgS = useState({}), uiCfg = _uiCfgS[0], setUiCfg = _uiCfgS[1]; /* v10.179 : réglages d'affichage partagés — zoomAll */
     var _j = useState({ sems: [], show: false, jaugeDef: true, sHC: 2, sUS: 2, sSam: 1 }), intCfg = _j[0], setIntCfg = _j[1]; // v10.54 internes
     var _k = useState(false), prefOn = _k[0], setPrefOn = _k[1]; // v10.81 : coloration des preferences — session seulement
     var _l = useState(false), intGardeOn = _l[0], setIntGardeOn = _l[1]; // v10.61 lot 3b : colonne garde int. du Planning — session seulement, cachée en nominal
@@ -9500,10 +9524,10 @@ function CardioPlanning() {
        Volontairement limité à cet onglet. */
     var _15 = useState("planning"), tab = _15[0], setTab = _15[1];
     /* v10.132 : écran étroit (< 760 px, même seuil que TableScroll), plateau ⋯ et menu du filtre */
-    var _16 = useState(typeof window !== "undefined" && window.innerWidth < 760), narrow = _16[0], setNarrow = _16[1];
+    var _16 = useState(typeof window !== "undefined" && window.innerWidth / ZOOM.f < 760), narrow = _16[0], setNarrow = _16[1];
     var _17 = useState(false), moreOpen = _17[0], setMoreOpen = _17[1];
     var _18 = useState(false), filtOpen = _18[0], setFiltOpen = _18[1];
-    useEffect(function () { var f = function () { return setNarrow(window.innerWidth < 760); }; window.addEventListener("resize", f); return function () { return window.removeEventListener("resize", f); }; }, []);
+    useEffect(function () { var f = function () { return setNarrow(window.innerWidth / ZOOM.f < 760); }; window.addEventListener("resize", f); return function () { return window.removeEventListener("resize", f); }; }, []);
     useEffect(function () {
         if (!moreOpen && !filtOpen)
             return;
@@ -10300,6 +10324,12 @@ function CardioPlanning() {
                     if (data_1.ideCfg) {
                         try {
                             setIdeCfg(JSON.parse(data_1.ideCfg));
+                        }
+                        catch (e) { }
+                    }
+                    if (data_1.uiCfg) {
+                        try {
+                            setUiCfg(JSON.parse(data_1.uiCfg) || {});
                         }
                         catch (e) { }
                     }
@@ -11354,6 +11384,8 @@ function CardioPlanning() {
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ intCfg: JSON.stringify(intCfg) }); }, [intCfg]);
     useEffect(function () { if (!isFirstLoad.current)
+        saveToFirebase({ uiCfg: JSON.stringify(uiCfg) }); }, [uiCfg]);
+    useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ ptOrder: JSON.stringify(ptOrder) }); }, [ptOrder]);
     useEffect(function () { if (!isFirstLoad.current)
         saveToFirebase({ specColors: JSON.stringify(specColors) }); }, [specColors]);
@@ -11458,6 +11490,7 @@ function CardioPlanning() {
     useEffect(function () { setNotif(null); }, [tab]);
     var acteById = useCallback(function (id) { return actes.find(function (a) { return a.id === id; }); }, [actes]);
     var isEdit = (accessMode === "edit" || (accessMode === "medecinEdit" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).niveau) || "basic") === "editeur" && (((medecins.find(function (m) { return m.id === editMedId; }) || {}).role) || "medecin") !== "attache")) && !netOff; /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
+    ZOOM.edit = isEdit; ZOOM.all = (uiCfg && uiCfg.zoomAll === true); /* v10.179 : qui voit le bouton 🔍 */
     /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
        une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
     var verrouDeb = useMemo(function () { return verrouDebut(); }, [PCFG.len, PCFG.startM, vacs]);
@@ -13818,7 +13851,7 @@ function CardioPlanning() {
        Garde int. reste à côté. Sur ordinateur, rien ne bouge. Les mêmes boutons servent aux deux onglets. */
     var btnPrint = React.createElement("button", { onClick: function () { return setModal("print"); }, title: "Imprimer", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDDA8\uFE0F");
     var btnDark = React.createElement("button", { onClick: function () { return setDarkMode(function (d) { return !d; }); }, style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓");
-    var btnSig = React.createElement("button", { onClick: function () { return setModal("signal"); }, title: "Signaler un probl\u00E8me", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDC1E"); /* v10.142 */
+    var btnSig = React.createElement(React.Fragment, null, React.createElement(ZoomBtn, null), React.createElement("button", { onClick: function () { return setModal("signal"); }, title: "Signaler un probl\u00E8me", style: __assign(__assign({}, S.arr), { fontSize: 13, width: 30 }) }, "\uD83D\uDC1E")); /* v10.142 ; v10.179 : le 🔍 devant */
     var btnFull = React.createElement("button", { onClick: function () { return setShowFull(function (f) { return !f; }); }, title: showFull ? "Depuis aujourd'hui" : "Mois complet", style: __assign(__assign({}, S.arr), { fontSize: 16, width: 32, color: showFull ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(showFull ? "var(--today-c)" : "var(--border)") }) }, showFull ? "📅" : "🗓️");
     var btnPref = canPref ? React.createElement("button", { onClick: function () { return setPrefOn(function (v) { return !v; }); }, title: "Afficher les pr\u00E9f\u00E9rences de tour et de garde", style: __assign(__assign({}, S.arr), { fontSize: 14, width: 30, color: prefOn ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(prefOn ? "var(--today-c)" : "var(--border)") }) }, "\u2B50") : null;
     var btnMore = React.createElement("button", { "data-keep": "1", onClick: function () { return setMoreOpen(function (v) { return !v; }); }, title: "Autres outils", style: __assign(__assign({}, S.arr), { fontSize: 15, width: 30, color: moreOpen ? "var(--today-c)" : "var(--txt2)", border: "1px solid ".concat(moreOpen ? "var(--today-c)" : "var(--border)") }) }, "\u22EF");
@@ -13871,7 +13904,7 @@ function CardioPlanning() {
     var tourProps = { medecins: medsAff, specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, tourPtOte: tourPtOte, setTourPtOte: setTourPtOte, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, tourHist: tourHist, tourHistDeb: tourHistDeb, intCfg: intCfg, getEntries: getEntries, isEdit: isEdit || (isInterEdit && !isAttEdit), edReel: isEdit, build: build, secrDif: secrCfg.dif || {}, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast, vRef: vRef, vToast: vToast };
     var gardeProps = { onRemoveGarde: removeGardeDay, printWk: printWk, onPrint: function () { return setModal("print"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, getEntry: getEntry, allDays: allDays, isEdit: isEdit, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast };
     return (React.createElement("div", { style: S.app },
-        React.createElement("style", null, setFoldCSS() + "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav{scrollbar-width:none;-ms-overflow-style:none}\nnav::-webkit-scrollbar { display: none; }\n/* v10.52 : sur ordinateur (pointeur souris), la barre reapparait \u2014 le navigateur\n   ne la dessine que si les onglets debordent, elle reste invisible sinon */\n@media (pointer:fine){\n  nav{scrollbar-width:thin}\n  nav::-webkit-scrollbar{display:block;height:5px}\n}\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; overflow: visible !important; }   /* v10.161 : le verrou de page ne gêne pas l'impression */\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
+        React.createElement("style", null, setFoldCSS() + "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav{scrollbar-width:none;-ms-overflow-style:none}\nnav::-webkit-scrollbar { display: none; }\n/* v10.52 : sur ordinateur (pointeur souris), la barre reapparait \u2014 le navigateur\n   ne la dessine que si les onglets debordent, elle reste invisible sinon */\n@media (pointer:fine){\n  nav{scrollbar-width:thin}\n  nav::-webkit-scrollbar{display:block;height:5px}\n}\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; overflow: visible !important; zoom: 1 !important; }   /* v10.161 : le verrou de page ne gêne pas l'impression */\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
         notif && React.createElement("div", { onClick: function () { return setNotif(null); }, title: "Cliquer pour fermer", style: __assign(__assign({}, S.notif), { background: "var(--bg-td)", cursor: "pointer", borderColor: notif.type === "warn" ? "#f59e0b" : notif.type === "lock" ? "#a78bfa" : "#4ade80", borderWidth: notif.type === "ok" ? 1.5 : 2.5, color: notif.type === "warn" ? "#b45309" : notif.type === "lock" ? "#6d28d9" : "var(--txt)" }) },
             notif.msg,
             notif.act && React.createElement("button", { onClick: function (e) { e.stopPropagation(); var c = notif.act.cells; setNotif(null); hlVoir(c); }, style: { marginLeft: 10, padding: "3px 10px", borderRadius: 6, border: "1.5px solid #e3b341", background: "rgba(227,179,65,.12)", color: "#b45309", fontWeight: 800, fontSize: 12, cursor: "pointer" } },
@@ -14909,6 +14942,12 @@ function CardioPlanning() {
                             React.createElement("button", { onClick: function () { return setTourHistDeb(TH_DEB_DEF); }, style: { fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "Date par défaut")),
                         React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 5 } }, "Le tableau 🤝 et la répartition automatique ne comptent rien avant cette date : les tours antérieurs étaient un essai. La fenêtre glisse ensuite sur deux ans. Ce décompte ne décide que d'AVEC QUI l'on tourne — jamais du nombre de semaines dû à chacun."))),
                 React.createElement(InternesTile, { intCfg: intCfg, setIntCfg: setIntCfg, actes: actes, pins: [editPin, adminPin, cadrePin] }),
+                React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) }, /* v10.179 */
+                    React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "🔍 Zoom de l'application"),
+                    React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--txt)", cursor: "pointer" } },
+                        React.createElement("input", { type: "checkbox", checked: uiCfg.zoomAll === true, onChange: function (e) { return setUiCfg(function (p) { return (__assign(__assign({}, (p || {})), { zoomAll: e.target.checked })); }); }, style: { width: 15, height: 15 } }),
+                        "Proposer le bouton 🔍 à tout le monde"),
+                    React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 5 } }, "Le bouton 🔍, à côté de 🐞 dans chaque onglet, règle la taille de tout l'affichage (100, 110, 120 ou 130 %) sur l'appareil où l'on clique ; l'application est à 110 % par défaut. Tant que la coche n'est pas mise, l'éditeur seul le voit.")),
                 React.createElement("div", { style: __assign(__assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD14 Notifications aux secr\u00E9taires"),
                     React.createElement("div", null,

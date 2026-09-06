@@ -23,6 +23,14 @@ var VER_STALE={on:false,serveur:"",toast:null};
    Le contrôle 9 excluait « toast » des noms non déclarés ; il ne l'exclut plus. */
 var TOAST_HUB={f:null};
 function toast(msg,type,act){if(TOAST_HUB.f)TOAST_HUB.f(msg,type,act);}
+/* v10.179 : ZOOM de l'application — un facteur par appareil (cp6_zoom), 110 % en nominal (son choix).
+   Posé sur <html> avant même React. Les mesures faites en pixels de FENÊTRE (largeur « téléphone »
+   < 760, hauteur des grilles pleine page) se divisent par ZOOM.f pour redevenir des pixels de page.
+   ZOOM.edit / ZOOM.all disent qui voit le bouton 🔍 ; l'application les pose à chaque rendu. */
+var ZOOM_DEF=110,ZOOM_PAS=[100,110,120,130];
+var ZOOM=(function(){var z=ZOOM_DEF;try{var v=parseInt(localStorage.getItem("cp6_zoom"),10);if(ZOOM_PAS.indexOf(v)>=0)z=v;}catch(e){}return {z:z,f:z/100,edit:false,all:false};})();
+function zoomApply(z){ZOOM.z=z;ZOOM.f=z/100;try{document.documentElement.style.zoom=String(ZOOM.f);}catch(e){}}
+zoomApply(ZOOM.z);
 function verNum(v){var m=String(v||"").match(/(\d+)\.(\d+)/);return m?parseInt(m[1],10)*1000+parseInt(m[2],10):0;}
 function verMuet(){if(VER_STALE.toast)VER_STALE.toast("⛔ Version périmée — modification NON enregistrée. Mettez l'application à jour.","warn");return Promise.resolve();}
 const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(){return VER_STALE.on?verMuet():window.firebaseSetDoc.apply(null,arguments);} : null;
@@ -62,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.178 — 06/09/2026";
+const APP_VERSION="v10.179 — 06/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -674,7 +682,15 @@ function Av({med}){return <div style={{...S.av,background:med.color}}>{med.init}
 function Chp({bg,c,children}){return <span style={{fontSize:9,background:bg,color:c,padding:"1px 4px",borderRadius:3,fontWeight:700}}>{children}</span>;}
 /* v10.174 : le 🐞 dans chaque onglet, à côté du bouton ☀️/🌓. Il ne connaît pas l'App et lui envoie
    un simple événement, que CardioPlanning écoute pour ouvrir la modale de signalement. */
-function SigBtn(){return <button onClick={()=>window.dispatchEvent(new Event("cp-signal"))} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button>;}
+/* v10.179 : le bouton de zoom voisin du 🐞 — cycle 100 → 110 → 120 → 130 %, mémorisé sur l'appareil.
+   Visible de l'éditeur ; de tous quand la coche « Proposer le bouton 🔍 à tout le monde » est mise. */
+function ZoomBtn(){
+  const [,tick]=useState(0);
+  if(!(ZOOM.edit||ZOOM.all))return null;
+  const suiv=ZOOM_PAS[(ZOOM_PAS.indexOf(ZOOM.z)+1)%ZOOM_PAS.length];
+  return <button onClick={()=>{zoomApply(suiv);try{localStorage.setItem("cp6_zoom",String(suiv));}catch(e){}window.dispatchEvent(new Event("resize"));tick(t=>t+1);}} title={"Zoom "+ZOOM.z+" % — cliquer pour "+suiv+" % (réglage de cet appareil)"} style={{...S.arr,fontSize:10,width:46,fontWeight:800}}>{"🔍"+ZOOM.z}</button>;
+}
+function SigBtn(){return <><ZoomBtn/><button onClick={()=>window.dispatchEvent(new Event("cp-signal"))} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button></>;}
 function Ov({children,onClose,wide=false}){return <div style={S.ov} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div style={wide?{...S.mb,width:"96vw",maxWidth:"96vw"}:S.mb}>{children}</div></div>;}   /* v10.176 : wide — la modale 🤝 restait dans les 500 px de S.mb */
 function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v} onChange={e=>c(e.target.value)} style={{...S.fi,width:"100%"}}/></div>;}
 /* ════ GRID H ════ */
@@ -1054,7 +1070,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
        sur téléphone : il est mesuré et déduit ici aussi, comme sur ordinateur. */
     let barH=0;document.querySelectorAll('[data-botbar="1"]').forEach(b=>{barH=Math.max(barH,b.offsetHeight||0);});
     const legacy="calc(100vh - "+(mh+barH)+"px)";
-    if(window.innerWidth<760){pageVerrou(false);if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
+    if(window.innerWidth/ZOOM.f<760){pageVerrou(false);if(el.style.maxHeight!==legacy)el.style.maxHeight=legacy;return;}
     /* v10.48, son retour Edge : « on perd de la place en bas ». Plus de marges
        au doigt mouillé — les bandeaux fixés en bas (hors-ligne, PIN médecin ou
        administratif) sont MESURÉS, et la boucle devient symétrique : elle
@@ -1064,7 +1080,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     pageVerrou(true);   /* v10.161 : la page ne défile plus ; retour en haut avant la mesure */
     const de=document.documentElement;
     const top=el.getBoundingClientRect().top+(window.scrollY||window.pageYOffset||0);
-    let h=window.innerHeight-top-barH-14;
+    let h=(window.innerHeight-top)/ZOOM.f-barH-14;   /* v10.179 : top est en pixels de fenêtre, la hauteur posée en pixels de page */
     const v0=Math.max(260,h)+"px";
     if(el.style.maxHeight!==v0)el.style.maxHeight=v0;
     const over=de.scrollHeight-de.clientHeight;   /* lu APRÈS la pose : la mise en page vient d'être refaite */
@@ -5321,6 +5337,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Zoom de l'application")," (v10.179) : tout l'affichage est à 110 % par défaut. Le bouton 🔍, à côté de 🐞, passe à 120, 130, puis 100 % — réglage mémorisé sur l'appareil, chacun le sien ; le zoom du navigateur (Ctrl + molette, pincement) reste possible par-dessus. L'impression reste à 100 %. Le bouton est d'abord réservé à l'éditeur ; une coche de Paramètres le propose à tous."]}),
   HP({children:[HE("b",null,"Le vrai nom du junior dans les modales")," (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."]}),
   HP({children:[HE("b",null,"Une seule barre de défilement sur ordinateur")," (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."]}),
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
@@ -8760,6 +8777,7 @@ function CardioPlanning(){
   const [isCadre,setIsCadre]=useState(false);
   /* ── v9.35 : effectifs IDE ── */
   const [ideCfg,setIdeCfg]=useState({def:{},ov:{}});
+  const [uiCfg,setUiCfg]=useState({});   /* v10.179 : réglages d'affichage partagés — zoomAll */
   const [intCfg,setIntCfg]=useState({sems:[],show:false,jaugeDef:true,sHC:2,sUS:2,sSam:1}); // v10.54 internes
   const [prefOn,setPrefOn]=useState(false);   // v10.81 : coloration des preferences — session seulement
   const [intGardeOn,setIntGardeOn]=useState(false); // v10.61 lot 3b : colonne garde int. du Planning — session seulement, cachée en nominal
@@ -8826,10 +8844,10 @@ function CardioPlanning(){
      Volontairement limité à cet onglet. */
   const [tab,setTab]=useState("planning");
   /* v10.132 : écran étroit (< 760 px, même seuil que TableScroll), plateau ⋯ et menu du filtre */
-  const [narrow,setNarrow]=useState(typeof window!=="undefined"&&window.innerWidth<760);
+  const [narrow,setNarrow]=useState(typeof window!=="undefined"&&window.innerWidth/ZOOM.f<760);
   const [moreOpen,setMoreOpen]=useState(false);
   const [filtOpen,setFiltOpen]=useState(false);
-  useEffect(()=>{const f=()=>setNarrow(window.innerWidth<760);window.addEventListener("resize",f);return ()=>window.removeEventListener("resize",f);},[]);
+  useEffect(()=>{const f=()=>setNarrow(window.innerWidth/ZOOM.f<760);window.addEventListener("resize",f);return ()=>window.removeEventListener("resize",f);},[]);
   useEffect(()=>{if(!moreOpen&&!filtOpen)return;
     const h=(e)=>{let t=e.target;while(t){if(t.getAttribute&&t.getAttribute("data-keep")==="1")return;t=t.parentNode;}setMoreOpen(false);setFiltOpen(false);};
     document.addEventListener("click",h);return ()=>document.removeEventListener("click",h);},[moreOpen,filtOpen]);
@@ -9301,6 +9319,7 @@ function CardioPlanning(){
             if(data.adminPin!==undefined)setAdminPin(data.adminPin);
           if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
+          if(data.uiCfg){try{setUiCfg(JSON.parse(data.uiCfg)||{});}catch(e){}}
           if(data.intCfg){try{setIntCfg(pv=>({...pv,...JSON.parse(data.intCfg)}));}catch(e){}}
           if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
           if(data.specColors){try{setSpecColors(JSON.parse(data.specColors)||{});}catch(e){}}
@@ -9862,6 +9881,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({intCfg:JSON.stringify(intCfg)});},[intCfg]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({uiCfg:JSON.stringify(uiCfg)});},[uiCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({specColors:JSON.stringify(specColors)});},[specColors]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({vacs:JSON.stringify(vacs),vacRule:vacRule?1:0});},[vacs,vacRule]);
@@ -9934,6 +9954,7 @@ function CardioPlanning(){
   useEffect(()=>{setNotif(null);},[tab]);
   const acteById=useCallback(id=>actes.find(a=>a.id===id),[actes]);
   const isEdit=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"&&(((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")!=="attache"))&&!netOff;  /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
+  ZOOM.edit=isEdit;ZOOM.all=(uiCfg&&uiCfg.zoomAll===true);   /* v10.179 : qui voit le bouton 🔍 */
   /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
      une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
   const verrouDeb=useMemo(()=>verrouDebut(),[PCFG.len,PCFG.startM,vacs]);
@@ -11490,7 +11511,7 @@ function CardioPlanning(){
      Garde int. reste à côté. Sur ordinateur, rien ne bouge. Les mêmes boutons servent aux deux onglets. */
   const btnPrint=<button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>;
   const btnDark=<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>;
-  const btnSig=<button onClick={()=>setModal("signal")} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button>;   /* v10.142 */
+  const btnSig=<React.Fragment><ZoomBtn/><button onClick={()=>setModal("signal")} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button></React.Fragment>;   /* v10.142 ; v10.179 : le 🔍 devant */
   const btnFull=<button onClick={()=>setShowFull(f=>!f)} title={showFull?"Depuis aujourd'hui":"Mois complet"} style={{...S.arr,fontSize:16,width:32,color:showFull?"var(--today-c)":"var(--txt2)",border:`1px solid ${showFull?"var(--today-c)":"var(--border)"}`}}>{showFull?"📅":"🗓️"}</button>;
   const btnPref=canPref?<button onClick={()=>setPrefOn(v=>!v)} title="Afficher les préférences de tour et de garde" style={{...S.arr,fontSize:14,width:30,color:prefOn?"var(--today-c)":"var(--txt2)",border:`1px solid ${prefOn?"var(--today-c)":"var(--border)"}`}}>⭐</button>:null;
   const btnMore=<button data-keep="1" onClick={()=>setMoreOpen(v=>!v)} title="Autres outils" style={{...S.arr,fontSize:15,width:30,color:moreOpen?"var(--today-c)":"var(--txt2)",border:`1px solid ${moreOpen?"var(--today-c)":"var(--border)"}`}}>⋯</button>;
@@ -11525,7 +11546,7 @@ nav::-webkit-scrollbar { display: none; }
 header::-webkit-scrollbar { display: none; }
 
 @media print {
-  html { font-size: 90% !important; overflow: visible !important; }   /* v10.161 : le verrou de page ne gêne pas l'impression */
+  html { font-size: 90% !important; overflow: visible !important; zoom: 1 !important; }   /* v10.161 : le verrou de page ne gêne pas l'impression */
 
   /* Forcer toutes les variables CSS en mode clair */
   html, :root {
@@ -12496,6 +12517,14 @@ header::-webkit-scrollbar { display: none; }
           </div>}
 
           <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]}/>
+          <div style={{...S.card,marginBottom:10}}>{/* v10.179 */}
+            <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔍 Zoom de l'application</div>
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--txt)",cursor:"pointer"}}>
+              <input type="checkbox" checked={uiCfg.zoomAll===true} onChange={e=>setUiCfg(p=>({...(p||{}),zoomAll:e.target.checked}))} style={{width:15,height:15}}/>
+              {"Proposer le bouton 🔍 à tout le monde"}
+            </label>
+            <div style={{fontSize:9,color:"var(--txt3)",marginTop:5}}>{"Le bouton 🔍, à côté de 🐞 dans chaque onglet, règle la taille de tout l'affichage (100, 110, 120 ou 130 %) sur l'appareil où l'on clique ; l'application est à 110 % par défaut. Tant que la coche n'est pas mise, l'éditeur seul le voit."}</div>
+          </div>
           <div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔔 Notifications aux secrétaires</div>
             <div>
