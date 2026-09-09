@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.193 — 09/09/2026";
+const APP_VERSION="v10.194 — 09/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -5140,8 +5140,10 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                   })}
                   <td style={{verticalAlign:"middle",whiteSpace:"nowrap",padding:"0 4px 0 8px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",fontSize:12,fontWeight:700,color:"var(--txt2)"}}>
+                      {isEdit&&<button style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",cursor:"pointer",fontWeight:800}}
+                        onClick={()=>{setSwapSrcKey(w.key);setSwapSrcMed(null);setSwapDstKey(w.key);setSwapDstMed(null);setSwapUpdPlan(true);setSwapOpen(true);}}>⇄ Échanger</button>}
                       {weekTPList(w.key).map((t3,i3)=>{
-                        /* v10.193 : puce courte « remplaçant → remplacé date », cliquable — ouvre la même modale
+                        /* v10.193 : puce courte (à droite de ⇄ Échanger depuis la v10.194, pour que le bouton ne bouge pas) « remplaçant → remplacé date », cliquable — ouvre la même modale
                            « ⇄ Échanger ce jour de tour » que la case du remplaçant dans le Planning */
                         const clic=!!(isEdit&&!lock&&onDaySwap&&t3.jr);
                         return <button key={i3} disabled={!clic} onClick={()=>{if(clic)onDaySwap(t3.jr.id,t3.y,t3.m,t3.d);}}
@@ -5150,8 +5152,6 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
                           {(t3.jr?t3.jr.init:"?")+" → "+(t3.tp?t3.tp.init:"?")+" "+t3.d+"/"+(t3.m+1)}
                         </button>;
                       })}
-                      {isEdit&&<button style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",cursor:"pointer",fontWeight:800}}
-                        onClick={()=>{setSwapSrcKey(w.key);setSwapSrcMed(null);setSwapDstKey(w.key);setSwapDstMed(null);setSwapUpdPlan(true);setSwapOpen(true);}}>⇄ Échanger</button>}
                       {horsTourSpecMeds.length>0&&<span style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
                         <span style={{fontSize:8,color:"var(--txt3)",fontWeight:600,textTransform:"uppercase"}}>Hors tour:</span>
                         {horsTourSpecMeds.map(hm=>{

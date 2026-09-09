@@ -187,7 +187,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.193 — 09/09/2026";
+var APP_VERSION = "v10.194 — 09/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -5766,14 +5766,14 @@ function TourTab(_a) {
                         }),
                         React.createElement("td", { style: { verticalAlign: "middle", whiteSpace: "nowrap", padding: "0 4px 0 8px" } },
                             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12, fontWeight: 700, color: "var(--txt2)" } },
+                                isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", cursor: "pointer", fontWeight: 800 }, onClick: function () { setSwapSrcKey(w.key); setSwapSrcMed(null); setSwapDstKey(w.key); setSwapDstMed(null); setSwapUpdPlan(true); setSwapOpen(true); } }, "\u21C4 \u00C9changer"),
                                 weekTPList(w.key).map(function (t3, i3) {
-                                    /* v10.193 : puce courte « remplaçant → remplacé date », cliquable — ouvre la même modale
+                                    /* v10.193 : puce courte (à droite de ⇄ Échanger depuis la v10.194, pour que le bouton ne bouge pas) « remplaçant → remplacé date », cliquable — ouvre la même modale
                                        « ⇄ Échanger ce jour de tour » que la case du remplaçant dans le Planning */
                                     var clic = !!(isEdit && !lock && onDaySwap && t3.jr);
                                     return React.createElement("button", { key: i3, disabled: !clic, onClick: function () { if (clic)
                                             onDaySwap(t3.jr.id, t3.y, t3.m, t3.d); }, title: t3.txt + (clic ? " — cliquer pour choisir un autre remplaçant" : ""), style: { fontSize: 10, fontWeight: 800, color: "#8b5cf6", padding: "1px 7px", borderRadius: 5, background: "rgba(139,92,246,.10)", border: "1px solid rgba(139,92,246,.35)", cursor: clic ? "pointer" : "default", fontFamily: "inherit" } }, (t3.jr ? t3.jr.init : "?") + " → " + (t3.tp ? t3.tp.init : "?") + " " + t3.d + "/" + (t3.m + 1));
                                 }),
-                                isEdit && React.createElement("button", { style: { fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1.5px solid #388bfd", background: "rgba(56,139,253,.10)", color: "#388bfd", cursor: "pointer", fontWeight: 800 }, onClick: function () { setSwapSrcKey(w.key); setSwapSrcMed(null); setSwapDstKey(w.key); setSwapDstMed(null); setSwapUpdPlan(true); setSwapOpen(true); } }, "\u21C4 \u00C9changer"),
                                 horsTourSpecMeds.length > 0 && React.createElement("span", { style: { display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" } },
                                     React.createElement("span", { style: { fontSize: 8, color: "var(--txt3)", fontWeight: 600, textTransform: "uppercase" } }, "Hors tour:"),
                                     horsTourSpecMeds.map(function (hm) {
