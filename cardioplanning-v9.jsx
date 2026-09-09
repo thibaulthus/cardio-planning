@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.201 — 09/09/2026";
+const APP_VERSION="v10.202 — 09/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1693,6 +1693,12 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
   },[gvSm,gvSy,showFull,PCFG.len]);
 
   const [gvSwapOpen,setGvSwapOpen]=React.useState(false);
+  /* v10.202 : les deux tableaux (répartition idéale, gardes posées par médecin) se replient séparément,
+     fermés par défaut — ils prennent de la place et ne servent pas à chaque fois ; bouton ↑ comme la tuile Tour. */
+  const [gRepOpen,setGRepOpen]=React.useState(false);
+  const [gPosOpen,setGPosOpen]=React.useState(false);
+  const [gHautVis,setGHautVis]=React.useState(false);
+  React.useEffect(()=>{const f=()=>setGHautVis((window.scrollY||window.pageYOffset||0)>300);window.addEventListener("scroll",f);f();return()=>window.removeEventListener("scroll",f);},[]);
   const exportGardesCSV=()=>{
     const rows=[["Date","Jour","Garde"]];
     const JX=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
@@ -2039,7 +2045,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
                 ))}
               </tbody>
             </table>
-            <div style={{fontSize:10,color:"var(--txt3)",marginBottom:12}}>Le tableau "Répartition idéale" au-dessus de la liste des gardes reste votre référence : laissez Max vide pour une répartition purement pondérée.</div>
+            <div style={{fontSize:10,color:"var(--txt3)",marginBottom:12}}>Le tableau "Répartition idéale" au-dessus de la liste des gardes (replié par défaut, cliquez son titre) reste votre référence : laissez Max vide pour une répartition purement pondérée.</div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
               <button onClick={()=>setGardeModal(false)}
                 style={{padding:"9px 16px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,fontSize:13,cursor:"pointer"}}>Annuler</button>
@@ -2077,10 +2083,10 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
         const fmt2=(n)=>{const v=n/nMeds;return v%1===0?String(v):v.toFixed(1);};
         return(
           <div style={{marginTop:14,maxWidth:560,borderRadius:8,border:"1px solid var(--border)",padding:12,background:"var(--bg2)"}}>
-            <div style={{fontSize:11,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>
-              Répartition idéale — {gMeds.length} médecin{gMeds.length>1?"s":""} de garde
+            <div onClick={()=>setGRepOpen(o=>!o)} title={gRepOpen?"Replier":"Déplier"} style={{fontSize:11,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:gRepOpen?8:0,cursor:"pointer",userSelect:"none"}}>
+              {gRepOpen?"▾ ":"▸ "}Répartition idéale — {gMeds.length} médecin{gMeds.length>1?"s":""} de garde
             </div>
-            <table style={{borderCollapse:"collapse",width:"100%"}}>
+            {gRepOpen&&<table style={{borderCollapse:"collapse",width:"100%"}}>
               <thead>
                 <tr style={{borderBottom:"2px solid var(--border)"}}>
                   <th style={{textAlign:"left",padding:"4px 8px",fontSize:10,color:"var(--txt3)",fontWeight:700}}>Type de jour</th>
@@ -2125,8 +2131,11 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
                   <td style={{textAlign:"center",padding:"5px 8px",fontSize:13,fontWeight:800,color:"#92400e"}}>{fmt2(nVen+nSam+nDim)}</td>
                 </tr>
               </tbody>
-            </table>
-            <table style={{borderCollapse:"collapse",width:"100%",marginTop:10}}>
+            </table>}
+            <div onClick={()=>setGPosOpen(o=>!o)} title={gPosOpen?"Replier":"Déplier"} style={{fontSize:11,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginTop:10,cursor:"pointer",userSelect:"none"}}>
+              {gPosOpen?"▾ ":"▸ "}Gardes posées par médecin
+            </div>
+            {gPosOpen&&<table style={{borderCollapse:"collapse",width:"100%",marginTop:6}}>
               <thead><tr>
                 <th style={{textAlign:"left",padding:"3px 8px",fontSize:10,color:"var(--txt3)"}}>Gardes posées</th>
                 <th style={{padding:"3px 6px",fontSize:10,color:"var(--txt3)"}}>Total</th>
@@ -2161,11 +2170,12 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
                   </tr>);
                 })}
               </tbody>
-            </table>
-            <div style={{fontSize:9,color:"var(--txt3)",marginTop:3}}>* Ven inclut les veilles de fériés · Dim inclut les jours fériés · période affichée</div>
+            </table>}
+            {gPosOpen&&<div style={{fontSize:9,color:"var(--txt3)",marginTop:3}}>* Ven inclut les veilles de fériés · Dim inclut les jours fériés · période affichée</div>}
           </div>
         );
       })()}
+      {gHautVis&&<button onClick={()=>window.scrollTo({top:0,behavior:"smooth"})} title="Revenir en haut de la tuile Gardes" style={{position:"fixed",right:14,bottom:48,zIndex:400,width:38,height:38,borderRadius:19,border:"1.5px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:18,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,.25)"}}>↑</button>}{/* v10.202 : même bouton ↑ que la tuile Tour */}
 
       {viewV}
 

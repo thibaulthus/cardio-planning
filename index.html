@@ -187,7 +187,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.201 — 09/09/2026";
+var APP_VERSION = "v10.202 — 09/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -1861,6 +1861,12 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
         return days;
     }, [gvSm, gvSy, showFull, PCFG.len]);
     const [gvSwapOpen, setGvSwapOpen] = React.useState(false);
+    /* v10.202 : les deux tableaux (répartition idéale, gardes posées par médecin) se replient séparément,
+       fermés par défaut — ils prennent de la place et ne servent pas à chaque fois ; bouton ↑ comme la tuile Tour. */
+    const [gRepOpen, setGRepOpen] = React.useState(false);
+    const [gPosOpen, setGPosOpen] = React.useState(false);
+    const [gHautVis, setGHautVis] = React.useState(false);
+    React.useEffect(() => { const f = () => setGHautVis((window.scrollY || window.pageYOffset || 0) > 300); window.addEventListener("scroll", f); f(); return () => window.removeEventListener("scroll", f); }, []);
     const exportGardesCSV = () => {
         const rows = [["Date", "Jour", "Garde"]];
         const JX = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
@@ -2289,7 +2295,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                         React.createElement("td", { style: { padding: "4px 6px", fontSize: 11, textAlign: "center", color: { less: "#f59e0b", normal: "var(--txt2)", more: "#16a34a" }[m.gardeFactor || "normal"] } }, { less: "Moins", normal: "Moyen", more: "Plus" }[m.gardeFactor || "normal"]),
                         React.createElement("td", { style: { padding: "4px 6px", textAlign: "center" } },
                             React.createElement("input", { type: "number", min: 0, placeholder: "\u2014", value: gMax[m.id] !== undefined ? gMax[m.id] : "", onChange: e => setGMax(p => (Object.assign(Object.assign({}, p), { [m.id]: e.target.value }))), style: { width: 52, padding: "3px 5px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, textAlign: "center" } }))))))),
-                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 12 } }, "Le tableau \"R\u00E9partition id\u00E9ale\" au-dessus de la liste des gardes reste votre r\u00E9f\u00E9rence : laissez Max vide pour une r\u00E9partition purement pond\u00E9r\u00E9e."),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 12 } }, "Le tableau \"R\u00E9partition id\u00E9ale\" au-dessus de la liste des gardes (repli\u00E9 par d\u00E9faut, cliquez son titre) reste votre r\u00E9f\u00E9rence : laissez Max vide pour une r\u00E9partition purement pond\u00E9r\u00E9e."),
                 React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } },
                     React.createElement("button", { onClick: () => setGardeModal(false), style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuler"),
                     React.createElement("button", { onClick: runGardeAuto, style: Object.assign(Object.assign({}, S.btnP), { background: "#f85149", padding: "9px 18px" }) }, "\uD83C\uDF19 Lancer la r\u00E9partition"))))),
@@ -2338,13 +2344,14 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
             });
             const fmt2 = (n) => { const v = n / nMeds; return v % 1 === 0 ? String(v) : v.toFixed(1); };
             return (React.createElement("div", { style: { marginTop: 14, maxWidth: 560, borderRadius: 8, border: "1px solid var(--border)", padding: 12, background: "var(--bg2)" } },
-                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } },
+                React.createElement("div", { onClick: () => setGRepOpen(o => !o), title: gRepOpen ? "Replier" : "D\u00E9plier", style: { fontSize: 11, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: gRepOpen ? 8 : 0, cursor: "pointer", userSelect: "none" } },
+                    gRepOpen ? "\u25BE " : "\u25B8 ",
                     "R\u00E9partition id\u00E9ale \u2014 ",
                     gMeds.length,
                     " m\u00E9decin",
                     gMeds.length > 1 ? "s" : "",
                     " de garde"),
-                React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
+                gRepOpen && React.createElement("table", { style: { borderCollapse: "collapse", width: "100%" } },
                     React.createElement("thead", null,
                         React.createElement("tr", { style: { borderBottom: "2px solid var(--border)" } },
                             React.createElement("th", { style: { textAlign: "left", padding: "4px 8px", fontSize: 10, color: "var(--txt3)", fontWeight: 700 } }, "Type de jour"),
@@ -2381,7 +2388,10 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                             React.createElement("td", { style: { padding: "5px 8px", fontSize: 12, fontWeight: 800, color: "#92400e" } }, "Week-end (ven+sam+dim)"),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 12, fontWeight: 700, color: "#92400e" } }, nVen + nSam + nDim),
                             React.createElement("td", { style: { textAlign: "center", padding: "5px 8px", fontSize: 13, fontWeight: 800, color: "#92400e" } }, fmt2(nVen + nSam + nDim))))),
-                React.createElement("table", { style: { borderCollapse: "collapse", width: "100%", marginTop: 10 } },
+                React.createElement("div", { onClick: () => setGPosOpen(o => !o), title: gPosOpen ? "Replier" : "D\u00E9plier", style: { fontSize: 11, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginTop: 10, cursor: "pointer", userSelect: "none" } },
+                    gPosOpen ? "\u25BE " : "\u25B8 ",
+                    "Gardes pos\u00E9es par m\u00E9decin"),
+                gPosOpen && React.createElement("table", { style: { borderCollapse: "collapse", width: "100%", marginTop: 6 } },
                     React.createElement("thead", null,
                         React.createElement("tr", null,
                             React.createElement("th", { style: { textAlign: "left", padding: "3px 8px", fontSize: 10, color: "var(--txt3)" } }, "Gardes pos\u00E9es"),
@@ -2412,8 +2422,9 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                             React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, cn.sam),
                             React.createElement("td", { style: { textAlign: "center", padding: "3px 6px", fontSize: 11, color: "var(--txt)" } }, cn.dim)));
                     }))),
-                React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 3 } }, "* Ven inclut les veilles de f\u00E9ri\u00E9s \u00B7 Dim inclut les jours f\u00E9ri\u00E9s \u00B7 p\u00E9riode affich\u00E9e")));
+                gPosOpen && React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 3 } }, "* Ven inclut les veilles de f\u00E9ri\u00E9s \u00B7 Dim inclut les jours f\u00E9ri\u00E9s \u00B7 p\u00E9riode affich\u00E9e")));
         })(),
+        gHautVis && React.createElement("button", { onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }), title: "Revenir en haut de la tuile Gardes", style: { position: "fixed", right: 14, bottom: 48, zIndex: 400, width: 38, height: 38, borderRadius: 19, border: "1.5px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", fontSize: 18, fontWeight: 800, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.25)" } }, "\u2191"), /* v10.202 : même bouton ↑ que la tuile Tour */
         viewV,
         pickerDay !== null && isEdit && (() => {
             const pd = pickerDay && typeof pickerDay === "object" ? pickerDay : { d: pickerDay, y: year, m: month };
