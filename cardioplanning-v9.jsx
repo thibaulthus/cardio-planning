@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.204 — 10/09/2026";
+const APP_VERSION="v10.205 — 10/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -710,7 +710,7 @@ function histProps(onCellHistory,medId,y,m,d,sl){
     onTouchEnd:()=>clearTimeout(_gvLpT),onTouchMove:()=>clearTimeout(_gvLpT)};
 }
 
-function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null,annJour=null}){
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null,annJour=null,gardeSelf=null,gardeOuvert=null}){   /* v10.205 : gardeSelf = médecin basique (ses gardes seulement), gardeOuvert(y,m,d) = gardes validées ? */
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
      disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
      partie → la case du jour est hachurée et verrouillée, et la personne
@@ -723,7 +723,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
   const pickGardeDay=pickGardeDayFull?pickGardeDayFull.d:null;
   const setPickGardeDay=(v)=>setPickGardeDayFull(v?{d:v,y:year,m:month}:null);
   const [gardeSearch,setGardeSearch]=useState("");
-  const gardePickMeds=(allMeds||meds).filter(m=>m.garde===true&&!(pickGardeDayFull&&offOn(m,pickGardeDayFull.y,pickGardeDayFull.m,pickGardeDayFull.d)));
+  const gardePickMeds=(allMeds||meds).filter(m=>m.garde===true&&!(pickGardeDayFull&&offOn(m,pickGardeDayFull.y,pickGardeDayFull.m,pickGardeDayFull.d))).filter(m=>!gardeSelf||m.id===gardeSelf);   /* v10.205 : un basique ne pose que LUI-MÊME */
   // 4-month view: flatten allDays4 by month groups
   const today2=new Date();
   const effectiveDays=useMemo(()=>{
@@ -767,6 +767,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
         {/* v9.82 : même présentation que la modale de l'onglet Gardes — échange et retrait
             visibles d'emblée, un seul clic chacun. Une seule façon de faire dans les deux écrans. */}
         <div style={{color:"var(--txt2)",fontSize:12,marginTop:-6,marginBottom:8}}>Le repos post-garde est posé automatiquement.</div>
+        {gardeSelf&&<div style={{fontSize:11,color:"#b45309",background:"rgba(245,158,11,.10)",border:"1px solid #f59e0b",borderRadius:6,padding:"5px 8px",marginBottom:8}}>Vous pouvez prendre cette garde à votre nom, ou l'échanger avec l'une des vôtres — rien d'autre.</div>}
         {(()=>{const pgf2=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};const cgm=djAff(getGardeMed2(pgf2.y,pgf2.m,pgf2.d),dKey(pgf2.y,pgf2.m,pgf2.d));return cgm?(
           <div style={{marginBottom:12,padding:"8px 10px",background:"var(--garde-bg)",borderRadius:7,border:"1px solid #86efac"}}>
             <div style={{fontSize:10,color:"#16a34a",fontWeight:700,marginBottom:5}}>✓ Garde assignée</div>
@@ -775,10 +776,10 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
               <span style={{color:"var(--txt)",fontSize:13,fontWeight:700}}>{cgm.prenom} {cgm.nom}</span>
             </div>
             <button onClick={()=>setGardeSwapOpen(v=>!v)} style={{width:"100%",padding:"6px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer",fontSize:11,marginBottom:6}}>⇄ Échanger cette garde…</button>
-            <button style={{width:"100%",padding:"6px",borderRadius:6,border:"none",background:"#fef2f2",color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:700}}
+            {!gardeSelf&&<button style={{width:"100%",padding:"6px",borderRadius:6,border:"none",background:"#fef2f2",color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:700}}
               onClick={()=>{const pgf3=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};if(onRemoveGarde)onRemoveGarde(pgf3.y,pgf3.m,pgf3.d);setPickGardeDay(null);}}>
               Retirer la garde + repos
-            </button>
+            </button>}
           </div>):null;})()}
         {gardeSwapOpen&&(()=>{
           const pgf=pickGardeDayFull||{d:pickGardeDay,y:year,m:month};
@@ -790,6 +791,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
             if(gy===pgf.y&&gm===pgf.m&&gd===pgf.d)return null;
             const mB=djAff(getGardeMed2(gy,gm,gd),dKey(gy,gm,gd));   /* v10.163 : nom du jour de CETTE garde */
             if(!mB||mB.id===medA.id)return null;
+            if(gardeSelf&&medA.id!==gardeSelf&&mB.id!==gardeSelf)return null;   /* v10.205 : un basique n'échange qu'avec l'une de SES gardes */
             const blockA=isAbsOn(medA.id,gy,gm,gd);      // A absent le jour de B
             const blockB=isAbsOn(mB.id,pgf.y,pgf.m,pgf.d); // B absent le jour de A
             const reason=blockA?(medA.init+" absent ce jour"):blockB?(mB.init+" absent le "+pgf.d):null;
@@ -878,7 +880,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   minWidth:CG,padding:"2px",verticalAlign:"middle",
                   cursor:isEdit?"pointer":"default",
                   background:we?"var(--bg-we)":gardeMed?"var(--garde-bg)":"var(--td-fix)"}}
-                  onClick={()=>{ if(!isEdit||gardeLocked)return; setGardeSearch(""); setPickGardeDayFull({d,y:ey,m:em}); }}>
+                  onClick={()=>{ if(!isEdit||gardeLocked)return; if(gardeSelf&&gardeOuvert&&!gardeOuvert(ey,em,d)){toast("Les gardes de cette période ne sont pas encore validées — les échanges s'ouvriront ensuite","warn");return;} setGardeSearch(""); setPickGardeDayFull({d,y:ey,m:em}); }}>
                   {gardeMed&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                     <div style={{width:26,height:26,borderRadius:"50%",background:gardeMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{gardeMed.init}</div>
                   </div>}
@@ -5707,7 +5709,7 @@ const HELP_SECTIONS=[
   HP({children:["Une étape mesurable se termine ",HE("b",null,"d'elle-même"),' (pastille « terminé ») ; seule l\'étape 5, planning type, se valide à la main, et l\'étape 8 se termine par le bouton 📢 Diffuser. Rien n\'est bloquant : une étape en retard n\'empêche jamais d\'avancer.']}),
   HT({children:"Les demandes à l'équipe"}),
   HP({children:["Depuis la tuile 1, trois demandes s'ouvrent séparément : ",HE("b",null,"poser ses congés"),", ",HE("b",null,"préférences de tour"),", ",HE("b",null,"préférences de gardes"),". Chaque médecin concerné voit alors un ",HE("b",null,"bandeau dans son Planning"),", quelle que soit la période affichée, avec un bouton pour aller à la bonne période et « ✓ C'est fait » qui coche sa ligne. Les préférences de tour ne partent qu'à ceux qui tournent, celles de gardes à ceux qui en prennent. Dès que l'étape 1 est terminée — tous les médecins pointés, ou validation à la main —, les demandes encore ouvertes se referment d'elles-mêmes et la période se verrouille pour toute l'équipe, éditeurs exceptés (v10.158)."]}),
-  HP({children:["Accès : éditeur et intermédiaires. Le bouton du ",HE("b",null,"Bip de Béthune")," vit dans la tuile 7 (il n'est plus dans l'onglet CHB)."]}),
+  HP({children:["Accès : éditeur et intermédiaires — mais avant la diffusion, seul l'éditeur y modifie quoi que ce soit (coches de congés et d'absences, listes de personnes, boutons, validation des étapes) ; une fois la période diffusée, les intermédiaires retrouvent les tuiles Tour et Gardes, et rien d'autre (v10.205). Le bouton du ",HE("b",null,"Bip de Béthune")," vit dans la tuile 7 (il n'est plus dans l'onglet CHB)."]}),
   HT({children:"Le détail, étape par étape"}),
   HP({children:["L'ordre compte : chaque étape s'appuie sur la précédente. Tout se fait sur la ",HE("b",null,"période affichée")," (généralement 4 mois). La période s'étend jusqu'au ",HE("b",null,"dimanche qui clôt la dernière semaine"),", et rattache le lundi suivant s'il est férié (ex. 1er novembre) : la répartition se fait en semaines complètes, et la période suivante démarre le lendemain."]}),
   HT({children:"🏖 Les vacances scolaires"}),
@@ -5715,7 +5717,7 @@ const HELP_SECTIONS=[
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
   HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport. Depuis la v10.165 elle veille en plus à l'ÉQUITÉ DES BINÔMES : un binôme, ce sont les 2 médecins d'une même unité sur une même semaine, HC et USIC confondus — le décompte est commun. À égalité de charge, l'algorithme sert celui qui a le moins tourné avec le médecin déjà posé dans l'unité, et les 60 essais retiennent la répartition la mieux ventilée. Le bouton 🤝 Binômes, ouvert à tout le monde en lecture, montre le tableau croisé des semaines passées ensemble : un 0 en ambre est un couple jamais formé. Les SEMAINES DE BASCULE D'INTERNE — celles dont le lundi ouvre un semestre, dates prises dans l'onglet Équipe et jamais écrites en dur — sont réparties entre ceux qui en ont fait le moins, et confiées à un junior seulement en dernier recours, avec un ⚠ au rapport : le junior arrive précisément ce lundi-là. Le décompte porte sur une fenêtre glissante de deux ans, à partir de la date réglée dans Paramètres (par défaut le 02/11/2026), et ne décide jamais du NOMBRE de semaines dû à chacun. Depuis la v10.166, le remplaçant junior d'un temps partiel en USIC est choisi sur le tour et le planning tels qu'ils sont à cet instant — jamais un junior déjà de tour cette semaine-là — et les journées de remplacement sont réparties entre les juniors, une journée comptant pour une : trois semaines, trois juniors, un jour chacun. Enfin, pendant les vacances scolaires (saisies dans Paramètres), un temps partiel posé en USIC est permuté avec un médecin HC de la même semaine quand c'est possible — jamais au prix d'une règle : si rien ne convient, il reste en USIC et le rapport le dit. Depuis la v10.167, un médecin peut ÉVITER UNE UNITÉ CERTAINES SEMAINES (garde alternée) : colonne « Éviter » de la modale ⚙️ — choisir USIC ou HC ouvre sa ligne, pré-remplie une semaine sur deux dès le premier lundi de la période ; le second bouton change de pied, et un clic sur une pastille inverse le rythme d'ici la fin de la période. Réglage propre à chaque période : une nouvelle période part vide. Sur une semaine évitée, le médecin passe en dernier dans le tri de l'unité évitée — jamais interdit, jamais de semaine incomplète — et la passe de permutation HC↔USIC le rattrape s'il y a atterri quand même ; sinon le rapport le nomme 🔁. Se cumule avec le 🚫 « pas de tour ». Dans le tableau du tour et la modale d'échange ⇄, le 🔁 et un avertissement signalent la pose dans l'unité évitée, sans l'empêcher. Depuis la v10.168 la répartition veille à l'ÉQUILIBRE HC / USIC de chacun : à une semaine près — 2 et 2 pour 4 semaines, 3 et 2 dans un sens ou l'autre pour 5. Le critère pèse dès le tirage, puis une dernière passe ⚖ permute HC↔USIC au sein d'une même semaine pour qui garde 2 semaines d'écart ou plus — le partenaire n'est jamais déséquilibré à son tour, et la passe respecte les vacances scolaires 🏖 des temps partiels et les unités évitées 🔁. Ce qui reste hors ±1 est nommé au rapport. Depuis la v10.187, le bouton 🔎 Vérifier (éditeur) relit la répartition TELLE QU'AFFICHÉE — retouches à la main comprises — et lui passe les mêmes contrôles, sans rien déplacer : semaines complètes, surspécialités, 🚫, enchaînement (3 semaines avant ET après la période comprises), semaines doublées, bascules d'interne, 🏖, 🔁, ⚖, quotas, binômes — plus trois contrôles propres aux retouches : un absent posé de tour, un médecin présent deux fois la même semaine, un exclu ou non-tourneur affecté. Il compte aussi les semaines de bascule d'interne sur la fenêtre 🤝 et nomme quiconque en a une entière de plus que la moyenne. Les réglages relus sont ceux de la dernière modale ⚙️ de la période. Le rapport, daté, remplace celui de la répartition automatique et reste affiché jusqu'au suivant. Depuis la v10.188, le rapport se lit en couleurs — ✓ en vert, ⚠ en rouge — et un rôle de Dr Junior est compté par titulaire pour l'enchaînement : la semaine du lundi de bascule et les suivantes vont au nouveau junior, les précédentes à l'ancien, et une semaine de l'un ne s'enchaîne jamais avec une semaine de l'autre. Un bouton ↑ flottant, en bas à droite, ramène en haut de la tuile dès qu'on a défilé. Depuis la v10.189, sous chaque constat ⚠ qui vise un médecin ou une semaine, le rapport propose jusqu'à trois ÉCHANGES À DEUX (lignes ↳) : X cède sa semaine à Y et prend la sienne — autre semaine, ou même semaine dans l'autre unité —, ce qui conserve les quotas. Un échange n'est proposé que s'il fait disparaître le constat sans en créer aucun autre : disponibilité, surspécialités, 🚫, enchaînement, 🔁, 🏖, équilibre HC/USIC, tout est rejugé. Les semaines passées et verrouillées ne sont jamais proposées. Depuis la v10.192, les semaines s'affichent en GRILLE : une colonne par médecin (sa tuile de décompte reste collée en haut au défilement), une ligne par semaine, et chaque médecin n'apparaît qu'une fois par semaine. Une case colorée porte l'unité (HC ou USIC, aux couleurs des activités « Tour médical HC / USIC » de l'onglet Activités) ; hachurée, le médecin est indisponible ou occupé (le détail au survol) ; 🚫 ⭐ 🔁 rappellent ses préférences, texte au survol. Un clic sur une case ouvre un petit menu HC / USIC / Retirer — changer d'unité se fait en un geste, sans passer par l'autre. À gauche de la ligne, le compte HC et USIC de la semaine et, depuis la v10.193, les surspécialités encore disponibles — un chiffre sous le minimum réglé passe en rouge ⚠ ; à droite, ⇄ Échanger et le remplacement TP. Depuis la v10.196, les médecins hors tour qui ont une surspécialité ont eux aussi leur colonne, dans l'ordre de l'onglet Équipe : une tuile d'initiales sans décompte, et par semaine une case jamais cliquable, portant en petit « présent hors tour » quand ils sont là, hachurée s'ils sont absents la majorité de la semaine — comme une case de tourneur indisponible. Depuis la v10.198, chaque colonne repose sur une bande de couleur continue, de la tuile au bas de la grille : la couleur de la surspécialité du médecin (réglable dans Paramètres), la même pour un hors tour, et la couleur de la personne quand sa colonne est suivie — les cases, un peu plus étroites que la bande, laissent la couleur visible de chaque côté. Sur téléphone (v10.200, v10.201), la grille défile dans son propre cadre, en hauteur comme en largeur, et non avec la page ; la colonne des semaines reste figée à gauche et l'en-tête en haut pendant le défilement, avec le bouton ⇄ et les remplacements TP sous chaque semaine ; les cases et les tuiles sont réduites, et la mention « présent hors tour » disparaît — la case blanche sur sa bande suffit. Depuis la v10.193, un clic sur une tuile d'initiales de l'en-tête suit sa colonne (bande teintée, cadre à la couleur du médecin), plusieurs à la fois pour comparer deux ou trois personnes avant un échange — un second clic la relâche. La puce d'un remplacement de temps partiel se lit « remplaçant → remplacé jour/mois » ; un clic dessus ouvre la même modale « ⇄ Échanger ce jour de tour » que la case du remplaçant dans le Planning, avec tous les médecins libres ce jour-là. Enfin, quand l'équipe grandit, les tuiles se resserrent d'elles-mêmes pour que la grille tienne dans la largeur de l'écran, jusqu'à un plancher en dessous duquel on défile. Depuis la v10.191, chaque ligne ↳ porte un bouton ⇄ Appliquer : l'échange se fait d'un clic, exactement comme par la modale ⇄ du tableau (planning type des deux médecins, temps partiels et remplaçants suivis, un seul cran ↶), et la vérification se relance toute seule. Si la répartition a changé depuis la vérification, le bouton refuse et demande de relancer 🔎. Quand un échange retire à quelqu'un les 2 semaines d'affilée qu'il a DEMANDÉES, il reste proposé mais la ligne le dit (⚠ … perd ses 2 semaines d'affilée demandées) et passe après les autres. Depuis la v10.190, un geste du tour — répartition automatique, 🗑 Retirer, échange ⇄, clic dans le tableau — ne fait qu'UN cran d'historique, même s'il écrit en plusieurs temps (tour, purge, activités, temps partiels et remplaçants) : un seul ↶ le défait, avec une seule confirmation qui annonce le vrai nombre de cases touchées."]}),
-  HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain."]}),
+  HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain. Depuis la v10.205, un bandeau en tête de la tuile 3 permet de « ✓ Valider les gardes » d'une période à venir (comme le tour) : tant qu'elles ne le sont pas, les médecins basiques ne peuvent ni prendre ni échanger une garde ; une fois validées, un médecin basique peut, depuis la colonne Garde du Planning, se mettre de garde à la place de quelqu'un ou échanger l'une de SES gardes avec une autre — jamais retirer une garde, jamais poser quelqu'un d'autre. Éditeur et intermédiaires gardent la main entière."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
   HStep({n:"6",children:[HE("b",null,"Ajuster")," — cases individuelles, échanges de gardes ⇄, dérogations de tour, notes 📝."]}),
@@ -7009,6 +7011,13 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
   const bPid=perIdOf(bPer.sy,bPer.sm);   /* v10.115 : identifiant de période des notifications */
   /* v10.158 : la période de Construire est-elle À VENIR ? (le masque du tour ne joue que là) */
   const bFut=(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return bPer.sy*12+bPer.sm>p0.sy*12+p0.sm;})();
+  /* v10.205 : DROITS DE CONSTRUIRE (sa règle du 10/09/2026). Avant la diffusion, seul l'ÉDITEUR
+     modifie quoi que ce soit ici — coches de congés et d'absences, listes de personnes, boutons,
+     validation des étapes ; les intermédiaires lisent. Une fois la période DIFFUSÉE, ils
+     retrouvent les tuiles Tour et Gardes, et rien d'autre. isEdit (prop) = éditeur ou intermédiaire. */
+  const bDif=!!(secrDif||{})[bPid];
+  const peutTout=edReel;
+  const peutTG=edReel||(isEdit&&bDif);
   const B=(build||{})[pKey]||{};
   const patchB=(patch)=>setBuild(p=>{const cur=(p||{})[pKey]||{};return {...(p||{}),[pKey]:{...cur,...patch}};});
   const sign=()=>({by:author||"?",at:new Date().toLocaleDateString("fr-FR")});
@@ -7081,7 +7090,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
      donc son bouton de validation a la main. */
   const autoOk={1:meds.length>0&&nMeds===meds.length,
     2:tour.tot>0&&tour.ok===tour.tot&&(!bFut||!!B.tourOk),   /* v10.159 : à venir = validation requise */
-    3:gardes.tot>0&&gardes.ok===gardes.tot,
+    3:gardes.tot>0&&gardes.ok===gardes.tot&&(!bFut||!!B.gardeOk),   /* v10.205 : à venir = validation requise, comme le tour */
     4:autres.length>0&&nAutres===autres.length,
     5:false,
     6:nSpec===BUILD_SPECS.length,
@@ -7094,12 +7103,12 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
      construction et se verrouille pour les non-éditeurs (verrou de l'avenir). */
   const fait1=estFait(1);
   React.useEffect(()=>{
-    if(!isEdit||!fait1)return;
+    if(!peutTout||!fait1)return;
     const d=B.dem||{};
     if(!Object.keys(d).length)return;
     patchB({dem:{}});
     tourProps.toast&&tourProps.toast("Étape 1 terminée — demandes refermées : la période est verrouillée pour l'équipe jusqu'à la diffusion","info");
-  },[fait1,B.dem,isEdit]);
+  },[fait1,B.dem,peutTout]);
 
   /* la premiere etape non terminee est ouverte au premier affichage ; une etape
      validee se REFERME (sa demande) et ne se rouvre jamais toute seule */
@@ -7151,16 +7160,16 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
              <div key={id} style={{border:"1px solid "+(ouverte?"#8b5cf6":"var(--border)"),borderRadius:8,padding:"7px 9px",background:"var(--bg3)"}}>
                <div style={{fontSize:12,fontWeight:800,color:"var(--txt)"}}>{ic+" "+titre}</div>
                <div style={{fontSize:11,color:"var(--txt3)",margin:"2px 0 6px"}}>{n+" réponse"+(n>1?"s":"")+" sur "+pop.length+(id==="tour"?" qui tournent":id==="garde"?" de garde":"")}</div>
-               {isEdit&&<button onClick={()=>setDem(id)} style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",
+               {peutTout&&<button onClick={()=>setDem(id)} style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",
                  border:"1.5px solid #8b5cf6",background:ouverte?"#8b5cf6":"rgba(139,92,246,.10)",color:ouverte?"#fff":"#8b5cf6"}}>{ouverte?"✓ Demande ouverte":"Ouvrir la demande"}</button>}
                {ouverte&&ouverte.at&&<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"ouverte le "+ouverte.at}</div>}
-               {id==="conges"&&ouverte&&(isEdit?<label style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"var(--txt3)",marginTop:4}}>{"jusqu'au"}<input type="date" value={B.demFin||""} onChange={e=>patchB({demFin:e.target.value||null})} title="Date de fin indicative, affichée dans le rappel de chacun — la fin réelle, c'est vous qui la décidez en refermant la demande" style={{fontSize:10,padding:"1px 4px",borderRadius:5,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)"}}/></label>
+               {id==="conges"&&ouverte&&(peutTout?<label style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"var(--txt3)",marginTop:4}}>{"jusqu'au"}<input type="date" value={B.demFin||""} onChange={e=>patchB({demFin:e.target.value||null})} title="Date de fin indicative, affichée dans le rappel de chacun — la fin réelle, c'est vous qui la décidez en refermant la demande" style={{fontSize:10,padding:"1px 4px",borderRadius:5,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)"}}/></label>
                  :(B.demFin?<div style={{fontSize:10,color:"var(--txt3)",marginTop:4}}>{"jusqu'au "+finLib(B.demFin)+" (indicatif)"}</div>:null))}{/* v10.146 */}
              </div>);
          })}
        </div>
        <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Une coche par personne dès qu'elle a posé ses vacances — elle se coche aussi toute seule quand le médecin répond au rappel affiché dans son Planning. Les attachés et les IDE sont rappelés à l'étape 4.</div>
-       <BuildPersonList gens={meds.map(m=>{const l=djNomsPeriode(m,bJours);const n=djActuelCouvre(m,bJours)?null:"junior suivant — congés saisis par l'éditeur";return (l||n)?{...m,_lib:l||undefined,_note:n}:m;})} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun médecin dans l'équipe."/>
+       <BuildPersonList gens={meds.map(m=>{const l=djNomsPeriode(m,bJours);const n=djActuelCouvre(m,bJours)?null:"junior suivant — congés saisis par l'éditeur";return (l||n)?{...m,_lib:l||undefined,_note:n}:m;})} etat={B.pers} onSet={setPers} peut={peutTout} vide="Aucun médecin dans l'équipe."/>
      </div>},
     {n:2,icon:"🔄",titre:"Distribution du tour",
      sous:tour.ok+" semaine"+(tour.ok>1?"s":"")+" sur "+tour.tot+" ont un tourneur",
@@ -7170,18 +7179,24 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
          <span style={{fontSize:11,fontWeight:700,color:B.tourOk?"#3fb950":"#8b5cf6"}}>{B.tourOk?("✓ Tour validé — visible de toute l'équipe"+(B.tourOk.by?" (par "+B.tourOk.by+" le "+B.tourOk.at+")":"")):"👁 Tour visible des seuls éditeurs — pas encore validé"}</span>
          <button onClick={()=>{if(B.tourOk){if(!window.confirm("Masquer à nouveau les semaines de tour de cette période à l'équipe (éditeurs exceptés) ?"))return;patchB({tourOk:null});}else{if(!window.confirm("Rendre les semaines de tour de cette période visibles de toute l'équipe dans le Planning ?"))return;patchB({tourOk:sign()});}}} style={{marginLeft:"auto",fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",border:"1.5px solid "+(B.tourOk?"var(--border)":"#8b5cf6"),background:B.tourOk?"var(--bg3)":"#8b5cf6",color:B.tourOk?"var(--txt2)":"#fff"}}>{B.tourOk?"Masquer à nouveau":"✓ Valider le tour"}</button>
        </div>}
-       <BuildEmbed><TourTab key={pKey} {...tourProps} medecins={medsB} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>
+       <BuildEmbed><TourTab key={pKey} {...tourProps} isEdit={peutTG} medecins={medsB} noNav={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>
      </div>},
     {n:3,icon:"🌙",titre:"Gardes",
      sous:gardes.ok+" jour"+(gardes.ok>1?"s":"")+" sur "+gardes.tot+" ont une garde",
-     alerte:mGar?(mGar+" jour"+(mGar>1?"s":"")+" sans garde sur la période"):null,
-     body:<BuildEmbed><GardeView key={pKey} {...gardeProps} medecins={medsB} noNav={true} showFull={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>},
+     alerte:mGar?(mGar+" jour"+(mGar>1?"s":"")+" sans garde sur la période"):(bFut&&gardes.tot>0&&gardes.ok===gardes.tot&&!B.gardeOk?"Gardes posées mais non validées — les médecins ne peuvent pas encore les échanger (bandeau ci-dessous)":null),   /* v10.205 */
+     body:<div>
+       {bFut&&edReel&&<div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",margin:"2px 0 8px",padding:"6px 9px",borderRadius:8,border:"1px solid "+(B.gardeOk?"#3fb950":"#8b5cf6"),background:B.gardeOk?"rgba(63,185,80,.10)":"rgba(139,92,246,.08)"}}>
+         <span style={{fontSize:11,fontWeight:700,color:B.gardeOk?"#3fb950":"#8b5cf6"}}>{B.gardeOk?("✓ Gardes validées — les médecins peuvent prendre ou échanger leurs gardes"+(B.gardeOk.by?" (par "+B.gardeOk.by+" le "+B.gardeOk.at+")":"")):"🔒 Gardes non validées — les médecins basiques ne peuvent pas encore les prendre ni les échanger"}</span>
+         <button onClick={()=>{if(B.gardeOk){if(!window.confirm("Refermer les échanges de gardes de cette période aux médecins basiques ?"))return;patchB({gardeOk:null});}else{if(!window.confirm("Valider les gardes de cette période : les médecins basiques pourront prendre une garde à leur nom ou échanger l'une des leurs. Continuer ?"))return;patchB({gardeOk:sign()});}}} style={{marginLeft:"auto",fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",border:"1.5px solid "+(B.gardeOk?"var(--border)":"#8b5cf6"),background:B.gardeOk?"var(--bg2)":"#8b5cf6",color:B.gardeOk?"var(--txt2)":"#fff"}}>{B.gardeOk?"Dévalider":"✓ Valider les gardes"}</button>
+       </div>}
+       <BuildEmbed><GardeView key={pKey} {...gardeProps} isEdit={peutTG} medecins={medsB} noNav={true} showFull={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>
+     </div>},
     {n:4,icon:"🚫",titre:"Absences de tout le monde",
      sous:nAutres+" sur "+autres.length+" renseigné"+(nAutres>1?"s":""),
      alerte:mAut?(mAut+" personne"+(mAut>1?"s":"")+" hors médecins sans réponse"):null,
      body:<div>
        <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Attachés et IDE. Rappel : pour certains on recueille les ABSENCES, pour d'autres les PRÉSENCES. Seuls ceux dont la fiche Équipe porte « absences à recueillir » figurent ici.</div>
-       <BuildPersonList gens={autres} etat={B.pers} onSet={setPers} peut={isEdit} vide="Aucun attaché ni IDE dans l'équipe."/>
+       <BuildPersonList gens={autres} etat={B.pers} onSet={setPers} peut={peutTout} vide="Aucun attaché ni IDE dans l'équipe."/>
        <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
          <BuildLien txt="→ Onglet Attachés" onClick={()=>goTab("attache")}/>
        </div></div>},
@@ -7190,8 +7205,8 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
      alerte:null,
      body:<div>
        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-         {isEdit&&<button onClick={()=>onApplyPT(bPer)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}}>📋 Appliquer le planning type</button>}
-         {isEdit&&<button onClick={()=>onRemovePT(bPer)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}}>🗑 Retirer</button>}
+         {peutTout&&<button onClick={()=>onApplyPT(bPer)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #388bfd",background:"rgba(56,139,253,.10)",color:"#388bfd",fontWeight:800,cursor:"pointer"}}>📋 Appliquer le planning type</button>}
+         {peutTout&&<button onClick={()=>onRemovePT(bPer)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontWeight:700,cursor:"pointer"}}>🗑 Retirer</button>}
          <BuildLien txt="→ Modifier le planning type" onClick={()=>goTab("plantype")}/>
        </div></div>},
     {n:6,icon:"🔬",titre:"Plannings par surspécialité",
@@ -7200,7 +7215,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
      body:<div>
        <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
          {BUILD_SPECS.map(s=>{const f=(B.specs||{})[s];return(
-           <button key={s} disabled={!isEdit} onClick={()=>setSpec(s)} style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:isEdit?"pointer":"default",border:"1px solid "+(f?"#3fb950":"var(--border)"),background:f?"rgba(63,185,80,.13)":"var(--bg3)",color:f?"#3fb950":"var(--txt2)"}}>{(f?"✓ ":"")+s}</button>);})}
+           <button key={s} disabled={!peutTout} onClick={()=>setSpec(s)} style={{fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:700,cursor:peutTout?"pointer":"default",border:"1px solid "+(f?"#3fb950":"var(--border)"),background:f?"rgba(63,185,80,.13)":"var(--bg3)",color:f?"#3fb950":"var(--txt2)"}}>{(f?"✓ ":"")+s}</button>);})}
        </div>
        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
          <BuildLien txt="→ PT Cardio" onClick={()=>goTab("plateau")}/>
@@ -7212,7 +7227,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
      body:<div>
        <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un jour sans bip est normal ; l'alerte se déclenche sous {BIP_MIN_SEM} bips dans une semaine.</div>
        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-         {isEdit&&<button onClick={onOpenBip} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}}>📟 Répartition du Bip</button>}
+         {peutTout&&<button onClick={onOpenBip} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #46bdc6",background:"rgba(70,189,198,.10)",color:"#46bdc6",fontWeight:800,cursor:"pointer"}}>📟 Répartition du Bip</button>}
          <BuildLien txt="→ Onglet CHB" onClick={()=>goTab("chb")}/>
        </div></div>},
     {n:8,icon:"📢",titre:"Diffuser le planning",sansPointage:true,
@@ -7220,10 +7235,10 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
      alerte:null,
      body:<div>
        <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>La diffusion marque le planning de la période comme communiqué à l'équipe : à partir de là, chaque modification d'une activité suivie alimente l'onglet 🔔 Notifications pour les secrétaires. Avant la diffusion, on construit librement — rien n'est émis. Les activités suivies se cochent dans Paramètres, encart 🔔.</div>
-       {isEdit&&!(secrDif||{})[bPid]&&<button onClick={()=>onDiffuser(bPid)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #f59e0b",background:"rgba(245,158,11,.10)",color:"#b45309",fontWeight:800,cursor:"pointer"}}>📢 Diffuser la période</button>}
+       {peutTout&&!(secrDif||{})[bPid]&&<button onClick={()=>onDiffuser(bPid)} style={{fontSize:11,padding:"4px 13px",borderRadius:6,border:"1.5px solid #f59e0b",background:"rgba(245,158,11,.10)",color:"#b45309",fontWeight:800,cursor:"pointer"}}>📢 Diffuser la période</button>}
        {(secrDif||{})[bPid]&&<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
          <span style={{fontSize:11,fontWeight:800,color:"#3fb950"}}>{"✓ Période diffusée le "+(secrDif||{})[bPid]}</span>
-         {isEdit&&<button onClick={()=>onAnnulerDif(bPid)} title="Annuler la diffusion : les notifications cessent pour cette période (celles déjà émises restent)" style={{fontSize:10,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt3)",borderRadius:6,cursor:"pointer",padding:"2px 8px"}}>annuler</button>}
+         {peutTout&&<button onClick={()=>onAnnulerDif(bPid)} title="Annuler la diffusion : les notifications cessent pour cette période (celles déjà émises restent)" style={{fontSize:10,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt3)",borderRadius:6,cursor:"pointer",padding:"2px 8px"}}>annuler</button>}
        </div>}
      </div>}
   ];
@@ -7248,10 +7263,10 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
         </div>
         <div style={{fontSize:11,color:"var(--txt2)",fontWeight:700,whiteSpace:"nowrap"}}>{nFaits+" étape"+(nFaits>1?"s":"")+" sur 8"}</div>
       </div>
-      {!isEdit&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Lecture seule : le pointage est réservé aux personnes qui peuvent modifier le planning.</div>}
+      {!peutTout&&<div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>{isEdit&&bDif?"Lecture seule, sauf les tuiles Tour et Gardes : la période est diffusée, les intermédiaires peuvent y retoucher le tour et les gardes.":isEdit?"Lecture seule jusqu'à la diffusion de la période : seul l'éditeur construit.":"Lecture seule : le pointage est réservé aux personnes qui peuvent modifier le planning."}</div>}
       {tuiles.map(t=>(
         <BuildTile key={t.n} n={t.n} icon={t.icon} titre={t.titre} sous={t.sous} ouvert={!!ouv[t.n]} onToggle={()=>toggle(t.n)}
-          alerte={t.alerte} fait={valide(t.n)} auto={autoOk[t.n]} onFait={()=>setEtape(t.n)} peutFaire={isEdit&&!autoOk[t.n]&&!t.sansPointage}>
+          alerte={t.alerte} fait={valide(t.n)} auto={autoOk[t.n]} onFait={()=>setEtape(t.n)} peutFaire={peutTout&&!autoOk[t.n]&&!t.sansPointage}>
           {t.body}
         </BuildTile>
       ))}
@@ -10867,6 +10882,13 @@ function CardioPlanning(){
     ?((isMedEdit&&editMedId===medId)||(isInterEdit&&attPeutMod(medId)))
     :(isEdit||isInterEdit||(isMedEdit&&editMedId===medId)||isAdminEdit);
   const isAnyEdit=isEdit||isMedEdit||isAdminEdit;
+  /* v10.205 : GARDES DES BASIQUES — un médecin basique ne touche aux gardes que pour lui-même
+     (se mettre de garde à la place de quelqu'un, ou échanger l'une des siennes), et seulement quand
+     les gardes de la période sont VALIDÉES (bandeau de la tuile 3 de Construire) — une période
+     déjà en cours ou passée est toujours ouverte. Les intermédiaires ne sont pas concernés. */
+  const gardeSelfId=(isMedEdit&&medLvl==="basic"&&!isAttEdit)?editMedId:null;
+  const gardeOuvert=(y2,m2,d2)=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());const p=perOfDay(y2,m2,d2);if(p.sy*12+p.sm<=p0.sy*12+p0.sm)return true;return !!(((build||{})[p.sy+"_"+p.sm]||{}).gardeOk);};
+  vRef.current.gardeSelf=gardeSelfId;vRef.current.gardeOuvert=gardeOuvert;   /* lus par applyGarde (useCallback sans dépendances) */
   /* v10.81 : voir les preferences de tour et de garde dans le Planning.
      Editeur et intermediaire voient tout le monde ; un medecin basique ne voit que
      sa ligne. Ni l'administratif ni l'interne ni l'attache n'y ont acces. */
@@ -11247,6 +11269,7 @@ function CardioPlanning(){
           RE2("button",{onClick:bipClear,style:{fontSize:12,padding:"6px 13px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #dc2626",background:"rgba(220,38,38,.10)",color:"#dc2626"}},"🗑 Effacer les bips de la période"))));
   };
   const removeGardeDay=(y3,m3,d3)=>{
+    if(gardeSelfId)return;   /* v10.205 : un basique ne retire jamais une garde */
     if(vBloque(vRef,y3,m3,d3)){vToast(false);return;}   /* v10.126 */
     setPlan(p=>{
       let next={...p};const gIds=[];
@@ -11267,6 +11290,7 @@ function CardioPlanning(){
   const applyGarde=useCallback((medId,y2,m2,d2)=>{
     if(accessMode==="adminEdit")return;
     if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.126 : le verrou couvre les gardes */
+    if(vRef.current.gardeSelf&&!vRef.current.gardeOuvert(y2,m2,d2)){toast("Les gardes de cette période ne sont pas encore validées","warn");return;}   /* v10.205 */
     logCell("add",medId,y2,m2,d2,"N","GARDE");
     /* v9.65 : la garde la veille d'une absence ou d'une FMC reste PERMISE (décision
        utilisateur), mais elle est signalée — le repos ne sera pas posé, la v9.64
@@ -12413,7 +12437,7 @@ header::-webkit-scrollbar { display: none; }
               {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             </div>}
           </div>
-          {<GridV annJour={annJourDe("planning")} onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {<GridV annJour={annJourDe("planning")} onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} gardeSelf={gardeSelfId} gardeOuvert={gardeOuvert} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -12495,7 +12519,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}</React.Fragment>)}</div>
           </div>
           {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}</React.Fragment>)}
-          {<GridV annJour={annJourDe("attache")} onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={astSelf} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {<GridV annJour={annJourDe("attache")} onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} gardeSelf={gardeSelfId} gardeOuvert={gardeOuvert} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={astSelf} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
