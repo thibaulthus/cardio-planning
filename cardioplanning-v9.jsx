@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.202 — 09/09/2026";
+const APP_VERSION="v10.203 — 10/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -710,7 +710,7 @@ function histProps(onCellHistory,medId,y,m,d,sl){
     onTouchEnd:()=>clearTimeout(_gvLpT),onTouchMove:()=>clearTimeout(_gvLpT)};
 }
 
-function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null}){
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null,annJour=null}){
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
      disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
      partie → la case du jour est hachurée et verrouillée, et la personne
@@ -865,7 +865,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
             const slots=we?["JOUR"]:["M","AM"];
             const isMonGV=!we&&dow(ey,em,d)===1;
             const gardeMed=getGardeMed2(ey,em,d);
-            return slots.map((sl,si)=>(
+            return annEvtRows(annJour?annJour(ey,em,d):null,slots.map((sl,si)=>(
               <tr key={ey+"-"+em+"-"+d+sl} data-day={ey+"-"+em+"-"+d} style={{height:28,borderBottom:si===slots.length-1?"1px solid var(--border)":"1px solid var(--border2)",...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{}),...(si===0&&isMonGV?{boxShadow:"0 -2px 0 0 var(--border)"}:{})}}>
                 {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:C0,background:isVac&&isVac(ey,em,d)?"var(--vac-bg)":"var(--td-fix)"}} rowSpan={slots.length}>
                   <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700,fontFamily:"sans-serif",lineHeight:1.2}}>{MOIS[em]}</div>}</div>
@@ -930,7 +930,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   </td>;
                 })}
               </tr>
-            ))
+            )))
           })}
         </tbody>
       </table>
@@ -5728,6 +5728,14 @@ const HELP_SECTIONS=[
   HP({children:["Une absence ou une FMC qui recouvre une activité suivie la signale « retirée », avec sa cause. Un déplacement donne deux lignes : « retirée » à l'ancienne date, « ajoutée » à la nouvelle. Une modification aussitôt annulée s'efface d'elle-même. Le tour, les gardes et l'application du planning type n'émettent rien en tant que tels."]}),
   HP({children:["Une notification ne vaut que ",HE("b",null,"tant que sa date est à venir")," : passée, plus personne ne peut rien en faire, elle ",HE("b",null,"s'efface d'elle-même"),", traitée ou non. Le jour même reste affiché ; c'est le lendemain qu'elle disparaît."]}),
   HP({last:true,children:["Les notifications suivent l'archivage : archiver une période retire aussi les siennes. Les attachés peuvent être suivis : cochez-les un par un dans les réglages des notifications (Paramètres) — aucun ne l'est par défaut."]}))},
+ {id:"messages",icon:"📣",title:"Messages — annonces et événements",body:()=>HE("div",null,
+  HP({children:["L'éditeur écrit ses messages depuis la section ",HE("b",null,"📣 Messages"),", en tête de l'onglet 🔔 Notifications. Un message a deux usages, cochables séparément."]}),
+  HT({children:"La bannière"}),
+  HP({children:["Une ",HE("b",null,"annonce en bannière"),", sous la barre d'onglets, visible sur tous les onglets entre deux dates (raccourcis 1 semaine, 2 semaines, 1 mois). L'éditeur choisit qui la voit : médecins, attachés, secrétaires, cadres, internes — les quatre premiers cochés d'office."]}),
+  HP({children:["Chacun peut la ",HE("b",null,"masquer"),' (elle revient à la prochaine ouverture) ou choisir « ',HE("b",null,"ne plus afficher"),' » : le message est alors écarté définitivement, sur cet appareil seulement. Si l\'éditeur modifie le texte, le message réapparaît. La bannière ne s\'imprime pas.']}),
+  HT({children:"La ligne dans la grille"}),
+  HP({children:["Un ",HE("b",null,"événement dans la grille"),' (répartition de garde, réunion de service…) : une ligne colorée pleine largeur, insérée avant le matin ou avant l\'après-midi du jour choisi, dans les onglets cochés — Planning en nominal, Internes et Attachés au choix. Elle s\'imprime avec la grille et ne touche aucune case.']}),
+  HP({last:true,children:["Les messages dont toutes les dates sont passées restent listés « terminé » pendant 90 jours, puis disparaissent au prochain enregistrement."]}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
   HP({children:["Pour chaque consultation perdue (absence, semaine de tour), l'application propose la ",HE("b",null,"semaine blanche libre la plus proche"),", jamais à plus d'",HE("b",null,"un mois"),", en avant comme en arrière, dans la période affichée. Une semaine sans solution se traite à la main : « ⇄ Chercher une autre semaine blanche » ouvre le choix complet, sans plafond. La ligne d'une blanche qui reçoit dit « peut accueillir le report de … » et se met à jour toute seule si vous décidez autrement."]}),
@@ -7271,6 +7279,139 @@ function secrPurgePasse(o){const t=secrToday();let ch=false;const n={};
   Object.keys(o||{}).forEach(k=>{const p=String(k).split("|");
     if(p.length>=3&&p[2]<t){ch=true;return;}n[k]=o[k];});
   return ch?n:null;}
+/* v10.203 : MESSAGES de l'éditeur. Un message a deux usages, cochables séparément :
+   · ban  = une ANNONCE en bannière sous la barre d'onglets, entre deux dates (d1..d2), pour
+            les familles cochées dans aud (med / att / sec / cad / int). Chacun peut la masquer
+            (jusqu'à la prochaine ouverture) ou ne plus l'afficher (mémorisé sur l'appareil,
+            cp6_annHide) — jamais d'écriture serveur depuis un lecteur ;
+   · plan = un ÉVÉNEMENT dans la grille : une ligne fine pleine largeur insérée avant le matin
+            ou avant l'après-midi du jour choisi, dans les onglets cochés (planning / internes /
+            attache). Purement affiché : aucune case n'est touchée. Imprimée avec la grille.
+   Champ Firestore « annonces » (JSON), écrit par l'éditeur seul. */
+const ANN_AUD=[["med","Médecins"],["att","Attachés"],["sec","Secrétaires"],["cad","Cadres"],["int","Internes"]];
+const ANN_TABS=[["planning","Planning"],["internes","Internes"],["attache","Attachés"]];
+const ANN_COLORS=["#7ff5f5","#fde68a","#bbf7d0","#fecaca","#ddd6fe","#fbcfe8"];
+const annToday=()=>{const t=new Date();return dKey(t.getFullYear(),t.getMonth(),t.getDate());};
+/* ajoute n jours (ou 1 mois si mois=true) à une clé "AAAA-MM-JJ" — le mois de la clé est en CLAIR (1-12), celui de Date est technique (0-11) */
+const annPlus=(dk,n,mois)=>{const p=String(dk||annToday()).split("-").map(Number);const d=mois?new Date(p[0],p[1],p[2]):new Date(p[0],p[1]-1,p[2]+n);return dKey(d.getFullYear(),d.getMonth(),d.getDate());};
+const annFmt=(dk)=>{if(!dk)return "—";const p=String(dk).split("-").map(Number);const d=new Date(p[0],p[1]-1,p[2]);return isNaN(d)?dk:d.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});};
+const annActive=(a,auj)=>!!(a&&a.ban&&(!a.d1||a.d1<=auj)&&(!a.d2||a.d2>=auj));
+/* fam = famille du profil connecté ; le code éditeur voit tout, le lecteur sans code voit ce qui vise les médecins */
+const annVise=(a,fam)=>fam==="edit"||!!((a.aud||{})[fam==="view"?"med":fam]);
+/* la dernière date utile d'un message : sert au ménage (90 jours) et au tri de la liste */
+const annFin=(a)=>[a.ban?(a.d2||a.d1||""):"",a.plan?(a.jour||""):""].sort().pop()||"";
+/* événements du jour pour un onglet donné */
+const annDuJour=(annonces,tabId,y,m,d)=>{const k=dKey(y,m,d);return (annonces||[]).filter(a=>a.plan&&a.jour===k&&(a.tabs||{})[tabId]);};
+/* insère les lignes d'événement dans les lignes d'un jour : avant la 1re ligne (matin / journée)
+   ou avant la 2e (après-midi). Un jour à une seule ligne reçoit tout avant celle-ci. */
+function annEvtRows(evts,rows){
+  if(!evts||!evts.length)return rows;
+  const out=[],un=rows.length<=1;
+  rows.forEach((r,i)=>{
+    evts.filter(e=>i===0?(un||e.slot!=="AM"):e.slot==="AM").forEach(e=>out.push(
+      <tr key={"ann-"+e.id}><td colSpan={999} style={{background:e.color||ANN_COLORS[0],padding:"2px 8px",height:22,borderBottom:"1px solid var(--border)",fontSize:12,fontWeight:700,color:"#0f172a",textAlign:"left",whiteSpace:"nowrap"}}>
+        <span style={{display:"inline-block",position:"sticky",left:8}}>{e.txt}</span></td></tr>));
+    out.push(r);
+  });
+  return out;
+}
+function AnnBanniere({annonces,fam,masques,setMasques}){
+  const auj=annToday();
+  const list=(annonces||[]).filter(a=>annActive(a,auj)&&annVise(a,fam)&&!(masques||{})[a.id]);
+  if(!list.length)return null;
+  const cacher=(id,def)=>{
+    setMasques(o=>({...(o||{}),[id]:1}));
+    if(def){try{const h=JSON.parse(localStorage.getItem("cp6_annHide")||"{}")||{};h[id]=1;localStorage.setItem("cp6_annHide",JSON.stringify(h));}catch(e){}}
+  };
+  return <div className="no-print" style={{marginBottom:8}}>
+    {list.map(a=><div key={a.id} style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap",background:"#eff6ff",border:"1px solid #93c5fd",borderRadius:9,padding:"8px 12px",marginBottom:6,fontSize:12.5,color:"#1e3a8a"}}>
+      <span>📣</span>
+      <span style={{flex:1,minWidth:160,whiteSpace:"pre-wrap",fontWeight:600}}>{a.txt}</span>
+      <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
+        <button onClick={()=>cacher(a.id,false)} title="Masquer jusqu'à la prochaine ouverture de l'application" style={{...S.icnBtn,fontSize:11}}>Masquer</button>
+        <button onClick={()=>cacher(a.id,true)} title="Ne plus afficher ce message sur cet appareil" style={{...S.icnBtn,fontSize:11}}>Ne plus afficher</button>
+      </div>
+    </div>)}
+  </div>;
+}
+function AnnEditeur({annonces,setAnnonces}){
+  const auj=annToday();
+  const neuf=()=>({id:"a"+Date.now().toString(36),txt:"",ban:true,plan:false,d1:auj,d2:annPlus(auj,7),aud:{med:1,att:1,sec:1,cad:1},jour:auj,slot:"M",tabs:{planning:1},color:ANN_COLORS[0]});
+  const [ed,setEd]=React.useState(null);       /* message en cours d'édition, null = formulaire fermé */
+  const [sup,setSup]=React.useState(null);     /* id dont la suppression attend une confirmation */
+  const set=(k,v)=>setEd(o=>({...o,[k]:v}));
+  const coche=(champ,k)=>setEd(o=>{const c={...(o[champ]||{})};if(c[k])delete c[k];else c[k]=1;return {...o,[champ]:c};});
+  const enregistrer=()=>{
+    if(!ed||!ed.txt.trim()||(!ed.ban&&!ed.plan))return;
+    const lim=annPlus(auj,-90);
+    /* un texte modifié reçoit un nouvel identifiant : ceux qui avaient écarté l'ancien revoient le nouveau */
+    const avant=(annonces||[]).find(a=>a.id===ed.id);
+    const id=avant&&avant.txt!==ed.txt.trim()?"a"+Date.now().toString(36):ed.id;
+    setAnnonces(l=>{const rest=(l||[]).filter(a=>a.id!==ed.id&&annFin(a)>=lim);return rest.concat([{...ed,id,txt:ed.txt.trim()}]).sort((a,b)=>annFin(a)<annFin(b)?1:-1);});
+    setEd(null);
+  };
+  const supprimer=(id)=>{if(sup!==id){setSup(id);return;}setAnnonces(l=>(l||[]).filter(a=>a.id!==id));setSup(null);};
+  const lib=(a)=>{
+    const parts=[];
+    if(a.ban)parts.push("📣 bannière du "+annFmt(a.d1)+" au "+annFmt(a.d2)+" · pour "+ANN_AUD.filter(x=>(a.aud||{})[x[0]]).map(x=>x[1].toLowerCase()).join(", "));
+    if(a.plan)parts.push("📅 dans la grille le "+annFmt(a.jour)+" ("+(a.slot==="AM"?"après-midi":"matin")+") · "+ANN_TABS.filter(x=>(a.tabs||{})[x[0]]).map(x=>x[1]).join(", "));
+    return parts;
+  };
+  const lbl={fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:4};
+  const chip=(on,txt,onClick)=><button key={txt} onClick={onClick} style={{...S.icnBtn,fontSize:11,fontWeight:on?800:500,background:on?"#1d4ed8":"var(--icon)",color:on?"#fff":"var(--txt2)",borderColor:on?"#1d4ed8":"var(--border)"}}>{txt}</button>;
+  const liste=(annonces||[]).slice().sort((a,b)=>annFin(a)<annFin(b)?1:-1);
+  return <div style={{...S.card,marginBottom:12}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+      <div style={{fontSize:13,fontWeight:800,color:"#1d4ed8"}}>📣 Messages</div>
+      {!ed&&<button onClick={()=>{setEd(neuf());setSup(null);}} style={{...S.btnP,marginLeft:"auto"}}>+ Nouveau message</button>}
+    </div>
+    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Une annonce en bannière (chacun peut la masquer ou ne plus l'afficher sur son appareil), une ligne dans la grille du planning, ou les deux. Réservé à l'éditeur.</div>
+    {ed&&<div style={{border:"1px solid var(--border)",borderRadius:9,padding:"10px 12px",marginBottom:10,background:"var(--bg2)"}}>
+      <div style={lbl}>Texte du message</div>
+      <textarea value={ed.txt} onChange={e=>set("txt",e.target.value)} rows={2} placeholder="Ex. : Répartition de garde lundi 14 à 8h" style={{...S.fi,width:"100%",resize:"vertical",marginBottom:10}}/>
+      <div style={{display:"flex",gap:14,flexWrap:"wrap",marginBottom:10}}>
+        <label style={{display:"flex",gap:6,alignItems:"center",fontSize:12,cursor:"pointer"}}><input type="checkbox" checked={!!ed.ban} onChange={()=>set("ban",!ed.ban)}/>Afficher en bannière</label>
+        <label style={{display:"flex",gap:6,alignItems:"center",fontSize:12,cursor:"pointer"}}><input type="checkbox" checked={!!ed.plan} onChange={()=>set("plan",!ed.plan)}/>Inscrire dans la grille du planning</label>
+      </div>
+      {ed.ban&&<div style={{borderTop:"1px solid var(--border2)",paddingTop:8,marginBottom:8}}>
+        <div style={lbl}>Bannière — du <input type="date" value={ed.d1||""} onChange={e=>set("d1",e.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/> au <input type="date" value={ed.d2||""} onChange={e=>set("d2",e.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/></div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+          {chip(false,"1 semaine",()=>set("d2",annPlus(ed.d1,7)))}
+          {chip(false,"2 semaines",()=>set("d2",annPlus(ed.d1,14)))}
+          {chip(false,"1 mois",()=>set("d2",annPlus(ed.d1,0,true)))}
+        </div>
+        <div style={lbl}>Visible par</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{ANN_AUD.map(([k,t])=>chip(!!(ed.aud||{})[k],t,()=>coche("aud",k)))}</div>
+      </div>}
+      {ed.plan&&<div style={{borderTop:"1px solid var(--border2)",paddingTop:8,marginBottom:8}}>
+        <div style={lbl}>Ligne dans la grille — le <input type="date" value={ed.jour||""} onChange={e=>set("jour",e.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/></div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+          {chip(ed.slot!=="AM","Avant le matin",()=>set("slot","M"))}
+          {chip(ed.slot==="AM","Avant l'après-midi",()=>set("slot","AM"))}
+        </div>
+        <div style={lbl}>Dans les onglets</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{ANN_TABS.map(([k,t])=>chip(!!(ed.tabs||{})[k],t,()=>coche("tabs",k)))}</div>
+        <div style={lbl}>Couleur</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{ANN_COLORS.map(c=><button key={c} onClick={()=>set("color",c)} title={c} style={{width:26,height:22,borderRadius:6,background:c,border:ed.color===c?"3px solid #1d4ed8":"1px solid var(--border)",cursor:"pointer"}}/>)}</div>
+      </div>}
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <button onClick={()=>setEd(null)} style={{...S.icnBtn,fontSize:12}}>Annuler</button>
+        <button onClick={enregistrer} disabled={!ed.txt.trim()||(!ed.ban&&!ed.plan)||(!!ed.ban&&!Object.keys(ed.aud||{}).length)||(!!ed.plan&&!Object.keys(ed.tabs||{}).length)} style={{...S.btnP,opacity:(!ed.txt.trim()||(!ed.ban&&!ed.plan))?.5:1}}>Enregistrer</button>
+      </div>
+    </div>}
+    {!liste.length&&!ed&&<div style={{fontSize:11,color:"var(--txt3)"}}>Aucun message.</div>}
+    {liste.map(a=>{const fini=annFin(a)<auj;return <div key={a.id} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 0",borderTop:"1px solid var(--border2)",opacity:fini?.55:1}}>
+      <div style={{width:10,height:10,borderRadius:3,marginTop:4,background:a.plan?(a.color||ANN_COLORS[0]):"#93c5fd",flexShrink:0}}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:12.5,fontWeight:700,whiteSpace:"pre-wrap"}}>{a.txt}{fini&&<span style={{fontSize:10,fontWeight:600,color:"var(--txt3)",marginLeft:6}}>— terminé</span>}</div>
+        {lib(a).map((t,i)=><div key={i} style={{fontSize:11,color:"var(--txt3)"}}>{t}</div>)}
+      </div>
+      <button onClick={()=>{setEd({...a});setSup(null);}} style={{...S.icnBtn,fontSize:11}}>Modifier</button>
+      <button onClick={()=>supprimer(a.id)} style={{...S.icnBtn,fontSize:11,color:"#ef4444",fontWeight:sup===a.id?800:500}}>{sup===a.id?"Confirmer ?":"Supprimer"}</button>
+    </div>;})}
+  </div>;
+}
+
 function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDarkMode,secrAtts}){
   const [ouvert,setOuvert]=React.useState({});
   /* clé = med|act|dKey|slot — regroupée par médecin puis par activité */
@@ -8712,7 +8853,7 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
   </Ov>;
 }
 
-function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],intSelf=false,prevM,nextM,darkMode,setDarkMode,notes={},setNotes=null}){
+function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],intSelf=false,prevM,nextM,darkMode,setDarkMode,notes={},setNotes=null,annJour=null}){
   const [sel,setSel]=useState(null);
   const [gm,setGm]=useState(null);
   const [jaugeOn,setJaugeOn]=useState(intCfg.jaugeDef!==false); /* v10.65 : affichage en nominal réglé dans Paramètres */
@@ -8797,7 +8938,7 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
             const slots=off?["JOUR"]:samJ?["M"]:["M","AM"];
             const vac=isVac(o.y,o.m,o.d);
             const gard=intGardeDuJour(getEntries,intCfg,o.y,o.m,o.d);
-            return slots.map((sl,si)=>(
+            return annEvtRows(annJour?annJour(o.y,o.m,o.d):null,slots.map((sl,si)=>(
               <tr key={o.y+"-"+o.m+"-"+o.d+sl} data-day={o.y+"-"+o.m+"-"+o.d} style={{height:28,borderBottom:si===slots.length-1?"1px solid var(--border)":"1px solid var(--border2)",
                 ...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{}),...(si===0&&isMon?{boxShadow:"0 -2px 0 0 var(--border)"}:{})}}>
                 {si===0&&<td rowSpan={slots.length} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,minWidth:C0,background:vac?"var(--vac-bg)":(we?"var(--bg-we)":"var(--td-fix)")}}>
@@ -8842,7 +8983,7 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
                   </td>;
                 })}
               </tr>
-            ));
+            )));
           })}
         </tbody>
       </table>
@@ -9422,7 +9563,9 @@ function CardioPlanning(){
   /* v10.115 : notifications secrétaires — entrées {med|act|dKey|slot:{s:±1,ts,c?}} et
      réglages {acts:[activités suivies], dif:{période:date de diffusion}} */
   const [secrNotif,setSecrNotif]=useState({});
-  const [secrCfg,setSecrCfg]=useState({acts:[],dif:{},atts:[]});   /* v10.121 : atts = attachés suivis */
+  const [secrCfg,setSecrCfg]=useState({acts:[],dif:{},atts:[]});
+  const [annonces,setAnnonces]=useState([]);   /* v10.203 : messages de l'éditeur (bannière + ligne dans la grille) */
+  const [annMasq,setAnnMasq]=useState(()=>{try{return JSON.parse(localStorage.getItem("cp6_annHide")||"{}")||{};}catch(e){return {};}});   /* v10.203 : messages écartés sur cet appareil (+ masqués pour la session) */   /* v10.121 : atts = attachés suivis */
   const [csBlanches,setCsBlanches]=useState({}); // {medId:{"y-m-d":true}} jours sans consultation (logiciel métier)
   const [csRep,setCsRep]=useState({}); // v9.14 {medId:{done:{wk:true},to:{"dKey|sl":{d,sl,n}}}}
   const [csActsSel,setCsActsSel]=useState({});   // {medId:[acteIds]} activités comptées comme consultation
@@ -9809,6 +9952,7 @@ function CardioPlanning(){
           if(data.gardeWish)setGardeWish(JSON.parse(data.gardeWish));
           if(data.secrNotif){try{setSecrNotif(JSON.parse(data.secrNotif)||{});}catch(e){}}
           if(data.secrCfg){try{const c=JSON.parse(data.secrCfg)||{};setSecrCfg({acts:c.acts||[],dif:c.dif||{},atts:c.atts||[]});}catch(e){}}
+          if(data.annonces){try{const l=JSON.parse(data.annonces);setAnnonces(Array.isArray(l)?l:[]);}catch(e){}}   /* v10.203 */
           if(data.csBlanches)setCsBlanches(JSON.parse(data.csBlanches));
           if(data.csRep)setCsRep(JSON.parse(data.csRep));
           if(data.csActsSel)setCsActsSel(JSON.parse(data.csActsSel));
@@ -10276,6 +10420,7 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({gardeWish:JSON.stringify(gardeWish)});},[gardeWish]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({secrNotif:JSON.stringify(secrNotif)});},[secrNotif]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({secrCfg:JSON.stringify(secrCfg)});},[secrCfg]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({annonces:JSON.stringify(annonces)});},[annonces]);   /* v10.203 */
   useEffect(()=>{secrRef.current={cfg:secrCfg,meds:medecins};},[secrCfg,medecins]);
   /* v10.116 : expiration des notifications dont la date est passée. Le premier
      effet couvre le chargement et chaque réception serveur ; le second le
@@ -10687,7 +10832,10 @@ function CardioPlanning(){
     .filter(([tid])=>hideTabs.indexOf(tid)<0&&HIDDEN_TABS.indexOf(tid)<0&&(tid!=="internes"||intCfg.show===true));
   useEffect(()=>{if(hideTabs.indexOf(tab)>=0||HIDDEN_TABS.indexOf(tab)>=0||(tab==="internes"&&intCfg.show!==true))setTab(accessMode==="interneEdit"?"internes":"planning");},[accessMode,tab,isMedEdit,intCfg]);
   const isAdminEdit=accessMode==="adminEdit"&&!netOff;
-  const isInterne=accessMode==="interneEdit"&&!netOff; /* v10.69 : interne connecte (hors ligne = lecture seule) */
+  const isInterne=accessMode==="interneEdit"&&!netOff;
+  /* v10.203 : famille du profil connecté, pour cibler les annonces (le code éditeur voit tout) */
+  const annFam=accessMode==="edit"?"edit":accessMode==="view"?"view":accessMode==="adminEdit"?(isCadre?"cad":"sec"):accessMode==="interneEdit"?"int":((((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")==="attache"?"att":"med");
+  const annJourDe=(tabId)=>(y,m,d)=>annDuJour(annonces,tabId,y,m,d); /* v10.69 : interne connecte (hors ligne = lecture seule) */
   /* v10.146 : verrou de l'avenir — profil de la personne, état de chaque période à venir (lu dans Construire
      et dans les diffusions), dérogations. Posé dans vRef pour que les fonctions d'écriture le lisent sans dépendance. */
   const vProfil=isEdit?"edit":isAttEdit?"att":isInterEdit?"inter":isMedEdit?"basic":isAdminEdit?"admin":isInterne?"interne":"view";
@@ -12157,6 +12305,8 @@ header::-webkit-scrollbar { display: none; }
       </header>
 
       <main style={{...S.main,paddingBottom:GRID_FIT.indexOf(tab)>=0?12:110}}>
+      {/* v10.203 : annonces de l'éditeur, sous la barre d'onglets, quel que soit l'onglet */}
+      <AnnBanniere annonces={annonces} fam={annFam} masques={annMasq} setMasques={setAnnMasq}/>
 
       {/* MON PLANNING */}
       
@@ -12253,7 +12403,7 @@ header::-webkit-scrollbar { display: none; }
               {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             </div>}
           </div>
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {<GridV annJour={annJourDe("planning")} onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -12335,7 +12485,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}</React.Fragment>)}</div>
           </div>
           {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}</React.Fragment>)}
-          {<GridV onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={astSelf} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {<GridV annJour={annJourDe("attache")} onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={astSelf} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -12429,8 +12579,8 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
-      {tab==="internes"&&<InternesView notes={notesAff} setNotes={setNotes} onCellHistory={isAnyEdit?openCellHistory:null} intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
-      {tab==="notifications"&&<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="internes"&&<InternesView annJour={annJourDe("internes")} notes={notesAff} setNotes={setNotes} onCellHistory={isAnyEdit?openCellHistory:null} intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="notifications"&&<div>{isEdit&&<AnnEditeur annonces={annonces} setAnnonces={setAnnonces}/>}<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/></div>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
