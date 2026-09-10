@@ -187,7 +187,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.207 — 10/09/2026";
+var APP_VERSION = "v10.208 — 10/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -1176,7 +1176,6 @@ function TableScroll(_a) {
         var el = ref.current;
         if (!el)
             return;
-        el.style.setProperty("--sx", el.scrollLeft + "px"); /* v10.207 : lu par les lignes d'événement (annEvtRows) */
         if (memX)
             SCROLL_MEM.x[memX] = el.scrollLeft; /* v10.130 */
         if (jours) {
@@ -7953,8 +7952,8 @@ function annEvtRows(evts, rows, fix) {
     rows.forEach((r, i) => {
         evts.filter(e => i === 0 ? (un || e.slot !== "AM") : e.slot === "AM").forEach(e => out.push(React.createElement("tr", { key: "ann-" + e.id, style: { height: 22 } },
             (i === 0 ? F.m : F.am).map((st, k) => React.createElement("td", { key: k, style: { ...S.tdFix, background: "var(--td-fix)", ...st } })),
-            React.createElement("td", { colSpan: F.n || 1, style: { background: e.color || ANN_COLORS[0], padding: "2px 6px", borderBottom: "1px solid var(--border)", fontSize: 12, fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap" } },
-                React.createElement("div", { style: { display: "block", transform: "translateX(var(--sx,0px))", willChange: "transform", width: "min(100%, calc(100vw - " + ((F.left || 0) + 40) + "px))", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis" } }, e.txt)))));
+            React.createElement("td", { colSpan: F.n || 1, style: { background: e.color || ANN_COLORS[0], padding: "2px 6px", borderBottom: "1px solid var(--border)", fontSize: 12, fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis" } },
+                e.txt))));
         out.push(r);
     });
     return out;
