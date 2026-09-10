@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.205 — 10/09/2026";
+const APP_VERSION="v10.206 — 10/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -933,7 +933,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   </td>;
                 })}
               </tr>
-            )),{left:C0+C1,m:[{position:"sticky",left:0,zIndex:10,minWidth:C0},{position:"sticky",left:C0,zIndex:9,minWidth:C1},...(showGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[]),...(intGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[])],am:[{position:"sticky",left:C0,zIndex:9,minWidth:C1}]})
+            )),{n:meds.length,left:C0+C1,m:[{position:"sticky",left:0,zIndex:10,minWidth:C0},{position:"sticky",left:C0,zIndex:9,minWidth:C1},...(showGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[]),...(intGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[])],am:[{position:"sticky",left:C0,zIndex:9,minWidth:C1}]})
           })}
         </tbody>
       </table>
@@ -7326,12 +7326,15 @@ const annDuJour=(annonces,tabId,y,m,d)=>{const k=dKey(y,m,d);return (annonces||[
    largeur, pour que le texte centré reste visible au défilement horizontal. */
 function annEvtRows(evts,rows,fix){
   if(!evts||!evts.length)return rows;
-  const out=[],un=rows.length<=1,F=fix||{m:[],am:[],left:0};
+  /* v10.206 : colSpan = le NOMBRE RÉEL de colonnes de médecins (fix.n), plus jamais 999 — sur une
+     table en tableLayout fixed, 999 colonnes virtuelles rendaient le Planning inutilisable sur
+     iPhone dès qu'un événement était affiché (son signalement du 10/09, 21:59). */
+  const out=[],un=rows.length<=1,F=fix||{m:[],am:[],left:0,n:1};
   rows.forEach((r,i)=>{
     evts.filter(e=>i===0?(un||e.slot!=="AM"):e.slot==="AM").forEach(e=>out.push(
       <tr key={"ann-"+e.id} style={{height:22}}>
         {(i===0?F.m:F.am).map((st,k)=><td key={k} style={{...S.tdFix,background:"var(--td-fix)",...st}}/>)}
-        <td colSpan={999} style={{background:e.color||ANN_COLORS[0],padding:"2px 6px",borderBottom:"1px solid var(--border)",fontSize:12,fontWeight:700,color:"#0f172a",whiteSpace:"nowrap"}}>
+        <td colSpan={F.n||1} style={{background:e.color||ANN_COLORS[0],padding:"2px 6px",borderBottom:"1px solid var(--border)",fontSize:12,fontWeight:700,color:"#0f172a",whiteSpace:"nowrap"}}>
           <div style={{display:"block",position:"sticky",left:F.left||0,width:"min(100%, calc(100vw - "+((F.left||0)+40)+"px))",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis"}}>{e.txt}</div></td></tr>));
     out.push(r);
   });
@@ -9008,7 +9011,7 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
                   </td>;
                 })}
               </tr>
-            )),{left:C0+C1,m:[{position:"sticky",left:0,zIndex:10,minWidth:C0},{position:"sticky",left:C0,zIndex:9,minWidth:C1},{minWidth:CG,borderRight:"2px solid var(--border)"}],am:[{position:"sticky",left:C0,zIndex:9,minWidth:C1}]});
+            )),{n:cols.length,left:C0+C1,m:[{position:"sticky",left:0,zIndex:10,minWidth:C0},{position:"sticky",left:C0,zIndex:9,minWidth:C1},{minWidth:CG,borderRight:"2px solid var(--border)"}],am:[{position:"sticky",left:C0,zIndex:9,minWidth:C1}]});
           })}
         </tbody>
       </table>
