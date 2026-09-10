@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.206 — 10/09/2026";
+const APP_VERSION="v10.207 — 10/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1038,6 +1038,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
   },[jours,memId,memX,centre]);
   const onScroll=()=>{
     const el=ref.current; if(!el)return;
+    el.style.setProperty("--sx",el.scrollLeft+"px");   /* v10.207 : lu par les lignes d'événement (annEvtRows) */
     if(memX)SCROLL_MEM.x[memX]=el.scrollLeft;   /* v10.130 */
     if(jours){
       const rows=el.querySelectorAll("[data-day]");
@@ -7320,7 +7321,11 @@ const annFin=(a)=>[a.ban?(a.d2||a.d1||""):"",a.plan?(a.jour||""):""].sort().pop(
 const annDuJour=(annonces,tabId,y,m,d)=>{const k=dKey(y,m,d);return (annonces||[]).filter(a=>a.plan&&a.jour===k&&(a.tabs||{})[tabId]);};
 /* insère les lignes d'événement dans les lignes d'un jour : avant la 1re ligne (matin / journée)
    ou avant la 2e (après-midi). Un jour à une seule ligne reçoit tout avant celle-ci.
-   v10.204 : la bande colorée ne couvre que les colonnes des médecins — fix.m = les colonnes
+   v10.207 : le texte n'est plus « collé » (position sticky) — Safari sur iPhone rendait le Planning
+   inutilisable dès qu'une ligne d'événement était affichée (ses tests du 10/09 : la lenteur suivait
+   la ligne, pas la bannière). Il est DÉPLACÉ par une transformation (translateX) pilotée par la
+   variable --sx que TableScroll pose à chaque défilement horizontal : même effet visuel, sans mise
+   en page. v10.204 : la bande colorée ne couvre que les colonnes des médecins — fix.m = les colonnes
    fixes à laisser vides avant le matin (jour, créneau, garde…), fix.am = celles qui ne sont
    pas déjà occupées par un rowSpan avant l'après-midi (le créneau seul) ; fix.left = leur
    largeur, pour que le texte centré reste visible au défilement horizontal. */
@@ -7335,7 +7340,7 @@ function annEvtRows(evts,rows,fix){
       <tr key={"ann-"+e.id} style={{height:22}}>
         {(i===0?F.m:F.am).map((st,k)=><td key={k} style={{...S.tdFix,background:"var(--td-fix)",...st}}/>)}
         <td colSpan={F.n||1} style={{background:e.color||ANN_COLORS[0],padding:"2px 6px",borderBottom:"1px solid var(--border)",fontSize:12,fontWeight:700,color:"#0f172a",whiteSpace:"nowrap"}}>
-          <div style={{display:"block",position:"sticky",left:F.left||0,width:"min(100%, calc(100vw - "+((F.left||0)+40)+"px))",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis"}}>{e.txt}</div></td></tr>));
+          <div style={{display:"block",transform:"translateX(var(--sx,0px))",willChange:"transform",width:"min(100%, calc(100vw - "+((F.left||0)+40)+"px))",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis"}}>{e.txt}</div></td></tr>));
     out.push(r);
   });
   return out;
