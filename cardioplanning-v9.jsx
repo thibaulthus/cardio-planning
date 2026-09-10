@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.203 — 10/09/2026";
+const APP_VERSION="v10.204 — 10/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -865,14 +865,15 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
             const slots=we?["JOUR"]:["M","AM"];
             const isMonGV=!we&&dow(ey,em,d)===1;
             const gardeMed=getGardeMed2(ey,em,d);
-            return annEvtRows(annJour?annJour(ey,em,d):null,slots.map((sl,si)=>(
+            const annE=annJour?annJour(ey,em,d):null,annN=annNbAM(annE,slots);   /* v10.204 : les rowSpan comptent les lignes d'événement de l'après-midi */
+            return annEvtRows(annE,slots.map((sl,si)=>(
               <tr key={ey+"-"+em+"-"+d+sl} data-day={ey+"-"+em+"-"+d} style={{height:28,borderBottom:si===slots.length-1?"1px solid var(--border)":"1px solid var(--border2)",...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{}),...(si===0&&isMonGV?{boxShadow:"0 -2px 0 0 var(--border)"}:{})}}>
-                {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:C0,background:isVac&&isVac(ey,em,d)?"var(--vac-bg)":"var(--td-fix)"}} rowSpan={slots.length}>
+                {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:C0,background:isVac&&isVac(ey,em,d)?"var(--vac-bg)":"var(--td-fix)"}} rowSpan={slots.length+annN}>
                   <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700,fontFamily:"sans-serif",lineHeight:1.2}}>{MOIS[em]}</div>}</div>
                   <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dow(ey,em,d)]}</div>
                 </td>}
                 <td style={{...S.tdFix,position:"sticky",left:C0,zIndex:9,fontSize:9,color:"var(--txt3)",fontWeight:700,textAlign:"center",background:we?"var(--bg-we)":"var(--td-fix)",minWidth:C1,padding:"2px"}}>{SLOTS[sl]}</td>
-                {si===0&&showGarde&&<td rowSpan={slots.length} style={{...S.tdFix,
+                {si===0&&showGarde&&<td rowSpan={slots.length+annN} style={{...S.tdFix,
                   borderRight:"2px solid var(--border)",
                   minWidth:CG,padding:"2px",verticalAlign:"middle",
                   cursor:isEdit?"pointer":"default",
@@ -884,7 +885,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                 </td>}
                 {si===0&&intGarde&&(()=>{ /* v10.61 lot 3b : garde des internes, lecture seule */
                   const gi=intGarde(ey,em,d);
-                  return <td rowSpan={slots.length} title={gi?(gi.ext?(gi.ext+" (interne extérieur)"):("Interne de garde : "+gi.med.nom)):"Aucun interne de garde"}
+                  return <td rowSpan={slots.length+annN} title={gi?(gi.ext?(gi.ext+" (interne extérieur)"):("Interne de garde : "+gi.med.nom)):"Aucun interne de garde"}
                     style={{...S.tdFix,borderRight:"2px solid var(--border)",minWidth:CG,padding:"2px",verticalAlign:"middle",
                       background:gi?(we?"var(--bg-we)":"var(--garde-bg)"):"rgba(248,81,73,.16)"}}>
                     {gi&&gi.med&&<div style={{width:26,height:26,borderRadius:"50%",background:gi.med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,margin:"0 auto"}}>{gi.med.init}</div>}
@@ -930,7 +931,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   </td>;
                 })}
               </tr>
-            )))
+            )),{left:C0+C1,m:[{position:"sticky",left:0,zIndex:10,minWidth:C0},{position:"sticky",left:C0,zIndex:9,minWidth:C1},...(showGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[]),...(intGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[])],am:[{position:"sticky",left:C0,zIndex:9,minWidth:C1}]})
           })}
         </tbody>
       </table>
@@ -7303,18 +7304,26 @@ const annFin=(a)=>[a.ban?(a.d2||a.d1||""):"",a.plan?(a.jour||""):""].sort().pop(
 /* événements du jour pour un onglet donné */
 const annDuJour=(annonces,tabId,y,m,d)=>{const k=dKey(y,m,d);return (annonces||[]).filter(a=>a.plan&&a.jour===k&&(a.tabs||{})[tabId]);};
 /* insère les lignes d'événement dans les lignes d'un jour : avant la 1re ligne (matin / journée)
-   ou avant la 2e (après-midi). Un jour à une seule ligne reçoit tout avant celle-ci. */
-function annEvtRows(evts,rows){
+   ou avant la 2e (après-midi). Un jour à une seule ligne reçoit tout avant celle-ci.
+   v10.204 : la bande colorée ne couvre que les colonnes des médecins — fix.m = les colonnes
+   fixes à laisser vides avant le matin (jour, créneau, garde…), fix.am = celles qui ne sont
+   pas déjà occupées par un rowSpan avant l'après-midi (le créneau seul) ; fix.left = leur
+   largeur, pour que le texte centré reste visible au défilement horizontal. */
+function annEvtRows(evts,rows,fix){
   if(!evts||!evts.length)return rows;
-  const out=[],un=rows.length<=1;
+  const out=[],un=rows.length<=1,F=fix||{m:[],am:[],left:0};
   rows.forEach((r,i)=>{
     evts.filter(e=>i===0?(un||e.slot!=="AM"):e.slot==="AM").forEach(e=>out.push(
-      <tr key={"ann-"+e.id}><td colSpan={999} style={{background:e.color||ANN_COLORS[0],padding:"2px 8px",height:22,borderBottom:"1px solid var(--border)",fontSize:12,fontWeight:700,color:"#0f172a",textAlign:"left",whiteSpace:"nowrap"}}>
-        <span style={{display:"inline-block",position:"sticky",left:8}}>{e.txt}</span></td></tr>));
+      <tr key={"ann-"+e.id} style={{height:22}}>
+        {(i===0?F.m:F.am).map((st,k)=><td key={k} style={{...S.tdFix,background:"var(--td-fix)",...st}}/>)}
+        <td colSpan={999} style={{background:e.color||ANN_COLORS[0],padding:"2px 6px",borderBottom:"1px solid var(--border)",fontSize:12,fontWeight:700,color:"#0f172a",whiteSpace:"nowrap"}}>
+          <div style={{display:"block",position:"sticky",left:F.left||0,width:"min(100%, calc(100vw - "+((F.left||0)+40)+"px))",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis"}}>{e.txt}</div></td></tr>));
     out.push(r);
   });
   return out;
 }
+/* nombre de lignes d'événement insérées avant l'après-midi : les cellules à rowSpan du jour doivent les compter */
+const annNbAM=(evts,slots)=>slots.length>1?(evts||[]).filter(e=>e.slot==="AM").length:0;
 function AnnBanniere({annonces,fam,masques,setMasques}){
   const auj=annToday();
   const list=(annonces||[]).filter(a=>annActive(a,auj)&&annVise(a,fam)&&!(masques||{})[a.id]);
@@ -8938,10 +8947,11 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
             const slots=off?["JOUR"]:samJ?["M"]:["M","AM"];
             const vac=isVac(o.y,o.m,o.d);
             const gard=intGardeDuJour(getEntries,intCfg,o.y,o.m,o.d);
-            return annEvtRows(annJour?annJour(o.y,o.m,o.d):null,slots.map((sl,si)=>(
+            const annE=annJour?annJour(o.y,o.m,o.d):null,annN=annNbAM(annE,slots);   /* v10.204 */
+            return annEvtRows(annE,slots.map((sl,si)=>(
               <tr key={o.y+"-"+o.m+"-"+o.d+sl} data-day={o.y+"-"+o.m+"-"+o.d} style={{height:28,borderBottom:si===slots.length-1?"1px solid var(--border)":"1px solid var(--border2)",
                 ...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{}),...(si===0&&isMon?{boxShadow:"0 -2px 0 0 var(--border)"}:{})}}>
-                {si===0&&<td rowSpan={slots.length} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,minWidth:C0,background:vac?"var(--vac-bg)":(we?"var(--bg-we)":"var(--td-fix)")}}>
+                {si===0&&<td rowSpan={slots.length+annN} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,minWidth:C0,background:vac?"var(--vac-bg)":(we?"var(--bg-we)":"var(--td-fix)")}}>
                   <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{o.d}<div style={{fontSize:10,color:"var(--txt2)",fontWeight:700,fontFamily:"sans-serif",lineHeight:1.2}}>{MOIS[o.m]}</div>
                     <div style={{fontSize:8,color:"var(--txt3)",fontWeight:700,fontFamily:"sans-serif"}}>{JOURSL[t].slice(0,3)}{fer?" F":""}</div>
                   </div>
@@ -8957,7 +8967,7 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
                     <span>{SLOTS[sl]}</span>{chip("H",jg.hc,badH)}{!samJ&&chip("U",jg.us,badU)}
                   </div>;
                 })():SLOTS[sl])}</td>
-                {si===0&&<td rowSpan={slots.length} onClick={canEdit?()=>setGm({y:o.y,m:o.m,d:o.d}):undefined}
+                {si===0&&<td rowSpan={slots.length+annN} onClick={canEdit?()=>setGm({y:o.y,m:o.m,d:o.d}):undefined}
                   style={{...S.tdFix,borderRight:"2px solid var(--border)",minWidth:CG,padding:"2px",verticalAlign:"middle",cursor:canEdit?"pointer":"default",
                     background:gard?(we?"var(--bg-we)":"var(--garde-bg)"):"rgba(248,81,73,.16)"}}>
                   {gard&&gard.med&&<div style={{width:26,height:26,borderRadius:"50%",background:gard.med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,margin:"0 auto"}}>{gard.med.init}</div>}
@@ -8983,7 +8993,7 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
                   </td>;
                 })}
               </tr>
-            )));
+            )),{left:C0+C1,m:[{position:"sticky",left:0,zIndex:10,minWidth:C0},{position:"sticky",left:C0,zIndex:9,minWidth:C1},{minWidth:CG,borderRight:"2px solid var(--border)"}],am:[{position:"sticky",left:C0,zIndex:9,minWidth:C1}]});
           })}
         </tbody>
       </table>
