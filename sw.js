@@ -1,9 +1,9 @@
-/* CardioPlanning — service worker (v10.211)
+/* CardioPlanning — service worker (v10.212)
    Page : réseau d'abord (toujours la dernière version quand il y a du réseau),
           cache en secours (l'app s'ouvre hors ligne).
    Bibliothèques CDN : cache d'abord (URL versionnées, jamais périmées).
    Données Firestore : jamais mises en cache ici — c'est le cache interne du SDK qui s'en charge. */
-var CACHE = "cardioplanning-v10-211";   /* v10.135 : nouveau nom = les vieilles entrées (dont une v9.22) sont effacées ; v10.211 : notifications */
+var CACHE = "cardioplanning-v10-212";   /* v10.135 : nouveau nom = les vieilles entrées (dont une v9.22) sont effacées ; v10.211 : notifications */
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

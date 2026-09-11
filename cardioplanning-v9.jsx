@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.211 — 11/09/2026";
+const APP_VERSION="v10.212 — 11/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -5782,6 +5782,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["En fin de période : archiver la période écoulée (voir la tuile Archiver)."]}))},
 
 {id:"notifications",icon:"🔔",title:"Notifications — prévenir les secrétaires",body:()=>HE("div",null,
+  HP({children:[HE("b",null,"Qui voit quoi (v10.212)")," : sans code (lecture seule) et avec le code interne, l'onglet n'apparaît pas. Un médecin basique ou un attaché entré avec son code n'y voit que ",HE("b",null,"sa propre tuile"),", en lecture — la coche ✓ reste aux secrétaires. Les intermédiaires, les éditeurs, les secrétaires et les cadres voient tout le monde."]}),
   HP({children:["L'onglet ",HE("b",null,"🔔 Notifications")," liste, médecin par médecin, les modifications du planning que les secrétaires doivent reporter dans le logiciel de consultations : une ",HE("b",null,"tuile par médecin")," avec le nombre de modifications en attente, et à l'intérieur les lignes groupées ",HE("b",null,"par activité puis par date"),", avec leur sens — ",HE("b",null,"ajoutée")," ou ",HE("b",null,"retirée")," — et la cause quand il y en a une (absence, FMC, repos de garde)."]}),
   HP({children:["Chaque ligne se traite d'un ",HE("b",null,"✓")," ; « Tout traiter » vide la tuile. L'acquittement est ",HE("b",null,"libre, sans code")," : chaque secrétaire nettoie les tuiles de ses médecins."]}),
   HT({children:"Ce qui déclenche une notification"}),
@@ -5802,8 +5803,8 @@ const HELP_SECTIONS=[
   HP({children:["Dès que le ",HE("b",null,"tour d\'une période est validé"),' (bandeau de la tuile 2), chaque semaine de tour ajoutée ou retirée est notée dans un journal, et un ',HE("b",null,"encart en bas de l\'onglet Tour"),' (donc de la tuile 2) ne montre que ces changements, regroupés par médecin concerné. Rien ne part tant qu\'on n\'appuie pas : on peut tâtonner, un aller-retour sur la même semaine s\'annule de lui-même. Le bouton « 📣 Prévenir les médecins concernés » crée une bannière par médecin, visible 14 jours par lui seul, puis vide l\'encart ; « Vider sans prévenir » l\'efface sans rien envoyer. Le bouton suit les droits de la tuile : l\'éditeur toujours, un intermédiaire quand la période lui est ouverte.']}),
   HP({children:["Même proposition, à la personne près, après un ",HE("b",null,"échange de jour de tour"),' (modale ⇄ du Planning : « Prévenir X et Y ? », celui qui fait l\'échange n\'est pas prévenu de son propre geste) et après la ',HE("b",null,"prise ou l\'échange d\'une garde par un médecin basique"),' (« Prévenir X ? »). Dans les trois cas, la bannière commence par « Tour : » ou « Garde : » et dit ce qui a changé.']}),
   HP({children:["Les messages dont toutes les dates sont passées restent listés « terminé » pendant 90 jours, puis disparaissent au prochain enregistrement."]}),
-  HT({children:"Notifications sur le téléphone ou l'ordinateur (v10.211)"}),
-  HP({children:["Toute personne entrée avec ",HE("b",null,"son code"),' (médecin ou attaché) trouve un bouton 🔔 dans la barre du haut, à côté des flèches ↶↷. Il ouvre une petite fenêtre « Notifications sur cet appareil » : ',HE("b",null,"Activer"),' demande l\'autorisation au navigateur, puis l\'appareil est rangé sous votre nom ; ',HE("b",null,"Désactiver"),' le retire — cet appareil seulement, les autres gardent leur réglage. Un point orange sur la cloche rappelle que rien n\'a encore été choisi ; « Plus tard » l\'éteint.']}),
+  HT({children:"Notifications sur le téléphone ou l'ordinateur (v10.211, v10.212)"}),
+  HP({children:["Toute personne entrée avec ",HE("b",null,"son code"),' (médecin ou attaché) trouve, en tête de l\'onglet 🔔 Notifications, une carte « Notifications sur cet appareil » avec un ',HE("b",null,"interrupteur"),' : gris, elles sont éteintes ; un clic demande l\'autorisation au navigateur, puis l\'appareil est rangé sous votre nom et l\'interrupteur passe au vert. Un second clic les retire — cet appareil seulement, les autres gardent leur réglage. Un point orange sur l\'onglet rappelle que rien n\'a encore été choisi ; « Plus tard » l\'éteint.']}),
   HP({children:["Vous êtes prévenu(e) quand un ",HE("b",null,"message vous est adressé"),' : bannière nommée (« Prévenir les médecins concernés », tour, garde) ou annonce de l\'éditeur cochée pour les médecins ou pour les attachés. La notification est volontairement neutre — « Un message vous attend dans CardioPlanning » — et un appui l\'ouvre ; le contenu reste dans l\'application. Elle arrive quelques minutes après l\'envoi, jamais à l\'instant : un script tourne toutes les dix minutes.']}),
   HP({last:true,children:["Sur ",HE("b",null,"iPhone"),', cela ne fonctionne que depuis l\'application installée sur l\'écran d\'accueil (Partager → « Sur l\'écran d\'accueil », iOS 16.4 ou plus) ; sur Android et sur ordinateur, Chrome ou Edge suffisent. Une autorisation refusée se rouvre dans les réglages du navigateur (ou du téléphone).']}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
@@ -7524,7 +7525,7 @@ function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins
   </div>;
 }
 
-function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDarkMode,secrAtts}){
+function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDarkMode,secrAtts,seulId=null}){   /* v10.212 : seulId = ne montrer que cette personne (médecin basique, attaché) */
   const [ouvert,setOuvert]=React.useState({});
   /* clé = med|act|dKey|slot — regroupée par médecin puis par activité */
   const parMed={},auj=secrToday();
@@ -7533,7 +7534,7 @@ function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDa
     const o=parMed[p[0]]=parMed[p[0]]||{};(o[p[1]]=o[p[1]]||[]).push({k,act:p[1],dk:p[2],sl:p[3],...(secrNotif[k]||{})});});
   /* v10.122 : les titulaires d'office, puis les attachés SUIVIS — et tout attaché
      qui a encore des notifications en attente, même décoché entre-temps. */
-  const meds=(medecins||[]).filter(m=>(m.role||"medecin")==="medecin")
+  const meds=seulId!=null?(medecins||[]).filter(m=>String(m.id)===String(seulId)):(medecins||[]).filter(m=>(m.role||"medecin")==="medecin")
     .concat((medecins||[]).filter(m=>(m.role||"")==="attache"&&(((secrAtts||[]).indexOf(m.id)>=0)||Object.keys(parMed[m.id]||{}).length>0)));
   const ack=(keys)=>{if(!canAck)return;setSecrNotif(o=>{const n={...o};keys.forEach(k=>{delete n[k];});return n;});};
   return(
@@ -7542,7 +7543,7 @@ function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDa
         <h2 style={S.mTit}>🔔 Notifications</h2>
         <div style={{marginLeft:"auto"}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div>
       </div>
-      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>Les modifications du planning à reporter dans le logiciel de consultations, médecin par médecin. Chaque ligne se traite d'un ✓, sans code — chacun nettoie les tuiles de ses médecins.</div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>{seulId!=null?"Vos modifications de planning que les secrétaires doivent reporter dans le logiciel de consultations. Les lignes disparaissent quand elles ont été traitées.":"Les modifications du planning à reporter dans le logiciel de consultations, médecin par médecin. Chaque ligne se traite d'un ✓, sans code — chacun nettoie les tuiles de ses médecins."}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:8}}>
         {meds.map(m=>{
           const grp=parMed[m.id]||{};
@@ -9516,8 +9517,11 @@ const pushEtatInitial=(medId)=>{
   try{const on=JSON.parse(localStorage.getItem(PUSH_ON_KEY)||"null");if(on&&String(on.med)===String(medId)&&Notification.permission==="granted")return "on";}catch(e){}
   return "off";
 };
-function PushBouton({medId,medecins=[]}){
-  const [open,setOpen]=React.useState(false);
+/* v10.212 : la carte vit EN TÊTE DE L'ONGLET NOTIFICATIONS (plus de cloche dans la barre du haut — sa
+   décision du 11/09 : « la place la plus logique »), avec un INTERRUPTEUR gris/vert à la place du bouton
+   « ✅ Activer », qui donnait l'impression d'être déjà coché. onChoix remonte le choix (Activer / Plus tard)
+   pour éteindre le point orange porté par l'onglet. */
+function PushCarte({medId,medecins=[],onChoix}){
   const [etat,setEtat]=React.useState(()=>pushEtatInitial(medId));
   const [choix,setChoix]=React.useState(()=>{try{return localStorage.getItem(PUSH_CHOIX_KEY)||"";}catch(e){return "";}});
   const [depuis,setDepuis]=React.useState(()=>{try{const on=JSON.parse(localStorage.getItem(PUSH_ON_KEY)||"null");return on&&String(on.med)===String(medId)?on.at:null;}catch(e){return null;}});
@@ -9525,7 +9529,7 @@ function PushBouton({medId,medecins=[]}){
   const moi=(medecins||[]).find(m=>String(m.id)===String(medId))||{};
   const docDe=(tok)=>({tok,med:String(medId),role:moi.role==="attache"?"attache":"medecin",init:moi.init||"",nom:moi.nom||"",lib:pushLibAppareil(),at:Date.now(),ver:APP_VERSION});
   const ecrire=async(tok)=>{const c=window.pushDB&&window.pushDB();if(!c)throw new Error("Firebase indisponible");await c.doc(pushDevId()).set(docDe(tok));};
-  const poserChoix=(v)=>{setChoix(v);try{localStorage.setItem(PUSH_CHOIX_KEY,v);}catch(e){}};
+  const poserChoix=(v)=>{setChoix(v);try{localStorage.setItem(PUSH_CHOIX_KEY,v);}catch(e){}if(onChoix)onChoix(v);};
   /* au changement de personne ou à l'ouverture : recalcul + rafraîchissement silencieux du jeton */
   React.useEffect(()=>{
     const e0=pushEtatInitial(medId);setEtat(e0);
@@ -9556,42 +9560,37 @@ function PushBouton({medId,medecins=[]}){
     try{localStorage.removeItem(PUSH_ON_KEY);}catch(e){}
     setDepuis(null);setEtat("off");poserChoix("off");toast("Notifications désactivées sur cet appareil","info");
   };
-  const point=!choix&&(etat==="off");   /* rien encore choisi : petit point sur la cloche */
-  const on=etat==="on";
+  const on=etat==="on",attente=etat==="attente",possible=etat==="on"||etat==="off"||attente;
   const fmtDepuis=(t)=>{if(!t)return "";const d=new Date(t);return isNaN(d)?"":d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});};
-  const P={fontSize:12,color:"var(--txt)",lineHeight:1.45,margin:"0 0 8px"};
-  return <div style={{position:"relative",flexShrink:0}}>
-    <button onClick={()=>setOpen(o=>!o)} title={on?"Notifications actives sur cet appareil":"Notifications sur cet appareil"}
-      style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:open?"rgba(255,255,255,.18)":"rgba(255,255,255,.1)",color:on?"#4ade80":"#f0f6fc",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
-      🔔{point&&<span style={{position:"absolute",top:2,right:2,width:7,height:7,borderRadius:"50%",background:"#f59e0b",border:"1px solid var(--hdr)"}}/>}
-    </button>
-    {open&&<div className="no-print" style={{...S.card,position:"fixed",top:HDR_H+6,left:8,zIndex:300,width:"min(360px, 94vw)",boxShadow:"0 8px 28px rgba(0,0,0,.35)"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-        <div style={{fontSize:13,fontWeight:800,color:"#1d4ed8"}}>🔔 Notifications sur cet appareil</div>
-        <button onClick={()=>setOpen(false)} title="Fermer" style={{...S.icnBtn,marginLeft:"auto",fontSize:11}}>✕</button>
-      </div>
+  const P={fontSize:12,color:"var(--txt)",lineHeight:1.45,margin:"0 0 6px"};
+  const appareil=pushLibAppareil();
+  return <div style={{...S.card,marginBottom:12}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+      <div style={{fontSize:13,fontWeight:800,color:"#1d4ed8"}}>🔔 Notifications sur cet appareil</div>
+      {possible&&<div style={{display:"flex",alignItems:"center",gap:8,marginLeft:"auto"}}>
+        <span style={{fontSize:12,fontWeight:700,color:on?"#15803d":"var(--txt2)"}}>{attente?"…":on?"Activées":"Désactivées"}</span>
+        {/* interrupteur : gris à gauche = non, vert à droite = oui */}
+        <button onClick={on?desactiver:activer} disabled={attente} role="switch" aria-checked={on} title={on?"Cliquer pour désactiver sur cet appareil":"Cliquer pour activer sur cet appareil"}
+          style={{width:46,height:26,borderRadius:13,border:"none",padding:0,cursor:attente?"default":"pointer",background:on?"#16a34a":"#9ca3af",position:"relative",transition:"background .2s",opacity:attente?.6:1,flexShrink:0}}>
+          <span style={{position:"absolute",top:3,left:on?23:3,width:20,height:20,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,.35)",transition:"left .2s"}}/>
+        </button>
+      </div>}
+    </div>
+    <div style={{marginTop:6}}>
       {etat==="noconf"&&<p style={P}>Les notifications ne sont pas encore configurées par l'éditeur (clé d'envoi manquante). Réessayez après la prochaine mise à jour.</p>}
       {etat==="ios"&&<p style={P}>Sur iPhone, les notifications ne fonctionnent que depuis l'application <b>installée sur l'écran d'accueil</b> : dans Safari, bouton Partager puis « Sur l'écran d'accueil ». Ouvrez ensuite CardioPlanning depuis son icône et revenez ici.</p>}
       {etat==="nonsupp"&&<p style={P}>Ce navigateur ne permet pas les notifications. Sur ordinateur, Chrome ou Edge conviennent ; sur téléphone, Chrome (Android) ou l'application installée (iPhone).</p>}
       {etat==="refuse"&&<p style={P}>Les notifications ont été <b>refusées</b> pour ce site. Pour les autoriser à nouveau, passez par les réglages du navigateur (icône à gauche de l'adresse → Notifications) — sur iPhone, Réglages → Notifications → CardioPlanning.</p>}
-      {(etat==="off"||etat==="attente")&&<div>
+      {(etat==="off"||attente)&&<div>
         <p style={P}>Recevez une notification quand un <b>message vous est adressé</b> dans CardioPlanning : changement de votre tour, garde, message nommé, annonce aux {moi.role==="attache"?"attachés":"médecins"}. La notification dit seulement qu'un message vous attend — son contenu reste dans l'application.</p>
-        <p style={{...P,color:"var(--txt2)",fontSize:11}}>Réglage propre à cet appareil ({pushLibAppareil()}) : vous pouvez l'activer sur plusieurs appareils, chacun recevra la notification.</p>
+        <p style={{...P,color:"var(--txt2)",fontSize:11}}>Réglage propre à cet appareil ({appareil}) : vous pouvez l'activer sur plusieurs appareils, chacun recevra la notification.{!choix&&<span> — <a href="#" onClick={e=>{e.preventDefault();poserChoix("plus_tard");}} style={{color:"var(--txt2)"}}>Plus tard</a></span>}</p>
         {erreur&&<p style={{...P,color:"#dc2626"}}>{erreur}</p>}
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <button onClick={activer} disabled={etat==="attente"} style={{...S.btnP,opacity:etat==="attente"?.6:1}}>{etat==="attente"?"…":"✅ Activer"}</button>
-          <button onClick={()=>{poserChoix("plus_tard");setOpen(false);}} style={{...S.icnBtn,fontSize:12}}>Plus tard</button>
-        </div>
       </div>}
-      {etat==="on"&&<div>
-        <p style={P}>✅ <b>Activées</b> sur cet appareil ({pushLibAppareil()}{depuis?", depuis le "+fmtDepuis(depuis):""}) pour {moi.init||"vous"}. Vous serez prévenu(e) dès qu'un message vous est adressé — quelques minutes après son envoi.</p>
-        <p style={{...P,color:"var(--txt2)",fontSize:11}}>Désactiver ne concerne que cet appareil ; vos autres appareils gardent leur réglage.</p>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <button onClick={desactiver} style={{...S.icnBtn,fontSize:12,color:"#dc2626",borderColor:"#dc2626"}}>Désactiver</button>
-          <button onClick={()=>setOpen(false)} style={{...S.icnBtn,fontSize:12}}>Fermer</button>
-        </div>
+      {on&&<div>
+        <p style={P}>Activées sur cet appareil ({appareil}{depuis?", depuis le "+fmtDepuis(depuis):""}) pour {moi.init||"vous"}. Vous serez prévenu(e) dès qu'un message vous est adressé — quelques minutes après son envoi.</p>
+        <p style={{...P,color:"var(--txt2)",fontSize:11}}>L'interrupteur ne concerne que cet appareil ; vos autres appareils gardent leur réglage.</p>
       </div>}
-    </div>}
+    </div>
   </div>;
 }
 
@@ -11067,10 +11066,18 @@ function CardioPlanning(){
   const attPeutMod=(medId)=>{const me=medecins.find(m=>m.id===editMedId)||{};const t=medecins.find(m=>m.id===medId)||{};
     return (((t.role)||"medecin")==="attache")&&((me.attEdit)||[]).indexOf(t.init)>=0;};
   /* v9.15 : visibilité des onglets unifiée par rôle — un onglet inutile au rôle n'est pas affiché */
-  const hideTabs=accessMode==="interneEdit"?["construire","tourmedical","garde","astreinte","reports","attache","plantype","equipe","activites","stats","partage"]
+  /* v10.212 : DROITS DE L'ONGLET NOTIFICATIONS (sa règle du 11/09) — lecture seule et internes : pas d'onglet ;
+     médecin basique ou attaché entré avec son code : sa seule tuile, sans coche ✓ ; intermédiaires, éditeurs,
+     secrétaires et cadres : tout le monde. Et un point orange sur l'onglet tant que la personne n'a pas choisi
+     pour les notifications de l'appareil (carte 🔔 en tête de l'onglet, v10.212). */
+  const notifMoi=accessMode==="medecinEdit"?(medecins.find(m=>m.id===editMedId)||{}):null;
+  const notifSeulId=notifMoi&&(notifMoi.role==="attache"||(notifMoi.niveau||"basic")==="basic")?editMedId:null;
+  const [pushChoix,setPushChoix]=useState(()=>{try{return localStorage.getItem(PUSH_CHOIX_KEY)||"";}catch(e){return "";}});
+  const pushPoint=accessMode==="medecinEdit"&&editMedId!=null&&!pushChoix&&pushEtatInitial(editMedId)==="off";
+  const hideTabs=accessMode==="interneEdit"?["construire","tourmedical","garde","astreinte","reports","attache","plantype","equipe","activites","stats","partage","notifications"]
     :accessMode==="adminEdit"?["activites","equipe","partage","plantype","stats","astreinte","construire"]
     :isMedEdit?["activites","equipe","partage"].concat(isInterEdit&&!isAttEdit?[]:["construire"]).concat(isInterEdit?[]:["stats"])   /* v10.133 : Stats n'est rendu que pour l'éditeur et le niveau intermédiaire — l'onglet était proposé vide aux autres (trouvé par le contrôle 18) */
-    :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage","construire"]:[];
+    :accessMode==="view"?["tourmedical","activites","equipe","reports","stats","partage","construire","notifications"]:[];
   const canAst=isEdit||(accessMode==="medecinEdit"&&!netOff&&((medecins.find(m=>m.id===editMedId)||{}).astreinte===true));
   const orderedTabs=tabOrder.map(id=>DEFAULT_TABS.find(t2=>t2[0]===id)).filter(Boolean)
     .filter(([tid])=>hideTabs.indexOf(tid)<0&&HIDDEN_TABS.indexOf(tid)<0&&(tid!=="internes"||intCfg.show===true));
@@ -12533,8 +12540,6 @@ header::-webkit-scrollbar { display: none; }
             <button onClick={doRedo} disabled={!canRedo} title="Rétablir (retour avant)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canRedo?"rgba(255,255,255,.1)":"transparent",color:canRedo?"#f0f6fc":"#484f58",cursor:canRedo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↷</button>
           </div>}
-          {/* v10.211 : notifications sur l'appareil — pour qui est entré avec son code (c'est lui qu'on notifie) */}
-          {accessMode==="medecinEdit"&&editMedId!=null&&<PushBouton medId={editMedId} medecins={medecins}/>}
           <div>
             {/* v10.176 : le mot « CardioPlanning » retiré — ~110 px rendus au nav sur téléphone ; les témoins (👁, période, Firebase) grandissent à sa place */}
             <div style={{fontSize:13,color:"#484f58",display:"flex",alignItems:"center",gap:5}}>
@@ -12559,7 +12564,7 @@ header::-webkit-scrollbar { display: none; }
               onDragOver={e=>{e.preventDefault();}}
               onDrop={e=>{ e.preventDefault(); if(dragTab&&dragTab!==v){ setTabOrder(p=>{ const a=[...p],fi=a.indexOf(dragTab),ti=a.indexOf(v); a.splice(fi,1); a.splice(ti,0,dragTab); return a; }); } setDragTab(null); }}
               onClick={()=>goTab(v)}
-              style={{...S.nb,...(tab===v?S.nba:{}),cursor:"grab",userSelect:"none"}}>{l}{v==="partage"&&sigNouv>0&&<span style={{marginLeft:4,background:"#dc2626",color:"#fff",borderRadius:9,padding:"0 5px",fontSize:9,fontWeight:800}}>{sigNouv}</span>}</button>
+              style={{...S.nb,...(tab===v?S.nba:{}),cursor:"grab",userSelect:"none"}}>{l}{v==="partage"&&sigNouv>0&&<span style={{marginLeft:4,background:"#dc2626",color:"#fff",borderRadius:9,padding:"0 5px",fontSize:9,fontWeight:800}}>{sigNouv}</span>}{v==="notifications"&&pushPoint&&<span title="Notifications sur cet appareil : à choisir" style={{marginLeft:4,display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#f59e0b",verticalAlign:"middle"}}/>}</button>
           ))}
         </nav>
       </header>
@@ -12840,7 +12845,7 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
       {tab==="internes"&&<InternesView annJour={annJourDe("internes")} notes={notesAff} setNotes={setNotes} onCellHistory={isAnyEdit?openCellHistory:null} intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
-      {tab==="notifications"&&<div>{isEdit&&<AnnEditeur annonces={annonces} setAnnonces={setAnnonces} medecins={medsAff}/>}<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff} darkMode={darkMode} setDarkMode={setDarkMode}/></div>}
+      {tab==="notifications"&&<div>{accessMode==="medecinEdit"&&editMedId!=null&&<PushCarte medId={editMedId} medecins={medecins} onChoix={setPushChoix}/>}{isEdit&&<AnnEditeur annonces={annonces} setAnnonces={setAnnonces} medecins={medsAff}/>}<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff&&notifSeulId==null} seulId={notifSeulId} darkMode={darkMode} setDarkMode={setDarkMode}/></div>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
