@@ -27,7 +27,7 @@
 <script>
 /* v10.211 : clé PUBLIQUE d'envoi des notifications (Firebase → Paramètres du projet → Cloud Messaging → Web Push certificates).
    Vide = notifications non configurées : le bouton 🔔 le dit et ne fait rien. */
-window.PUSH_VAPID="";
+window.PUSH_VAPID="BF-fxgtq9n1kwk1WJ3zrdpnKOkMQLPTEBnI3ucKM5ttk4hpn9RsKmT6MkhBuKojtzfrYTqMKc8xlSWvutO1vF4w";
 firebase.initializeApp({apiKey:"AIzaSyCTyQVUAvsZta9RISMBmqmRKOlqFHoa4wI",authDomain:"planning-cardio-chl-et-chb.firebaseapp.com",projectId:"planning-cardio-chl-et-chb",storageBucket:"planning-cardio-chl-et-chb.firebasestorage.app",messagingSenderId:"628915396436",appId:"1:628915396436:web:30f0e67a527d89b58a32c1"});
 const _db=firebase.firestore();window.firebaseDB=_db;
 try{_db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){} /* v9.10 : cache local des données (mode hors ligne) */
