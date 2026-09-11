@@ -198,7 +198,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.212 — 11/09/2026";
+var APP_VERSION = "v10.213 — 11/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -851,7 +851,7 @@ function histProps(onCellHistory, medId, y, m, d, sl) {
         onTouchStart: function () { _gvLpF = false; clearTimeout(_gvLpT); _gvLpT = setTimeout(function () { _gvLpF = true; onCellHistory(medId, y, m, d, sl); }, 600); },
         onTouchEnd: function () { return clearTimeout(_gvLpT); }, onTouchMove: function () { return clearTimeout(_gvLpT); } };
 }
-function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, meds, getEntries, acteById, onCell, isEdit, notes = {}, isVac, applyGarde, allMeds, viewPeriod, allDays4, showFull, showGarde = true, intGarde = null, gardeLocked = false, onCellHistory = null, getAstreinteForDay, prefFor = null, gardePref = null, printWk = null, memX = null, selfId = null, centreId = null, lis = LIS, suiviId = null, onSuivi = null, annJour = null, gardeSelf = null, gardeOuvert = null, onPrevenir = null }) {
+function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, meds, getEntries, acteById, onCell, isEdit, notes = {}, isVac, applyGarde, allMeds, viewPeriod, allDays4, showFull, showGarde = true, intGarde = null, gardeLocked = false, onCellHistory = null, getAstreinteForDay, prefFor = null, gardePref = null, printWk = null, memX = null, selfId = null, centreId = null, lis = LIS, suiviId = null, onSuivi = null, annJour = null, gardeSelf = null, gardeOuvert = null, onPrevenir = null, pushMeds = null }) {
     /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
        disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
        partie → la case du jour est hachurée et verrouillée, et la personne
@@ -917,10 +917,11 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
             React.createElement("div", { style: S.mTit2 }, "\u2713 Garde enregistr\u00E9e"),
             React.createElement("button", { onClick: () => setPickGardeDay(null), style: S.xBtn }, "\u00D7")),
         React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, D.txt),
-        React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", fontWeight: 700, marginBottom: 8 } }, "Prévenir " + D.init + " ? Une bannière visible 14 jours, par lui seul."),
+        React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", fontWeight: 700, marginBottom: 8 } }, "Prévenir " + pushIni(pushMeds, { id: D.mid, init: D.init }) + " ? Une bannière visible 14 jours, par lui seul."),
+        React.createElement("div", { style: { marginBottom: 8 } }, React.createElement(PushCase, { on: !D.nopush, set: v => setPickGardeDayFull(o => (Object.assign(Object.assign({}, o), { done: Object.assign(Object.assign({}, o.done), { nopush: !v }) }))) })),
         React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" } },
             React.createElement("button", { onClick: () => setPickGardeDay(null), style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 12 }) }, "Fermer sans pr\u00E9venir"),
-            React.createElement("button", { onClick: () => { onPrevenir && onPrevenir([{ mid: D.mid, niv: "orange", txt: "Garde : " + D.txt }]); setPickGardeDay(null); }, style: Object.assign(Object.assign({}, S.btnP), { background: "#f59e0b" }) }, "📣 Prévenir " + D.init)));
+            React.createElement("button", { onClick: () => { onPrevenir && onPrevenir([{ mid: D.mid, niv: "orange", txt: "Garde : " + D.txt }], !D.nopush); setPickGardeDay(null); }, style: Object.assign(Object.assign({}, S.btnP), { background: "#f59e0b" }) }, "📣 Prévenir " + D.init)));
 })() :
     React.createElement("div", { style: { minWidth: 280 } },
         React.createElement("div", { style: S.mHd },
@@ -3972,7 +3973,8 @@ function RapportTour(_a) {
 }
 var jrnWkLbl = function (wk) { var p = String(wk).split("-").map(Number); return p[2] + " " + SECR_M[p[1]]; };
 function TourJournal(_a) {
-    var jrn = _a.jrn, medecins = _a.medecins, setBuild = _a.setBuild, perKey = _a.perKey, onPrevenir = _a.onPrevenir, peut = _a.peut;
+    var jrn = _a.jrn, medecins = _a.medecins, setBuild = _a.setBuild, perKey = _a.perKey, onPrevenir = _a.onPrevenir, peut = _a.peut, _b = _a.pushMeds, pushMeds = _b === void 0 ? null : _b;
+    var _c = React.useState(true), push = _c[0], setPush = _c[1]; /* v10.213 : aussi par notification — AVANT les retours anticipés (règle des hooks) */
     var ks = Object.keys(jrn || {});
     if (!ks.length)
         return null;
@@ -3989,23 +3991,26 @@ function TourJournal(_a) {
             return;
         if (!window.confirm("Créer une bannière pour chacun des " + meds.length + " médecin" + (meds.length > 1 ? "s" : "") + " concerné" + (meds.length > 1 ? "s" : "") + " (visible 14 jours, par lui seul), puis vider cet encart ?"))
             return;
-        onPrevenir(meds.map(function (x) { return ({ mid: x.m.id, niv: "rouge", txt: "Changement de votre tour : " + x.l.map(ligne).join(" · ") }); }));
+        onPrevenir(meds.map(function (x) { return ({ mid: x.m.id, niv: "rouge", txt: "Changement de votre tour : " + x.l.map(ligne).join(" · ") }); }), push);
         vider();
     };
+    var nAvec = pushMeds ? meds.filter(function (x) { return pushA(pushMeds, x.m.id); }).length : null;
     return React.createElement("div", { style: { marginTop: 6, marginBottom: 14, padding: "9px 12px", borderRadius: 9, border: "1.5px solid #f59e0b", background: "rgba(245,158,11,.08)" } },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 } },
             React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "#b45309" } }, "📣 Changements du tour depuis sa validation — " + meds.length + " médecin" + (meds.length > 1 ? "s" : "") + " à prévenir"),
-            peut && React.createElement("div", { style: { display: "flex", gap: 6, marginLeft: "auto", flexWrap: "wrap" } },
+            peut && React.createElement("div", { style: { display: "flex", gap: 8, marginLeft: "auto", flexWrap: "wrap", alignItems: "center" } },
+                React.createElement(PushCase, { on: push, set: setPush, note: nAvec == null ? null : (nAvec + " sur " + meds.length + " " + (nAvec > 1 ? "les ont" : "les a") + " activées") }),
                 React.createElement("button", { onClick: prevenir, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "none", background: "#f59e0b", color: "#fff", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCE3 Pr\u00E9venir les m\u00E9decins concern\u00E9s"),
                 React.createElement("button", { onClick: function () { if (window.confirm("Vider l'encart sans prévenir personne ?"))
                         vider(); }, style: __assign(__assign({}, S.icnBtn), { fontSize: 11 }) }, "Vider sans pr\u00E9venir"))),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 6 } }, meds.map(function (x) { return React.createElement("div", { key: x.mid, style: { display: "flex", gap: 8, alignItems: "flex-start", padding: "5px 8px", borderRadius: 7, background: "var(--bg2)", border: "1px solid var(--border2)" } },
             React.createElement("span", { style: { width: 26, height: 26, borderRadius: "50%", background: x.m.color, color: "#fff", fontSize: 10, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, x.m.init),
+            pushA(pushMeds, x.m.id) && React.createElement("span", { title: "A activ\u00E9 les notifications", style: { fontSize: 12, marginLeft: -4 } }, "\uD83D\uDD14"),
             React.createElement("div", { style: { fontSize: 11 } }, x.l.map(function (e, i2) { return React.createElement("div", { key: i2, style: { color: e.s > 0 ? "#3fb950" : "#f85149", fontWeight: 700 } }, ligne(e)); }))); })),
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 6 } }, "Rien n'est envoy\u00E9 tant que vous n'appuyez pas : un aller-retour sur la m\u00EAme semaine s'annule de lui-m\u00EAme."));
 }
 function TourTab(_a) {
-    var _b = _a.noNav, noNav = _b === void 0 ? false : _b, _c = _a.specColors, specColors = _c === void 0 ? null : _c, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, tourPtOte = _a.tourPtOte, setTourPtOte = _a.setTourPtOte, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, tourHist = _a.tourHist, tourHistDeb = _a.tourHistDeb, _bn0 = _a.intCfg, intCfg = _bn0 === void 0 ? null : _bn0, medecins = _a.medecins, getEntries = _a.getEntries, isEditIn = _a.isEdit, edReel = _a.edReel, build = _a.build, secrDif = _a.secrDif, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast, vRef = _a.vRef, vToast = _a.vToast, _actes = _a.actes, actes = _actes === void 0 ? null : _actes, _ods = _a.onDaySwap, onDaySwap = _ods === void 0 ? null : _ods, setBuild = _a.setBuild === undefined ? null : _a.setBuild, onPrevenir = _a.onPrevenir === undefined ? null : _a.onPrevenir; /* v10.192 : actes, pour les couleurs HC / USIC ; v10.209 : encart des changements */
+    var _b = _a.noNav, noNav = _b === void 0 ? false : _b, _c = _a.specColors, specColors = _c === void 0 ? null : _c, tourMins = _a.tourMins, tourMinsHard = _a.tourMinsHard, tourAvoid = _a.tourAvoid, tourWish = _a.tourWish, applyTPForWeek = _a.applyTPForWeek, cleanTPForWeek = _a.cleanTPForWeek, clearWeekActivities = _a.clearWeekActivities, reapplyPTWeek = _a.reapplyPTWeek, purgeTourExtras = _a.purgeTourExtras, plan = _a.plan, tourDerog = _a.tourDerog, tourPtOte = _a.tourPtOte, setTourPtOte = _a.setTourPtOte, lastReport = _a.lastReport, setLastReport = _a.setLastReport, tourCfg = _a.tourCfg, setTourCfg = _a.setTourCfg, tourYear = _a.year, tourMonth = _a.month, setTourYear = _a.setYear, setTourMonth = _a.setMonth, tourMed = _a.tourMed, setTourMed = _a.setTourMed, tourHist = _a.tourHist, tourHistDeb = _a.tourHistDeb, _bn0 = _a.intCfg, intCfg = _bn0 === void 0 ? null : _bn0, medecins = _a.medecins, getEntries = _a.getEntries, isEditIn = _a.isEdit, edReel = _a.edReel, build = _a.build, secrDif = _a.secrDif, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, planningType = _a.planningType, setPlan = _a.setPlan, allDays = _a.allDays, toast = _a.toast, vRef = _a.vRef, vToast = _a.vToast, _actes = _a.actes, actes = _actes === void 0 ? null : _actes, _ods = _a.onDaySwap, onDaySwap = _ods === void 0 ? null : _ods, setBuild = _a.setBuild === undefined ? null : _a.setBuild, onPrevenir = _a.onPrevenir === undefined ? null : _a.onPrevenir, _pm = _a.pushMeds, pushMeds = _pm === undefined ? null : _pm; /* v10.192 : actes, pour les couleurs HC / USIC ; v10.209 : encart des changements */
     /* v10.159 : deux niveaux de droits dans la tuile Tour.
        — edReel (vrais éditeurs) : répartition automatique, 🗑 Retirer, rapport ;
        — isEdit (le geste MANUEL — attribution, échanges) : les éditeurs toujours,
@@ -5917,7 +5922,7 @@ function TourTab(_a) {
                                                 onDaySwap(t3.jr.id, t3.y, t3.m, t3.d); }, title: t3.txt + (clic ? " — cliquer pour choisir un autre remplaçant" : ""), style: { fontSize: 10, fontWeight: 800, color: "#8b5cf6", padding: "1px 7px", borderRadius: 5, background: "rgba(139,92,246,.10)", border: "1px solid rgba(139,92,246,.35)", cursor: clic ? "pointer" : "default", fontFamily: "inherit" } }, (t3.jr ? t3.jr.init : "?") + " → " + (t3.tp ? t3.tp.init : "?") + " " + t3.d + "/" + (t3.m + 1));
                                     }))))));
                 })))),
-        React.createElement(TourJournal, { jrn: (((build || {})[perKeyT] || {}).tourJrn) || {}, medecins: medecins, setBuild: setBuild, perKey: perKeyT, onPrevenir: onPrevenir, peut: isEdit }) /* v10.209 */,
+        React.createElement(TourJournal, { pushMeds: pushMeds, jrn: (((build || {})[perKeyT] || {}).tourJrn) || {}, medecins: medecins, setBuild: setBuild, perKey: perKeyT, onPrevenir: onPrevenir, peut: isEdit }) /* v10.209 */,
         /* v10.165 : tableau des binômes — lecture seule, ouvert à tous les niveaux */
         binOpen && (React.createElement(Ov, { wide: true, onClose: function () { return setBinOpen(false); } },
             React.createElement("div", { style: __assign(__assign({}, S.modal), { width: "100%", maxHeight: "88vh", overflowY: "auto" }), onClick: function (e) { return e.stopPropagation(); } }, /* v10.169 : le tableau tenait dans 840 px et se coupait */
@@ -6392,7 +6397,8 @@ const HELP_SECTIONS=[
   HP({children:["Les messages dont toutes les dates sont passées restent listés « terminé » pendant 90 jours, puis disparaissent au prochain enregistrement."]}),
   HT({children:"Notifications sur le téléphone ou l'ordinateur (v10.211, v10.212)"}),
   HP({children:["Toute personne entrée avec ",HE("b",null,"son code"),' (médecin ou attaché) trouve, en tête de l\'onglet 🔔 Notifications, une carte « Notifications sur cet appareil » avec un ',HE("b",null,"interrupteur"),' : gris, elles sont éteintes ; un clic demande l\'autorisation au navigateur, puis l\'appareil est rangé sous votre nom et l\'interrupteur passe au vert. Un second clic les retire — cet appareil seulement, les autres gardent leur réglage. Un point orange sur l\'onglet rappelle que rien n\'a encore été choisi ; « Plus tard » l\'éteint.']}),
-  HP({children:["Vous êtes prévenu(e) quand un ",HE("b",null,"message vous est adressé"),' : bannière nommée (« Prévenir les médecins concernés », tour, garde) ou annonce de l\'éditeur cochée pour les médecins ou pour les attachés. La notification est volontairement neutre — « Un message vous attend dans CardioPlanning » — et un appui l\'ouvre ; le contenu reste dans l\'application. Elle arrive quelques minutes après l\'envoi, jamais à l\'instant : un script tourne toutes les dix minutes.']}),
+  HP({children:["Vous êtes prévenu(e) quand un ",HE("b",null,"message vous est adressé"),' : bannière nommée (« Prévenir les médecins concernés », tour, garde) ou annonce de l\'éditeur cochée pour les médecins ou pour les attachés — à condition que son auteur ait laissé cochée la case ',HE("b",null,"📱 Aussi par notification"),' (v10.213 : cochée d\'office dans l\'éditeur de messages et aux trois « Prévenir » ; décochée, le message reste une simple bannière). La notification est volontairement neutre — « Un message vous attend dans CardioPlanning » — et un appui l\'ouvre ; le contenu reste dans l\'application. Elle arrive quelques minutes après l\'envoi, jamais à l\'instant : un script tourne toutes les dix minutes.']}),
+  HP({children:[HE("b",null,"Qui a activé (éditeur seul, v10.213)"),' : en tête de la section 📣 Messages, une ligne nomme ceux qui ont activé les notifications sur au moins un appareil et ceux qui ne l\'ont pas fait ; dans l\'éditeur, les initiales des personnes nommables portent 🔔 quand elles recevront la notification, de même que les médecins de l\'encart Prévenir de la tuile Tour et les noms des modales d\'échange et de garde. Cette lecture se rafraîchit à chaque changement d\'onglet.']}),
   HP({last:true,children:["Sur ",HE("b",null,"iPhone"),', cela ne fonctionne que depuis l\'application installée sur l\'écran d\'accueil (Partager → « Sur l\'écran d\'accueil », iOS 16.4 ou plus) ; sur Android et sur ordinateur, Chrome ou Edge suffisent. Une autorisation refusée se rouvre dans les réglages du navigateur (ou du téléphone).']}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
@@ -8079,9 +8085,9 @@ function AnnBanniere({ annonces, fam, medId = null, masques, setMasques }) {
                 React.createElement("button", { onClick: () => cacher(a.id, true), title: "Ne plus afficher ce message sur cet appareil", style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 11 }) }, "Ne plus afficher")));
     }));
 }
-function AnnEditeur({ annonces, setAnnonces, medecins = [] }) {
+function AnnEditeur({ annonces, setAnnonces, medecins = [], pushMeds = null }) {
     const auj = annToday();
-    const neuf = () => ({ id: "a" + Date.now().toString(36), at: Date.now(), txt: "", ban: true, plan: false, d1: auj, d2: annPlus(auj, 7), aud: { med: 1, att: 1, sec: 1, cad: 1 }, niv: "vert", jour: auj, slot: "M", tabs: { planning: 1 }, color: ANN_COLORS[0] });
+    const neuf = () => ({ id: "a" + Date.now().toString(36), at: Date.now(), txt: "", push: true, ban: true, plan: false, d1: auj, d2: annPlus(auj, 7), aud: { med: 1, att: 1, sec: 1, cad: 1 }, niv: "vert", jour: auj, slot: "M", tabs: { planning: 1 }, color: ANN_COLORS[0] });
     const [ed, setEd] = React.useState(null); /* message en cours d'édition, null = formulaire fermé */
     const [sup, setSup] = React.useState(null); /* id dont la suppression attend une confirmation */
     const set = (k, v) => setEd(o => (Object.assign(Object.assign({}, o), { [k]: v })));
@@ -8114,7 +8120,7 @@ function AnnEditeur({ annonces, setAnnonces, medecins = [] }) {
     const lib = (a) => {
         const parts = [];
         if (a.ban)
-            parts.push(annNivDe(a)[1].slice(0, 2) + " bannière " + annNivDe(a)[1].slice(3).toLowerCase() + " du " + annFmt(a.d1) + " au " + annFmt(a.d2) + " · pour " + ((a.meds && a.meds.length) ? a.meds.map(nomDe).join(", ") + " (nommés)" : ANN_AUD.filter(x => (a.aud || {})[x[0]]).map(x => x[1].toLowerCase()).join(", ")));
+            parts.push(annNivDe(a)[1].slice(0, 2) + " bannière " + annNivDe(a)[1].slice(3).toLowerCase() + " du " + annFmt(a.d1) + " au " + annFmt(a.d2) + " · pour " + ((a.meds && a.meds.length) ? a.meds.map(nomDe).join(", ") + " (nommés)" : ANN_AUD.filter(x => (a.aud || {})[x[0]]).map(x => x[1].toLowerCase()).join(", ")) + (a.push === true ? " · 📱 notification" : ""));
         if (a.plan)
             parts.push("📅 dans la grille le " + annFmt(a.jour) + " (" + (a.slot === "AM" ? "après-midi" : "matin") + ") · " + ANN_TABS.filter(x => (a.tabs || {})[x[0]]).map(x => x[1]).join(", "));
         return parts;
@@ -8127,6 +8133,7 @@ function AnnEditeur({ annonces, setAnnonces, medecins = [] }) {
             React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#1d4ed8" } }, "\uD83D\uDCE3 Messages"),
             !ed && React.createElement("button", { onClick: () => { setEd(neuf()); setSup(null); }, style: Object.assign(Object.assign({}, S.btnP), { marginLeft: "auto" }) }, "+ Nouveau message")),
         React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "Une annonce en banni\u00E8re (chacun peut la masquer ou ne plus l'afficher sur son appareil), une ligne dans la grille du planning, ou les deux. R\u00E9serv\u00E9 \u00E0 l'\u00E9diteur."),
+        React.createElement(PushQui, { pushMeds: pushMeds, medecins: medecins }),
         ed && React.createElement("div", { style: { border: "1px solid var(--border)", borderRadius: 9, padding: "10px 12px", marginBottom: 10, background: "var(--bg2)" } },
             React.createElement("div", { style: lbl }, "Texte du message"),
             React.createElement("textarea", { value: ed.txt, onChange: e => set("txt", e.target.value), rows: 2, placeholder: "Ex. : R\u00E9partition de garde lundi 14 \u00E0 8h", style: Object.assign(Object.assign({}, S.fi), { width: "100%", resize: "vertical", marginBottom: 10 }) }),
@@ -8149,10 +8156,12 @@ function AnnEditeur({ annonces, setAnnonces, medecins = [] }) {
                     chip(false, "1 mois", () => set("d2", annPlus(ed.d1, 0, true)))),
                 React.createElement("div", { style: lbl }, "Importance"),
                 React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 } }, ANN_NIV.map(n => chip((ed.niv || "vert") === n[0], n[1], () => set("niv", n[0])))),
+                React.createElement("div", { style: { marginBottom: 8 } },
+                    React.createElement(PushCase, { on: ed.push === true, set: v => set("push", v), note: "sur les t\u00E9l\u00E9phones de ceux qui les ont activ\u00E9es (\uD83D\uDD14 ci-dessous)" })),
                 React.createElement("div", { style: lbl }, "Visible par"),
                 React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", opacity: (ed.meds || []).length ? .45 : 1 } }, ANN_AUD.map(([k, t]) => chip(!!(ed.aud || {})[k], t, () => coche("aud", k)))),
                 React.createElement("div", { style: Object.assign(Object.assign({}, lbl), { marginTop: 8 }) }, "\u2026ou seulement ces personnes (elles seules le verront, quel que soit leur code)"),
-                React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, nommables.map(m => chip((ed.meds || []).indexOf(m.id) >= 0, m.init, () => cocheMed(m.id))))),
+                React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, nommables.map(m => chip((ed.meds || []).indexOf(m.id) >= 0, pushIni(pushMeds, m), () => cocheMed(m.id))))),
             ed.plan && React.createElement("div", { style: { borderTop: "1px solid var(--border2)", paddingTop: 8, marginBottom: 8 } },
                 React.createElement("div", { style: lbl },
                     "Ligne dans la grille \u2014 le ",
@@ -8181,7 +8190,6 @@ function AnnEditeur({ annonces, setAnnonces, medecins = [] }) {
                 React.createElement("button", { onClick: () => supprimer(a.id), style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 11, color: "#ef4444", fontWeight: sup === a.id ? 800 : 500 }) }, sup === a.id ? "Confirmer ?" : "Supprimer"));
         }));
 }
-
 function SecrTab(_a) {
     var medecins = _a.medecins, acteById = _a.acteById, secrNotif = _a.secrNotif, setSecrNotif = _a.setSecrNotif, canAck = _a.canAck, darkMode = _a.darkMode, setDarkMode = _a.setDarkMode, secrAtts = _a.secrAtts, _sid = _a.seulId, seulId = _sid === void 0 ? null : _sid; /* v10.212 : seulId = ne montrer que cette personne (médecin basique, attaché) */
     var _b = React.useState({}), ouvert = _b[0], setOuvert = _b[1];
@@ -10517,6 +10525,37 @@ function PushCarte({ medId, medecins = [], onChoix }) {
                     moi.init || "vous",
                     ". Vous serez pr\u00E9venu(e) d\u00E8s qu'un message vous est adress\u00E9 \u2014 quelques minutes apr\u00E8s son envoi."),
                 React.createElement("p", { style: Object.assign(Object.assign({}, P), { color: "var(--txt2)", fontSize: 11 }) }, "L'interrupteur ne concerne que cet appareil ; vos autres appareils gardent leur r\u00E9glage."))));
+}
+
+/* v10.213 : NOTIFICATION PAR MESSAGE + QUI A ACTIVÉ.
+   · un message porte push:true quand il doit AUSSI partir en notification sur les téléphones (case
+     « 📱 Aussi par notification », cochée d'office dans l'éditeur et aux trois « Prévenir ») ; le script
+     envoi-push.js n'envoie plus que ceux-là — un message sans cette case reste une simple bannière ;
+   · pushMeds = ensemble des identifiants (chaînes) des personnes qui ont AU MOINS UN appareil dans la
+     collection « push », lu par l'éditeur seul à l'ouverture des onglets concernés (une personne, pas
+     un compte d'appareils — sa demande du 11/09) ; 🔔 après des initiales = elle recevra la notification. */
+const pushA = (pushMeds, id) => !!(pushMeds && pushMeds.has && pushMeds.has(String(id)));
+const pushIni = (pushMeds, m) => ((m && m.init) || "?") + (pushA(pushMeds, m && m.id) ? " 🔔" : "");
+function PushCase({ on, set, note }) {
+    return React.createElement("label", { style: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "var(--txt2)", cursor: "pointer" } },
+        React.createElement("input", { type: "checkbox", checked: !!on, onChange: e => set(e.target.checked) }),
+        "\uD83D\uDCF1 Aussi par notification",
+        note ? React.createElement("span", { style: { fontWeight: 500 } }, " — " + note) : null);
+}
+function PushQui({ pushMeds, medecins }) {
+    if (!pushMeds)
+        return null;
+    const l = (medecins || []).filter(m => ((m.role || "medecin") === "medecin" || m.role === "attache") && !medParti(m));
+    const avec = l.filter(m => pushA(pushMeds, m.id)), sans = l.filter(m => !pushA(pushMeds, m.id));
+    return React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8, lineHeight: 1.5 } },
+        React.createElement("b", null, "\uD83D\uDD14 Notifications activ\u00E9es"),
+        " : ",
+        avec.length ? avec.map(m => m.init).join(", ") : "personne",
+        sans.length ? React.createElement("span", null,
+            " \u00B7 ",
+            React.createElement("b", null, "sans"),
+            " : ",
+            sans.map(m => m.init).join(", ")) : null);
 }
 
 function CardioPlanning() {
@@ -12988,6 +13027,11 @@ function CardioPlanning() {
        médecin basique ou attaché entré avec son code : sa seule tuile, sans coche ✓ ; intermédiaires, éditeurs,
        secrétaires et cadres : tout le monde. Et un point orange sur l'onglet tant que la personne n'a pas choisi
        pour les notifications de l'appareil (carte 🔔 en tête de l'onglet, v10.212). */
+    /* v10.213 : qui a activé les notifications — lu par l'éditeur seul (collection « push »), à chaque changement d'onglet */
+    var _pms = useState(null), pushMeds = _pms[0], setPushMeds = _pms[1];
+    useEffect(function () { if (!isEdit || !window.pushDB) { setPushMeds(null); return; } var vivant = true;
+        try { window.pushDB().get().then(function (snap) { var s = new Set(); snap.forEach(function (d) { var x = (d && d.data && d.data()) || {}; if (x.med) s.add(String(x.med)); }); if (vivant) setPushMeds(s); }).catch(function () { }); } catch (e) { }
+        return function () { vivant = false; }; }, [isEdit, tab]);
     var notifMoi = accessMode === "medecinEdit" ? (medecins.find(function (m) { return m.id === editMedId; }) || {}) : null;
     var notifSeulId = notifMoi && (notifMoi.role === "attache" || (notifMoi.niveau || "basic") === "basic") ? editMedId : null;
     var _pc = useState(function () { try { return localStorage.getItem(PUSH_CHOIX_KEY) || ""; } catch (e) { return ""; } }), pushChoix = _pc[0], setPushChoix = _pc[1];
@@ -13009,8 +13053,8 @@ function CardioPlanning() {
     /* v10.203 : famille du profil connecté, pour cibler les annonces (le code éditeur voit tout) */
     var annFam = accessMode === "edit" ? "edit" : accessMode === "view" ? "view" : accessMode === "adminEdit" ? (isCadre ? "cad" : "sec") : accessMode === "interneEdit" ? "int" : ((((medecins.find(function (m) { return m.id === editMedId; }) || {}).role) || "medecin") === "attache" ? "att" : "med");
     /* v10.209 : PRÉVENIR — une bannière par personne nommée (14 jours), visible d'elle seule */
-    var annPrevenir = function (list) { var l = (list || []).filter(function (x) { return x && x.mid != null; }); if (!l.length) return; var auj = annToday(), base = Date.now().toString(36);
-        setAnnonces(function (a) { return (a || []).concat(l.map(function (x, i2) { return { id: "p" + base + i2, at: Date.now(), txt: x.txt, ban: true, plan: false, d1: auj, d2: annPlus(auj, 14), aud: {}, meds: [x.mid], niv: x.niv || "orange", color: ANN_COLORS[0] }; })); });
+    var annPrevenir = function (list, push) { var l = (list || []).filter(function (x) { return x && x.mid != null; }); if (!l.length) return; var auj = annToday(), base = Date.now().toString(36);
+        setAnnonces(function (a) { return (a || []).concat(l.map(function (x, i2) { return { id: "p" + base + i2, at: Date.now(), push: push !== false, txt: x.txt, ban: true, plan: false, d1: auj, d2: annPlus(auj, 14), aud: {}, meds: [x.mid], niv: x.niv || "orange", color: ANN_COLORS[0] }; })); });
         toast(l.length + " personne" + (l.length > 1 ? "s" : "") + " prévenue" + (l.length > 1 ? "s" : "") + " — bannière visible 14 jours", "info"); };
     var annJourDe = function (tabId) { return function (y, m, d) { return annDuJour(annonces, tabId, y, m, d); }; }; /* v10.69 : interne connecte (hors ligne = lecture seule) */
     /* v10.146 : verrou de l'avenir — profil de la personne, état de chaque période à venir (lu dans Construire
@@ -15062,7 +15106,7 @@ function CardioPlanning() {
             return;
         Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, { appVer: APP_VERSION }, { merge: true })).then(function () { VER_STALE.on = false; setStale(false); toast("Version rétablie : " + APP_VERSION, "info"); }).catch(function () { return toast("Échec du rétablissement", "warn"); });
     };
-    var tourProps = { medecins: medsAff, specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, tourPtOte: tourPtOte, setTourPtOte: setTourPtOte, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, tourHist: tourHist, tourHistDeb: tourHistDeb, intCfg: intCfg, getEntries: getEntries, isEdit: isEdit || (isInterEdit && !isAttEdit), edReel: isEdit, build: build, secrDif: secrCfg.dif || {}, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast, vRef: vRef, vToast: vToast, actes: actes, setBuild: setBuild, onPrevenir: annPrevenir, onDaySwap: function (medId, y2, m2, d2) { setMData({ medId: medId, y: y2, m: m2, d: d2, fromTour: true }); setModal("daySwap"); } }; /* v10.193 : depuis la puce TP de la tuile Tour */
+    var tourProps = { medecins: medsAff, specColors: specColors, tourMins: tourMins, tourMinsHard: tourMinsHard, tourAvoid: tourAvoid, tourWish: tourWish, applyTPForWeek: applyTPForWeek, cleanTPForWeek: cleanTPForWeek, clearWeekActivities: clearWeekActivities, reapplyPTWeek: reapplyPTWeek, purgeTourExtras: purgeTourExtras, plan: plan, tourDerog: tourDerog, tourPtOte: tourPtOte, setTourPtOte: setTourPtOte, lastReport: tourReport, setLastReport: setTourReport, tourCfg: tourCfg, setTourCfg: setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed: tourMed, setTourMed: setTourMed, tourHist: tourHist, tourHistDeb: tourHistDeb, intCfg: intCfg, getEntries: getEntries, isEdit: isEdit || (isInterEdit && !isAttEdit), edReel: isEdit, build: build, secrDif: secrCfg.dif || {}, darkMode: darkMode, setDarkMode: setDarkMode, planningType: planningType, setPlan: setPlan, allDays: allDays, toast: toast, vRef: vRef, vToast: vToast, actes: actes, setBuild: setBuild, onPrevenir: annPrevenir, pushMeds: pushMeds, onDaySwap: function (medId, y2, m2, d2) { setMData({ medId: medId, y: y2, m: m2, d: d2, fromTour: true }); setModal("daySwap"); } }; /* v10.193 : depuis la puce TP de la tuile Tour */
     var gardeProps = { onRemoveGarde: removeGardeDay, printWk: printWk, onPrint: function () { return setModal("print"); }, year: year, month: month, prevM: prevM, nextM: nextM, medecins: medsAff, getEntry: getEntry, allDays: allDays, isEdit: isEdit, applyGarde: applyGarde, isMedAvailable: isMedAvailable, plan: plan, setPlan: setPlan, darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod, tourMed: tourMed, gardeAvoid: gardeAvoid, gardeWish: gardeWish, toast: toast };
     return (React.createElement("div", { style: S.app },
         React.createElement("style", null, setFoldCSS() + "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');\n*{box-sizing:border-box;margin:0;padding:0}\n::-webkit-scrollbar{width:5px;height:5px}\n::-webkit-scrollbar-track{background:var(--bg)}\n::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}\ntd{background:var(--bg2)}\n\nnav{scrollbar-width:none;-ms-overflow-style:none}\nnav::-webkit-scrollbar { display: none; }\n/* v10.52 : sur ordinateur (pointeur souris), la barre reapparait \u2014 le navigateur\n   ne la dessine que si les onglets debordent, elle reste invisible sinon */\n@media (pointer:fine){\n  nav{scrollbar-width:thin}\n  nav::-webkit-scrollbar{display:block;height:5px}\n}\nheader::-webkit-scrollbar { display: none; }\n\n@media print {\n  html { font-size: 90% !important; overflow: visible !important; zoom: 1 !important; }   /* v10.161 : le verrou de page ne gêne pas l'impression */\n\n  /* Forcer toutes les variables CSS en mode clair */\n  html, :root {\n    --bg: #ffffff !important;\n    --bg2: #ffffff !important;\n    --bg-n: #e8edf5 !important;     /* Nuit : gris-bleu l\u00E9ger */\n    --bg-we: #fdf5e4 !important;    /* Weekend : cr\u00E8me l\u00E9ger */\n    --bg-weh: #faefd0 !important;   /* Weekend header : cr\u00E8me */\n    --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert tr\u00E8s l\u00E9ger */\n    --border: #cbd5e1 !important;\n    --border2: #e2e8f0 !important;\n    --txt: #1e293b !important;\n    --txt2: #475569 !important;\n    --txt3: #64748b !important;\n    --th: #f1f5f9 !important;\n    --td-fix: #f1f5f9 !important;\n    --today-c: #15803d !important;\n    --nav-act: #dcfce7 !important;\n    --nav-act-c: #15803d !important;\n  }\n\n  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }\n\n  /* Masquer header, nav, boutons */\n  header, nav, button, .no-print { display: none !important; }\n\n  /* Fond blanc par d\u00E9faut, texte noir */\n  body, div, span, p, h2, main {\n    color: #1e293b !important;\n    box-shadow: none !important;\n  }\n  body { background: white !important; }\n  /* td/th utilisent les variables CSS pour garder les couleurs nuit/WE/today */\n  td, th { color: #1e293b !important; box-shadow: none !important; }\n\n  /* CONSERVER les couleurs des badges d'activit\u00E9 */\n  div[style*=\"JetBrains Mono\"] {\n    -webkit-print-color-adjust: exact !important;\n    print-color-adjust: exact !important;\n  }\n\n  /* Tableaux */\n  table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; }\n  tr { page-break-inside: avoid; }\n  td, th { border: 1px solid #cbd5e1 !important; }\n\n  /* S\u00E9parateur de semaine = coupure de page */\n  tr[style*=\"border-top: 3px\"] { page-break-before: always; }\n\n  /* Masquer scrollbars */\n  div { overflow: visible !important; max-height: none !important; }\n\n  /* Marges */\n  @page { margin: 1cm; size: A4 landscape; }\n}\n"),
@@ -15247,7 +15291,7 @@ function CardioPlanning() {
                     filtOpen && React.createElement("div", { "data-keep": "1", style: { position: "absolute", top: "100%", left: 0, zIndex: 60, marginTop: 4, padding: 8, borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg)", boxShadow: "0 6px 18px rgba(0,0,0,.18)", display: "flex", flexWrap: "wrap", gap: 4, maxWidth: "min(92vw,520px)" } },
                         React.createElement("button", { onClick: function () { return setPlanFilter([]); }, style: { padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border)", background: planFilter.length === 0 ? "#1d4ed8" : "var(--bg2)", color: planFilter.length === 0 ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: 600 } }, "Tous"),
                         medPlan.map(function (m) { var on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: function () { return setPlanFilter(function (p) { return on ? p.filter(function (x) { return x !== m.id; }) : __spreadArray(__spreadArray([], p, true), [m.id], false); }); }, style: { padding: "2px 7px", borderRadius: 10, border: "1px solid ".concat(on ? m.color : "var(--border)"), background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); }))),
-                React.createElement(GridV, { annJour: annJourDe("planning"), onRemoveGarde: removeGardeDay, planIssues: planIssues.map, intGarde: intGardeOn ? (function (y2, m2, d2) { return intGardeDuJour(getEntries, intCfgAff, y2, m2, d2); }) : null, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, gardeSelf: gardeSelfId, gardeOuvert: gardeOuvert, onPrevenir: annPrevenir, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, prefFor: prefOn ? prefFor : null, gardePref: gardePrefFor, getAstreinteForDay: prefOn ? null : astSelf, memX: "planning", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
+                React.createElement(GridV, { annJour: annJourDe("planning"), onRemoveGarde: removeGardeDay, planIssues: planIssues.map, intGarde: intGardeOn ? (function (y2, m2, d2) { return intGardeDuJour(getEntries, intCfgAff, y2, m2, d2); }) : null, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, gardeSelf: gardeSelfId, gardeOuvert: gardeOuvert, onPrevenir: annPrevenir, pushMeds: pushMeds, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, prefFor: prefOn ? prefFor : null, gardePref: gardePrefFor, getAstreinteForDay: prefOn ? null : astSelf, memX: "planning", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
             tab === "tourmedical" && React.createElement(TourTab, __assign({}, tourProps)),
             tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medsAff, getEntries: getEntries, tourMed: tourMed, isEdit: (isEdit || isInterEdit) && !isAttEdit, edReel: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: function (per) { return openPtModal(null, "apply", per); }, onRemovePT: function (per) { return openPtModal(null, "remove", per); }, secrDif: secrCfg.dif || {}, onDiffuser: function (pid) { return setSecrCfg(function (c) {
                     var _a;
@@ -15332,7 +15376,7 @@ function CardioPlanning() {
                     btnPrint,
                     btnDark,
                     btnSig)),
-                React.createElement(GridV, { annJour: annJourDe("attache"), onRemoveGarde: removeGardeDay, planIssues: attIssues.map, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, gardeSelf: gardeSelfId, gardeOuvert: gardeOuvert, onPrevenir: annPrevenir, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: astSelf, memX: "attache", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
+                React.createElement(GridV, { annJour: annJourDe("attache"), onRemoveGarde: removeGardeDay, planIssues: attIssues.map, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: __spreadArray(__spreadArray([], medAttache, true), medecins.filter(function (m) { return m.role === "ide"; }), true), getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, gardeSelf: gardeSelfId, gardeOuvert: gardeOuvert, onPrevenir: annPrevenir, pushMeds: pushMeds, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, showGarde: false, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: isAnyEdit ? openCellHistory : null, getAstreinteForDay: astSelf, memX: "attache", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
             tab === "activites" && (React.createElement("div", null,
                 React.createElement("div", { style: S.bar },
                     React.createElement("h2", { style: S.mTit },
@@ -15414,7 +15458,7 @@ function CardioPlanning() {
             tab === "internes" && React.createElement(InternesView, { annJour: annJourDe("internes"), notes: notesAff, setNotes: setNotes, onCellHistory: isAnyEdit ? openCellHistory : null, intCfg: intCfgAff, setIntCfg: setIntCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, setShowFull: setShowFull, canEdit: isEdit || (isInterEdit && !isAttEdit) || isAdminEdit || isInterne, canSalle: isEdit || (isInterEdit && !isAttEdit) || (isAdminEdit && isCadre), intSelf: isInterne, salleReg: salleReg, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "notifications" && React.createElement("div", null,
                 accessMode === "medecinEdit" && editMedId != null && React.createElement(PushCarte, { medId: editMedId, medecins: medecins, onChoix: setPushChoix }),
-                isEdit && React.createElement(AnnEditeur, { annonces: annonces, setAnnonces: setAnnonces, medecins: medsAff }),
+                isEdit && React.createElement(AnnEditeur, { annonces: annonces, setAnnonces: setAnnonces, medecins: medsAff, pushMeds: pushMeds }),
                 React.createElement(SecrTab, { medecins: medsAff, acteById: acteById, secrNotif: secrNotif, setSecrNotif: setSecrNotif, secrAtts: secrCfg.atts || [], canAck: !netOff && notifSeulId == null, seulId: notifSeulId, darkMode: darkMode, setDarkMode: setDarkMode })),
             tab === "aide" && React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 6 } },
@@ -16853,10 +16897,11 @@ function CardioPlanning() {
                     React.createElement("div", { style: S.mTit2 }, "\u2713 \u00C9change enregistr\u00E9"),
                     React.createElement("button", { onClick: function () { return setModal(null); }, style: S.xBtn }, "\u00D7")),
                 React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, D_1.txt),
-                dest_1.length > 0 && React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", fontWeight: 700, marginBottom: 8 } }, "Prévenir " + dest_1.map(function (x) { return x.init; }).join(" et ") + " ? Une bannière visible 14 jours, par " + (dest_1.length > 1 ? "chacun d'eux seulement" : "lui seul") + "."),
+                dest_1.length > 0 && React.createElement("div", { style: { fontSize: 12, color: "var(--txt)", fontWeight: 700, marginBottom: 8 } }, "Prévenir " + dest_1.map(function (x) { return pushIni(pushMeds, x); }).join(" et ") + " ? Une bannière visible 14 jours, par " + (dest_1.length > 1 ? "chacun d'eux seulement" : "lui seul") + "."),
+                dest_1.length > 0 && React.createElement("div", { style: { marginBottom: 8 } }, React.createElement(PushCase, { on: !D_1.nopush, set: function (v) { setMData(function (o) { return __assign(__assign({}, o), { _done: __assign(__assign({}, o._done), { nopush: !v }) }); }); } })),
                 React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" } },
                     React.createElement("button", { onClick: function () { return setModal(null); }, style: __assign(__assign({}, S.icnBtn), { fontSize: 12 }) }, dest_1.length ? "Fermer sans prévenir" : "Fermer"),
-                    dest_1.length > 0 && React.createElement("button", { onClick: function () { annPrevenir(dest_1.map(function (x) { return ({ mid: x.id, niv: "orange", txt: "Tour : " + D_1.txt }); })); setModal(null); }, style: __assign(__assign({}, S.btnP), { background: "#f59e0b" }) }, "📣 Prévenir " + dest_1.map(function (x) { return x.init; }).join(" et "))))));
+                    dest_1.length > 0 && React.createElement("button", { onClick: function () { annPrevenir(dest_1.map(function (x) { return ({ mid: x.id, niv: "orange", txt: "Tour : " + D_1.txt }); }), !D_1.nopush); setModal(null); }, style: __assign(__assign({}, S.btnP), { background: "#f59e0b" }) }, "📣 Prévenir " + dest_1.map(function (x) { return x.init; }).join(" et "))))));
     }
     return (React.createElement(Ov, { onClose: function () { return setModal(mData.fromTour ? null : "cell"); } },
         React.createElement("div", { style: __assign(__assign({}, S.modal), { maxWidth: 430 }), onClick: function (e) { return e.stopPropagation(); } },

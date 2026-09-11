@@ -6,7 +6,7 @@
 //   1. s'authentifie auprès de Google avec la clé de compte de service (secret FCM_SERVICE_ACCOUNT) ;
 //   2. lit dans Firestore le document planning/main (ses « annonces ») et la collection « push »
 //      (un document par appareil : jeton, personne, rôle) ;
-//   3. pour chaque bannière RÉCENTE (créée il y a moins de 30 jours), ACTIVE (d1 ≤ aujourd'hui ≤ d2)
+//   3. pour chaque bannière RÉCENTE (créée il y a moins de 30 jours), COCHÉE « aussi par notification » (push:true), ACTIVE (d1 ≤ aujourd'hui ≤ d2)
 //      et pas encore poussée, trouve les personnes visées — nommées (meds), ou par famille (médecins,
 //      attachés) — et envoie à chacun de leurs appareils une notification NEUTRE :
 //      « Un message vous attend dans CardioPlanning » ;
@@ -104,7 +104,8 @@ const vise = (a, app) => { if (a.meds && a.meds.length) return a.meds.map(String
   let done = {}; try { done = JSON.parse((champs(etatDoc).done) || "{}") || {}; } catch (e) { done = {}; }
   const appareils = docs.filter(d => !/\/push\/_etat$/.test(d.name)).map(d => Object.assign({ nom: d.name }, champs(d))).filter(a => a.tok && a.med);
   const jour = auj(), lim = Date.now() - JOURS_MAX * 86400000;
-  const aFaire = annonces.filter(a => a && a.ban && a.at && a.at >= lim && (!a.d1 || a.d1 <= jour) && (!a.d2 || a.d2 >= jour) && !done[a.id]);
+  // v10.213 : seuls les messages cochés « 📱 Aussi par notification » (push:true) partent ; les autres restent de simples bannières
+const aFaire = annonces.filter(a => a && a.ban && a.push === true && a.at && a.at >= lim && (!a.d1 || a.d1 <= jour) && (!a.d2 || a.d2 >= jour) && !done[a.id]);
   console.log(annonces.length + " message(s) dans planning/" + PLAN_ID + ", " + appareils.length + " appareil(s) enregistré(s), " + aFaire.length + " bannière(s) à pousser" + (ESSAI ? " — ESSAI, rien ne part" : ""));
   const morts = new Set(); let nEnv = 0, nErr = 0;
   for (const a of aFaire) {

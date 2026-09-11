@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.212 — 11/09/2026";
+const APP_VERSION="v10.213 — 11/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -710,7 +710,7 @@ function histProps(onCellHistory,medId,y,m,d,sl){
     onTouchEnd:()=>clearTimeout(_gvLpT),onTouchMove:()=>clearTimeout(_gvLpT)};
 }
 
-function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null,annJour=null,gardeSelf=null,gardeOuvert=null,onPrevenir=null}){   /* v10.205 : gardeSelf = médecin basique (ses gardes seulement), gardeOuvert(y,m,d) = gardes validées ? */
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null,annJour=null,gardeSelf=null,gardeOuvert=null,onPrevenir=null,pushMeds=null}){   /* v10.205 : gardeSelf = médecin basique (ses gardes seulement), gardeOuvert(y,m,d) = gardes validées ? */
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
      disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
      partie → la case du jour est hachurée et verrouillée, et la personne
@@ -767,10 +767,11 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
         return <div style={{minWidth:280}}>
           <div style={S.mHd}><div style={S.mTit2}>✓ Garde enregistrée</div><button onClick={()=>setPickGardeDay(null)} style={S.xBtn}>×</button></div>
           <div style={{fontSize:12,color:"var(--txt2)",marginBottom:10}}>{D.txt}</div>
-          <div style={{fontSize:12,color:"var(--txt)",fontWeight:700,marginBottom:8}}>{"Prévenir "+D.init+" ? Une bannière visible 14 jours, par lui seul."}</div>
+          <div style={{fontSize:12,color:"var(--txt)",fontWeight:700,marginBottom:8}}>{"Prévenir "+pushIni(pushMeds,{id:D.mid,init:D.init})+" ? Une bannière visible 14 jours, par lui seul."}</div>
+          <div style={{marginBottom:8}}><PushCase on={!D.nopush} set={v=>setPickGardeDayFull(o=>({...o,done:{...o.done,nopush:!v}}))}/></div>
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
             <button onClick={()=>setPickGardeDay(null)} style={{...S.icnBtn,fontSize:12}}>Fermer sans prévenir</button>
-            <button onClick={()=>{onPrevenir&&onPrevenir([{mid:D.mid,niv:"orange",txt:"Garde : "+D.txt}]);setPickGardeDay(null);}} style={{...S.btnP,background:"#f59e0b"}}>{"📣 Prévenir "+D.init}</button>
+            <button onClick={()=>{onPrevenir&&onPrevenir([{mid:D.mid,niv:"orange",txt:"Garde : "+D.txt}],!D.nopush);setPickGardeDay(null);}} style={{...S.btnP,background:"#f59e0b"}}>{"📣 Prévenir "+D.init}</button>
           </div>
         </div>;})():
       <div style={{minWidth:280}}>
@@ -3798,7 +3799,8 @@ function RapportTour({txt,onEchange}){
    concerné. Rien ne part tant qu'on n'appuie pas sur Prévenir : on peut tâtonner. Le bouton suit
    les droits de la tuile (éditeur toujours, intermédiaire quand la période lui est ouverte). */
 const jrnWkLbl=(wk)=>{const p=String(wk).split("-").map(Number);return p[2]+" "+SECR_M[p[1]];};
-function TourJournal({jrn,medecins,setBuild,perKey,onPrevenir,peut}){
+function TourJournal({jrn,medecins,setBuild,perKey,onPrevenir,peut,pushMeds=null}){
+  const [push,setPush]=React.useState(true);   /* v10.213 : aussi par notification — AVANT les retours anticipés (règle des hooks) */
   const ks=Object.keys(jrn||{});
   if(!ks.length)return null;
   const par={};
@@ -3809,11 +3811,13 @@ function TourJournal({jrn,medecins,setBuild,perKey,onPrevenir,peut}){
   const vider=()=>{if(!setBuild)return;setBuild(b=>{const n={...(b||{})};const cur={...(n[perKey]||{})};delete cur.tourJrn;n[perKey]=cur;return n;});};
   const prevenir=()=>{if(!onPrevenir)return;
     if(!window.confirm("Créer une bannière pour chacun des "+meds.length+" médecin"+(meds.length>1?"s":"")+" concerné"+(meds.length>1?"s":"")+" (visible 14 jours, par lui seul), puis vider cet encart ?"))return;
-    onPrevenir(meds.map(x=>({mid:x.m.id,niv:"rouge",txt:"Changement de votre tour : "+x.l.map(ligne).join(" · ")})));vider();};
+    onPrevenir(meds.map(x=>({mid:x.m.id,niv:"rouge",txt:"Changement de votre tour : "+x.l.map(ligne).join(" · ")})),push);vider();};
+  const nAvec=pushMeds?meds.filter(x=>pushA(pushMeds,x.m.id)).length:null;
   return <div style={{marginTop:6,marginBottom:14,padding:"9px 12px",borderRadius:9,border:"1.5px solid #f59e0b",background:"rgba(245,158,11,.08)"}}>
     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
       <span style={{fontSize:12,fontWeight:800,color:"#b45309"}}>{"📣 Changements du tour depuis sa validation — "+meds.length+" médecin"+(meds.length>1?"s":"")+" à prévenir"}</span>
-      {peut&&<div style={{display:"flex",gap:6,marginLeft:"auto",flexWrap:"wrap"}}>
+      {peut&&<div style={{display:"flex",gap:8,marginLeft:"auto",flexWrap:"wrap",alignItems:"center"}}>
+        <PushCase on={push} set={setPush} note={nAvec==null?null:(nAvec+" sur "+meds.length+" "+(nAvec>1?"les ont":"les a")+" activées")}/>
         <button onClick={prevenir} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"none",background:"#f59e0b",color:"#fff",fontWeight:800,cursor:"pointer"}}>📣 Prévenir les médecins concernés</button>
         <button onClick={()=>{if(window.confirm("Vider l'encart sans prévenir personne ?"))vider();}} style={{...S.icnBtn,fontSize:11}}>Vider sans prévenir</button>
       </div>}
@@ -3821,6 +3825,7 @@ function TourJournal({jrn,medecins,setBuild,perKey,onPrevenir,peut}){
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:6}}>
       {meds.map(x=><div key={x.mid} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border2)"}}>
         <span style={{width:26,height:26,borderRadius:"50%",background:x.m.color,color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{x.m.init}</span>
+        {pushA(pushMeds,x.m.id)&&<span title="A activé les notifications" style={{fontSize:12,marginLeft:-4}}>🔔</span>}
         <div style={{fontSize:11}}>{x.l.map((e,i2)=><div key={i2} style={{color:e.s>0?"#3fb950":"#f85149",fontWeight:700}}>{ligne(e)}</div>)}</div>
       </div>)}
     </div>
@@ -3828,7 +3833,7 @@ function TourJournal({jrn,medecins,setBuild,perKey,onPrevenir,peut}){
   </div>;
 }
 
-function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg=null,medecins,getEntries,isEdit:isEditIn,edReel,build,secrDif,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes=null,onDaySwap=null,setBuild=null,onPrevenir=null}){   /* v10.192 : actes, pour les couleurs HC / USIC ; v10.193 : onDaySwap, la modale « ⇄ Échanger ce jour de tour » du Planning ; v10.209 : setBuild + onPrevenir pour l'encart des changements */
+function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg=null,medecins,getEntries,isEdit:isEditIn,edReel,build,secrDif,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes=null,onDaySwap=null,setBuild=null,pushMeds=null,onPrevenir=null}){   /* v10.192 : actes, pour les couleurs HC / USIC ; v10.193 : onDaySwap, la modale « ⇄ Échanger ce jour de tour » du Planning ; v10.209 : setBuild + onPrevenir pour l'encart des changements */
   /* v10.159 : deux niveaux de droits dans la tuile Tour.
      — edReel (vrais éditeurs) : répartition automatique, 🗑 Retirer, rapport ;
      — isEdit (le geste MANUEL — attribution, échanges) : les éditeurs toujours,
@@ -5291,7 +5296,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
           </tbody>
         </table>
       </div>
-      <TourJournal jrn={(((build||{})[perKeyT]||{}).tourJrn)||{}} medecins={medecins} setBuild={setBuild} perKey={perKeyT} onPrevenir={onPrevenir} peut={isEdit}/>{/* v10.209 */}
+      <TourJournal pushMeds={pushMeds} jrn={(((build||{})[perKeyT]||{}).tourJrn)||{}} medecins={medecins} setBuild={setBuild} perKey={perKeyT} onPrevenir={onPrevenir} peut={isEdit}/>{/* v10.209 */}
 
       {/* v10.165 : tableau des binômes — lecture seule, ouvert à tous les niveaux */}
       {binOpen&&(
@@ -5805,7 +5810,8 @@ const HELP_SECTIONS=[
   HP({children:["Les messages dont toutes les dates sont passées restent listés « terminé » pendant 90 jours, puis disparaissent au prochain enregistrement."]}),
   HT({children:"Notifications sur le téléphone ou l'ordinateur (v10.211, v10.212)"}),
   HP({children:["Toute personne entrée avec ",HE("b",null,"son code"),' (médecin ou attaché) trouve, en tête de l\'onglet 🔔 Notifications, une carte « Notifications sur cet appareil » avec un ',HE("b",null,"interrupteur"),' : gris, elles sont éteintes ; un clic demande l\'autorisation au navigateur, puis l\'appareil est rangé sous votre nom et l\'interrupteur passe au vert. Un second clic les retire — cet appareil seulement, les autres gardent leur réglage. Un point orange sur l\'onglet rappelle que rien n\'a encore été choisi ; « Plus tard » l\'éteint.']}),
-  HP({children:["Vous êtes prévenu(e) quand un ",HE("b",null,"message vous est adressé"),' : bannière nommée (« Prévenir les médecins concernés », tour, garde) ou annonce de l\'éditeur cochée pour les médecins ou pour les attachés. La notification est volontairement neutre — « Un message vous attend dans CardioPlanning » — et un appui l\'ouvre ; le contenu reste dans l\'application. Elle arrive quelques minutes après l\'envoi, jamais à l\'instant : un script tourne toutes les dix minutes.']}),
+  HP({children:["Vous êtes prévenu(e) quand un ",HE("b",null,"message vous est adressé"),' : bannière nommée (« Prévenir les médecins concernés », tour, garde) ou annonce de l\'éditeur cochée pour les médecins ou pour les attachés — à condition que son auteur ait laissé cochée la case ',HE("b",null,"📱 Aussi par notification"),' (v10.213 : cochée d\'office dans l\'éditeur de messages et aux trois « Prévenir » ; décochée, le message reste une simple bannière). La notification est volontairement neutre — « Un message vous attend dans CardioPlanning » — et un appui l\'ouvre ; le contenu reste dans l\'application. Elle arrive quelques minutes après l\'envoi, jamais à l\'instant : un script tourne toutes les dix minutes.']}),
+  HP({children:[HE("b",null,"Qui a activé (éditeur seul, v10.213)"),' : en tête de la section 📣 Messages, une ligne nomme ceux qui ont activé les notifications sur au moins un appareil et ceux qui ne l\'ont pas fait ; dans l\'éditeur, les initiales des personnes nommables portent 🔔 quand elles recevront la notification, de même que les médecins de l\'encart Prévenir de la tuile Tour et les noms des modales d\'échange et de garde. Cette lecture se rafraîchit à chaque changement d\'onglet.']}),
   HP({last:true,children:["Sur ",HE("b",null,"iPhone"),', cela ne fonctionne que depuis l\'application installée sur l\'écran d\'accueil (Partager → « Sur l\'écran d\'accueil », iOS 16.4 ou plus) ; sur Android et sur ordinateur, Chrome ou Edge suffisent. Une autorisation refusée se rouvre dans les réglages du navigateur (ou du téléphone).']}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
@@ -7439,9 +7445,9 @@ function AnnBanniere({annonces,fam,medId=null,masques,setMasques}){   /* v10.209
     </div>;})}
   </div>;
 }
-function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins, pour nommer des destinataires */
+function AnnEditeur({annonces,setAnnonces,medecins=[],pushMeds=null}){   /* v10.213 : pushMeds = qui a activé les notifications */   /* v10.209 : medecins, pour nommer des destinataires */
   const auj=annToday();
-  const neuf=()=>({id:"a"+Date.now().toString(36),at:Date.now(),txt:"",ban:true,plan:false,d1:auj,d2:annPlus(auj,7),aud:{med:1,att:1,sec:1,cad:1},niv:"vert",jour:auj,slot:"M",tabs:{planning:1},color:ANN_COLORS[0]});
+  const neuf=()=>({id:"a"+Date.now().toString(36),at:Date.now(),txt:"",push:true,ban:true,plan:false,d1:auj,d2:annPlus(auj,7),aud:{med:1,att:1,sec:1,cad:1},niv:"vert",jour:auj,slot:"M",tabs:{planning:1},color:ANN_COLORS[0]});
   const [ed,setEd]=React.useState(null);       /* message en cours d'édition, null = formulaire fermé */
   const [sup,setSup]=React.useState(null);     /* id dont la suppression attend une confirmation */
   const set=(k,v)=>setEd(o=>({...o,[k]:v}));
@@ -7462,7 +7468,7 @@ function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins
   const supprimer=(id)=>{if(sup!==id){setSup(id);return;}setAnnonces(l=>(l||[]).filter(a=>a.id!==id));setSup(null);};
   const lib=(a)=>{
     const parts=[];
-    if(a.ban)parts.push(annNivDe(a)[1].slice(0,2)+" bannière "+annNivDe(a)[1].slice(3).toLowerCase()+" du "+annFmt(a.d1)+" au "+annFmt(a.d2)+" · pour "+((a.meds&&a.meds.length)?a.meds.map(nomDe).join(", ")+" (nommés)":ANN_AUD.filter(x=>(a.aud||{})[x[0]]).map(x=>x[1].toLowerCase()).join(", ")));
+    if(a.ban)parts.push(annNivDe(a)[1].slice(0,2)+" bannière "+annNivDe(a)[1].slice(3).toLowerCase()+" du "+annFmt(a.d1)+" au "+annFmt(a.d2)+" · pour "+((a.meds&&a.meds.length)?a.meds.map(nomDe).join(", ")+" (nommés)":ANN_AUD.filter(x=>(a.aud||{})[x[0]]).map(x=>x[1].toLowerCase()).join(", "))+(a.push===true?" · 📱 notification":""));
     if(a.plan)parts.push("📅 dans la grille le "+annFmt(a.jour)+" ("+(a.slot==="AM"?"après-midi":"matin")+") · "+ANN_TABS.filter(x=>(a.tabs||{})[x[0]]).map(x=>x[1]).join(", "));
     return parts;
   };
@@ -7475,6 +7481,7 @@ function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins
       {!ed&&<button onClick={()=>{setEd(neuf());setSup(null);}} style={{...S.btnP,marginLeft:"auto"}}>+ Nouveau message</button>}
     </div>
     <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Une annonce en bannière (chacun peut la masquer ou ne plus l'afficher sur son appareil), une ligne dans la grille du planning, ou les deux. Réservé à l'éditeur.</div>
+    <PushQui pushMeds={pushMeds} medecins={medecins}/>
     {ed&&<div style={{border:"1px solid var(--border)",borderRadius:9,padding:"10px 12px",marginBottom:10,background:"var(--bg2)"}}>
       <div style={lbl}>Texte du message</div>
       <textarea value={ed.txt} onChange={e=>set("txt",e.target.value)} rows={2} placeholder="Ex. : Répartition de garde lundi 14 à 8h" style={{...S.fi,width:"100%",resize:"vertical",marginBottom:10}}/>
@@ -7491,10 +7498,11 @@ function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins
         </div>
         <div style={lbl}>Importance</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{ANN_NIV.map(n=>chip((ed.niv||"vert")===n[0],n[1],()=>set("niv",n[0])))}</div>
+        <div style={{marginBottom:8}}><PushCase on={ed.push===true} set={v=>set("push",v)} note="sur les téléphones de ceux qui les ont activées (🔔 ci-dessous)"/></div>
         <div style={lbl}>Visible par</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",opacity:(ed.meds||[]).length?.45:1}}>{ANN_AUD.map(([k,t])=>chip(!!(ed.aud||{})[k],t,()=>coche("aud",k)))}</div>
         <div style={{...lbl,marginTop:8}}>…ou seulement ces personnes (elles seules le verront, quel que soit leur code)</div>
-        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{nommables.map(m=>chip((ed.meds||[]).indexOf(m.id)>=0,m.init,()=>cocheMed(m.id)))}</div>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{nommables.map(m=>chip((ed.meds||[]).indexOf(m.id)>=0,pushIni(pushMeds,m),()=>cocheMed(m.id)))}</div>
       </div>}
       {ed.plan&&<div style={{borderTop:"1px solid var(--border2)",paddingTop:8,marginBottom:8}}>
         <div style={lbl}>Ligne dans la grille — le <input type="date" value={ed.jour||""} onChange={e=>set("jour",e.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/></div>
@@ -9594,6 +9602,27 @@ function PushCarte({medId,medecins=[],onChoix}){
   </div>;
 }
 
+/* v10.213 : NOTIFICATION PAR MESSAGE + QUI A ACTIVÉ.
+   · un message porte push:true quand il doit AUSSI partir en notification sur les téléphones (case
+     « 📱 Aussi par notification », cochée d'office dans l'éditeur et aux trois « Prévenir ») ; le script
+     envoi-push.js n'envoie plus que ceux-là — un message sans cette case reste une simple bannière ;
+   · pushMeds = ensemble des identifiants (chaînes) des personnes qui ont AU MOINS UN appareil dans la
+     collection « push », lu par l'éditeur seul à l'ouverture des onglets concernés (une personne, pas
+     un compte d'appareils — sa demande du 11/09) ; 🔔 après des initiales = elle recevra la notification. */
+const pushA=(pushMeds,id)=>!!(pushMeds&&pushMeds.has&&pushMeds.has(String(id)));
+const pushIni=(pushMeds,m)=>((m&&m.init)||"?")+(pushA(pushMeds,m&&m.id)?" 🔔":"");
+function PushCase({on,set,note}){
+  return <label style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,fontWeight:700,color:"var(--txt2)",cursor:"pointer"}}>
+    <input type="checkbox" checked={!!on} onChange={e=>set(e.target.checked)}/>📱 Aussi par notification{note?<span style={{fontWeight:500}}>{" — "+note}</span>:null}
+  </label>;
+}
+function PushQui({pushMeds,medecins}){
+  if(!pushMeds)return null;
+  const l=(medecins||[]).filter(m=>((m.role||"medecin")==="medecin"||m.role==="attache")&&!medParti(m));
+  const avec=l.filter(m=>pushA(pushMeds,m.id)),sans=l.filter(m=>!pushA(pushMeds,m.id));
+  return <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8,lineHeight:1.5}}><b>🔔 Notifications activées</b> : {avec.length?avec.map(m=>m.init).join(", "):"personne"}{sans.length?<span> · <b>sans</b> : {sans.map(m=>m.init).join(", ")}</span>:null}</div>;
+}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -11070,6 +11099,11 @@ function CardioPlanning(){
      médecin basique ou attaché entré avec son code : sa seule tuile, sans coche ✓ ; intermédiaires, éditeurs,
      secrétaires et cadres : tout le monde. Et un point orange sur l'onglet tant que la personne n'a pas choisi
      pour les notifications de l'appareil (carte 🔔 en tête de l'onglet, v10.212). */
+  /* v10.213 : qui a activé les notifications — lu par l'éditeur seul (collection « push »), à chaque changement d'onglet */
+  const [pushMeds,setPushMeds]=useState(null);
+  useEffect(()=>{if(!isEdit||!window.pushDB){setPushMeds(null);return;}let vivant=true;
+    try{window.pushDB().get().then(snap=>{const s=new Set();snap.forEach(d=>{const x=(d&&d.data&&d.data())||{};if(x.med)s.add(String(x.med));});if(vivant)setPushMeds(s);}).catch(()=>{});}catch(e){}
+    return ()=>{vivant=false;};},[isEdit,tab]);
   const notifMoi=accessMode==="medecinEdit"?(medecins.find(m=>m.id===editMedId)||{}):null;
   const notifSeulId=notifMoi&&(notifMoi.role==="attache"||(notifMoi.niveau||"basic")==="basic")?editMedId:null;
   const [pushChoix,setPushChoix]=useState(()=>{try{return localStorage.getItem(PUSH_CHOIX_KEY)||"";}catch(e){return "";}});
@@ -11089,8 +11123,8 @@ function CardioPlanning(){
   const annJourDe=(tabId)=>(y,m,d)=>annDuJour(annonces,tabId,y,m,d);
   /* v10.209 : PRÉVENIR — une bannière par personne nommée (14 jours), visible d'elle seule. Appelé par
      l'encart de l'onglet Tour, la modale d'échange de jour et la modale de garde d'un médecin basique. */
-  const annPrevenir=(list)=>{const l=(list||[]).filter(x=>x&&x.mid!=null);if(!l.length)return;const auj=annToday(),base=Date.now().toString(36);
-    setAnnonces(a=>(a||[]).concat(l.map((x,i2)=>({id:"p"+base+i2,at:Date.now(),txt:x.txt,ban:true,plan:false,d1:auj,d2:annPlus(auj,14),aud:{},meds:[x.mid],niv:x.niv||"orange",color:ANN_COLORS[0]}))));
+  const annPrevenir=(list,push)=>{const l=(list||[]).filter(x=>x&&x.mid!=null);if(!l.length)return;   /* v10.213 : push = aussi en notification (défaut oui) */const auj=annToday(),base=Date.now().toString(36);
+    setAnnonces(a=>(a||[]).concat(l.map((x,i2)=>({id:"p"+base+i2,at:Date.now(),push:push!==false,txt:x.txt,ban:true,plan:false,d1:auj,d2:annPlus(auj,14),aud:{},meds:[x.mid],niv:x.niv||"orange",color:ANN_COLORS[0]}))));
     toast(l.length+" personne"+(l.length>1?"s":"")+" prévenue"+(l.length>1?"s":"")+" — bannière visible 14 jours","info");}; /* v10.69 : interne connecte (hors ligne = lecture seule) */
   /* v10.146 : verrou de l'avenir — profil de la personne, état de chaque période à venir (lu dans Construire
      et dans les diffusions), dérogations. Posé dans vRef pour que les fonctions d'écriture le lisent sans dépendance. */
@@ -12406,7 +12440,7 @@ function CardioPlanning(){
     window.location.reload();};
   const verRetablir=()=>{if(!window.confirm("Déclarer CETTE version ("+APP_VERSION+") comme version en service ?\n\nÀ n'utiliser qu'après un retour volontaire à une version antérieure : toutes les copies plus récentes passeront à leur tour en lecture seule."))return;
     if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
-  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes,setBuild,onPrevenir:annPrevenir,onDaySwap:(medId,y2,m2,d2)=>{setMData({medId,y:y2,m:m2,d:d2,fromTour:true});setModal("daySwap");}};   /* v10.193 : depuis la puce TP de la tuile Tour */
+  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes,setBuild,onPrevenir:annPrevenir,pushMeds,onDaySwap:(medId,y2,m2,d2)=>{setMData({medId,y:y2,m:m2,d:d2,fromTour:true});setModal("daySwap");}};   /* v10.193 : depuis la puce TP de la tuile Tour */
   const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
@@ -12668,7 +12702,7 @@ header::-webkit-scrollbar { display: none; }
               {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             </div>}
           </div>
-          {<GridV annJour={annJourDe("planning")} onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} gardeSelf={gardeSelfId} gardeOuvert={gardeOuvert} onPrevenir={annPrevenir} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {<GridV annJour={annJourDe("planning")} onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} gardeSelf={gardeSelfId} gardeOuvert={gardeOuvert} onPrevenir={annPrevenir} pushMeds={pushMeds} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -12750,7 +12784,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>{iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}</React.Fragment>)}</div>
           </div>
           {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}</React.Fragment>)}
-          {<GridV annJour={annJourDe("attache")} onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} gardeSelf={gardeSelfId} gardeOuvert={gardeOuvert} onPrevenir={annPrevenir} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={astSelf} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {<GridV annJour={annJourDe("attache")} onRemoveGarde={removeGardeDay} planIssues={attIssues.map} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={[...medAttache,...medecins.filter(m=>m.role==="ide")]} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} gardeSelf={gardeSelfId} gardeOuvert={gardeOuvert} onPrevenir={annPrevenir} pushMeds={pushMeds} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} showGarde={false} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} getAstreinteForDay={astSelf} memX="attache" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -12845,7 +12879,7 @@ header::-webkit-scrollbar { display: none; }
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
       {tab==="internes"&&<InternesView annJour={annJourDe("internes")} notes={notesAff} setNotes={setNotes} onCellHistory={isAnyEdit?openCellHistory:null} intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
-      {tab==="notifications"&&<div>{accessMode==="medecinEdit"&&editMedId!=null&&<PushCarte medId={editMedId} medecins={medecins} onChoix={setPushChoix}/>}{isEdit&&<AnnEditeur annonces={annonces} setAnnonces={setAnnonces} medecins={medsAff}/>}<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff&&notifSeulId==null} seulId={notifSeulId} darkMode={darkMode} setDarkMode={setDarkMode}/></div>}
+      {tab==="notifications"&&<div>{accessMode==="medecinEdit"&&editMedId!=null&&<PushCarte medId={editMedId} medecins={medecins} onChoix={setPushChoix}/>}{isEdit&&<AnnEditeur annonces={annonces} setAnnonces={setAnnonces} medecins={medsAff} pushMeds={pushMeds}/>}<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff&&notifSeulId==null} seulId={notifSeulId} darkMode={darkMode} setDarkMode={setDarkMode}/></div>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
         const astMeds=medecins.filter(m=>m.astreinte===true);
@@ -14029,10 +14063,11 @@ header::-webkit-scrollbar { display: none; }
                 <button onClick={()=>setModal(null)} style={S.xBtn}>×</button>
               </div>
               <div style={{fontSize:12,color:"var(--txt2)",marginBottom:10}}>{D.txt}</div>
-              {dest.length>0&&<div style={{fontSize:12,color:"var(--txt)",fontWeight:700,marginBottom:8}}>{"Prévenir "+dest.map(x=>x.init).join(" et ")+" ? Une bannière visible 14 jours, par "+(dest.length>1?"chacun d'eux seulement":"lui seul")+"."}</div>}
+              {dest.length>0&&<div style={{fontSize:12,color:"var(--txt)",fontWeight:700,marginBottom:8}}>{"Prévenir "+dest.map(x=>pushIni(pushMeds,x)).join(" et ")+" ? Une bannière visible 14 jours, par "+(dest.length>1?"chacun d'eux seulement":"lui seul")+"."}</div>}
+              {dest.length>0&&<div style={{marginBottom:8}}><PushCase on={!D.nopush} set={v=>setMData(o=>({...o,_done:{...o._done,nopush:!v}}))}/></div>}
               <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
                 <button onClick={()=>setModal(null)} style={{...S.icnBtn,fontSize:12}}>{dest.length?"Fermer sans prévenir":"Fermer"}</button>
-                {dest.length>0&&<button onClick={()=>{annPrevenir(dest.map(x=>({mid:x.id,niv:"orange",txt:"Tour : "+D.txt})));setModal(null);}} style={{...S.btnP,background:"#f59e0b"}}>{"📣 Prévenir "+dest.map(x=>x.init).join(" et ")}</button>}
+                {dest.length>0&&<button onClick={()=>{annPrevenir(dest.map(x=>({mid:x.id,niv:"orange",txt:"Tour : "+D.txt})),!D.nopush);setModal(null);}} style={{...S.btnP,background:"#f59e0b"}}>{"📣 Prévenir "+dest.map(x=>x.init).join(" et ")}</button>}
               </div>
             </div>
           </Ov>);}
