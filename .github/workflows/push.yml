@@ -1,0 +1,31 @@
+# CardioPlanning — envoi des notifications (v10.211).
+# Tourne toutes les 10 minutes (GitHub peut décaler de quelques minutes aux heures chargées)
+# et à la main depuis l'onglet Actions (« Run workflow »), avec un mode essai qui n'envoie rien.
+name: Notifications CardioPlanning
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      essai:
+        description: "Essai : lire et afficher sans rien envoyer"
+        type: boolean
+        default: false
+concurrency:
+  group: envoi-push
+  cancel-in-progress: false
+jobs:
+  envoyer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Envoi
+        env:
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+          APP_URL: https://thibaulthus.github.io/cardio-planning/
+          ESSAI: ${{ inputs.essai == true && '1' || '' }}
+        run: node envoi-push.js
