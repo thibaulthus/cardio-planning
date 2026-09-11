@@ -9,7 +9,7 @@
 //   3. pour chaque bannière RÉCENTE (créée il y a moins de 30 jours), COCHÉE « aussi par notification » (push:true), ACTIVE (d1 ≤ aujourd'hui ≤ d2)
 //      et pas encore poussée, trouve les personnes visées — nommées (meds), ou par famille (médecins,
 //      attachés) — et envoie à chacun de leurs appareils une notification NEUTRE :
-//      « Un message vous attend dans CardioPlanning » ;
+//      qui reprend le début du texte du message (v10.214) ;
 //   4. note la bannière comme poussée dans le document push/_etat, efface les jetons morts.
 // Rien n'est jamais envoyé deux fois pour une même bannière. Un appareil enregistré APRÈS l'envoi
 // ne reçoit pas les bannières antérieures — il ouvre l'application, elles y sont.
@@ -26,6 +26,8 @@ const ESSAI = !!process.env.ESSAI;
 const PLAN_ID = process.env.PLAN_ID || "main";
 const FS = "https://firestore.googleapis.com/v1/projects/" + PID + "/databases/(default)/documents";
 const TITRE = "CardioPlanning", CORPS = "Un message vous attend dans CardioPlanning";
+// v10.214 : le corps de la notification reprend le début du message (sa demande du 12/09 : « un peu plus explicite »)
+const corpsDe = (a) => { const t = String((a && a.txt) || "").replace(/\s+/g, " ").trim(); return t ? (t.length > 120 ? t.slice(0, 117) + "…" : t) : CORPS; };
 const JOURS_MAX = 30;
 
 const b64 = (s) => Buffer.from(s).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -77,12 +79,12 @@ async function fsEtat(tok, done) {
   if (!r.ok) throw new Error("écriture push/_etat : " + r.status + " " + (await r.text()).slice(0, 200));
 }
 // envoi d'une notification à un jeton — rend "ok", "mort" (jeton à effacer) ou "erreur" (à retenter au prochain passage)
-async function envoyer(tok, jetonAppareil, tag) {
+async function envoyer(tok, jetonAppareil, corps) {
   if (ESSAI) return "ok";
   const r = await fetch("https://fcm.googleapis.com/v1/projects/" + PID + "/messages:send", { method: "POST", headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" },
     body: JSON.stringify({ message: { token: jetonAppareil,
-      notification: { title: TITRE, body: CORPS },
-      data: { title: TITRE, body: CORPS, url: APP_URL, tag: "cardioplanning" },
+      notification: { title: TITRE, body: corps },
+      data: { title: TITRE, body: corps, url: APP_URL, tag: "cardioplanning" },
       webpush: { headers: { Urgency: "high", TTL: "86400" }, fcm_options: { link: APP_URL } } } }) });
   if (r.ok) return "ok";
   const t = await r.text();
@@ -105,7 +107,8 @@ const vise = (a, app) => { if (a.meds && a.meds.length) return a.meds.map(String
   const appareils = docs.filter(d => !/\/push\/_etat$/.test(d.name)).map(d => Object.assign({ nom: d.name }, champs(d))).filter(a => a.tok && a.med);
   const jour = auj(), lim = Date.now() - JOURS_MAX * 86400000;
   // v10.213 : seuls les messages cochés « 📱 Aussi par notification » (push:true) partent ; les autres restent de simples bannières
-const aFaire = annonces.filter(a => a && a.ban && a.push === true && a.at && a.at >= lim && (!a.d1 || a.d1 <= jour) && (!a.d2 || a.d2 >= jour) && !done[a.id]);
+// v10.214 : un message peut être une « notification seule » (ni bannière ni grille) — d'où plus de condition sur a.ban
+const aFaire = annonces.filter(a => a && a.push === true && a.at && a.at >= lim && (!a.d1 || a.d1 <= jour) && (!a.d2 || a.d2 >= jour) && !done[a.id]);
   console.log(annonces.length + " message(s) dans planning/" + PLAN_ID + ", " + appareils.length + " appareil(s) enregistré(s), " + aFaire.length + " bannière(s) à pousser" + (ESSAI ? " — ESSAI, rien ne part" : ""));
   const morts = new Set(); let nEnv = 0, nErr = 0;
   for (const a of aFaire) {
@@ -113,7 +116,7 @@ const aFaire = annonces.filter(a => a && a.ban && a.push === true && a.at && a.a
     console.log("· « " + String(a.txt || "").slice(0, 60).replace(/\n/g, " ") + " » → " + cibles.length + " appareil(s)" + (cibles.length ? " : " + cibles.map(c => (c.init || c.med) + "/" + (c.lib || "?")).join(", ") : ""));
     let transitoire = false;
     for (const c of cibles) {
-      const r = await envoyer(tok, c.tok, a.id);
+      const r = await envoyer(tok, c.tok, corpsDe(a));
       if (r === "ok") nEnv++; else if (r === "mort") { morts.add(c.nom); } else { transitoire = true; nErr++; }
     }
     if (!transitoire) done[a.id] = Date.now();

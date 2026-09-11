@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.213 — 11/09/2026";
+const APP_VERSION="v10.214 — 12/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -5810,7 +5810,7 @@ const HELP_SECTIONS=[
   HP({children:["Les messages dont toutes les dates sont passées restent listés « terminé » pendant 90 jours, puis disparaissent au prochain enregistrement."]}),
   HT({children:"Notifications sur le téléphone ou l'ordinateur (v10.211, v10.212)"}),
   HP({children:["Toute personne entrée avec ",HE("b",null,"son code"),' (médecin ou attaché) trouve, en tête de l\'onglet 🔔 Notifications, une carte « Notifications sur cet appareil » avec un ',HE("b",null,"interrupteur"),' : gris, elles sont éteintes ; un clic demande l\'autorisation au navigateur, puis l\'appareil est rangé sous votre nom et l\'interrupteur passe au vert. Un second clic les retire — cet appareil seulement, les autres gardent leur réglage. Un point orange sur l\'onglet rappelle que rien n\'a encore été choisi ; « Plus tard » l\'éteint.']}),
-  HP({children:["Vous êtes prévenu(e) quand un ",HE("b",null,"message vous est adressé"),' : bannière nommée (« Prévenir les médecins concernés », tour, garde) ou annonce de l\'éditeur cochée pour les médecins ou pour les attachés — à condition que son auteur ait laissé cochée la case ',HE("b",null,"📱 Aussi par notification"),' (v10.213 : cochée d\'office dans l\'éditeur de messages et aux trois « Prévenir » ; décochée, le message reste une simple bannière). La notification est volontairement neutre — « Un message vous attend dans CardioPlanning » — et un appui l\'ouvre ; le contenu reste dans l\'application. Elle arrive quelques minutes après l\'envoi, jamais à l\'instant : un script tourne toutes les dix minutes.']}),
+  HP({children:["Vous êtes prévenu(e) quand un ",HE("b",null,"message vous est adressé"),' : bannière nommée (« Prévenir les médecins concernés », tour, garde) ou annonce de l\'éditeur cochée pour les médecins ou pour les attachés — à condition que son auteur ait laissé cochée la case ',HE("b",null,"📱 Aussi par notification"),' (v10.213 : cochée d\'office dans l\'éditeur de messages et aux trois « Prévenir » ; décochée, le message reste une simple bannière). La notification reprend le début du message (v10.214 : « Changement de votre tour : + semaine du 11 janv… », « Garde : … », « Demande de congés ouverte pour … ») et un appui ouvre l\'application. Un message peut aussi être une ',HE("b",null,"notification seule"),' : ni bannière ni grille cochées, seule la case 📱 — utile pour un simple rappel sur les téléphones. Et l\'',HE("b",null,"ouverture d\'une demande de congés"),' (Construire → tuile Congés) propose d\'envoyer une notification seule aux médecins concernés ; le rappel dans Planning existe déjà, il n\'y a donc pas de bannière en double. Elle arrive quelques minutes après l\'envoi, jamais à l\'instant : un script tourne toutes les dix minutes.']}),
   HP({children:[HE("b",null,"Qui a activé (éditeur seul, v10.213)"),' : en tête de la section 📣 Messages, une ligne nomme ceux qui ont activé les notifications sur au moins un appareil et ceux qui ne l\'ont pas fait ; dans l\'éditeur, les initiales des personnes nommables portent 🔔 quand elles recevront la notification, de même que les médecins de l\'encart Prévenir de la tuile Tour et les noms des modales d\'échange et de garde. Cette lecture se rafraîchit à chaque changement d\'onglet.']}),
   HP({last:true,children:["Sur ",HE("b",null,"iPhone"),', cela ne fonctionne que depuis l\'application installée sur l\'écran d\'accueil (Partager → « Sur l\'écran d\'accueil », iOS 16.4 ou plus) ; sur Android et sur ordinateur, Chrome ou Edge suffisent. Une autorisation refusée se rouvre dans les réglages du navigateur (ou du téléphone).']}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
@@ -7077,7 +7077,7 @@ function BuildAsk({build,medecins,editMedId,onRepondre,onGoPer}){
   );
 }
 
-function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps,secrDif,onDiffuser,onAnnulerDif}){
+function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,darkMode,setDarkMode,author,goTab,onOpenBip,onApplyPT,onRemovePT,tourProps,gardeProps,secrDif,onDiffuser,onAnnulerDif,onPushDemande=null}){   /* v10.214 : onPushDemande(liste) = notification seule à l'ouverture des congés */
   /* période : ouverture sur la période SUIVANTE, comme repPer de ReportsView */
   const [bPer,setBPer]=React.useState(()=>{if(BUILD_MEM.per)return BUILD_MEM.per;const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
   const allerA=(p)=>{BUILD_MEM.per={sy:p.sy,sm:p.sm};setBPer({sy:p.sy,sm:p.sm});};
@@ -7102,7 +7102,16 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
       /* v10.158 : refermer la demande de congés verrouille la période — on le dit avant */
       if(id==="conges"&&!window.confirm("Refermer la demande de congés verrouille la période pour toute l'équipe (sauf éditeurs) jusqu'à la diffusion du planning. Continuer ?"))return;
       delete d[id];
-    }else d[id]=sign();
+    }else{
+      d[id]=sign();
+      /* v10.214 : à l'ouverture des CONGÉS, proposer une notification aux médecins concernés — notification seule
+         (le rappel dans Planning existe déjà, pas de bannière en double) */
+      if(id==="conges"&&onPushDemande){
+        const pop=demPop(meds,"conges",bJours);
+        if(pop.length&&window.confirm("Prévenir par notification les "+pop.length+" médecins concernés (ceux qui ont activé les notifications) ?"))
+          onPushDemande(pop.map(m=>({mid:m.id,niv:"orange",txt:"Demande de congés ouverte pour "+MOIS[bPer.sm]+" — "+MOIS[(bPer.sm+PCFG.len-1)%12]+" : merci de poser vos congés dans Construire"})));
+      }
+    }
     patchB({dem:d});};
   const setSpec=(nom)=>{const s={...(B.specs||{})};if(s[nom])delete s[nom];else s[nom]=sign();patchB({specs:s});};
 
@@ -7392,7 +7401,7 @@ const annActive=(a,auj)=>!!(a&&a.ban&&(!a.d1||a.d1<=auj)&&(!a.d2||a.d2>=auj));
    pas pour mon rôle ») ; sans liste, la visibilité par famille de la v10.203 s'applique. */
 const annVise=(a,fam,medId)=>{if(a.meds&&a.meds.length)return medId!=null&&a.meds.map(String).indexOf(String(medId))>=0;return fam==="edit"||!!((a.aud||{})[fam==="view"?"med":fam]);};
 /* la dernière date utile d'un message : sert au ménage (90 jours) et au tri de la liste */
-const annFin=(a)=>[a.ban?(a.d2||a.d1||""):"",a.plan?(a.jour||""):""].sort().pop()||"";
+const annFin=(a)=>[(a.ban||(!a.plan&&a.push===true))?(a.d2||a.d1||""):"",a.plan?(a.jour||""):""].sort().pop()||"";   /* v10.214 : notification seule = d2 */
 /* événements du jour pour un onglet donné */
 const annDuJour=(annonces,tabId,y,m,d)=>{const k=dKey(y,m,d);return (annonces||[]).filter(a=>a.plan&&a.jour===k&&(a.tabs||{})[tabId]);};
 /* insère les lignes d'événement dans les lignes d'un jour : avant la 1re ligne (matin / journée)
@@ -7457,7 +7466,7 @@ function AnnEditeur({annonces,setAnnonces,medecins=[],pushMeds=null}){   /* v10.
   const nommables=(medecins||[]).filter(m=>(m.role||"medecin")==="medecin"||m.role==="attache");
   const nomDe=(id)=>{const m=nommables.find(x=>String(x.id)===String(id));return m?m.init:"?";};
   const enregistrer=()=>{
-    if(!ed||!ed.txt.trim()||(!ed.ban&&!ed.plan))return;
+    if(!ed||!ed.txt.trim()||(!ed.ban&&!ed.plan&&ed.push!==true))return;   /* v10.214 : une notification seule (ni bannière ni grille) est un message valable */
     const lim=annPlus(auj,-90);
     /* un texte modifié reçoit un nouvel identifiant : ceux qui avaient écarté l'ancien revoient le nouveau */
     const avant=(annonces||[]).find(a=>a.id===ed.id);
@@ -7470,6 +7479,7 @@ function AnnEditeur({annonces,setAnnonces,medecins=[],pushMeds=null}){   /* v10.
     const parts=[];
     if(a.ban)parts.push(annNivDe(a)[1].slice(0,2)+" bannière "+annNivDe(a)[1].slice(3).toLowerCase()+" du "+annFmt(a.d1)+" au "+annFmt(a.d2)+" · pour "+((a.meds&&a.meds.length)?a.meds.map(nomDe).join(", ")+" (nommés)":ANN_AUD.filter(x=>(a.aud||{})[x[0]]).map(x=>x[1].toLowerCase()).join(", "))+(a.push===true?" · 📱 notification":""));
     if(a.plan)parts.push("📅 dans la grille le "+annFmt(a.jour)+" ("+(a.slot==="AM"?"après-midi":"matin")+") · "+ANN_TABS.filter(x=>(a.tabs||{})[x[0]]).map(x=>x[1]).join(", "));
+    if(!a.ban&&!a.plan&&a.push===true)parts.push("📱 notification seule (ni bannière ni grille) · le "+annFmt(a.d1)+" · pour "+((a.meds&&a.meds.length)?a.meds.map(nomDe).join(", ")+" (nommés)":ANN_AUD.filter(x=>(a.aud||{})[x[0]]).map(x=>x[1].toLowerCase()).join(", ")));   /* v10.214 */
     return parts;
   };
   const lbl={fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:4};
@@ -7489,16 +7499,16 @@ function AnnEditeur({annonces,setAnnonces,medecins=[],pushMeds=null}){   /* v10.
         <label style={{display:"flex",gap:6,alignItems:"center",fontSize:12,cursor:"pointer"}}><input type="checkbox" checked={!!ed.ban} onChange={()=>set("ban",!ed.ban)}/>Afficher en bannière</label>
         <label style={{display:"flex",gap:6,alignItems:"center",fontSize:12,cursor:"pointer"}}><input type="checkbox" checked={!!ed.plan} onChange={()=>set("plan",!ed.plan)}/>Inscrire dans la grille du planning</label>
       </div>
-      {ed.ban&&<div style={{borderTop:"1px solid var(--border2)",paddingTop:8,marginBottom:8}}>
-        <div style={lbl}>Bannière — du <input type="date" value={ed.d1||""} onChange={e=>set("d1",e.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/> au <input type="date" value={ed.d2||""} onChange={e=>set("d2",e.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/></div>
+      {(ed.ban||(!ed.plan&&ed.push===true))&&<div style={{borderTop:"1px solid var(--border2)",paddingTop:8,marginBottom:8}}>{/* v10.214 : bloc aussi pour une notification seule */}
+        <div style={lbl}>{ed.ban?"Bannière — du ":"Notification seule — envoyée le "}<input type="date" value={ed.d1||""} onChange={e=>set("d1",e.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/> au <input type="date" value={ed.d2||""} onChange={e=>set("d2",e.target.value)} style={{...S.fi,padding:"3px 6px",fontSize:12}}/></div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
           {chip(false,"1 semaine",()=>set("d2",annPlus(ed.d1,7)))}
           {chip(false,"2 semaines",()=>set("d2",annPlus(ed.d1,14)))}
           {chip(false,"1 mois",()=>set("d2",annPlus(ed.d1,0,true)))}
         </div>
-        <div style={lbl}>Importance</div>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{ANN_NIV.map(n=>chip((ed.niv||"vert")===n[0],n[1],()=>set("niv",n[0])))}</div>
-        <div style={{marginBottom:8}}><PushCase on={ed.push===true} set={v=>set("push",v)} note="sur les téléphones de ceux qui les ont activées (🔔 ci-dessous)"/></div>
+        {ed.ban&&<div style={lbl}>Importance</div>}
+        {ed.ban&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{ANN_NIV.map(n=>chip((ed.niv||"vert")===n[0],n[1],()=>set("niv",n[0])))}</div>}
+        <div style={{marginBottom:8}}><PushCase on={ed.push===true} set={v=>set("push",v)} note={(!ed.ban&&!ed.plan)?"seule : ni bannière ni grille, juste la notification sur les téléphones (🔔 ci-dessous)":"sur les téléphones de ceux qui les ont activées (🔔 ci-dessous)"}/></div>
         <div style={lbl}>Visible par</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",opacity:(ed.meds||[]).length?.45:1}}>{ANN_AUD.map(([k,t])=>chip(!!(ed.aud||{})[k],t,()=>coche("aud",k)))}</div>
         <div style={{...lbl,marginTop:8}}>…ou seulement ces personnes (elles seules le verront, quel que soit leur code)</div>
@@ -7517,7 +7527,9 @@ function AnnEditeur({annonces,setAnnonces,medecins=[],pushMeds=null}){   /* v10.
       </div>}
       <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
         <button onClick={()=>setEd(null)} style={{...S.icnBtn,fontSize:12}}>Annuler</button>
-        <button onClick={enregistrer} disabled={!ed.txt.trim()||(!ed.ban&&!ed.plan)||(!!ed.ban&&!Object.keys(ed.aud||{}).length&&!(ed.meds||[]).length)||(!!ed.plan&&!Object.keys(ed.tabs||{}).length)} style={{...S.btnP,opacity:(!ed.txt.trim()||(!ed.ban&&!ed.plan))?.5:1}}>Enregistrer</button>
+        {(()=>{const seule=!ed.ban&&!ed.plan&&ed.push===true;   /* v10.214 : notification seule = un public ou des nommés suffisent */
+          const ko=!ed.txt.trim()||(!ed.ban&&!ed.plan&&!seule)||((!!ed.ban||seule)&&!Object.keys(ed.aud||{}).length&&!(ed.meds||[]).length)||(!!ed.plan&&!Object.keys(ed.tabs||{}).length);
+          return <button onClick={enregistrer} disabled={ko} style={{...S.btnP,opacity:ko?.5:1}}>Enregistrer</button>;})()}
       </div>
     </div>}
     {!liste.length&&!ed&&<div style={{fontSize:11,color:"var(--txt3)"}}>Aucun message.</div>}
@@ -11123,8 +11135,8 @@ function CardioPlanning(){
   const annJourDe=(tabId)=>(y,m,d)=>annDuJour(annonces,tabId,y,m,d);
   /* v10.209 : PRÉVENIR — une bannière par personne nommée (14 jours), visible d'elle seule. Appelé par
      l'encart de l'onglet Tour, la modale d'échange de jour et la modale de garde d'un médecin basique. */
-  const annPrevenir=(list,push)=>{const l=(list||[]).filter(x=>x&&x.mid!=null);if(!l.length)return;   /* v10.213 : push = aussi en notification (défaut oui) */const auj=annToday(),base=Date.now().toString(36);
-    setAnnonces(a=>(a||[]).concat(l.map((x,i2)=>({id:"p"+base+i2,at:Date.now(),push:push!==false,txt:x.txt,ban:true,plan:false,d1:auj,d2:annPlus(auj,14),aud:{},meds:[x.mid],niv:x.niv||"orange",color:ANN_COLORS[0]}))));
+  const annPrevenir=(list,push,seul)=>{const l=(list||[]).filter(x=>x&&x.mid!=null);if(!l.length)return;   /* v10.213 : push = aussi en notification (défaut oui) ; v10.214 : seul = notification SANS bannière */const auj=annToday(),base=Date.now().toString(36);
+    setAnnonces(a=>(a||[]).concat(l.map((x,i2)=>({id:"p"+base+i2,at:Date.now(),push:push!==false,txt:x.txt,ban:!seul,plan:false,d1:auj,d2:annPlus(auj,14),aud:{},meds:[x.mid],niv:x.niv||"orange",color:ANN_COLORS[0]}))));
     toast(l.length+" personne"+(l.length>1?"s":"")+" prévenue"+(l.length>1?"s":"")+" — bannière visible 14 jours","info");}; /* v10.69 : interne connecte (hors ligne = lecture seule) */
   /* v10.146 : verrou de l'avenir — profil de la personne, état de chaque période à venir (lu dans Construire
      et dans les diffusions), dérogations. Posé dans vRef pour que les fonctions d'écriture le lisent sans dépendance. */
@@ -12710,7 +12722,7 @@ header::-webkit-scrollbar { display: none; }
       {tab==="tourmedical"&&<TourTab {...tourProps}/>}
 
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
-      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
+      {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onPushDemande={(l)=>annPrevenir(l,true,true)} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
       {tab==="chl"&&<SiteView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
