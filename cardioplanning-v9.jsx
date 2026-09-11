@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.210 — 11/09/2026";
+const APP_VERSION="v10.211 — 11/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -5801,7 +5801,11 @@ const HELP_SECTIONS=[
   HP({children:["Un message peut viser des ",HE("b",null,"personnes nommées"),' plutôt que des familles : dans l\'éditeur, sous « Visible par », cochez leurs initiales. Elles seules le verront — pour leur nom, pas pour leur rôle ni leur code : un éditeur non nommé ne le voit pas.']}),
   HP({children:["Dès que le ",HE("b",null,"tour d\'une période est validé"),' (bandeau de la tuile 2), chaque semaine de tour ajoutée ou retirée est notée dans un journal, et un ',HE("b",null,"encart en bas de l\'onglet Tour"),' (donc de la tuile 2) ne montre que ces changements, regroupés par médecin concerné. Rien ne part tant qu\'on n\'appuie pas : on peut tâtonner, un aller-retour sur la même semaine s\'annule de lui-même. Le bouton « 📣 Prévenir les médecins concernés » crée une bannière par médecin, visible 14 jours par lui seul, puis vide l\'encart ; « Vider sans prévenir » l\'efface sans rien envoyer. Le bouton suit les droits de la tuile : l\'éditeur toujours, un intermédiaire quand la période lui est ouverte.']}),
   HP({children:["Même proposition, à la personne près, après un ",HE("b",null,"échange de jour de tour"),' (modale ⇄ du Planning : « Prévenir X et Y ? », celui qui fait l\'échange n\'est pas prévenu de son propre geste) et après la ',HE("b",null,"prise ou l\'échange d\'une garde par un médecin basique"),' (« Prévenir X ? »). Dans les trois cas, la bannière commence par « Tour : » ou « Garde : » et dit ce qui a changé.']}),
-  HP({last:true,children:["Les messages dont toutes les dates sont passées restent listés « terminé » pendant 90 jours, puis disparaissent au prochain enregistrement."]}))},
+  HP({children:["Les messages dont toutes les dates sont passées restent listés « terminé » pendant 90 jours, puis disparaissent au prochain enregistrement."]}),
+  HT({children:"Notifications sur le téléphone ou l'ordinateur (v10.211)"}),
+  HP({children:["Toute personne entrée avec ",HE("b",null,"son code"),' (médecin ou attaché) trouve un bouton 🔔 dans la barre du haut, à côté des flèches ↶↷. Il ouvre une petite fenêtre « Notifications sur cet appareil » : ',HE("b",null,"Activer"),' demande l\'autorisation au navigateur, puis l\'appareil est rangé sous votre nom ; ',HE("b",null,"Désactiver"),' le retire — cet appareil seulement, les autres gardent leur réglage. Un point orange sur la cloche rappelle que rien n\'a encore été choisi ; « Plus tard » l\'éteint.']}),
+  HP({children:["Vous êtes prévenu(e) quand un ",HE("b",null,"message vous est adressé"),' : bannière nommée (« Prévenir les médecins concernés », tour, garde) ou annonce de l\'éditeur cochée pour les médecins ou pour les attachés. La notification est volontairement neutre — « Un message vous attend dans CardioPlanning » — et un appui l\'ouvre ; le contenu reste dans l\'application. Elle arrive quelques minutes après l\'envoi, jamais à l\'instant : un script tourne toutes les dix minutes.']}),
+  HP({last:true,children:["Sur ",HE("b",null,"iPhone"),', cela ne fonctionne que depuis l\'application installée sur l\'écran d\'accueil (Partager → « Sur l\'écran d\'accueil », iOS 16.4 ou plus) ; sur Android et sur ordinateur, Chrome ou Edge suffisent. Une autorisation refusée se rouvre dans les réglages du navigateur (ou du téléphone).']}))},
  {id:"reportsdoc",icon:"📥",title:"Reports de consultations",body:()=>HE("div",null,
   HP({children:["L'onglet liste ",HE("b",null,"toutes les semaines de la période")," — y compris celles où il n'y a rien à faire — avec des pastilles de filtre, pour ne rien oublier. Un bandeau compte les reports encore à valider."]}),
   HP({children:["Pour chaque consultation perdue (absence, semaine de tour), l'application propose la ",HE("b",null,"semaine blanche libre la plus proche"),", jamais à plus d'",HE("b",null,"un mois"),", en avant comme en arrière, dans la période affichée. Une semaine sans solution se traite à la main : « ⇄ Chercher une autre semaine blanche » ouvre le choix complet, sans plafond. La ligne d'une blanche qui reçoit dit « peut accueillir le report de … » et se met à jour toute seule si vous décidez autrement."]}),
@@ -7436,7 +7440,7 @@ function AnnBanniere({annonces,fam,medId=null,masques,setMasques}){   /* v10.209
 }
 function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins, pour nommer des destinataires */
   const auj=annToday();
-  const neuf=()=>({id:"a"+Date.now().toString(36),txt:"",ban:true,plan:false,d1:auj,d2:annPlus(auj,7),aud:{med:1,att:1,sec:1,cad:1},niv:"vert",jour:auj,slot:"M",tabs:{planning:1},color:ANN_COLORS[0]});
+  const neuf=()=>({id:"a"+Date.now().toString(36),at:Date.now(),txt:"",ban:true,plan:false,d1:auj,d2:annPlus(auj,7),aud:{med:1,att:1,sec:1,cad:1},niv:"vert",jour:auj,slot:"M",tabs:{planning:1},color:ANN_COLORS[0]});
   const [ed,setEd]=React.useState(null);       /* message en cours d'édition, null = formulaire fermé */
   const [sup,setSup]=React.useState(null);     /* id dont la suppression attend une confirmation */
   const set=(k,v)=>setEd(o=>({...o,[k]:v}));
@@ -7450,8 +7454,8 @@ function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins
     const lim=annPlus(auj,-90);
     /* un texte modifié reçoit un nouvel identifiant : ceux qui avaient écarté l'ancien revoient le nouveau */
     const avant=(annonces||[]).find(a=>a.id===ed.id);
-    const id=avant&&avant.txt!==ed.txt.trim()?"a"+Date.now().toString(36):ed.id;
-    setAnnonces(l=>{const rest=(l||[]).filter(a=>a.id!==ed.id&&annFin(a)>=lim);return rest.concat([{...ed,id,txt:ed.txt.trim()}]).sort((a,b)=>annFin(a)<annFin(b)?1:-1);});
+    const id=avant&&avant.txt!==ed.txt.trim()?"a"+Date.now().toString(36):ed.id;const at=id!==ed.id?Date.now():ed.at;
+    setAnnonces(l=>{const rest=(l||[]).filter(a=>a.id!==ed.id&&annFin(a)>=lim);return rest.concat([{...ed,id,at,txt:ed.txt.trim()}]).sort((a,b)=>annFin(a)<annFin(b)?1:-1);});
     setEd(null);
   };
   const supprimer=(id)=>{if(sup!==id){setSup(id);return;}setAnnonces(l=>(l||[]).filter(a=>a.id!==id));setSup(null);};
@@ -9479,6 +9483,118 @@ function vAvertit(r,y,m,d){return dKey(y,m,d)<r.current.deb&&r.current.passe;}
 function vSemBloque(r,wk){var q=String(wk).split("-").map(Number);var f=new Date(q[0],q[1],q[2]+4);return vBloque(r,f.getFullYear(),f.getMonth(),f.getDate());}
 function vSemAvertit(r,wk){var q=String(wk).split("-").map(Number);var f=new Date(q[0],q[1],q[2]+4);return vAvertit(r,f.getFullYear(),f.getMonth(),f.getDate());}
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   v10.211 : NOTIFICATIONS SUR L'APPAREIL (Web Push) — bouton 🔔 de la barre du haut.
+   Visible par toute personne entrée avec SON code (médecin ou attaché) : c'est son
+   code qui l'identifie, et ce sont les messages qui lui sont ADRESSÉS (bannières
+   nommées « Prévenir », bannières pour les médecins ou les attachés) qui déclenchent
+   une notification — au contenu neutre : « Un message vous attend dans CardioPlanning ».
+   Rien n'est envoyé par l'application elle-même : elle range seulement un JETON par
+   appareil sous le nom de la personne (collection Firestore « push », un document par
+   appareil, identifiant tiré au sort et gardé dans localStorage cp6_pushDev). C'est le
+   script envoi-push.js, lancé par GitHub Actions toutes les 10 minutes, qui lit les
+   bannières récentes et pousse la notification aux jetons des personnes visées.
+   · Activer = permission du navigateur + jeton FCM + document push/<appareil> ;
+   · Désactiver = document effacé + jeton rendu — sur CET appareil seulement ;
+   · un point sur la cloche tant que la personne n'a rien choisi (« Plus tard » l'éteint) ;
+   · à chaque ouverture, si les notifications sont actives ici, le jeton est relu et
+     réécrit s'il a changé (les jetons tournent) ;
+   · iPhone : uniquement depuis l'application installée sur l'écran d'accueil (iOS ≥ 16.4) ;
+     Android et ordinateur : Chrome/Edge sans installation.
+   La clé publique (VAPID) est window.PUSH_VAPID dans index.html ; vide = pas configuré. */
+const PUSH_DEV_KEY="cp6_pushDev",PUSH_ON_KEY="cp6_pushOn",PUSH_CHOIX_KEY="cp6_pushChoix";
+const pushDevId=()=>{try{let d=localStorage.getItem(PUSH_DEV_KEY);if(!d){d="d"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);localStorage.setItem(PUSH_DEV_KEY,d);}return d;}catch(e){return "d0";}};
+const pushLibAppareil=()=>{const u=(typeof navigator!=="undefined"&&navigator.userAgent)||"";if(/iPhone|iPad|iPod/i.test(u))return "iPhone";if(/Android/i.test(u))return "Android";return "ordinateur";};
+const pushInstalle=()=>{try{return !!((typeof navigator!=="undefined"&&navigator.standalone)||(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches));}catch(e){return false;}};
+/* état de départ, sans rien demander au navigateur */
+const pushEtatInitial=(medId)=>{
+  if(typeof window==="undefined")return "nonsupp";
+  if(!window.PUSH_VAPID)return "noconf";
+  if(pushLibAppareil()==="iPhone"&&!pushInstalle())return "ios";
+  if(typeof Notification==="undefined"||!("serviceWorker" in navigator)||!window.pushGetToken)return "nonsupp";
+  if(Notification.permission==="denied")return "refuse";
+  try{const on=JSON.parse(localStorage.getItem(PUSH_ON_KEY)||"null");if(on&&String(on.med)===String(medId)&&Notification.permission==="granted")return "on";}catch(e){}
+  return "off";
+};
+function PushBouton({medId,medecins=[]}){
+  const [open,setOpen]=React.useState(false);
+  const [etat,setEtat]=React.useState(()=>pushEtatInitial(medId));
+  const [choix,setChoix]=React.useState(()=>{try{return localStorage.getItem(PUSH_CHOIX_KEY)||"";}catch(e){return "";}});
+  const [depuis,setDepuis]=React.useState(()=>{try{const on=JSON.parse(localStorage.getItem(PUSH_ON_KEY)||"null");return on&&String(on.med)===String(medId)?on.at:null;}catch(e){return null;}});
+  const [erreur,setErreur]=React.useState("");
+  const moi=(medecins||[]).find(m=>String(m.id)===String(medId))||{};
+  const docDe=(tok)=>({tok,med:String(medId),role:moi.role==="attache"?"attache":"medecin",init:moi.init||"",nom:moi.nom||"",lib:pushLibAppareil(),at:Date.now(),ver:APP_VERSION});
+  const ecrire=async(tok)=>{const c=window.pushDB&&window.pushDB();if(!c)throw new Error("Firebase indisponible");await c.doc(pushDevId()).set(docDe(tok));};
+  const poserChoix=(v)=>{setChoix(v);try{localStorage.setItem(PUSH_CHOIX_KEY,v);}catch(e){}};
+  /* au changement de personne ou à l'ouverture : recalcul + rafraîchissement silencieux du jeton */
+  React.useEffect(()=>{
+    const e0=pushEtatInitial(medId);setEtat(e0);
+    if(e0!=="on")return;
+    let vivant=true;
+    window.pushGetToken(window.PUSH_VAPID).then(tok=>{if(!vivant||!tok)return;let on=null;try{on=JSON.parse(localStorage.getItem(PUSH_ON_KEY)||"null");}catch(e){}
+      if(!on||on.tok!==tok){return ecrire(tok).then(()=>{try{localStorage.setItem(PUSH_ON_KEY,JSON.stringify({med:String(medId),tok,at:(on&&on.at)||Date.now()}));}catch(e){}});}
+    }).catch(()=>{});
+    return ()=>{vivant=false;};
+  },[medId]);
+  const activer=async()=>{
+    setErreur("");setEtat("attente");
+    try{
+      const perm=await Notification.requestPermission();
+      if(perm!=="granted"){setEtat(perm==="denied"?"refuse":"off");if(perm==="denied")poserChoix("refuse");return;}
+      const tok=await window.pushGetToken(window.PUSH_VAPID);
+      if(!tok)throw new Error("Aucun jeton reçu");
+      await ecrire(tok);
+      const at=Date.now();
+      try{localStorage.setItem(PUSH_ON_KEY,JSON.stringify({med:String(medId),tok,at}));}catch(e){}
+      setDepuis(at);setEtat("on");poserChoix("on");toast("Notifications activées sur cet appareil","info");
+    }catch(e){setEtat("off");setErreur("Impossible d'activer : "+(e&&e.message?e.message:String(e)));}
+  };
+  const desactiver=async()=>{
+    setErreur("");setEtat("attente");
+    try{const c=window.pushDB&&window.pushDB();if(c)await c.doc(pushDevId()).delete();}catch(e){}
+    try{if(window.pushDelToken)await window.pushDelToken();}catch(e){}
+    try{localStorage.removeItem(PUSH_ON_KEY);}catch(e){}
+    setDepuis(null);setEtat("off");poserChoix("off");toast("Notifications désactivées sur cet appareil","info");
+  };
+  const point=!choix&&(etat==="off");   /* rien encore choisi : petit point sur la cloche */
+  const on=etat==="on";
+  const fmtDepuis=(t)=>{if(!t)return "";const d=new Date(t);return isNaN(d)?"":d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});};
+  const P={fontSize:12,color:"var(--txt)",lineHeight:1.45,margin:"0 0 8px"};
+  return <div style={{position:"relative",flexShrink:0}}>
+    <button onClick={()=>setOpen(o=>!o)} title={on?"Notifications actives sur cet appareil":"Notifications sur cet appareil"}
+      style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:open?"rgba(255,255,255,.18)":"rgba(255,255,255,.1)",color:on?"#4ade80":"#f0f6fc",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+      🔔{point&&<span style={{position:"absolute",top:2,right:2,width:7,height:7,borderRadius:"50%",background:"#f59e0b",border:"1px solid var(--hdr)"}}/>}
+    </button>
+    {open&&<div className="no-print" style={{...S.card,position:"fixed",top:HDR_H+6,left:8,zIndex:300,width:"min(360px, 94vw)",boxShadow:"0 8px 28px rgba(0,0,0,.35)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <div style={{fontSize:13,fontWeight:800,color:"#1d4ed8"}}>🔔 Notifications sur cet appareil</div>
+        <button onClick={()=>setOpen(false)} title="Fermer" style={{...S.icnBtn,marginLeft:"auto",fontSize:11}}>✕</button>
+      </div>
+      {etat==="noconf"&&<p style={P}>Les notifications ne sont pas encore configurées par l'éditeur (clé d'envoi manquante). Réessayez après la prochaine mise à jour.</p>}
+      {etat==="ios"&&<p style={P}>Sur iPhone, les notifications ne fonctionnent que depuis l'application <b>installée sur l'écran d'accueil</b> : dans Safari, bouton Partager puis « Sur l'écran d'accueil ». Ouvrez ensuite CardioPlanning depuis son icône et revenez ici.</p>}
+      {etat==="nonsupp"&&<p style={P}>Ce navigateur ne permet pas les notifications. Sur ordinateur, Chrome ou Edge conviennent ; sur téléphone, Chrome (Android) ou l'application installée (iPhone).</p>}
+      {etat==="refuse"&&<p style={P}>Les notifications ont été <b>refusées</b> pour ce site. Pour les autoriser à nouveau, passez par les réglages du navigateur (icône à gauche de l'adresse → Notifications) — sur iPhone, Réglages → Notifications → CardioPlanning.</p>}
+      {(etat==="off"||etat==="attente")&&<div>
+        <p style={P}>Recevez une notification quand un <b>message vous est adressé</b> dans CardioPlanning : changement de votre tour, garde, message nommé, annonce aux {moi.role==="attache"?"attachés":"médecins"}. La notification dit seulement qu'un message vous attend — son contenu reste dans l'application.</p>
+        <p style={{...P,color:"var(--txt2)",fontSize:11}}>Réglage propre à cet appareil ({pushLibAppareil()}) : vous pouvez l'activer sur plusieurs appareils, chacun recevra la notification.</p>
+        {erreur&&<p style={{...P,color:"#dc2626"}}>{erreur}</p>}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <button onClick={activer} disabled={etat==="attente"} style={{...S.btnP,opacity:etat==="attente"?.6:1}}>{etat==="attente"?"…":"✅ Activer"}</button>
+          <button onClick={()=>{poserChoix("plus_tard");setOpen(false);}} style={{...S.icnBtn,fontSize:12}}>Plus tard</button>
+        </div>
+      </div>}
+      {etat==="on"&&<div>
+        <p style={P}>✅ <b>Activées</b> sur cet appareil ({pushLibAppareil()}{depuis?", depuis le "+fmtDepuis(depuis):""}) pour {moi.init||"vous"}. Vous serez prévenu(e) dès qu'un message vous est adressé — quelques minutes après son envoi.</p>
+        <p style={{...P,color:"var(--txt2)",fontSize:11}}>Désactiver ne concerne que cet appareil ; vos autres appareils gardent leur réglage.</p>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <button onClick={desactiver} style={{...S.icnBtn,fontSize:12,color:"#dc2626",borderColor:"#dc2626"}}>Désactiver</button>
+          <button onClick={()=>setOpen(false)} style={{...S.icnBtn,fontSize:12}}>Fermer</button>
+        </div>
+      </div>}
+    </div>}
+  </div>;
+}
+
 function CardioPlanning(){
   const today=new Date();
   const [accessMode,setAccessMode]=useState("ask");
@@ -10967,7 +11083,7 @@ function CardioPlanning(){
   /* v10.209 : PRÉVENIR — une bannière par personne nommée (14 jours), visible d'elle seule. Appelé par
      l'encart de l'onglet Tour, la modale d'échange de jour et la modale de garde d'un médecin basique. */
   const annPrevenir=(list)=>{const l=(list||[]).filter(x=>x&&x.mid!=null);if(!l.length)return;const auj=annToday(),base=Date.now().toString(36);
-    setAnnonces(a=>(a||[]).concat(l.map((x,i2)=>({id:"p"+base+i2,txt:x.txt,ban:true,plan:false,d1:auj,d2:annPlus(auj,14),aud:{},meds:[x.mid],niv:x.niv||"orange",color:ANN_COLORS[0]}))));
+    setAnnonces(a=>(a||[]).concat(l.map((x,i2)=>({id:"p"+base+i2,at:Date.now(),txt:x.txt,ban:true,plan:false,d1:auj,d2:annPlus(auj,14),aud:{},meds:[x.mid],niv:x.niv||"orange",color:ANN_COLORS[0]}))));
     toast(l.length+" personne"+(l.length>1?"s":"")+" prévenue"+(l.length>1?"s":"")+" — bannière visible 14 jours","info");}; /* v10.69 : interne connecte (hors ligne = lecture seule) */
   /* v10.146 : verrou de l'avenir — profil de la personne, état de chaque période à venir (lu dans Construire
      et dans les diffusions), dérogations. Posé dans vRef pour que les fonctions d'écriture le lisent sans dépendance. */
@@ -12417,6 +12533,8 @@ header::-webkit-scrollbar { display: none; }
             <button onClick={doRedo} disabled={!canRedo} title="Rétablir (retour avant)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canRedo?"rgba(255,255,255,.1)":"transparent",color:canRedo?"#f0f6fc":"#484f58",cursor:canRedo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↷</button>
           </div>}
+          {/* v10.211 : notifications sur l'appareil — pour qui est entré avec son code (c'est lui qu'on notifie) */}
+          {accessMode==="medecinEdit"&&editMedId!=null&&<PushBouton medId={editMedId} medecins={medecins}/>}
           <div>
             {/* v10.176 : le mot « CardioPlanning » retiré — ~110 px rendus au nav sur téléphone ; les témoins (👁, période, Firebase) grandissent à sa place */}
             <div style={{fontSize:13,color:"#484f58",display:"flex",alignItems:"center",gap:5}}>
