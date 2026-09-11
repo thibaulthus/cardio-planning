@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.209 — 10/09/2026";
+const APP_VERSION="v10.210 — 11/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -770,7 +770,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
           <div style={{fontSize:12,color:"var(--txt)",fontWeight:700,marginBottom:8}}>{"Prévenir "+D.init+" ? Une bannière visible 14 jours, par lui seul."}</div>
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
             <button onClick={()=>setPickGardeDay(null)} style={{...S.icnBtn,fontSize:12}}>Fermer sans prévenir</button>
-            <button onClick={()=>{onPrevenir&&onPrevenir([{mid:D.mid,txt:"Garde : "+D.txt}]);setPickGardeDay(null);}} style={{...S.btnP,background:"#f59e0b"}}>{"📣 Prévenir "+D.init}</button>
+            <button onClick={()=>{onPrevenir&&onPrevenir([{mid:D.mid,niv:"orange",txt:"Garde : "+D.txt}]);setPickGardeDay(null);}} style={{...S.btnP,background:"#f59e0b"}}>{"📣 Prévenir "+D.init}</button>
           </div>
         </div>;})():
       <div style={{minWidth:280}}>
@@ -3809,7 +3809,7 @@ function TourJournal({jrn,medecins,setBuild,perKey,onPrevenir,peut}){
   const vider=()=>{if(!setBuild)return;setBuild(b=>{const n={...(b||{})};const cur={...(n[perKey]||{})};delete cur.tourJrn;n[perKey]=cur;return n;});};
   const prevenir=()=>{if(!onPrevenir)return;
     if(!window.confirm("Créer une bannière pour chacun des "+meds.length+" médecin"+(meds.length>1?"s":"")+" concerné"+(meds.length>1?"s":"")+" (visible 14 jours, par lui seul), puis vider cet encart ?"))return;
-    onPrevenir(meds.map(x=>({mid:x.m.id,txt:"Changement de votre tour : "+x.l.map(ligne).join(" · ")})));vider();};
+    onPrevenir(meds.map(x=>({mid:x.m.id,niv:"rouge",txt:"Changement de votre tour : "+x.l.map(ligne).join(" · ")})));vider();};
   return <div style={{marginTop:6,marginBottom:14,padding:"9px 12px",borderRadius:9,border:"1.5px solid #f59e0b",background:"rgba(245,158,11,.08)"}}>
     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
       <span style={{fontSize:12,fontWeight:800,color:"#b45309"}}>{"📣 Changements du tour depuis sa validation — "+meds.length+" médecin"+(meds.length>1?"s":"")+" à prévenir"}</span>
@@ -5794,6 +5794,7 @@ const HELP_SECTIONS=[
   HT({children:"La bannière"}),
   HP({children:["Une ",HE("b",null,"annonce en bannière"),", sous la barre d'onglets, visible sur tous les onglets entre deux dates (raccourcis 1 semaine, 2 semaines, 1 mois). L'éditeur choisit qui la voit : médecins, attachés, secrétaires, cadres, internes — les quatre premiers cochés d'office."]}),
   HP({children:["Chacun peut la ",HE("b",null,"masquer"),' (elle revient à la prochaine ouverture) ou choisir « ',HE("b",null,"ne plus afficher"),' » : le message est alors écarté définitivement, sur cet appareil seulement. Si l\'éditeur modifie le texte, le message réapparaît. La bannière ne s\'imprime pas.']}),
+  HP({children:["Chaque bannière a une ",HE("b",null,"importance"),' choisie dans l\'éditeur : 🟢 vert (information), 🟠 orange (attention), 🔴 rouge (urgent) — c\'est sa couleur à l\'écran. Les bannières « Prévenir » sont rouges pour un changement de semaine de tour, orange pour un jour de tour ou une garde (v10.210).']}),
   HT({children:"La ligne dans la grille"}),
   HP({children:["Un ",HE("b",null,"événement dans la grille"),' (répartition de garde, réunion de service…) : une ligne colorée pleine largeur, insérée avant le matin ou avant l\'après-midi du jour choisi, dans les onglets cochés — Planning en nominal, Internes et Attachés au choix. Elle s\'imprime avec la grille et ne touche aucune case.']}),
   HT({children:"Messages nommés et « Prévenir les médecins concernés » (v10.209)"}),
@@ -7410,6 +7411,10 @@ function annEvtRows(evts,rows,fix){
 }
 /* nombre de lignes d'événement insérées avant l'après-midi : les cellules à rowSpan du jour doivent les compter */
 const annNbAM=(evts,slots)=>slots.length>1?(evts||[]).filter(e=>e.slot==="AM").length:0;
+/* v10.210 : trois niveaux d'importance pour la bannière — vert (information), orange (attention), rouge (urgent) ;
+   un message sans niveau est vert. Les bannières « Prévenir » sont rouges (tour) ou orange (jour, garde). */
+const ANN_NIV=[["vert","🟢 Information",{bg:"#ecfdf5",bd:"#6ee7b7",tx:"#065f46"}],["orange","🟠 Attention",{bg:"#fff7ed",bd:"#fdba74",tx:"#9a3412"}],["rouge","🔴 Urgent",{bg:"#fef2f2",bd:"#fca5a5",tx:"#991b1b"}]];
+const annNivDe=(a)=>ANN_NIV.find(n=>n[0]===(a&&a.niv))||ANN_NIV[0];
 function AnnBanniere({annonces,fam,medId=null,masques,setMasques}){   /* v10.209 : medId = la personne connectée, pour les messages nommés */
   const auj=annToday();
   const list=(annonces||[]).filter(a=>annActive(a,auj)&&annVise(a,fam,medId)&&!(masques||{})[a.id]);
@@ -7419,19 +7424,19 @@ function AnnBanniere({annonces,fam,medId=null,masques,setMasques}){   /* v10.209
     if(def){try{const h=JSON.parse(localStorage.getItem("cp6_annHide")||"{}")||{};h[id]=1;localStorage.setItem("cp6_annHide",JSON.stringify(h));}catch(e){}}
   };
   return <div className="no-print" style={{marginBottom:8}}>
-    {list.map(a=><div key={a.id} style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap",background:"#eff6ff",border:"1px solid #93c5fd",borderRadius:9,padding:"8px 12px",marginBottom:6,fontSize:12.5,color:"#1e3a8a"}}>
-      <span>📣</span>
+    {list.map(a=>{const nv=annNivDe(a)[2];return <div key={a.id} style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap",background:nv.bg,border:"1.5px solid "+nv.bd,borderRadius:9,padding:"8px 12px",marginBottom:6,fontSize:12.5,color:nv.tx}}>
+      <span>{annNivDe(a)[1].slice(0,2)}</span>
       <span style={{flex:1,minWidth:160,whiteSpace:"pre-wrap",fontWeight:600}}>{a.txt}</span>
       <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
         <button onClick={()=>cacher(a.id,false)} title="Masquer jusqu'à la prochaine ouverture de l'application" style={{...S.icnBtn,fontSize:11}}>Masquer</button>
         <button onClick={()=>cacher(a.id,true)} title="Ne plus afficher ce message sur cet appareil" style={{...S.icnBtn,fontSize:11}}>Ne plus afficher</button>
       </div>
-    </div>)}
+    </div>;})}
   </div>;
 }
 function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins, pour nommer des destinataires */
   const auj=annToday();
-  const neuf=()=>({id:"a"+Date.now().toString(36),txt:"",ban:true,plan:false,d1:auj,d2:annPlus(auj,7),aud:{med:1,att:1,sec:1,cad:1},jour:auj,slot:"M",tabs:{planning:1},color:ANN_COLORS[0]});
+  const neuf=()=>({id:"a"+Date.now().toString(36),txt:"",ban:true,plan:false,d1:auj,d2:annPlus(auj,7),aud:{med:1,att:1,sec:1,cad:1},niv:"vert",jour:auj,slot:"M",tabs:{planning:1},color:ANN_COLORS[0]});
   const [ed,setEd]=React.useState(null);       /* message en cours d'édition, null = formulaire fermé */
   const [sup,setSup]=React.useState(null);     /* id dont la suppression attend une confirmation */
   const set=(k,v)=>setEd(o=>({...o,[k]:v}));
@@ -7452,7 +7457,7 @@ function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins
   const supprimer=(id)=>{if(sup!==id){setSup(id);return;}setAnnonces(l=>(l||[]).filter(a=>a.id!==id));setSup(null);};
   const lib=(a)=>{
     const parts=[];
-    if(a.ban)parts.push("📣 bannière du "+annFmt(a.d1)+" au "+annFmt(a.d2)+" · pour "+((a.meds&&a.meds.length)?a.meds.map(nomDe).join(", ")+" (nommés)":ANN_AUD.filter(x=>(a.aud||{})[x[0]]).map(x=>x[1].toLowerCase()).join(", ")));
+    if(a.ban)parts.push(annNivDe(a)[1].slice(0,2)+" bannière "+annNivDe(a)[1].slice(3).toLowerCase()+" du "+annFmt(a.d1)+" au "+annFmt(a.d2)+" · pour "+((a.meds&&a.meds.length)?a.meds.map(nomDe).join(", ")+" (nommés)":ANN_AUD.filter(x=>(a.aud||{})[x[0]]).map(x=>x[1].toLowerCase()).join(", ")));
     if(a.plan)parts.push("📅 dans la grille le "+annFmt(a.jour)+" ("+(a.slot==="AM"?"après-midi":"matin")+") · "+ANN_TABS.filter(x=>(a.tabs||{})[x[0]]).map(x=>x[1]).join(", "));
     return parts;
   };
@@ -7479,6 +7484,8 @@ function AnnEditeur({annonces,setAnnonces,medecins=[]}){   /* v10.209 : medecins
           {chip(false,"2 semaines",()=>set("d2",annPlus(ed.d1,14)))}
           {chip(false,"1 mois",()=>set("d2",annPlus(ed.d1,0,true)))}
         </div>
+        <div style={lbl}>Importance</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{ANN_NIV.map(n=>chip((ed.niv||"vert")===n[0],n[1],()=>set("niv",n[0])))}</div>
         <div style={lbl}>Visible par</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",opacity:(ed.meds||[]).length?.45:1}}>{ANN_AUD.map(([k,t])=>chip(!!(ed.aud||{})[k],t,()=>coche("aud",k)))}</div>
         <div style={{...lbl,marginTop:8}}>…ou seulement ces personnes (elles seules le verront, quel que soit leur code)</div>
@@ -10960,7 +10967,7 @@ function CardioPlanning(){
   /* v10.209 : PRÉVENIR — une bannière par personne nommée (14 jours), visible d'elle seule. Appelé par
      l'encart de l'onglet Tour, la modale d'échange de jour et la modale de garde d'un médecin basique. */
   const annPrevenir=(list)=>{const l=(list||[]).filter(x=>x&&x.mid!=null);if(!l.length)return;const auj=annToday(),base=Date.now().toString(36);
-    setAnnonces(a=>(a||[]).concat(l.map((x,i2)=>({id:"p"+base+i2,txt:x.txt,ban:true,plan:false,d1:auj,d2:annPlus(auj,14),aud:{},meds:[x.mid],color:ANN_COLORS[0]}))));
+    setAnnonces(a=>(a||[]).concat(l.map((x,i2)=>({id:"p"+base+i2,txt:x.txt,ban:true,plan:false,d1:auj,d2:annPlus(auj,14),aud:{},meds:[x.mid],niv:x.niv||"orange",color:ANN_COLORS[0]}))));
     toast(l.length+" personne"+(l.length>1?"s":"")+" prévenue"+(l.length>1?"s":"")+" — bannière visible 14 jours","info");}; /* v10.69 : interne connecte (hors ligne = lecture seule) */
   /* v10.146 : verrou de l'avenir — profil de la personne, état de chaque période à venir (lu dans Construire
      et dans les diffusions), dérogations. Posé dans vRef pour que les fonctions d'écriture le lisent sans dépendance. */
@@ -13902,7 +13909,7 @@ header::-webkit-scrollbar { display: none; }
               {dest.length>0&&<div style={{fontSize:12,color:"var(--txt)",fontWeight:700,marginBottom:8}}>{"Prévenir "+dest.map(x=>x.init).join(" et ")+" ? Une bannière visible 14 jours, par "+(dest.length>1?"chacun d'eux seulement":"lui seul")+"."}</div>}
               <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
                 <button onClick={()=>setModal(null)} style={{...S.icnBtn,fontSize:12}}>{dest.length?"Fermer sans prévenir":"Fermer"}</button>
-                {dest.length>0&&<button onClick={()=>{annPrevenir(dest.map(x=>({mid:x.id,txt:"Tour : "+D.txt})));setModal(null);}} style={{...S.btnP,background:"#f59e0b"}}>{"📣 Prévenir "+dest.map(x=>x.init).join(" et ")}</button>}
+                {dest.length>0&&<button onClick={()=>{annPrevenir(dest.map(x=>({mid:x.id,niv:"orange",txt:"Tour : "+D.txt})));setModal(null);}} style={{...S.btnP,background:"#f59e0b"}}>{"📣 Prévenir "+dest.map(x=>x.init).join(" et ")}</button>}
               </div>
             </div>
           </Ov>);}
