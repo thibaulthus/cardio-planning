@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.216 — 13/09/2026";
+const APP_VERSION="v10.217 — 14/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1747,6 +1747,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
     });
   };
   const [pickerDay,setPickerDay]=React.useState(null);
+  const [gvSearch,setGvSearch]=React.useState("");   /* v10.217 : recherche par initiales dans le sélecteur de garde (comme dans Planning) */
 
   /* ═══ Répartition automatique des gardes ═══ */
   const [gardeModal,setGardeModal]=React.useState(false);
@@ -2211,7 +2212,7 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
         const dw2=dow(pd.y,pd.m,pd.d), gardeSlot=(dw2===6||dw2===0)?"JOUR":"N";
         const gMed=djAff(getGardeMed2(pd.y,pd.m,pd.d),dKey(pd.y,pd.m,pd.d));   /* v10.163 */
         return(
-          <Ov onClose={()=>setPickerDay(null)}>
+          <Ov onClose={()=>{setGvSearch("");setPickerDay(null);}}>
             <div style={S.mHd}>
               <div>
                 <div style={S.mTit2}>🌙 Garde — {JOURSC[dw2]} {pd.d} {MOIS[pd.m]}</div>
@@ -2268,15 +2269,23 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
               </div>
             )}
             <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>{gMed?"Changer :":"Assigner :"}</div>
+            {(()=>{const cands=medecins.filter(m=>m.garde===true).map(m=>djAff(m,dKey(pd.y,pd.m,pd.d))).filter(m=>!gvSearch||(m.init||"").toUpperCase().startsWith(gvSearch));
+              const bloque=(mid)=>isMedAvailable(medecins.find(x=>x.id===mid),pd.y,pd.m,pd.d,gardeSlot)==="blocked"||gvIsAbs(mid,pd.y,pd.m,pd.d);
+              return <>
+            <input autoFocus value={gvSearch} onChange={e=>setGvSearch(e.target.value.toUpperCase())} placeholder="Initiales ou nom..."
+              onKeyDown={e=>{if(e.key==="Enter"&&cands.length===1){if(bloque(cands[0].id)){toast("Absent / FMC ce jour","warn");return;}applyGarde(cands[0].id,pd.y,pd.m,pd.d);setGvSearch("");setPickerDay(null);}}}
+              style={{width:"100%",padding:"8px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:14,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:2,marginBottom:8,boxSizing:"border-box"}}/>
+            {cands.length===1&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:4,textAlign:"center"}}>↵ Entrée pour confirmer</div>}
             <GardeCandidateList
-              meds={medecins.filter(m=>m.garde===true).map(m=>djAff(m,dKey(pd.y,pd.m,pd.d)))}
+              meds={cands}
               isAbsDay={mid=>isMedAvailable(medecins.find(x=>x.id===mid),pd.y,pd.m,pd.d,gardeSlot)==="blocked"||gvIsAbs(mid,pd.y,pd.m,pd.d)}
               isAbsNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);return gvIsAbs(mid,nx.getFullYear(),nx.getMonth(),nx.getDate());}}
               tourNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);const ny=nx.getFullYear(),nm=nx.getMonth(),nd=nx.getDate();if(isWE(ny,nm,nd))return null;const t=["M","AM"].map(sl=>getEntry(mid,ny,nm,nd,sl)).find(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));return t?(t.acteId==="TOUR_HC"?"HC":"USIC"):null;}}
               prefOf={mid=>{const dkP=dKey(pd.y,pd.m,pd.d);return ((gardeWish||{})[dkP]||{})[mid]?"wish":(((gardeAvoid||{})[dkP]||{})[mid]?"avoid":null);}}
               currentId={gMed?gMed.id:null}
-              onPick={mid=>{applyGarde(mid,pd.y,pd.m,pd.d);setPickerDay(null);}}
+              onPick={mid=>{applyGarde(mid,pd.y,pd.m,pd.d);setGvSearch("");setPickerDay(null);}}
               maxHeight={360}/>
+            </>;})()}
           </Ov>
         );
       })()}
@@ -14605,6 +14614,8 @@ header::-webkit-scrollbar { display: none; }
                       opacity:on?1:0.75}}
                       title={salleWarn?`⚠ ${a.fixedSalle} occupée par ${fixedSalleOcc.map(m=>m.init).join(", ")}`:undefined}
                       onClick={()=>{ if(a.id==="ABSENCE"||a.id==="FORMATION"){setMData(p=>({...p,_absDur:a.id,_absConf:null,_pickSalle:null}));return;}   /* v10.172 */
+                        /* v10.217 : une autre activité choisie referme la ligne de durée ABS/FMC restée ouverte (son signalement du 14/09) */
+                        setMData(p=>(p&&p._absDur)?{...p,_absDur:null,_absConf:null}:p);
                         if(a.fixedSalle){doAdd(a.id,a.fixedSalle);}else if(a.hasSalle)setMData(p=>({...p,_pickSalle:a.id}));else doAdd(a.id); }}>
                       <span style={{fontWeight:800,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{a.short}{salleWarn?" ⚠":""}</span>
                       <span style={{fontSize:10}}>{a.label}</span>
