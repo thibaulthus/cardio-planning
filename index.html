@@ -198,7 +198,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.217 — 14/09/2026";
+var APP_VERSION = "v10.218 — 14/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -319,6 +319,9 @@ var EDIT_PIN_DEFAULT = "1234";
 /* ════ HELPERS ════ */
 var dIM = function (y, m) { return new Date(y, m + 1, 0).getDate(); };
 var isWE = function (y, m, d) { var w = new Date(y, m, d).getDay(); return w === 0 || w === 6 || isFerie(y, m, d); };
+/* v10.218 : créneau d'une garde — un férié se comporte comme un week-end (case JOUR) ; gardeFerieSem = férié en semaine */
+var gardeSlotDe = function (y, m, d) { return isWE(y, m, d) ? "JOUR" : "N"; };
+var gardeFerieSem = function (y, m, d) { var w = new Date(y, m, d).getDay(); return w !== 0 && w !== 6 && isFerie(y, m, d); };
 var dow = function (y, m, d) { return new Date(y, m, d).getDay(); };
 var dKey = function (y, m, d) { return "".concat(y, "-").concat(String(m + 1).padStart(2, "0"), "-").concat(String(d).padStart(2, "0")); };
 var sk = function (y, m, d, sl) { return "".concat(dKey(y, m, d), "|").concat(sl); };
@@ -890,7 +893,7 @@ function GridV({ onRemoveGarde = null, planIssues = {}, allDays, year, month, me
     const printDays = printWk ? effectiveDays.filter(o => inPrintRange(printWk, o.y, o.m, o.d)) : effectiveDays;
     const getGardeMed2 = (y2, m2, d2) => {
         const dw2 = dow(y2, m2, d2);
-        const gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
+        const gardeSlot = gardeSlotDe(y2, m2, d2); /* v10.218 */
         for (const m of (allMeds || meds)) {
             const es = getEntries(m.id, y2, m2, d2, gardeSlot);
             if (es.some(e => e.acteId === "GARDE"))
@@ -1961,8 +1964,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
     };
     const GCATS = ["sem", "jeu", "ven", "sam", "dim"];
     const hasGardeAlready = (y2, m2, d2) => {
-        const dw = dow(y2, m2, d2);
-        const slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+        const slot = gardeSlotDe(y2, m2, d2); /* v10.218 */
         const dm = plan[sk(y2, m2, d2, slot)] || {};
         return Object.keys(dm).some(mid => cellHasAny(dm[mid], ["GARDE"]));
     };
@@ -2042,8 +2044,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
         // Toutes les gardes existantes par médecin (pour l'écart minimal de 3 jours)
         const exG = {}; // {medId:Set("y-m-d")}
         gvAllDays.forEach(({ y: y2, m: m2, d: d2 }) => {
-            const dw = dow(y2, m2, d2);
-            const slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+            const slot = gardeSlotDe(y2, m2, d2); /* v10.218 */
             const dm = plan[sk(y2, m2, d2, slot)] || {};
             Object.keys(dm).forEach(mid => {
                 if (!cellHasAny(dm[mid], ["GARDE"]))
@@ -2059,7 +2060,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
             const dw = dow(y2, m2, d2);
             if (dw !== 4 && dw !== 6 && dw !== 0)
                 return;
-            const slot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+            const slot = gardeSlotDe(y2, m2, d2); /* v10.218 */
             const dm = plan[sk(y2, m2, d2, slot)] || {};
             Object.keys(dm).forEach(mid => {
                 if (!cellHasAny(dm[mid], ["GARDE"]))
@@ -2192,7 +2193,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                 const [y2, m2, d2] = dk4.split("-").map(Number);
                 const my = m2 - 1;
                 const dw = dow(y2, my, d2);
-                const gslot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+                const gslot = gardeSlotDe(y2, my, d2); /* v10.218 */
                 const gk = sk(y2, my, d2, gslot);
                 next[gk] = Object.assign(Object.assign({}, (next[gk] || {})), { [best.assign[dk4]]: { acteId: "GARDE", salle: null } });
                 const nx = new Date(y2, my, d2 + 1);
@@ -2221,7 +2222,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
     };
     function getGardeMed2(gvY, gvM, d) {
         var gy2 = gvY || year, gm2 = (gvM !== undefined) ? gvM : month;
-        var dw2 = dow(gy2, gm2, d), gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
+        var dw2 = dow(gy2, gm2, d), gardeSlot = gardeSlotDe(gy2, gm2, d); /* v10.218 */
         return medecins.find(function (m) { var e = getEntry(m.id, gy2, gm2, d, gardeSlot); return e && e.acteId === "GARDE"; });
     }
     const wdays = printWk ? gvEffDays.filter(o => inPrintRange(printWk, o.y, o.m, o.d)) : gvEffDays; // keep full objects
@@ -2453,10 +2454,9 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
                     React.createElement("tbody", null, medecins.filter(m2 => m2.garde).map(m2 => {
                         const cn = { sem: 0, jeu: 0, ven: 0, sam: 0, dim: 0 };
                         gvEffDays.forEach(({ y: ry, m: rm, d: rd }) => {
-                            const dwR = dow(ry, rm, rd);
-                            const slotR = (dwR === 6 || dwR === 0) ? "JOUR" : "N";
+                            const slotR = gardeSlotDe(ry, rm, rd); /* v10.218 : + garde d'un férié rangée à l'ancienne dans la nuit */
                             const dmR = plan[sk(ry, rm, rd, slotR)] || {};
-                            if (cellHasAny(dmR[m2.id], ["GARDE"]))
+                            if (cellHasAny(dmR[m2.id], ["GARDE"]) || (gardeFerieSem(ry, rm, rd) && cellHasAny((plan[sk(ry, rm, rd, "N")] || {})[m2.id], ["GARDE"])))
                                 cn[catOf(ry, rm, rd)]++;
                         });
                         const totR = cn.sem + cn.jeu + cn.ven + cn.sam + cn.dim;
@@ -2477,7 +2477,7 @@ function GardeView({ noNav = false, onRemoveGarde = null, printWk = null, onPrin
         viewV,
         pickerDay !== null && isEdit && (() => {
             const pd = pickerDay && typeof pickerDay === "object" ? pickerDay : { d: pickerDay, y: year, m: month };
-            const dw2 = dow(pd.y, pd.m, pd.d), gardeSlot = (dw2 === 6 || dw2 === 0) ? "JOUR" : "N";
+            const dw2 = dow(pd.y, pd.m, pd.d), gardeSlot = gardeSlotDe(pd.y, pd.m, pd.d); /* v10.218 */
             const gMed = djAff(getGardeMed2(pd.y, pd.m, pd.d), dKey(pd.y, pd.m, pd.d)); /* v10.163 */
             return (React.createElement(Ov, { onClose: () => { setGvSearch(""); setPickerDay(null); } },
                 React.createElement("div", { style: S.mHd },
@@ -8305,7 +8305,10 @@ function expEntries(p, tourMed, tourDerog, medId, y2, m2, d2, slot) {
     }
     if (slot === "JOUR") {
         var e = (p[sk(y2, m2, d2, "JOUR")] || {})[medId];
-        return e ? (Array.isArray(e) ? e : [e]) : [];
+        var es = e ? (Array.isArray(e) ? e : [e]) : [];
+        /* v10.218 : garde d'un férié en semaine rangée à l'ancienne dans la nuit — on la montre dans la case JOUR */
+        if (gardeFerieSem(y2, m2, d2) && !es.some(function (x) { return x && x.acteId === "GARDE"; })) { var g = cellEs((p[sk(y2, m2, d2, "N")] || {})[medId]).find(function (x) { return x && x.acteId === "GARDE"; }); if (g) es = es.concat([g]); }
+        return es;
     }
     var entries = (p[sk(y2, m2, d2, slot)] || {})[medId];
     if (entries)
@@ -13466,9 +13469,11 @@ function CardioPlanning() {
         } /* v10.106 */
         if (vAvertit(vRef, y2, m2, d2))
             vToast(true);
-        var key = sk(y2, m2, d2, slot);
+        var key0 = sk(y2, m2, d2, slot);
         setPlan(function (p) {
             var _a;
+            /* v10.218 : garde d'un férié en semaine encore rangée dans la nuit — c'est là qu'on la retire */
+            var key = (acteId === "GARDE" && slot === "JOUR" && gardeFerieSem(y2, m2, d2) && !cellEs((p[key0] || {})[medId]).some(function (e) { return e && e.acteId === "GARDE"; })) ? sk(y2, m2, d2, "N") : key0;
             var dm = __assign({}, (p[key] || {}));
             var ex = dm[medId];
             if (!ex)
@@ -13708,7 +13713,7 @@ function CardioPlanning() {
            ÉVITE ces gardes depuis toujours (canTake teste le lendemain). */
         var nxWarn = false;
         var dw = dow(y2, m2, d2);
-        var gardeSlot = (dw === 6 || dw === 0) ? "JOUR" : "N";
+        var gardeSlot = gardeSlotDe(y2, m2, d2); /* v10.218 */
         var dt = new Date(y2, m2, d2 + 1);
         var ny = dt.getFullYear(), nm = dt.getMonth(), nd2 = dt.getDate();
         setPlan(function (p) {
@@ -13740,8 +13745,9 @@ function CardioPlanning() {
                         delete gdm[mid];
                 }
             });
+            /* v10.218 : férié en semaine — une garde rangée à l'ancienne dans la nuit est retirée, pour ne pas en avoir deux */
+            if (gardeFerieSem(y2, m2, d2)) { var nk2 = sk(y2, m2, d2, "N"), ndm = __assign({}, (next[nk2] || {})), ch2 = false; Object.keys(ndm).forEach(function (mid) { if (cellHasAny(ndm[mid], ["GARDE"])) { var r = cellDrop(ndm[mid], ["GARDE"]); if (r) ndm[mid] = r; else delete ndm[mid]; ch2 = true; } }); if (ch2) { var _o2 = {}; _o2[nk2] = ndm; next = __assign(__assign({}, next), _o2); } }
             next = __assign(__assign({}, next), (_a = {}, _a[gk] = gdm, _a));
-            next[gk] = __assign(__assign({}, next[gk]), (_b = {}, _b[medId] = { acteId: "GARDE", salle: null }, _b));
             if (isWE(ny, nm, nd2)) {
                 var k = sk(ny, nm, nd2, "JOUR"), dm = __assign({}, (next[k] || {}));
                 if (!cellHasAny(dm[medId], EXCL_IDS))
