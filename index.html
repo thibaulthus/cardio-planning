@@ -198,7 +198,7 @@ var JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 var JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 var SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 var SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-var APP_VERSION = "v10.220 — 16/09/2026";
+var APP_VERSION = "v10.221 — 17/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 var PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -13755,6 +13755,8 @@ function CardioPlanning() {
             /* v10.218 : férié en semaine — une garde rangée à l'ancienne dans la nuit est retirée, pour ne pas en avoir deux */
             if (gardeFerieSem(y2, m2, d2)) { var nk2 = sk(y2, m2, d2, "N"), ndm = __assign({}, (next[nk2] || {})), ch2 = false; Object.keys(ndm).forEach(function (mid) { if (cellHasAny(ndm[mid], ["GARDE"])) { var r = cellDrop(ndm[mid], ["GARDE"]); if (r) ndm[mid] = r; else delete ndm[mid]; ch2 = true; } }); if (ch2) { var _o2 = {}; _o2[nk2] = ndm; next = __assign(__assign({}, next), _o2); } }
             next = __assign(__assign({}, next), (_a = {}, _a[gk] = gdm, _a));
+            /* v10.221 : la ligne qui ÉCRIT la garde manquait ici depuis la greffe v10.218 (le repos se posait, pas le nom) */
+            var _g = {}; _g[medId] = { acteId: "GARDE", salle: null }; next[gk] = __assign(__assign({}, next[gk]), _g);
             if (isWE(ny, nm, nd2)) {
                 var k = sk(ny, nm, nd2, "JOUR"), dm = __assign({}, (next[k] || {}));
                 if (!cellHasAny(dm[medId], EXCL_IDS))
