@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.221 — 17/09/2026";
+const APP_VERSION="v10.223 — 17/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -574,7 +574,7 @@ function SallePill({nom,acte,night}){
   return(
     <span style={{...pillCols((acte&&acte.color)||"#888888",night),
       fontSize:10,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",borderRadius:4,
-      padding:"2px 3px",lineHeight:1.3,textAlign:"center",display:"inline-block",
+      padding:"2px 6px",lineHeight:1.3,textAlign:"center",display:"inline-block",
       /* v10.16 : largeur ADAPTATIVE. Les 48 px figés dataient d'une police plus petite et ne
    tenaient plus que 6 caractères — « Angio-1 » et « CHB-BIP » se retrouvaient tronqués.
    On garde un minimum pour que les pastilles restent alignées entre elles, mais le nom
@@ -1711,7 +1711,83 @@ function GardeCandidateList({meds,isAbsDay,isAbsNext,tourNext=null,prefOf=null,c
     </div>);
 }
 
-function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
+/* ═══ v10.223 : OUTILS DE GARDES de la tuile 3 de Construire ═══
+   (1) saisie en chaîne — la modale de garde habituelle qui passe au jour suivant ;
+   (2) import d'une liste — « 02/11 TH », une ligne par jour, contrôlée AVANT toute écriture.
+   Les deux fonctions ci-dessous sont pures (elles ne lisent ni n'écrivent le planning) : tout ce
+   qu'elles doivent savoir du planning leur est passé par « cx ». L'écriture passe par applyGarde. */
+const GL_MOIS=[[/^janv?(ier)?$/,0],[/^fe?v(r(ier)?)?$/,1],[/^mars?$/,2],[/^avr(il)?$/,3],[/^mai$/,4],[/^juin$/,5],[/^juil(let)?$/,6],[/^aout$/,7],[/^sept?(embre)?$/,8],[/^oct(obre)?$/,9],[/^nov(embre)?$/,10],[/^dec(embre)?$/,11]];
+function gardesLireLigne(brut){
+  const b=String(brut).replace(/\u00a0/g," ").trim();
+  if(!b||b.charAt(0)==="#")return null;
+  let t=b.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/^[\s\-–—•*·]+/,"");
+  t=t.replace(/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|lun|mar|mer|jeu|ven|sam|dim)\.?\s+(?=\d)/,"");
+  let d=null,mo=null,an=null,reste="";
+  let m=t.match(/^(\d{1,2})\s*[\/.\-]\s*(\d{1,2})(?:\s*[\/.\-]\s*(\d{4}|\d{2}))?(?!\d)/);
+  if(m){d=+m[1];mo=+m[2]-1;if(m[3])an=(+m[3]<100?2000:0)+(+m[3]);reste=t.slice(m[0].length);}
+  else{
+    m=t.match(/^(\d{1,2})(?:er)?\s+([a-z]+)\.?(?:\s+(\d{4}))?/);
+    const mm=m?GL_MOIS.find(x=>x[0].test(m[2])):null;
+    if(mm){d=+m[1];mo=mm[1];if(m[3])an=+m[3];reste=t.slice(m[0].length);}
+  }
+  if(d===null||d<1||d>31||mo<0||mo>11)return {brut:b,err:"ligne incompréhensible (date non reconnue)"};
+  reste=reste.replace(/^[\s:=>\-–—,;.]+/,"").replace(/[\s.,;]+$/,"");
+  if(!reste||/^[?\-–—_]+$/.test(reste))return {brut:b,d,mo,an,err:"pas d'initiales sur cette ligne"};
+  if(!/^[a-z0-9]{1,6}$/.test(reste))return {brut:b,d,mo,an,err:"ligne incompréhensible (une seule paire d'initiales attendue après la date)"};
+  return {brut:b,d,mo,an,init:reste.toUpperCase()};
+}
+function gardesControler(texte,jours,cx){
+  const cle=j=>dKey(j.y,j.m,j.d),lib=j=>JOURSC[dow(j.y,j.m,j.d)]+" "+j.d+" "+MOIS[j.m].slice(0,4);
+  const rows=[],parJour={};
+  String(texte||"").split(/\r?\n/).forEach((brut,i)=>{
+    const l=gardesLireLigne(brut);if(!l)return;
+    const j=(l.d!=null)?jours.find(o=>o.d===l.d&&o.m===l.mo&&(l.an==null||o.y===l.an)):null;
+    if(l.d!=null&&!j){rows.push({k:"x"+i,lib:"—",brut:l.brut,etat:"err",msgs:["date hors de la période en construction"]});return;}
+    if(l.err){rows.push({k:"x"+i,lib:j?lib(j):"—",jour:j||null,brut:l.brut,etat:"err",msgs:[l.err]});if(j)(parJour[cle(j)]=parJour[cle(j)]||[]);return;}
+    (parJour[cle(j)]=parJour[cle(j)]||[]).push({brut:l.brut,init:l.init,k:"l"+i});
+  });
+  const cites=jours.filter(j=>parJour[cle(j)]);
+  const kMin=cites.length?cle(cites[0]):null,kMax=cites.length?cle(cites[cites.length-1]):null;
+  let horsListe=0;
+  jours.forEach(j=>{
+    const k=cle(j),L=parJour[k],tit=cx.titulaire(j),pourvu=!!tit||cx.pourvu(j);
+    if(!L){if(!pourvu){if(kMin&&k>kMin&&k<kMax)rows.push({k:"m"+k,jour:j,lib:lib(j),brut:"",etat:"err",msgs:["jour manquant dans la liste"]});else horsListe++;}return;}
+    if(!L.length)return;   /* la ligne du jour est déjà en rouge (pas d'initiales, illisible) */
+    const inits=uniqArr(L.map(x=>x.init));
+    if(inits.length>1){L.forEach(x=>rows.push({k:x.k,jour:j,lib:lib(j),brut:x.brut,init:x.init,etat:"err",msgs:["doublon : "+L.length+" lignes pour ce jour ("+inits.join(", ")+")"]}));return;}
+    const x=L[0],r={k:x.k,jour:j,lib:lib(j),brut:x.brut,init:x.init,etat:"ok",msgs:[]};
+    if(L.length>1)r.msgs.push("ligne répétée "+L.length+" fois (identique) — comptée une fois");
+    const c=cx.tous(j).filter(m=>m.role!=="ide"&&(String(m.init||"").toUpperCase()===x.init||String(m.initAuth||"").toUpperCase()===x.init));
+    const rouge=t=>{r.etat="err";r.msgs.unshift(t);rows.push(r);};
+    if(!c.length)return rouge("initiales inconnues");
+    if(c.length>1)return rouge("initiales portées par "+c.length+" personnes");
+    const med=c[0];r.med=med;
+    if(med.garde!==true)return rouge(med.init+" ne participe pas aux gardes");
+    if(tit&&String(tit.id)===String(med.id)){r.etat="deja";r.msgs.unshift("déjà en place — rien à faire");rows.push(r);return;}
+    if(pourvu)return rouge("jour déjà pourvu"+(tit?" par "+tit.init:"")+" — non modifié");
+    if(cx.absent(med,j))return rouge(med.init+" est absent ou en FMC ce jour");
+    if(cx.off(med,j))return rouge(med.init+" est désactivé ce jour-là");
+    if((med.gardeDays||{})[String(dow(j.y,j.m,j.d))]===false)return rouge(med.init+" ne prend pas de garde le "+JOURSC[dow(j.y,j.m,j.d)].toLowerCase()+" (fiche Équipe)");
+    const nx=new Date(j.y,j.m,j.d+1),jn={y:nx.getFullYear(),m:nx.getMonth(),d:nx.getDate()};
+    if(cx.absent(med,jn))r.msgs.push("absence ou FMC le lendemain — garde posée SANS repos");
+    const tn=cx.tourLendemain(med,jn);if(tn)r.msgs.push("tour "+tn+" le lendemain — le repos de garde tombera dessus");
+    if(cx.eviter(med,j))r.msgs.push("a demandé à éviter cette garde");
+    rows.push(r);
+  });
+  /* même médecin deux jours de suite (liste et gardes déjà posées confondues) */
+  const qui={};jours.forEach(j=>{const t=cx.titulaire(j);if(t)qui[cle(j)]=String(t.id);});
+  rows.forEach(r=>{if(r.med&&r.jour&&(r.etat==="ok"||r.etat==="deja"))qui[cle(r.jour)]=String(r.med.id);});
+  rows.forEach(r=>{if(r.etat!=="ok")return;const a=new Date(r.jour.y,r.jour.m,r.jour.d-1),z=new Date(r.jour.y,r.jour.m,r.jour.d+1),id=String(r.med.id);
+    if(qui[dKey(a.getFullYear(),a.getMonth(),a.getDate())]===id)r.msgs.push("déjà de garde la veille");
+    if(qui[dKey(z.getFullYear(),z.getMonth(),z.getDate())]===id)r.msgs.push("encore de garde le lendemain");});
+  rows.forEach(r=>{if(r.etat==="ok"&&r.msgs.length)r.etat="warn";});
+  const rang=r=>r.jour?cle(r.jour):"";
+  rows.sort((a,b)=>rang(a)<rang(b)?-1:rang(a)>rang(b)?1:0);
+  const n=e=>rows.filter(r=>r.etat===e).length;
+  return {rows,nOk:n("ok"),nWarn:n("warn"),nErr:n("err"),nDeja:n("deja"),horsListe};
+}
+
+function GardeView({outils=false,noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
   /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
      l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
   const removeGarde=(d3,y3,m3)=>{ if(onRemoveGarde)onRemoveGarde(y3,m3,d3); };
@@ -1754,6 +1830,10 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
   };
   const [pickerDay,setPickerDay]=React.useState(null);
   const [gvSearch,setGvSearch]=React.useState("");   /* v10.217 : recherche par initiales dans le sélecteur de garde (comme dans Planning) */
+  /* v10.223 : saisie en chaîne (pickerDay.chaine) et import d'une liste — tuile 3 de Construire seulement (prop outils) */
+  const [impG,setImpG]=React.useState(null);   /* null | {txt, etape:"saisie"|"controle"} */
+  const chaineOn=!!(pickerDay&&typeof pickerDay==="object"&&pickerDay.chaine);
+  React.useEffect(()=>{if(!chaineOn)return;const f=e=>{if(e.key==="Escape"){setGvSearch("");setPickerDay(null);}};window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f);},[chaineOn]);
 
   /* ═══ Répartition automatique des gardes ═══ */
   const [gardeModal,setGardeModal]=React.useState(false);
@@ -1786,6 +1866,15 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
   const inTourWeek=(medId,y2,m2,d2)=>{
     const wk=wKey(y2,m2,d2);const wm=(tourMed||{})[wk]||{HC:[],USIC:[]};
     return [...(wm.HC||[]),...(wm.USIC||[])].map(String).includes(String(medId));
+  };
+  /* v10.223 : la chaîne parcourt TOUTE la période (gvAllDays), un jour = une garde, férié ou non */
+  const chOuvrir=()=>{if(!gvAllDays.length)return;const j=gvAllDays[0];setGvSearch("");setGvSwapOpen(false);setPickerDay({d:j.d,y:j.y,m:j.m,chaine:true});};
+  const chFin=(txt)=>{setGvSearch("");setPickerDay(null);setTimeout(()=>toast(txt,"info"),80);};
+  const chSuite=(pd,libreSeulement)=>{
+    const i=gvAllDays.findIndex(j=>j.y===pd.y&&j.m===pd.m&&j.d===pd.d);
+    const j=i<0?null:(libreSeulement?gvAllDays.slice(i+1).find(o=>!hasGardeAlready(o.y,o.m,o.d)):gvAllDays[i+1]);
+    if(!j){chFin(libreSeulement?"Fin de la période — plus aucun jour sans garde":"Fin de la période — saisie en chaîne terminée");return;}
+    setGvSearch("");setPickerDay({d:j.d,y:j.y,m:j.m,chaine:true});
   };
   const runGardeAuto=()=>{
     const tod=new Date();tod.setHours(0,0,0,0);
@@ -2047,6 +2136,10 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
           }}>🗑 Retirer</button>}
           <button onClick={exportGardesCSV} style={{...S.btnP,fontSize:11,padding:"3px 10px"}}>🖨️ Export</button>
       </div>
+      {isEdit&&outils&&<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
+          <button title="Ouvre la modale de garde sur le premier jour de la période, puis passe au jour suivant après chaque validation" onClick={chOuvrir} style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #0e7490",background:"rgba(14,116,144,.10)",color:"#0e7490",fontWeight:800,cursor:"pointer"}}>⏩ Saisie en chaîne</button>
+          <button title="Coller une liste de gardes (une ligne par jour) — contrôlée avant d'être écrite" onClick={()=>setImpG({txt:"",etape:"saisie"})} style={{fontSize:11,padding:"3px 12px",borderRadius:6,border:"1.5px solid #0e7490",background:"rgba(14,116,144,.10)",color:"#0e7490",fontWeight:800,cursor:"pointer"}}>📋 Importer une liste</button>
+      </div>}
       {gardeModal&&(
         <Ov onClose={()=>setGardeModal(false)}>
           <div style={{...S.modal,maxWidth:460,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
@@ -2215,12 +2308,36 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
         const pd=pickerDay&&typeof pickerDay==="object"?pickerDay:{d:pickerDay,y:year,m:month};
         const dw2=dow(pd.y,pd.m,pd.d), gardeSlot=gardeSlotDe(pd.y,pd.m,pd.d);   /* v10.218 */
         const gMed=djAff(getGardeMed2(pd.y,pd.m,pd.d),dKey(pd.y,pd.m,pd.d));   /* v10.163 */
+        /* v10.223 : saisie en chaîne — sur un jour déjà pourvu la chaîne S'ARRÊTE : titulaire affiché, aucun champ de
+           saisie (des initiales tapées sans regarder ne doivent jamais remplacer une garde posée). */
+        const chI=pd.chaine?gvAllDays.findIndex(j=>j.y===pd.y&&j.m===pd.m&&j.d===pd.d):-1;
+        if(pd.chaine&&hasGardeAlready(pd.y,pd.m,pd.d))return(
+          <Ov onClose={()=>{setGvSearch("");setPickerDay(null);}}>
+            <div style={S.mHd}>
+              <div>
+                <div style={S.mTit2}>⏩ Saisie en chaîne — {JOURSC[dw2]} {pd.d} {MOIS[pd.m]}</div>
+                <div style={{color:"var(--txt2)",fontSize:12,marginTop:2}}>{"Jour "+(chI+1)+" sur "+gvAllDays.length}</div>
+              </div>
+              <button onClick={()=>setPickerDay(null)} style={S.xBtn}>×</button>
+            </div>
+            <div style={{marginBottom:10,padding:"8px 10px",borderRadius:7,border:"1px solid #dc2626",background:"rgba(220,38,38,.08)",color:"#dc2626",fontSize:12,fontWeight:700}}>{chI===0?"⛔ Le premier jour de la période a déjà une garde — la saisie en chaîne ne démarre pas dessus.":"⛔ Ce jour a déjà une garde — la saisie en chaîne s'arrête ici."} Rien n'est modifié.</div>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12,padding:"8px 10px",background:"var(--bg-td)",borderRadius:7,border:"1px solid var(--today-c)44"}}>
+              {gMed?<><div style={{width:28,height:28,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{gMed.init}</div>
+              <span style={{color:"var(--txt)",fontSize:13,fontWeight:700}}>{gMed.prenom} {gMed.nom}</span></>:<span style={{color:"var(--txt)",fontSize:12,fontWeight:700}}>Garde tenue par une personne hors de la liste affichée</span>}
+            </div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:10}}>Pour changer cette garde, fermez puis cliquez sur le jour dans la liste, comme d'habitude.</div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
+              <button onClick={()=>{setGvSearch("");setPickerDay(null);}} style={{...S.icnBtn,fontSize:12}}>Fermer</button>
+              <button onClick={()=>chSuite(pd,true)} style={{...S.btnP,background:"#0e7490"}}>Reprendre au prochain jour sans garde →</button>
+            </div>
+          </Ov>);
         return(
           <Ov onClose={()=>{setGvSearch("");setPickerDay(null);}}>
             <div style={S.mHd}>
               <div>
-                <div style={S.mTit2}>🌙 Garde — {JOURSC[dw2]} {pd.d} {MOIS[pd.m]}</div>
+                <div style={S.mTit2}>{pd.chaine?"⏩ Saisie en chaîne":"🌙 Garde"} — {JOURSC[dw2]} {pd.d} {MOIS[pd.m]}</div>
                 <div style={{color:"var(--txt2)",fontSize:12,marginTop:2}}>Le repos post-garde est posé automatiquement.</div>
+                {pd.chaine&&<div style={{color:"#0e7490",fontSize:11,fontWeight:700,marginTop:3}}>{"Jour "+(chI+1)+" sur "+gvAllDays.length+" · Entrée sur un champ vide = passer ce jour · Échap = arrêter"}</div>}
               </div>
               <button onClick={()=>setPickerDay(null)} style={S.xBtn}>×</button>
             </div>
@@ -2277,7 +2394,11 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
               const bloque=(mid)=>isMedAvailable(medecins.find(x=>x.id===mid),pd.y,pd.m,pd.d,gardeSlot)==="blocked"||gvIsAbs(mid,pd.y,pd.m,pd.d);
               return <>
             <input autoFocus value={gvSearch} onChange={e=>setGvSearch(e.target.value.toUpperCase())} placeholder="Initiales ou nom..."
-              onKeyDown={e=>{if(e.key==="Enter"&&cands.length===1){if(bloque(cands[0].id)){toast("Absent / FMC ce jour","warn");return;}applyGarde(cands[0].id,pd.y,pd.m,pd.d);setGvSearch("");setPickerDay(null);}}}
+              onKeyDown={e=>{
+                if(e.key==="Enter"&&pd.chaine&&!gvSearch){chSuite(pd,false);return;}   /* v10.223 : champ vide = passer le jour */
+                if(e.key==="Enter"&&cands.length===1){if(bloque(cands[0].id)){toast("Absent / FMC ce jour"+(pd.chaine?" — « Assigner quand même », ou videz le champ et Entrée pour passer":""),"warn");return;}
+                  const ecrit=applyGarde(cands[0].id,pd.y,pd.m,pd.d);
+                  if(pd.chaine){if(ecrit!==false)chSuite(pd,false);}else{setGvSearch("");setPickerDay(null);}}}}
               style={{width:"100%",padding:"8px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:14,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:2,marginBottom:8,boxSizing:"border-box"}}/>
             {cands.length===1&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:4,textAlign:"center"}}>↵ Entrée pour confirmer</div>}
             <GardeCandidateList
@@ -2287,11 +2408,85 @@ function GardeView({noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,yea
               tourNext={mid=>{const nx=new Date(pd.y,pd.m,pd.d+1);const ny=nx.getFullYear(),nm=nx.getMonth(),nd=nx.getDate();if(isWE(ny,nm,nd))return null;const t=["M","AM"].map(sl=>getEntry(mid,ny,nm,nd,sl)).find(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));return t?(t.acteId==="TOUR_HC"?"HC":"USIC"):null;}}
               prefOf={mid=>{const dkP=dKey(pd.y,pd.m,pd.d);return ((gardeWish||{})[dkP]||{})[mid]?"wish":(((gardeAvoid||{})[dkP]||{})[mid]?"avoid":null);}}
               currentId={gMed?gMed.id:null}
-              onPick={mid=>{applyGarde(mid,pd.y,pd.m,pd.d);setGvSearch("");setPickerDay(null);}}
+              onPick={mid=>{const ecrit=applyGarde(mid,pd.y,pd.m,pd.d);if(pd.chaine){if(ecrit!==false)chSuite(pd,false);}else{setGvSearch("");setPickerDay(null);}}}
               maxHeight={360}/>
             </>;})()}
           </Ov>
         );
+      })()}
+      {/* v10.223 : import d'une liste de gardes — rien n'est écrit avant « Appliquer » */}
+      {impG&&isEdit&&outils&&(()=>{
+        const ferme=()=>setImpG(null);
+        if(impG.etape==="saisie")return(
+          <Ov onClose={()=>{}}>
+            <div style={S.mHd}>
+              <div>
+                <div style={S.mTit2}>📋 Importer une liste de gardes</div>
+                <div style={{color:"var(--txt2)",fontSize:12,marginTop:2}}>{"Période "+MOIS[gvSm]+" — "+MOIS[(gvSm+PCFG.len-1)%12]+" · une ligne par jour · rien n'est écrit à cette étape"}</div>
+              </div>
+              <button onClick={ferme} style={S.xBtn}>×</button>
+            </div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6}}>Formats acceptés : « 02/11 TH », « 3/11 MP », « mar 4 nov : VA ». L'année se déduit de la période. Une ligne qui commence par # est ignorée.</div>
+            <textarea autoFocus value={impG.txt} onChange={e=>setImpG({txt:e.target.value,etape:"saisie"})} placeholder={"02/11 TH\n03/11 MP\n04/11 VA"} rows={14}
+              style={{width:"100%",boxSizing:"border-box",padding:"8px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace",marginBottom:10,resize:"vertical"}}/>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={ferme} style={{...S.icnBtn,fontSize:12}}>Annuler</button>
+              <button disabled={!impG.txt.trim()} onClick={()=>setImpG({txt:impG.txt,etape:"controle"})} style={{...S.btnP,background:"#0e7490",opacity:impG.txt.trim()?1:.45,cursor:impG.txt.trim()?"pointer":"not-allowed"}}>Contrôler la liste →</button>
+            </div>
+          </Ov>);
+        const R=gardesControler(impG.txt,gvAllDays,{
+          titulaire:j=>djAff(getGardeMed2(j.y,j.m,j.d),dKey(j.y,j.m,j.d))||null,
+          pourvu:j=>hasGardeAlready(j.y,j.m,j.d),
+          tous:j=>medecins.map(m=>djAff(m,dKey(j.y,j.m,j.d))),
+          absent:(med,j)=>isMedAvailable(medecins.find(x=>x.id===med.id),j.y,j.m,j.d,gardeSlotDe(j.y,j.m,j.d))==="blocked"||gvIsAbs(med.id,j.y,j.m,j.d),
+          off:(med,j)=>offOn(med,j.y,j.m,j.d),
+          tourLendemain:(med,jn)=>{if(isWE(jn.y,jn.m,jn.d))return null;const t=["M","AM"].map(sl=>getEntry(med.id,jn.y,jn.m,jn.d,sl)).find(e=>e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC"));return t?(t.acteId==="TOUR_HC"?"HC":"USIC"):null;},
+          eviter:(med,j)=>!!(((gardeAvoid||{})[dKey(j.y,j.m,j.d)]||{})[med.id])
+        });
+        const aPoser=R.rows.filter(r=>r.etat==="ok"||r.etat==="warn");
+        const COL={ok:"#16a34a",warn:"#b45309",err:"#dc2626",deja:"var(--txt3)"},FOND={ok:"transparent",warn:"rgba(245,158,11,.10)",err:"rgba(220,38,38,.10)",deja:"transparent"},SIG={ok:"✓",warn:"⚠",err:"⛔",deja:"="};
+        const appliquer=()=>{
+          let n=0;aPoser.forEach(r=>{if(applyGarde(r.med.id,r.jour.y,r.jour.m,r.jour.d,true)!==false)n++;});
+          setImpG(null);
+          setTimeout(()=>toast(n+" garde"+(n>1?"s":"")+" posée"+(n>1?"s":"")+", repos compris"+(n<aPoser.length?" — "+(aPoser.length-n)+" refusée(s) par le verrou":"")+(R.nErr?" · "+R.nErr+" ligne"+(R.nErr>1?"s":"")+" en rouge non traitée"+(R.nErr>1?"s":""):""),n<aPoser.length||R.nErr?"warn":"info"),80);
+        };
+        return(
+          <Ov onClose={()=>{}} wide>
+            <div style={S.mHd}>
+              <div>
+                <div style={S.mTit2}>📋 Contrôle de la liste — rien n'est encore écrit</div>
+                <div style={{fontSize:12,marginTop:3,display:"flex",gap:10,flexWrap:"wrap",fontWeight:700}}>
+                  <span style={{color:COL.ok}}>{"✓ "+R.nOk+" à poser"}</span>
+                  <span style={{color:COL.warn}}>{"⚠ "+R.nWarn+" à poser avec remarque"}</span>
+                  <span style={{color:COL.err}}>{"⛔ "+R.nErr+" en rouge (non posée"+(R.nErr>1?"s":"")+")"}</span>
+                  <span style={{color:COL.deja}}>{"= "+R.nDeja+" déjà en place"}</span>
+                </div>
+              </div>
+              <button onClick={ferme} style={S.xBtn}>×</button>
+            </div>
+            {R.horsListe>0&&<div style={{fontSize:11,color:"#b45309",background:"rgba(245,158,11,.10)",border:"1px solid #f59e0b",borderRadius:6,padding:"5px 8px",marginBottom:8}}>{"En dehors des dates de la liste, "+R.horsListe+" jour"+(R.horsListe>1?"s":"")+" de la période "+(R.horsListe>1?"restent":"reste")+" sans garde."}</div>}
+            <div style={{maxHeight:"56vh",overflowY:"auto",border:"1px solid var(--border)",borderRadius:8,marginBottom:10}}>
+              <table style={{borderCollapse:"collapse",width:"100%"}}>
+                <thead><tr>{["","Jour","Ligne lue","Médecin reconnu","Contrôle"].map((h,i)=><th key={i} style={{position:"sticky",top:0,background:"var(--bg3)",color:"var(--txt2)",fontSize:10,fontWeight:800,textAlign:"left",padding:"5px 8px",borderBottom:"1px solid var(--border)"}}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {R.rows.map(r=>(
+                    <tr key={r.k} data-etat={r.etat} style={{background:FOND[r.etat],borderBottom:"1px solid var(--border2)"}}>
+                      <td style={{padding:"4px 8px",background:FOND[r.etat],color:COL[r.etat],fontWeight:800,fontSize:13,width:22}}>{SIG[r.etat]}</td>
+                      <td style={{padding:"4px 8px",background:FOND[r.etat],color:"var(--txt)",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>{r.lib}</td>
+                      <td style={{padding:"4px 8px",background:FOND[r.etat],color:"var(--txt2)",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{r.brut||"—"}</td>
+                      <td style={{padding:"4px 8px",background:FOND[r.etat],fontSize:12,color:"var(--txt)",whiteSpace:"nowrap"}}>{r.med?<span style={{display:"inline-flex",alignItems:"center",gap:6}}><span style={{width:22,height:22,borderRadius:"50%",background:r.med.color,color:"#fff",fontSize:9,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{r.med.init}</span>{r.med.prenom} {r.med.nom}</span>:"—"}</td>
+                      <td style={{padding:"4px 8px",background:FOND[r.etat],color:COL[r.etat],fontSize:11,fontWeight:700}}>{r.msgs.length?r.msgs.join(" · "):"garde + repos le lendemain"}</td>
+                    </tr>))}
+                  {R.rows.length===0&&<tr><td colSpan={5} style={{padding:10,fontSize:12,color:"var(--txt3)"}}>Aucune ligne lisible dans la liste.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap",alignItems:"center"}}>
+              {R.nErr>0&&<span style={{fontSize:11,color:COL.err,fontWeight:700,marginRight:"auto"}}>Les lignes en rouge ne seront pas posées : corrigez la liste, ou posez ces jours à la main ensuite.</span>}
+              <button onClick={()=>setImpG({txt:impG.txt,etape:"saisie"})} style={{...S.icnBtn,fontSize:12}}>← Corriger la liste</button>
+              <button disabled={!aPoser.length} onClick={appliquer} style={{...S.btnP,background:"#16a34a",opacity:aPoser.length?1:.45,cursor:aPoser.length?"pointer":"not-allowed"}}>{"Appliquer — poser "+aPoser.length+" garde"+(aPoser.length>1?"s":"")+" + repos"}</button>
+            </div>
+          </Ov>);
       })()}
     </div>
   );
@@ -5314,7 +5509,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
       {/* v10.165 : tableau des binômes — lecture seule, ouvert à tous les niveaux */}
       {binOpen&&(
         <Ov wide onClose={()=>setBinOpen(false)}>
-          <div style={{...S.modal,width:"100%",maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>   {/* v10.169 : le tableau tenait dans 840 px et se coupait */}
+          <div style={{...S.modal,width:"100%",maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>{/* v10.169 : le tableau tenait dans 840 px et se coupait */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={S.mTit2}>🤝 Qui a tourné avec qui</div>
               <button onClick={()=>setBinOpen(false)} style={S.xBtn}>×</button>
@@ -5329,7 +5524,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
               if(LB.length<2)return <div style={{fontSize:11,color:"var(--txt3)"}}>{"Il faut au moins deux tourneurs pour former un binôme."}</div>;
               return(
                 <div style={{overflowX:"auto",border:"1px solid var(--border)",borderRadius:8}}>
-                  <table style={{borderCollapse:"collapse",fontSize:11,width:"100%"}}>   {/* v10.169 : toute la largeur disponible */}
+                  <table style={{borderCollapse:"collapse",fontSize:11,width:"100%"}}>{/* v10.169 : toute la largeur disponible */}
                     <thead>
                       <tr>
                         <th style={{...S.thFix,position:"sticky",left:0,top:0,zIndex:30,minWidth:54,textAlign:"left",padding:"5px 8px"}}>{""}</th>
@@ -5751,7 +5946,7 @@ function HK(tag,props,c){return HE.apply(null,[tag,props].concat(Array.isArray(c
 function HP(p){return HK("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.65,marginBottom:p.last?0:8}},p.children);}
 function HT(p){return HK("div",{style:{fontSize:11,fontWeight:800,color:"var(--txt2)",textTransform:"uppercase",letterSpacing:.4,margin:"12px 0 4px"}},p.children);}
 function HStep(p){return HE("div",{style:{display:"flex",gap:8,marginBottom:7,alignItems:"flex-start"}},
-  HE("span",{style:{flexShrink:0,width:26,height:26,borderRadius:"50%",background:"#1d4ed8",color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}},p.n),
+  HE("span",{style:{flexShrink:0,width:20,height:20,borderRadius:"50%",background:"#1d4ed8",color:"#fff",fontSize:11,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center"}},p.n),
   HK("div",{style:{fontSize:12,color:"var(--txt)",lineHeight:1.6}},p.children));}
 function HTab(p){return HE("div",{style:{marginBottom:7}},
   HE("span",{style:{fontWeight:800,fontSize:12,color:"var(--txt)"}},p.t+" — "),
@@ -5794,6 +5989,8 @@ const HELP_SECTIONS=[
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
   HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport. Depuis la v10.165 elle veille en plus à l'ÉQUITÉ DES BINÔMES : un binôme, ce sont les 2 médecins d'une même unité sur une même semaine, HC et USIC confondus — le décompte est commun. À égalité de charge, l'algorithme sert celui qui a le moins tourné avec le médecin déjà posé dans l'unité, et les 60 essais retiennent la répartition la mieux ventilée. Le bouton 🤝 Binômes, ouvert à tout le monde en lecture, montre le tableau croisé des semaines passées ensemble : un 0 en ambre est un couple jamais formé. Les SEMAINES DE BASCULE D'INTERNE — celles dont le lundi ouvre un semestre, dates prises dans l'onglet Équipe et jamais écrites en dur — sont réparties entre ceux qui en ont fait le moins, et confiées à un junior seulement en dernier recours, avec un ⚠ au rapport : le junior arrive précisément ce lundi-là. Le décompte porte sur une fenêtre glissante de deux ans, à partir de la date réglée dans Paramètres (par défaut le 02/11/2026), et ne décide jamais du NOMBRE de semaines dû à chacun. Depuis la v10.166, le remplaçant junior d'un temps partiel en USIC est choisi sur le tour et le planning tels qu'ils sont à cet instant — jamais un junior déjà de tour cette semaine-là — et les journées de remplacement sont réparties entre les juniors, une journée comptant pour une : trois semaines, trois juniors, un jour chacun. Enfin, pendant les vacances scolaires (saisies dans Paramètres), un temps partiel posé en USIC est permuté avec un médecin HC de la même semaine quand c'est possible — jamais au prix d'une règle : si rien ne convient, il reste en USIC et le rapport le dit. Depuis la v10.167, un médecin peut ÉVITER UNE UNITÉ CERTAINES SEMAINES (garde alternée) : colonne « Éviter » de la modale ⚙️ — choisir USIC ou HC ouvre sa ligne, pré-remplie une semaine sur deux dès le premier lundi de la période ; le second bouton change de pied, et un clic sur une pastille inverse le rythme d'ici la fin de la période. Réglage propre à chaque période : une nouvelle période part vide. Sur une semaine évitée, le médecin passe en dernier dans le tri de l'unité évitée — jamais interdit, jamais de semaine incomplète — et la passe de permutation HC↔USIC le rattrape s'il y a atterri quand même ; sinon le rapport le nomme 🔁. Se cumule avec le 🚫 « pas de tour ». Dans le tableau du tour et la modale d'échange ⇄, le 🔁 et un avertissement signalent la pose dans l'unité évitée, sans l'empêcher. Depuis la v10.168 la répartition veille à l'ÉQUILIBRE HC / USIC de chacun : à une semaine près — 2 et 2 pour 4 semaines, 3 et 2 dans un sens ou l'autre pour 5. Le critère pèse dès le tirage, puis une dernière passe ⚖ permute HC↔USIC au sein d'une même semaine pour qui garde 2 semaines d'écart ou plus — le partenaire n'est jamais déséquilibré à son tour, et la passe respecte les vacances scolaires 🏖 des temps partiels et les unités évitées 🔁. Ce qui reste hors ±1 est nommé au rapport. Depuis la v10.187, le bouton 🔎 Vérifier (éditeur) relit la répartition TELLE QU'AFFICHÉE — retouches à la main comprises — et lui passe les mêmes contrôles, sans rien déplacer : semaines complètes, surspécialités, 🚫, enchaînement (3 semaines avant ET après la période comprises), semaines doublées, bascules d'interne, 🏖, 🔁, ⚖, quotas, binômes — plus trois contrôles propres aux retouches : un absent posé de tour, un médecin présent deux fois la même semaine, un exclu ou non-tourneur affecté. Il compte aussi les semaines de bascule d'interne sur la fenêtre 🤝 et nomme quiconque en a une entière de plus que la moyenne. Les réglages relus sont ceux de la dernière modale ⚙️ de la période. Le rapport, daté, remplace celui de la répartition automatique et reste affiché jusqu'au suivant. Depuis la v10.188, le rapport se lit en couleurs — ✓ en vert, ⚠ en rouge — et un rôle de Dr Junior est compté par titulaire pour l'enchaînement : la semaine du lundi de bascule et les suivantes vont au nouveau junior, les précédentes à l'ancien, et une semaine de l'un ne s'enchaîne jamais avec une semaine de l'autre. Un bouton ↑ flottant, en bas à droite, ramène en haut de la tuile dès qu'on a défilé. Depuis la v10.189, sous chaque constat ⚠ qui vise un médecin ou une semaine, le rapport propose jusqu'à trois ÉCHANGES À DEUX (lignes ↳) : X cède sa semaine à Y et prend la sienne — autre semaine, ou même semaine dans l'autre unité —, ce qui conserve les quotas. Un échange n'est proposé que s'il fait disparaître le constat sans en créer aucun autre : disponibilité, surspécialités, 🚫, enchaînement, 🔁, 🏖, équilibre HC/USIC, tout est rejugé. Les semaines passées et verrouillées ne sont jamais proposées. Depuis la v10.192, les semaines s'affichent en GRILLE : une colonne par médecin (sa tuile de décompte reste collée en haut au défilement), une ligne par semaine, et chaque médecin n'apparaît qu'une fois par semaine. Une case colorée porte l'unité (HC ou USIC, aux couleurs des activités « Tour médical HC / USIC » de l'onglet Activités) ; hachurée, le médecin est indisponible ou occupé (le détail au survol) ; 🚫 ⭐ 🔁 rappellent ses préférences, texte au survol. Un clic sur une case ouvre un petit menu HC / USIC / Retirer — changer d'unité se fait en un geste, sans passer par l'autre. À gauche de la ligne, le compte HC et USIC de la semaine et, depuis la v10.193, les surspécialités encore disponibles — un chiffre sous le minimum réglé passe en rouge ⚠ ; à droite, ⇄ Échanger et le remplacement TP. Depuis la v10.196, les médecins hors tour qui ont une surspécialité ont eux aussi leur colonne, dans l'ordre de l'onglet Équipe : une tuile d'initiales sans décompte, et par semaine une case jamais cliquable, portant en petit « présent hors tour » quand ils sont là, hachurée s'ils sont absents la majorité de la semaine — comme une case de tourneur indisponible. Depuis la v10.198, chaque colonne repose sur une bande de couleur continue, de la tuile au bas de la grille : la couleur de la surspécialité du médecin (réglable dans Paramètres), la même pour un hors tour, et la couleur de la personne quand sa colonne est suivie — les cases, un peu plus étroites que la bande, laissent la couleur visible de chaque côté. Sur téléphone (v10.200, v10.201), la grille défile dans son propre cadre, en hauteur comme en largeur, et non avec la page ; la colonne des semaines reste figée à gauche et l'en-tête en haut pendant le défilement, avec le bouton ⇄ et les remplacements TP sous chaque semaine ; les cases et les tuiles sont réduites, et la mention « présent hors tour » disparaît — la case blanche sur sa bande suffit. Depuis la v10.193, un clic sur une tuile d'initiales de l'en-tête suit sa colonne (bande teintée, cadre à la couleur du médecin), plusieurs à la fois pour comparer deux ou trois personnes avant un échange — un second clic la relâche. La puce d'un remplacement de temps partiel se lit « remplaçant → remplacé jour/mois » ; un clic dessus ouvre la même modale « ⇄ Échanger ce jour de tour » que la case du remplaçant dans le Planning, avec tous les médecins libres ce jour-là. Enfin, quand l'équipe grandit, les tuiles se resserrent d'elles-mêmes pour que la grille tienne dans la largeur de l'écran, jusqu'à un plancher en dessous duquel on défile. Depuis la v10.191, chaque ligne ↳ porte un bouton ⇄ Appliquer : l'échange se fait d'un clic, exactement comme par la modale ⇄ du tableau (planning type des deux médecins, temps partiels et remplaçants suivis, un seul cran ↶), et la vérification se relance toute seule. Si la répartition a changé depuis la vérification, le bouton refuse et demande de relancer 🔎. Quand un échange retire à quelqu'un les 2 semaines d'affilée qu'il a DEMANDÉES, il reste proposé mais la ligne le dit (⚠ … perd ses 2 semaines d'affilée demandées) et passe après les autres. Depuis la v10.190, un geste du tour — répartition automatique, 🗑 Retirer, échange ⇄, clic dans le tableau — ne fait qu'UN cran d'historique, même s'il écrit en plusieurs temps (tour, purge, activités, temps partiels et remplaçants) : un seul ↶ le défait, avec une seule confirmation qui annonce le vrai nombre de cases touchées."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain. Depuis la v10.205, un bandeau en tête de la tuile 3 permet de « ✓ Valider les gardes » d'une période à venir (comme le tour) : tant qu'elles ne le sont pas, les médecins basiques ne peuvent ni prendre ni échanger une garde ; une fois validées, un médecin basique peut, depuis la colonne Garde du Planning, se mettre de garde à la place de quelqu'un ou échanger l'une de SES gardes avec une autre — jamais retirer une garde, jamais poser quelqu'un d'autre. Éditeur et intermédiaires gardent la main entière."]}),
+  HP({children:[HE("b",null,"Saisir les gardes à la main, vite")," (v10.223, tuile 3 de Construire seulement) : le bouton ",HBtn({kind:"ghost",children:"⏩ Saisie en chaîne"})," ouvre la modale de garde habituelle sur le ",HE("b",null,"premier jour de la période"),". Tapez les initiales : dès qu'il ne reste qu'un candidat, ",HE("b",null,"Entrée")," pose la garde et son repos, puis la modale passe ",HE("b",null,"d'elle-même au jour suivant"),", champ vidé. ",HE("b",null,"Entrée sur un champ vide")," passe le jour sans rien poser. La chaîne ",HE("b",null,"s'arrête sur tout jour qui a déjà une garde")," : le titulaire est affiché, rien n'est modifié, et un bouton propose de reprendre au prochain jour sans garde. Échap ou × arrête ; après le dernier jour, le message « Fin de la période » s'affiche et la modale se ferme. Un jour = une garde, férié ou non. La modale ouverte depuis la colonne Garde du Planning ou depuis l'onglet Gardes ne change pas."]}),
+  HP({children:[HE("b",null,"Importer une liste de gardes")," (v10.223) : ",HBtn({kind:"ghost",children:"📋 Importer une liste"})," ouvre une zone où coller une liste, ",HE("b",null,"une ligne par jour")," — « 02/11 TH », « 3/11 MP », « mar 4 nov : VA » ; l'année se déduit de la période. « Contrôler la liste » affiche un ",HE("b",null,"tableau jour par jour sans rien écrire")," : ✓ à poser, ⚠ à poser avec une remarque (absence ou tour le lendemain, garde à éviter, deux jours de suite), = déjà en place, et ",HE("b",null,"⛔ en rouge ce qui coince")," — initiales inconnues, médecin absent, désactivé ou sans garde ce jour de la semaine, jour déjà pourvu par quelqu'un d'autre (",HE("b",null,"jamais écrasé"),"), jour manquant entre la première et la dernière date de la liste, doublon, date hors période, ligne incompréhensible. « Appliquer » pose d'un coup les lignes ✓ et ⚠, repos compris, par le même chemin que la modale ; les lignes rouges ne sont jamais posées — corrigez la liste ou posez ces jours à la main."]}),
   HStep({n:"4",children:[HE("b",null,"Appliquer le Planning type")," — onglet Type : « Depuis le début de la période » par défaut. Les absences, gardes, repos et tours déjà posés sont préservés."]}),
   HStep({n:"5",children:[HE("b",null,"Poser les Astreintes")," — onglet Astreinte : répartition automatique par semaines complètes (lun→dim), équitable entre les médecins cochés « Astreinte rythmo » ; exceptions possibles jour par jour."]}),
   HStep({n:"6",children:[HE("b",null,"Ajuster")," — cases individuelles, échanges de gardes ⇄, dérogations de tour, notes 📝."]}),
@@ -7290,7 +7487,7 @@ function BuildTab({build,setBuild,medecins,getEntries,tourMed,isEdit,edReel,dark
          <span style={{fontSize:11,fontWeight:700,color:B.gardeOk?"#3fb950":"#8b5cf6"}}>{B.gardeOk?("✓ Gardes validées — les médecins peuvent prendre ou échanger leurs gardes"+(B.gardeOk.by?" (par "+B.gardeOk.by+" le "+B.gardeOk.at+")":"")):"🔒 Gardes non validées — les médecins basiques ne peuvent pas encore les prendre ni les échanger"}</span>
          <button onClick={()=>{if(B.gardeOk){if(!window.confirm("Refermer les échanges de gardes de cette période aux médecins basiques ?"))return;patchB({gardeOk:null});}else{if(!window.confirm("Valider les gardes de cette période : les médecins basiques pourront prendre une garde à leur nom ou échanger l'une des leurs. Continuer ?"))return;patchB({gardeOk:sign()});}}} style={{marginLeft:"auto",fontSize:11,padding:"3px 11px",borderRadius:6,fontWeight:800,cursor:"pointer",border:"1.5px solid "+(B.gardeOk?"var(--border)":"#8b5cf6"),background:B.gardeOk?"var(--bg2)":"#8b5cf6",color:B.gardeOk?"var(--txt2)":"#fff"}}>{B.gardeOk?"Dévalider":"✓ Valider les gardes"}</button>
        </div>}
-       <BuildEmbed><GardeView key={pKey} {...gardeProps} isEdit={peutTG} medecins={medsB} noNav={true} showFull={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>
+       <BuildEmbed><GardeView key={pKey} outils={true} {...gardeProps} isEdit={peutTG} medecins={medsB} noNav={true} showFull={true} year={bPer.sy} month={bPer.sm}/></BuildEmbed>
      </div>},
     {n:4,icon:"🚫",titre:"Absences de tout le monde",
      sous:nAutres+" sur "+autres.length+" renseigné"+(nAutres>1?"s":""),
@@ -7589,7 +7786,7 @@ function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDa
           const ouv=!!ouvert[m.id];
           const allKeys=acts.reduce((l,a)=>l.concat(grp[a].map(e=>e.k)),[]);
           return(
-            <div key={m.id} style={{border:"1px solid "+(nTot?"#f59e0b":"var(--border)"),borderRadius:10,background:"var(--card)",opacity:nTot?1:.55,gridColumn:(ouv&&nTot>0)?"1 / -1":"auto"}}>   {/* v10.174 : pleine largeur seulement s'il y a des lignes */}
+            <div key={m.id} style={{border:"1px solid "+(nTot?"#f59e0b":"var(--border)"),borderRadius:10,background:"var(--card)",opacity:nTot?1:.55,gridColumn:(ouv&&nTot>0)?"1 / -1":"auto"}}>{/* v10.174 : pleine largeur seulement s'il y a des lignes */}
               <div onClick={()=>setOuvert(o=>({...o,[m.id]:!o[m.id]}))} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer"}}>
                 <span style={{fontWeight:800,fontSize:13,color:"var(--txt)"}}>{(m.prenom?m.prenom+" ":"")+(m.nom||m.init||"")}</span>
                 {nTot>0
@@ -11591,10 +11788,12 @@ function CardioPlanning(){
     if(vAvertit(vRef,y3,m3,d3))vToast(true);else toast("Garde et repos retir\u00e9s","info");
   };
 
-  const applyGarde=useCallback((medId,y2,m2,d2)=>{
-    if(accessMode==="adminEdit")return;
-    if(vBloque(vRef,y2,m2,d2)){vToast(false);return;}   /* v10.126 : le verrou couvre les gardes */
-    if(vRef.current.gardeSelf&&!vRef.current.gardeOuvert(y2,m2,d2)){toast("Les gardes de cette période ne sont pas encore validées","warn");return;}   /* v10.205 */
+  /* v10.223 : répond false quand rien n'est écrit (la saisie en chaîne n'avance pas, l'import le compte) ;
+     « silencieux » (import d'une liste) : un seul message à la fin, pas un par garde. */
+  const applyGarde=useCallback((medId,y2,m2,d2,silencieux)=>{
+    if(accessMode==="adminEdit")return false;
+    if(vBloque(vRef,y2,m2,d2)){vToast(false);return false;}   /* v10.126 : le verrou couvre les gardes */
+    if(vRef.current.gardeSelf&&!vRef.current.gardeOuvert(y2,m2,d2)){toast("Les gardes de cette période ne sont pas encore validées","warn");return false;}   /* v10.205 */
     logCell("add",medId,y2,m2,d2,"N","GARDE");
     /* v9.65 : la garde la veille d'une absence ou d'une FMC reste PERMISE (décision
        utilisateur), mais elle est signalée — le repos ne sera pas posé, la v9.64
@@ -11637,11 +11836,12 @@ function CardioPlanning(){
       }
       return next;
     });
-    setTimeout(()=>{
+    if(!silencieux)setTimeout(()=>{
       if(vAvertit(vRef,y2,m2,d2))vToast(true);   /* v10.126 : déverrouillé — écrit, mais averti */
       else if(nxWarn)toast("⚠ Absence ou FMC le lendemain — garde posée SANS repos","warn");
       else toast("Garde + repos automatique","info");
     },0);
+    return true;
   },[]);
 
   /* ── applyAbsence ── */
