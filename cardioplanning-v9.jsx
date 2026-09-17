@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.224 — 17/09/2026";
+const APP_VERSION="v10.225 — 17/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -113,7 +113,7 @@ function perNextB(sy,sm,av){var p=perNext(sy,sm);return perOk(p.sy,p.sm,av)?p:nu
 //    puis inclut le lundi suivant s'il est férié (ex. 1er novembre). La période suivante démarre le lendemain.
 function perEnd(sy,sm){
   const t=sm+PCFG.len-1;const em=t%12,ey=t>11?sy+1:sy;
-  const dt=new Date(ey,em+1,0); // dernier jour du dernier mois
+  let dt=new Date(ey,em+1,0); // dernier jour du dernier mois — v10.225 : « let », car dt est REMPLACÉ plus bas quand le lundi suivant est férié (un const plantait depuis la compilation es2017)
   while(dt.getDay()!==0)dt.setDate(dt.getDate()+1); // → dimanche
   const mon=new Date(dt);mon.setDate(mon.getDate()+1);
   if(isFerie(mon.getFullYear(),mon.getMonth(),mon.getDate()))dt=mon;
