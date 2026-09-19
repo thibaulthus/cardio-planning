@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.226 — 17/09/2026";
+const APP_VERSION="v10.227 — 19/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6119,7 +6119,7 @@ const HELP_SECTIONS=[
   HP({children:["Chaque jour de semaine a deux créneaux (M matin, AM après-midi) plus la nuit N pour la garde ; le week-end une seule case JOUR. Cliquez sur une case (en mode édition) pour ouvrir la modale :"]}),
   HP({children:["• choisir l'",HE("b",null,"activité")," (seules celles autorisées pour ce médecin apparaissent), la ",HE("b",null,"salle")," si l'activité en demande une, ajouter une ",HE("b",null,"note")," 📝. Depuis la v10.173, une ",HE("b",null,"pose avec salle se valide"),' : après le choix de la salle, la modale reste ouverte, montre ce qui va être posé et le champ de note, puis « ✓ Valider » écrit l\'activité et la note ensemble — « ← Retour » ou × ne posent rien. Les activités sans salle, l\'absence, la FMC et la garde se posent toujours au clic. Le bouton « 📅 Modifier sur une période… » a lui aussi son « ← Retour » vers la modale de case.']}),
   HP({children:["• ",HE("b",null,"retirer")," : rouvrir la case et choisir Retirer."]}),
-  HP({children:["• ",HE("b",null,"absence ou FMC")," : depuis la v10.172, le clic sur ABS ou FMC ne pose plus tout de suite — une ligne propose la ",HE("b",null,"durée"),", dates réelles affichées sous chaque bouton. Absence : ce créneau, cette journée, 1, 2 ou 3 semaines (du samedi précédent au dimanche, fériés accolés compris). FMC : ce créneau, cette journée, 2 ou 3 jours calendaires, la semaine du lundi au vendredi — et la FMC se pose désormais aussi le week-end, pour les congrès. Si la plage est vide, le clic pose et ferme ; sinon un encart liste ce qu'elle rencontre : un ",HE("b",null,"jour de tour"),' refuse la pose (le jour s\'échange d\'abord, ⇄), une ',HE("b",null,"garde"),' et son repos sont conservés d\'office (une garde s\'échange, elle ne s\'efface pas), et les autres cases occupées — activité, planning type, choix ouvert — se ',HE("b",null,"gardent ou se remplacent"),", au choix. Le retour ↶ défait la pose entière d'un coup."]}),
+  HP({children:["• ",HE("b",null,"absence ou FMC")," : depuis la v10.172, le clic sur ABS ou FMC ne pose plus tout de suite — une ligne propose la ",HE("b",null,"durée"),", dates réelles affichées sous chaque bouton. Absence : ce créneau, cette journée, 1, 2 ou 3 semaines (du samedi précédent au dimanche, fériés accolés compris). FMC : ce créneau, cette journée, 2 ou 3 jours calendaires, la semaine du lundi au vendredi — et la FMC se pose désormais aussi le week-end, pour les congrès. Depuis la v10.227, la FMC est proposée à tous les profils comme l'absence, IDE compris (colonnes IDE de l'onglet Attachés) : sa liste de praticiens autorisés n'est plus consultée. Si la plage est vide, le clic pose et ferme ; sinon un encart liste ce qu'elle rencontre : un ",HE("b",null,"jour de tour"),' refuse la pose (le jour s\'échange d\'abord, ⇄), une ',HE("b",null,"garde"),' et son repos sont conservés d\'office (une garde s\'échange, elle ne s\'efface pas), et les autres cases occupées — activité, planning type, choix ouvert — se ',HE("b",null,"gardent ou se remplacent"),", au choix. Le retour ↶ défait la pose entière d'un coup."]}),
   HP({children:["Repères visuels : cases grisées = bloquées par une semaine de tour · fond jaune pâle = week-end · fond et contour verts = semaine d'astreinte · ",HBadg({txt:"G",color:"#93c47d"})," garde · ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde · cases ",HE("b",null,"hachurées")," = personne indisponible (section ⏸)."]}),
   HP({children:["Les activités cochées « reprise » affichent le nom du médecin seul dans les onglets concernés."]}),
   HT({children:"📝 Les notes"}),
@@ -14577,6 +14577,11 @@ header::-webkit-scrollbar { display: none; }
           if(isNight)return a.id==="GARDE"&&canGarde;
           if(we)return a.id==="ABSENCE"||a.id==="FORMATION"||(a.id==="GARDE"&&canGarde);   /* v10.172 : FMC le week-end (congrès) */
           if(SYS.includes(a.id)) return a.id==="ABSENCE";
+          /* v10.227 : la FMC se propose à TOUS les profils, comme l'absence — sa liste de praticiens autorisés n'est plus
+             consultée ici. Les profils IDE ne peuvent entrer dans aucune liste (ni fiche Équipe, ni fenêtre de l'activité) :
+             la FMC leur était donc refusée en semaine, alors que le week-end (v10.172) et « Modifier sur une période »
+             ne regardaient déjà pas la liste. */
+          if(a.id==="FORMATION")return true;
           // Check if medecin is authorized for this activity
           if((a.medecinsAutorise&&a.medecinsAutorise.length)>0&&!(med&&a.medecinsAutorise.includes(authI(med))))return false;
           return true;
