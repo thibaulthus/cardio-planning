@@ -70,7 +70,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.227 — 19/09/2026";
+const APP_VERSION="v10.228 — 20/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -993,6 +993,23 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
      la même hauteur d'un onglet à l'autre ;
    — les autres onglets retrouvent simplement l'endroit où ils étaient.
    Rien ne survit au rechargement : on revient alors au jour courant, ce qui convient. */
+/* ════ v10.228 : MÉMOIRE DES ONGLETS — « quand je reviens sur un onglet, je le retrouve où je l'ai laissé ».
+   Un onglet qu'on quitte est démonté : ses réglages d'affichage (période des Stats, médecins filtrés, tri, tuiles
+   dépliées de l'Aide…) repartaient donc de zéro au retour. useOngletMem s'emploie comme useState, mais range aussi
+   la valeur ici, hors des composants, sous une clé ; au retour, l'onglet repart de la valeur rangée.
+   Durée de vie : la session (comme SCROLL_MEM et BUILD_MEM). Tout est VIDÉ au retour à l'accueil (♥) : sur un poste
+   partagé, la personne suivante ne retrouve pas les filtres de la précédente. `valide` écarte une valeur rangée devenue
+   invalide (un médecin retiré de l'équipe, par exemple). Seuls des réglages d'AFFICHAGE passent par ici — jamais une
+   modale ouverte ni une saisie en cours. */
+const ONGLET_MEM={};
+function ongletMemVider(){Object.keys(ONGLET_MEM).forEach(k=>{delete ONGLET_MEM[k];});}
+function useOngletMem(cle,init,valide){
+  const [v,setV]=React.useState(()=>{
+    if(Object.prototype.hasOwnProperty.call(ONGLET_MEM,cle)&&(!valide||valide(ONGLET_MEM[cle])))return ONGLET_MEM[cle];
+    return typeof init==="function"?init():init;});
+  const set=React.useCallback((x)=>setV(p=>{const n=typeof x==="function"?x(p):x;ONGLET_MEM[cle]=n;return n;}),[cle]);
+  return [v,set];
+}
 const SCROLL_MEM={jour:null,pos:{},x:{},centre:false};
 /* v10.130 : mémoire HORIZONTALE (x, par onglet à jours — chacun a ses colonnes) et
    centrage unique à l'ouverture (centre) sur la colonne du médecin connecté.
@@ -5829,8 +5846,8 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
 }
 
 function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed}){
-  const [statsYear,setStatsYear]=React.useState(()=>new Date().getFullYear());
-  const [statsMonth,setStatsMonth]=React.useState(()=>new Date().getMonth());
+  const [statsYear,setStatsYear]=useOngletMem("stats.annee",()=>new Date().getFullYear());   /* v10.228 */
+  const [statsMonth,setStatsMonth]=useOngletMem("stats.mois",()=>new Date().getMonth());
   const [statSite,setStatSite]=React.useState("tous");
   const _ps=perStart(statsYear,statsMonth);
   const per={startY:_ps.sy,startM:_ps.sm};
@@ -5851,8 +5868,8 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
 
   // Count per med per acte
   const allStatMeds=djListePeriode(medecins,days).filter(m=>m.role==="medecin"&&!m._nonPourvu);   /* v10.123 */
-  const [medFilter,setMedFilter]=React.useState([]);
-  const [sortCol,setSortCol]=React.useState(null); // {col,dir:'desc'|'asc'}
+  const [medFilter,setMedFilter]=useOngletMem("stats.meds",[]);
+  const [sortCol,setSortCol]=useOngletMem("stats.tri",null); // {col,dir:'desc'|'asc'}
   const meds=medFilter.length>0?allStatMeds.filter(m=>medFilter.includes(m.id)):allStatMeds;
   const counts={};
   meds.forEach(m=>{counts[m.id]={};allTrack.forEach(a=>{counts[m.id][a.id]=0;});});
@@ -6018,6 +6035,7 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"Vos propres activités")," : modifier le contenu de vos cases (activité, salle, note)."]}),
   HP({children:["• ",HE("b",null,"Signaler un problème")," : le bouton 🐞, à côté du bouton ☀️/🌓 dans chaque onglet (sur téléphone, dans le ⋯ de Planning et Attachés) — décrivez, Envoyer, et le contexte technique part tout seul. Disponible aussi en simple consultation."]}),
   HP({children:["• ",HE("b",null,"Remonter")," (v10.226) : dès qu'on a défilé, une flèche ↑ discrète apparaît en bas à droite, dans tous les onglets. Dans les plannings (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Internes), Type, Stats et Astreinte, elle ramène le tableau tout en haut — c'est-à-dire à aujourd'hui quand l'affichage est « depuis aujourd'hui », au début de la période en « mois complet » — sans toucher au défilement gauche-droite. Dans les onglets à tuiles (Aide, Notifications, Construire), elle ramène en haut de la tuile dépliée que vous lisez ; un second appui ramène en haut de la page. Une bande vide termine chaque tableau : la dernière ligne peut toujours être remontée au-dessus de la flèche. Elle ne s'imprime pas."]}),
+  HP({children:["• ",HE("b",null,"Retrouver un onglet où on l'a laissé")," (v10.228) : quand on quitte un onglet puis qu'on y revient, il se rouvre dans le même état — Stats garde sa période, les médecins filtrés et le tri ; Reports garde le médecin choisi, la période et les groupes repliés ; Internes garde le semestre affiché ; Aide et Notifications gardent leurs tuiles dépliées ; et chaque onglet retrouve son défilement. Cette mémoire dure tant que l'application reste ouverte ; elle est effacée au retour à l'accueil (♥), pour qu'un poste partagé ne montre pas les filtres de la personne précédente."]}),
   HP({last:true,children:["Votre PIN vous est remis par un éditeur (il le définit dans Équipe → ",HBtn({kind:"ghost",children:"🔑"}),"). En cas d'oubli, demandez-lui de le consulter ou d'en définir un nouveau."]}))},
 
  {id:"mobile",icon:"📱",title:"Installer sur votre téléphone",body:()=>HE("div",null,
@@ -6232,7 +6250,7 @@ const HELP_SECTIONS=[
 ];
 
 function HelpView(){
-  const [hOpen,setHOpen]=React.useState({});
+  const [hOpen,setHOpen]=useOngletMem("aide.tuiles",{});   /* v10.228 */
   const toggleH=(id)=>setHOpen(p=>Object.assign({},p,{[id]:!p[id]}));
   /* v10.100 : le rappel des tuiles en haut est retire a sa demande. Seules
      restent les tuiles depliables ci-dessous ; le raccourci de defilement
@@ -6353,7 +6371,7 @@ function ReportsView(p){
     csBlanches=p.csBlanches,setCsBlanches=p.setCsBlanches,csActsSel=p.csActsSel,setCsActsSel=p.setCsActsSel,
     year=p.year,month=p.month,toast=p.toast;
   const medsCS=medecins.filter(m=>m.role==="medecin");
-  const [selId,setSelId]=React.useState(accessMode==="medecinEdit"?editMedId:(medsCS[0]?medsCS[0].id:null));
+  const [selId,setSelId]=useOngletMem("reports.med",()=>accessMode==="medecinEdit"?editMedId:(medsCS[0]?medsCS[0].id:null),(id)=>medsCS.some(m=>m.id===id));   /* v10.228 */
   const medSelRaw=medecins.find(m=>m.id===(accessMode==="medecinEdit"?editMedId:selId));
   /* v10.35.1 : valeur de repli — les hooks qui suivent doivent s'exécuter à TOUS
      les rendus. La garde est descendue juste avant le rendu (règle des hooks). */
@@ -6419,7 +6437,7 @@ function ReportsView(p){
   };
   const wkOf=(y,m,d)=>{const dt=new Date(y,m,d);const dw=dt.getDay();const diff=dw===0?-6:1-dw;const mn=new Date(y,m,d+diff);return dk3(mn.getFullYear(),mn.getMonth(),mn.getDate());};
   /* ── Période : sélecteur local, défaut = période suivante (outil de préparation) ── */
-  const [repPer,setRepPer]=React.useState(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
+  const [repPer,setRepPer]=useOngletMem("reports.per",()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());return perNext(p0.sy,p0.sm);});
   const per=repPer;
   const perLbl=MOIS[per.sm]+" — "+MOIS[(per.sm+PCFG.len-1)%12]+" "+per.sy;
   const days=React.useMemo(()=>perDaysList(per.sy,per.sm),[per.sy,per.sm]);
@@ -6648,7 +6666,7 @@ function ReportsView(p){
     if(ps.length)ps.forEach(q=>{validAt[q.d+"|"+q.sl]=L;});
     else if(wp.dest&&wp.dest[k])propAt[dk3(wp.dest[k].y,wp.dest[k].m,wp.dest[k].d)+"|"+wp.dest[k].sl]=L;
   }));
-  const [hidGrp,setHidGrp]=React.useState({});
+  const [hidGrp,setHidGrp]=useOngletMem("reports.groupes",{});
   /* ── v9.12 : salles libres sur les demi-journées off ── */
   const [freeModal,setFreeModal]=React.useState(null);
   const [freeStep,setFreeStep]=React.useState(null);
@@ -7815,7 +7833,7 @@ function AnnEditeur({annonces,setAnnonces,medecins=[],pushMeds=null}){   /* v10.
 }
 
 function SecrTab({medecins,acteById,secrNotif,setSecrNotif,canAck,darkMode,setDarkMode,secrAtts,seulId=null}){   /* v10.212 : seulId = ne montrer que cette personne (médecin basique, attaché) */
-  const [ouvert,setOuvert]=React.useState({});
+  const [ouvert,setOuvert]=useOngletMem("notifs.tuiles",{});   /* v10.228 */
   /* clé = med|act|dKey|slot — regroupée par médecin puis par activité */
   const parMed={},auj=secrToday();
   Object.keys(secrNotif||{}).forEach(k=>{const p=k.split("|");if(p.length<4)return;
@@ -9265,8 +9283,8 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
 function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],intSelf=false,canGarde=true,adminKey=null,prevM,nextM,darkMode,setDarkMode,notes={},setNotes=null,annJour=null}){
   const [sel,setSel]=useState(null);
   const [gm,setGm]=useState(null);
-  const [jaugeOn,setJaugeOn]=useState(intCfg.jaugeDef!==false); /* v10.65 : affichage en nominal réglé dans Paramètres */
-  const [statsOpen,setStatsOpen]=useState(false);
+  const [jaugeOn,setJaugeOn]=useOngletMem("internes.jauge",()=>intCfg.jaugeDef!==false); /* v10.65 : affichage en nominal réglé dans Paramètres */
+  const [statsOpen,setStatsOpen]=useOngletMem("internes.stats",false);
   /* v10.71 : l'onglet vit au SEMESTRE (6 mois), plus sur la periode de 4 mois de
      l'application — les internes tournent par semestre et echangent leurs gardes
      dessus. Les fleches ne touchent donc plus le mois GLOBAL (prevM/nextM ne sont
@@ -9274,7 +9292,7 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
      La liste des jours avance date a date entre les deux bornes du semestre —
      aucun calcul par mois, donc pas de decalage possible (famille du bug v9.26). */
   const sems=useMemo(()=>intSemsTri(intCfg),[intCfg]);
-  const [semIdx,setSemIdx]=useState(()=>{
+  const [semIdx,setSemIdx]=useOngletMem("internes.semestre",()=>{
     const t=intISO(new Date());
     const l=intSemsTri(intCfg);
     let i=l.findIndex(s=>s.deb<=t&&t<=s.fin);      /* celui du jour */
@@ -10004,12 +10022,16 @@ function CardioPlanning(){
       if(cur===next)return cur;
       /* v10.31 : Construire rejoint Paramètres — on retrouve l'endroit où on était.
          La période et les tuiles ouvertes, elles, sont retenues par BUILD_MEM. */
-      if(cur==="partage"||cur==="construire")pageMem.current[cur]=window.scrollY||0;
-      const y=(next==="partage"||next==="construire")?(pageMem.current[next]||0):0;
+      /* v10.228 : TOUS les onglets retrouvent leur défilement de page (Aide, Notifications, Reports, Équipe, Activités,
+         Stats…), plus seulement Paramètres et Construire. Les tableaux, eux, ont leur propre mémoire (SCROLL_MEM). */
+      pageMem.current[cur]=window.scrollY||window.pageYOffset||0;
+      const y=pageMem.current[next]||0;
       setTimeout(()=>window.scrollTo(0,y),0);
       return next;
     });
   },[]);
+  /* v10.228 : retour à l'accueil (♥) = mémoire des onglets vidée — poste partagé */
+  useEffect(()=>{if(accessMode==="ask"){ongletMemVider();pageMem.current={};}},[accessMode]);
   const [ym,setYM]=useState(()=>({year:new Date().getFullYear(),month:new Date().getMonth()}));
   const year=ym.year, month=ym.month;
   const setYear=y=>setYM(p=>({...p,year:typeof y==="function"?y(p.year):y}));
