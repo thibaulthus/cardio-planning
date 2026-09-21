@@ -119,7 +119,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.234 — 21/09/2026";
+const APP_VERSION="v10.235 — 21/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6274,7 +6274,7 @@ const HELP_SECTIONS=[
   HP({children:["Le gel n'existe pas dans le 🧪 bac à sable. Un appareil resté sur une version plus ancienne ne connaît pas le gel, mais il est déjà en lecture seule : le garde-fou de version l'empêche d'écrire tant qu'il n'est pas à jour."]})
  )},
  {id:"fermees",icon:"🚫",title:"Plages fermées — fermer une salle sur une demi-journée",body:()=>HE("div",null,
-  HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée")," dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
+  HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée et hachurée")," (hachures depuis la v10.235, pour ne pas la confondre avec la couleur d'une salle vide) dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
   HT({children:"Colorer les salles vides (v10.232)"}),
   HP({children:["Depuis la v10.233, tous les choix de couleur des Paramètres (salles vides, surspécialités, pointillé de votre colonne et sa transparence) se valident par ",HBtn({kind:"ghost",children:"✓ OK"})," : tant que vous cherchez la teinte, rien n'est enregistré ni envoyé aux autres appareils ; ✕ abandonne."]}),
   HP({children:["À ne pas confondre avec une plage fermée : dans Paramètres → 🏥 Salles, cliquez le nom d'une salle et cochez ",HE("b",null,"🎨 Colorer la case quand la salle est vide"),". Dans CHL, CHB, PT Angio et PT Cardio, sa case prend alors la ",HE("b",null,"couleur des salles vides")," tant que personne n'y est posé — pratique pour voir d'un coup d'œil ce qui reste à pourvoir. La couleur est ",HE("b",null,"unique"),", réglée en tête de la carte 🏥 Salles ; les salles cochées y portent une petite pastille. Si la plage est fermée, ",HE("b",null,"le gris gagne"),"."]}),
@@ -9991,7 +9991,12 @@ function videFond(sv,salle,vide,night){
   const c=videColOk(sv.col)?sv.col:VIDE_COL_DEF;
   return {background:night?c+"59":c,...FILET};
 }
-function fermFond(night){return {background:night?"#3a4150":"#cfd4dc",...FILET};}   /* un seul « background » : les cases voisines posent déjà ce raccourci, React refuse le mélange */
+/* v10.235 : plage fermée HACHURÉE. Depuis que les salles vides sont colorées (v10.232), le gris uni d'une plage fermée se
+   lisait mal à côté d'un autre aplat : deux couleurs pleines à comparer. La hachure dit « barré » par sa FORME. Toujours un
+   seul « background » (la hachure y tient tout entière) : React refuse le mélange avec les cases voisines, qui posent ce
+   raccourci. Le gris de base est inchangé (#cfd4dc clair, #3a4150 sombre) ; l'autre bande est plus claire / plus sombre. */
+function fermFond(night){const a=night?"#3a4150":"#cfd4dc",b=night?"#262c38":"#eef0f4";
+  return {background:"repeating-linear-gradient(135deg,"+a+" 0 5px,"+b+" 5px 10px)",...FILET};}   /* un seul « background » : les cases voisines posent déjà ce raccourci, React refuse le mélange */
 /* la ligne « 🚫 Plage fermée » des deux modales de salle (même composant : parité des deux modales) */
 function FermLigne({ferm}){
   if(!ferm||(!ferm.on&&!ferm.can))return null;
