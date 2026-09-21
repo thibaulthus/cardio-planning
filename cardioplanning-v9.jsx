@@ -44,15 +44,33 @@ function gelMuet(){var n=Date.now();if(n-(GEL.t||0)>10000){GEL.t=n;try{jlog("GEL
    enregistrée, et disparaissait au redémarrage (signalement du 21/09/2026). Tout ce qui part vers le serveur passe désormais
    par sansIndef : les clés « undefined » sont retirées (null dans une liste). Seuls les objets ORDINAIRES sont parcourus —
    les valeurs spéciales de Firestore (FieldValue.delete…) passent telles quelles. */
+/* v10.233 : TRAFIC. Compter ne coûte rien : un entier de plus par écriture ou par message reçu, et l'heure dans une petite
+   file tournante (300 entrées au plus). AUCUN état React, AUCUN affichage ici : la tuile 📡 des Paramètres ne lit ces
+   compteurs que pendant qu'on lui demande de mesurer. La latence est celle des VRAIES écritures : délai entre l'envoi et
+   l'accusé du serveur (la promesse de Firestore) — elle ne génère donc aucun trafic supplémentaire. */
+var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[]};
+function trafFil(k){TRAFIC.fil.push({t:Date.now(),k:k});if(TRAFIC.fil.length>300)TRAFIC.fil.splice(0,TRAFIC.fil.length-300);}
+function trafEcr(p){
+  TRAFIC.ecr++;trafFil("e");
+  if(p&&typeof p.then==="function"){const t=Date.now();TRAFIC.vol++;
+    p.then(()=>{TRAFIC.vol--;TRAFIC.lat.push(Date.now()-t);if(TRAFIC.lat.length>20)TRAFIC.lat.shift();},()=>{TRAFIC.vol--;TRAFIC.ko++;});}
+  return p;
+}
+function trafBilan(now){
+  let e10=0,r10=0,e60=0,r60=0;const bar=[];for(let i=0;i<60;i++)bar.push(0);
+  TRAFIC.fil.forEach(x=>{const a=now-x.t;if(a<0||a>=60000)return;if(x.k==="e")e60++;else r60++;if(a<10000){if(x.k==="e")e10++;else r10++;}bar[59-Math.floor(a/1000)]++;});
+  const l=TRAFIC.lat.slice().sort((a,b)=>a-b);
+  return {e10,r10,e60,r60,bar,ecr:TRAFIC.ecr,recu:TRAFIC.recu,ko:TRAFIC.ko,vol:TRAFIC.vol,latDer:TRAFIC.lat.length?TRAFIC.lat[TRAFIC.lat.length-1]:null,latMed:l.length?l[Math.floor(l.length/2)]:null,nLat:l.length,depuis:Math.round((now-TRAFIC.t0)/60000)};
+}
 function sansIndef(v){
   if(Array.isArray(v))return v.map(x=>x===undefined?null:sansIndef(x));
   if(v&&typeof v==="object"){const pr=Object.getPrototypeOf(v);
     if(pr===null||pr.constructor===undefined||pr.constructor.name==="Object"){const o={};Object.keys(v).forEach(k=>{if(v[k]!==undefined)o[k]=sansIndef(v[k]);});return o;}}
   return v;
 }
-const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){return VER_STALE.on?verMuet():GEL.on?gelMuet():(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
-const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? window.firebaseOnSnapshot : null;
-const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){return VER_STALE.on?verMuet():GEL.on?gelMuet():window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])]));} : null;
+const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){return VER_STALE.on?verMuet():GEL.on?gelMuet():trafEcr(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
+const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? function(ref,suite,err){return window.firebaseOnSnapshot(ref,function(){TRAFIC.recu++;trafFil("r");return suite.apply(this,arguments);},err);} : null;   /* v10.233 : chaque message reçu est compté */
+const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){return VER_STALE.on?verMuet():GEL.on?gelMuet():trafEcr(window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])])));} : null;
 
 /* v10.142 : JOURNAL DE BORD — l'équivalent de la console (F12) gardé en mémoire : erreurs, avertissements,
    erreurs non rattrapées, promesses rejetées, et les changements d'onglet. 40 entrées, 300 caractères
@@ -87,7 +105,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.232 — 21/09/2026";
+const APP_VERSION="v10.233 — 21/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6099,6 +6117,8 @@ const HELP_SECTIONS=[
   HT({children:"🏖 Les vacances scolaires"}),
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
+  HT({children:"📡 Trafic et latence (v10.233)"}),
+  HP({children:["Dans Paramètres, la carte ",HE("b",null,"📡 Trafic et latence")," montre ce que l'appareil échange avec le serveur : écritures envoyées, messages reçus (10 s, 1 min, depuis l'ouverture), écritures en attente ou refusées, et la ",HE("b",null,"latence")," — le délai entre une écriture et l'accusé du serveur. Elle ne mesure que si vous appuyez sur ",HBtn({kind:"ghost",children:"▶ Mesurer"})," et s'arrête seule au bout de 2 minutes : éteinte, elle ne coûte rien. ",HBtn({kind:"ghost",children:"⏱ Tester la latence"})," envoie une écriture minuscule pour avoir une mesure tout de suite. À savoir : chaque écriture renvoie le planning à tous les appareils connectés — beaucoup de messages reçus en peu de temps signifie que quelqu'un écrit en rafale."]}),
   HT({children:"Où voit-on les vacances ? (v10.230)"}),
   HP({children:["Dans tous les onglets qui affichent des jours ou des semaines, avec la même teinte gris-bleu. ",HE("b",null,"Onglets par jours")," — Planning, Internes, Attachés, CHL, CHB, PT Cardio, PT Angio, Gardes : la ",HE("b",null,"case de la date"),", à gauche, est teintée, jour par jour, exactement. Seule la date l'est, jamais la case d'une salle : le gris d'une case de salle veut toujours dire « plage fermée »."]}),
   HP({children:[HE("b",null,"Onglets par semaines")," : dans le Tour (Construire), le ",HE("b",null,"libellé de la semaine"),", à gauche, est teinté — d'un gris plus soutenu qu'ailleurs depuis la v10.231, le fond de cette grille étant déjà gris ; dans les Reports, la ",HE("b",null,"case de la semaine")," du tableau des semaines blanches est grisée (le bleu des semaines de tour reste sur les jours) ; dans l'Astreinte, un ",HE("b",null,"liseré gris avec la mention VAC")," précède la date de la tuile — du côté de la date, pas du médecin : c'est la semaine qui est en vacances, pas la personne. Il ne se confond pas avec le bord violet épaissi de la tuile, qui signale des exceptions."]}),
@@ -6242,6 +6262,7 @@ const HELP_SECTIONS=[
  {id:"fermees",icon:"🚫",title:"Plages fermées — fermer une salle sur une demi-journée",body:()=>HE("div",null,
   HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée")," dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
   HT({children:"Colorer les salles vides (v10.232)"}),
+  HP({children:["Depuis la v10.233, tous les choix de couleur des Paramètres (salles vides, surspécialités, pointillé de votre colonne et sa transparence) se valident par ",HBtn({kind:"ghost",children:"✓ OK"})," : tant que vous cherchez la teinte, rien n'est enregistré ni envoyé aux autres appareils ; ✕ abandonne."]}),
   HP({children:["À ne pas confondre avec une plage fermée : dans Paramètres → 🏥 Salles, cliquez le nom d'une salle et cochez ",HE("b",null,"🎨 Colorer la case quand la salle est vide"),". Dans CHL, CHB, PT Angio et PT Cardio, sa case prend alors la ",HE("b",null,"couleur des salles vides")," tant que personne n'y est posé — pratique pour voir d'un coup d'œil ce qui reste à pourvoir. La couleur est ",HE("b",null,"unique"),", réglée en tête de la carte 🏥 Salles ; les salles cochées y portent une petite pastille. Si la plage est fermée, ",HE("b",null,"le gris gagne"),"."]}),
   HT({children:"Fermer ou rouvrir un jour précis"}),
   HP({children:["Cliquez la case de la salle : en tête de la fenêtre, la ligne ",HE("b",null,"🚫 Plage fermée")," se coche pour fermer, se décoche pour rouvrir — ce jour-là seulement. Réservé aux ",HE("b",null,"éditeurs, cadres et médecins intermédiaires")," ; pour les autres, une plage fermée ne s'ouvre pas, un message le dit."]}),
@@ -8158,6 +8179,60 @@ const PSET_MAX=40;   /* rangs couverts par les règles de repli */
 /* v10.39 : à l'usage, la rangée de boutons du haut ne servait pas — avec tous
    les encarts repliés, la page EST déjà son propre sommaire. Il ne reste qu'un
    bouton pour tout ouvrir d'un coup. */
+/* v10.233 : UN SÉLECTEUR DE COULEUR QUI N'ÉCRIT QU'À LA VALIDATION. Le sélecteur du navigateur est CONTINU : il émet une
+   valeur par teinte traversée. Branché directement sur un réglage enregistré, chaque teinte devenait une écriture Firebase,
+   donc un renvoi du planning complet à tous les appareils — un téléphone y a passé plusieurs minutes (retour du 21/09/2026).
+   Ici la teinte reste un BROUILLON local ; ✓ OK envoie UNE valeur, ✕ abandonne. onApercu (facultatif) suit le brouillon. */
+function CouleurOK({value,onOk,onApercu=null,w=38,h=24,title}){
+  const [tmp,setTmp]=useState(null);
+  const chg=(v)=>{setTmp(v);if(onApercu)onApercu(v);};
+  const fin=()=>{setTmp(null);if(onApercu)onApercu(null);};
+  const dirty=tmp!==null&&tmp!==value;
+  const bs={fontSize:11,padding:"2px 8px",borderRadius:6,cursor:"pointer",fontWeight:800,lineHeight:1.4};
+  return <span data-couleurok={dirty?"1":"0"} style={{display:"inline-flex",alignItems:"center",gap:5}}>
+    <input type="color" value={tmp!==null?tmp:value} onChange={e=>chg(e.target.value)} title={title} style={{width:w,height:h,padding:0,border:dirty?"2px solid #16a34a":"1px solid var(--border)",borderRadius:5,background:"none",cursor:"pointer"}}/>
+    {dirty&&<button data-colok="1" onClick={()=>{const v=tmp;fin();onOk(v);}} style={{...bs,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.12)",color:"#16a34a"}}>✓ OK</button>}
+    {dirty&&<button data-colno="1" onClick={fin} title="Abandonner ce choix" style={{...bs,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)"}}>✕</button>}
+  </span>;
+}
+/* v10.233 : tuile 📡 Trafic des Paramètres. Rien ne tourne tant qu'on n'a pas appuyé sur ▶ Mesurer ; la mesure se rafraîchit
+   une fois par seconde, s'arrête SEULE au bout de 2 minutes et au démontage (on quitte Paramètres). « Tester » envoie une
+   écriture minuscule (champ _ping) : une seule, à la demande. */
+function TraficTuile({onPing=null,netOff=false}){
+  const [on,setOn]=useState(false);
+  const [b,setB]=useState(null);
+  useEffect(()=>{
+    if(!on)return;
+    const t0=Date.now();setB(trafBilan(t0));
+    const id=setInterval(()=>{const n=Date.now();if(n-t0>120000){setOn(false);return;}setB(trafBilan(n));},1000);
+    return ()=>clearInterval(id);
+  },[on]);
+  const ms=(v)=>v===null?"—":(v<1000?v+" ms":(v/1000).toFixed(1)+" s");
+  const colLat=(v)=>v===null?"var(--txt3)":v<400?"#16a34a":v<1500?"#d97706":"#dc2626";
+  const lg=(l,v,c)=><div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:11.5,padding:"2px 0",borderBottom:"1px solid var(--border2)"}}><span style={{color:"var(--txt2)"}}>{l}</span><b style={{color:c||"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{v}</b></div>;
+  const mx=b?Math.max(1,...b.bar):1;
+  return <div data-trafic={on?"1":"0"} style={{...S.card,marginBottom:10}}>
+    <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>📡 Trafic et latence</div>
+    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.45}}>Ce que cet appareil échange avec le serveur. Chaque écriture — la vôtre ou celle d'un collègue — renvoie le planning à tous les appareils connectés : beaucoup de messages reçus en peu de temps, c'est quelqu'un qui écrit en rafale. La mesure ne tourne que si vous la lancez, et s'arrête seule au bout de 2 minutes.</div>
+    <div style={{display:"flex",gap:6,marginBottom:8}}>
+      <button data-trafbtn="1" onClick={()=>setOn(v=>!v)} style={{flex:1,fontSize:12,padding:"7px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #388bfd",background:on?"rgba(56,139,253,.15)":"var(--bg2)",color:"#388bfd"}}>{on?"⏸ Arrêter la mesure":"▶ Mesurer"}</button>
+      {onPing&&<button data-trafping="1" disabled={netOff} onClick={()=>{onPing();if(!on)setOn(true);}} title="Envoie une écriture minuscule pour mesurer la latence maintenant" style={{fontSize:12,padding:"7px 10px",borderRadius:8,cursor:"pointer",fontWeight:700,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)"}}>⏱ Tester la latence</button>}
+    </div>
+    {on&&b&&<div data-trafbilan="1">
+      <div title="Une barre par seconde, sur la dernière minute" style={{display:"flex",alignItems:"flex-end",gap:1,height:26,marginBottom:6,padding:"2px 0",borderBottom:"1px solid var(--border)"}}>
+        {b.bar.map((n,i)=><span key={i} style={{flex:1,height:n?Math.max(3,Math.round(22*n/mx)):1,background:n?(n>=5?"#dc2626":n>=2?"#d97706":"#388bfd"):"var(--border2)",borderRadius:1}}/>)}
+      </div>
+      {lg("Latence — dernière écriture",ms(b.latDer),colLat(b.latDer))}
+      {lg("Latence — médiane ("+b.nLat+" dernière"+(b.nLat>1?"s":"")+")",ms(b.latMed),colLat(b.latMed))}
+      {lg("Messages reçus — 10 s / 1 min",b.r10+" / "+b.r60,b.r60>=40?"#dc2626":b.r60>=15?"#d97706":undefined)}
+      {lg("Écritures envoyées — 10 s / 1 min",b.e10+" / "+b.e60,b.e60>=40?"#dc2626":b.e60>=15?"#d97706":undefined)}
+      {lg("En attente d'accusé",String(b.vol),b.vol>=5?"#d97706":undefined)}
+      {lg("Écritures refusées",String(b.ko),b.ko?"#dc2626":undefined)}
+      {lg("Depuis l'ouverture ("+b.depuis+" min)",b.ecr+" envoyées · "+b.recu+" reçus")}
+      <div style={{fontSize:10,color:"var(--txt3)",marginTop:6,lineHeight:1.45}}>Repères : latence verte sous 0,4 s, orange jusqu'à 1,5 s, rouge au-delà. Sans écriture depuis l'ouverture, la latence est vide : « ⏱ Tester » en mesure une.</div>
+    </div>}
+  </div>;
+}
 function SetQuick({items,replies,onTout}){
   if(!items.length)return null;
   const tout=replies.length>=items.length;
@@ -10071,7 +10146,7 @@ function CardioPlanning(){
   /* v10.134 : la pipette de couleur d'iOS envoie un événement à chaque mouvement du doigt — des
      dizaines par seconde, chacun déclenchait un enregistrement Firebase et l'application plantait.
      La couleur est tamponnée et validée après 400 ms sans changement. */
-  const [lisTmp,setLisTmp]=useState(null);const lisTmr=useRef(null);
+  const [lisTmp,setLisTmp]=useState(null);const [opTmp,setOpTmp]=useState(null);   /* v10.233 : brouillons du pointillé — rien n'est écrit avant ✓ OK */
   const [colModal,setColModal]=useState(null);
   /* ── v9.40 : impression ── */
   const [printWk,setPrintWk]=useState(null);
@@ -13892,10 +13967,11 @@ header::-webkit-scrollbar { display: none; }
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas.</div>
             <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:8,fontSize:11,color:"var(--txt2)"}}>{/* v10.133 */}
               <span>Couleur et transparence du pointillé :</span>
-              <input type="color" value={lisTmp!==null?lisTmp:(colSelf.col||"#7c3aed")} onChange={e=>{const v=e.target.value;setLisTmp(v);clearTimeout(lisTmr.current);lisTmr.current=setTimeout(()=>{setColSelf(c=>({...(c||{}),col:v}));setLisTmp(null);},400);}} title="Couleur du pointillé" style={{width:34,height:24,padding:0,border:"1px solid var(--border)",borderRadius:6,background:"none",cursor:"pointer"}}/>
-              <input type="range" min="10" max="100" step="5" value={Math.round((colSelf.op===undefined?1:colSelf.op)*100)} onChange={e=>{const v=Number(e.target.value)/100;setColSelf(c=>({...(c||{}),op:v}));}} title="Transparence du pointillé" style={{width:120}}/>
-              <span style={{fontWeight:700,minWidth:34}}>{Math.round((colSelf.op===undefined?1:colSelf.op)*100)+" %"}</span>
-              <span style={{display:"inline-block",width:46,height:22,borderRadius:4,background:"var(--bg2)",...(lisTmp!==null?lisStyle(lisTmp,colSelf.op===undefined?1:colSelf.op):lisCur)}} title="Aperçu"></span>
+              <CouleurOK value={colSelf.col||"#7c3aed"} w={34} h={24} title="Couleur du pointillé" onApercu={setLisTmp} onOk={v=>setColSelf(c=>({...(c||{}),col:v}))}/>{/* v10.233 : ✓ OK (avant : une écriture toutes les 400 ms pendant le glissé) */}
+              <input type="range" min="10" max="100" step="5" value={Math.round((opTmp!==null?opTmp:(colSelf.op===undefined?1:colSelf.op))*100)} onChange={e=>setOpTmp(Number(e.target.value)/100)} title="Transparence du pointillé" style={{width:120}}/>
+              <span style={{fontWeight:700,minWidth:34}}>{Math.round((opTmp!==null?opTmp:(colSelf.op===undefined?1:colSelf.op))*100)+" %"}</span>
+              {opTmp!==null&&opTmp!==(colSelf.op===undefined?1:colSelf.op)&&<button data-opok="1" onClick={()=>{const v=opTmp;setOpTmp(null);setColSelf(c=>({...(c||{}),op:v}));}} style={{fontSize:11,padding:"2px 8px",borderRadius:6,cursor:"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"rgba(22,163,74,.12)",color:"#16a34a"}}>✓ OK</button>}{/* v10.233 : le curseur écrivait à chaque cran */}
+              <span style={{display:"inline-block",width:46,height:22,borderRadius:4,background:"var(--bg2)",...((lisTmp!==null||opTmp!==null)?lisStyle(lisTmp!==null?lisTmp:(colSelf.col||"#7c3aed"),opTmp!==null?opTmp:(colSelf.op===undefined?1:colSelf.op)):lisCur)}} title="Aperçu"></span>
               <button onClick={()=>setColSelf(c=>{const n={...(c||{})};delete n.col;delete n.op;return n;})} style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",cursor:"pointer"}}>↩ défaut</button>
             </div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
@@ -13963,8 +14039,7 @@ header::-webkit-scrollbar { display: none; }
                   const cur=(specColors&&specColors[k2])||SPEC_COLORS_DEF[k2];
                   return(
                     <div key={k2} style={{display:"flex",alignItems:"center",gap:5}}>
-                      <input type="color" value={cur} onChange={e=>{const v=e.target.value;setSpecColors(p=>({...p,[k2]:v}));}}
-                        style={{width:30,height:26,padding:0,border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer"}}/>
+                      <CouleurOK value={cur} w={30} h={26} onOk={v=>setSpecColors(p=>({...p,[k2]:v}))}/>{/* v10.233 : ✓ OK — une seule écriture */}
                       <span style={{fontSize:12,fontWeight:800,color:cur}}>{lb2}</span>
                     </div>);
                 })}
@@ -14113,7 +14188,7 @@ header::-webkit-scrollbar { display: none; }
               <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🏥 Salles</div>
               <div data-videcol="1" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:8,fontSize:11.5,color:"var(--txt2)"}}>
                 <span>🎨 Couleur des salles vides</span>
-                <input type="color" value={videColOk(salleVideCol)?salleVideCol:VIDE_COL_DEF} onChange={e=>{if(videColOk(e.target.value))setSalleVideCol(e.target.value);}} style={{width:38,height:24,padding:0,border:"1px solid var(--border)",borderRadius:5,background:"none",cursor:"pointer"}}/>
+                <CouleurOK value={videColOk(salleVideCol)?salleVideCol:VIDE_COL_DEF} onOk={v=>{if(videColOk(v))setSalleVideCol(v);}}/>{/* v10.233 : ✓ OK — une seule écriture */}
                 <span style={{fontSize:10,color:"var(--txt3)"}}>une seule couleur, pour toutes les salles cochées « colorer quand vide » ({salleReg.filter(x=>x.vide).length}) — cliquez le nom d'une salle pour la cocher</span>
               </div>
               {["CHL","CHB","ANGIO","PLATEAU"].map(site2=>{
@@ -14169,6 +14244,7 @@ header::-webkit-scrollbar { display: none; }
                 <button onClick={bacEntrer} style={{width:"100%",padding:"9px",borderRadius:8,border:"1.5px solid #c2410c",background:"rgba(194,65,12,.10)",color:"#c2410c",fontWeight:800,cursor:"pointer",fontSize:13}}>🧪 Entrer dans le bac à sable</button>
               </div>}
           </div>}
+          <TraficTuile netOff={netOff} onPing={()=>{if(PLANNING_DOC&&setDoc)Promise.resolve(setDoc(PLANNING_DOC,{_ping:Date.now()},{merge:true})).catch(()=>{});}}/>
           <div style={{...S.card,marginBottom:10}}>{/* v10.137 : Sauvegarde & archivage, carte à part */}
             <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
