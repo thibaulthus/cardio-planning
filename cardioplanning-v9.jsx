@@ -76,7 +76,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.229 — 21/09/2026";
+const APP_VERSION="v10.230 — 21/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -93,6 +93,22 @@ function vacContient(dt){
   const k=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
   return VAC_LIST.find(v=>v.d1&&v.d2&&k>=v.d1&&k<=v.d2)||null;
 }
+/* v10.230 : VACANCES VISIBLES PARTOUT. Deux règles, et une seule fonction pour chacune :
+   • affichage par JOURS (Planning, Internes, Attachés, CHL, CHB, PT Cardio, PT Angio, Gardes, jours d'une tuile
+     d'Astreinte ouverte) : vacFondDate teinte la case de DATE de chaque jour exactement — jamais la case d'une salle,
+     pour ne pas se confondre avec le gris des plages fermées ;
+   • affichage par SEMAINES (Tour, Reports, tuiles d'Astreinte) : vacSemaine compte les vacances sur les CINQ jours du
+     lundi au vendredi du calendrier — 3 jours ou plus (plus de 50 %) : semaine marquée ; 2 ou moins : non marquée.
+     Elle part du LUNDI et non des jours affichés : une semaine coupée par un bord de période garde ainsi le même statut
+     dans tous les onglets. wk = clé « a-m-j » du lundi (mois 0-11, celle de tourMed et d'astreinte) ou {y,m,d}. */
+function vacSemaine(isVac,wk){
+  if(!isVac||!wk)return false;
+  const q=typeof wk==="string"?wk.split("-").map(Number):[wk.y,wk.m,wk.d];
+  let n=0;
+  for(let i=0;i<5;i++){const dt=new Date(q[0],q[1],q[2]+i);if(isVac(dt.getFullYear(),dt.getMonth(),dt.getDate()))n++;}
+  return n>=3;
+}
+function vacFondDate(isVac,y,m,d,sinon){return isVac&&isVac(y,m,d)?"var(--vac-bg)":sinon;}
 function perStart(y,m){
   const d=((m-PCFG.startM)%12+12)%12;
   const off=d%PCFG.len;
@@ -1258,7 +1274,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     </div>
   );
 }
-function SiteView({salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+function SiteView({isVac=null,salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -1402,7 +1418,6 @@ function SiteView({salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPr
             <ActPill a={g.acte} night={darkMode} hasNote={g.meds.concat(g.imeds||[]).some(m=>!!notes[nk(m.id,ry,rm,d,sl)])}/>
           </div>
         ))}
-        {fz&&<div style={{textAlign:"center",fontSize:grps.length?9:11,lineHeight:1.2,opacity:.75}}>🚫</div>}
         </div>
       </td>
     );
@@ -1450,7 +1465,7 @@ function SiteView({salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPr
               const dSV=dow(wY,wM,d), weSV=isWE(wY,wM,d), isMonSV=dSV===1&&!weSV;
               if(weSV) return(
                 <tr key={wY+"-"+wM+"-"+d+"we"} data-day={wY+"-"+wM+"-"+d} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
-                  <td colSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,background:"var(--bg-we)"}}>
+                  <td colSpan={2} data-vac={isVac&&isVac(wY,wM,d)?"1":undefined} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,background:vacFondDate(isVac,wY,wM,d,"var(--bg-we)")}}>
                     <div style={{fontWeight:800,color:"#92400e",fontSize:11,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<span style={{fontSize:7,color:"#92400e",fontWeight:600,marginLeft:2}}>{MOIS[wM].slice(0,4)}</span>} {JOURSC[dSV]}</div>
                   </td>
                   {sallesVues.map(s=><td key={s} style={{...S.td,...S.tdWE}}/>)}
@@ -1458,7 +1473,7 @@ function SiteView({salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPr
               );
               return["M","AM"].map((sl,si)=>(
                 <tr key={wY+"-"+wM+"-"+d+sl} data-day={wY+"-"+wM+"-"+d} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",...(isT?{background:"var(--bg-td)"}:{}),...(isMonSV&&si===0?{borderTop:"3px solid var(--border)"}:{})}}>
-                  {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:42}} rowSpan={2}>
+                  {si===0&&<td data-vac={isVac&&isVac(wY,wM,d)?"1":undefined} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:42,background:vacFondDate(isVac,wY,wM,d,"var(--td-fix)")}} rowSpan={2}>
                     <div style={{fontWeight:800,color:isT?"var(--today-c)":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:8,color:"var(--txt3)",fontWeight:600}}>{MOIS[wM]}</div>}</div>
                     <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dSV]}</div>
                   </td>}
@@ -1475,7 +1490,7 @@ function SiteView({salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPr
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({salleFerm=null,onCellHistory=null,issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+function ActTabView({isVac=null,salleFerm=null,onCellHistory=null,issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1672,7 +1687,6 @@ function ActTabView({salleFerm=null,onCellHistory=null,issMap={},title,titleColo
           </div>
         );})}
         </div>
-        {fz&&<div style={{textAlign:"center",fontSize:_grpsA.length?9:11,lineHeight:1.2,opacity:.75}}>🚫</div>}
         {!fz&&occ.length===0&&_grpsA.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
       </td>
     );
@@ -1724,7 +1738,7 @@ function ActTabView({salleFerm=null,onCellHistory=null,issMap={},title,titleColo
               const dAT=dow(wY,wM,d), weAT=isWE(wY,wM,d), isMonAT=dAT===1&&!weAT;
                 if(weAT) return(
                   <tr key={wY+"-"+wM+"-"+d+"we"} data-day={wY+"-"+wM+"-"+d} style={{background:"var(--bg-we)",borderBottom:"1px solid var(--border)",height:28}}>
-                    <td colSpan={2} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,background:"var(--bg-we)"}}>
+                    <td colSpan={2} data-vac={isVac&&isVac(wY,wM,d)?"1":undefined} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,background:vacFondDate(isVac,wY,wM,d,"var(--bg-we)")}}>
                       <div style={{fontWeight:800,color:"#92400e",fontSize:11,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<span style={{fontSize:7,color:"#92400e",fontWeight:600,marginLeft:2}}>{MOIS[wM].slice(0,4)}</span>} {JOURSC[dAT]}</div>
                     </td>
                     {rowsVus.map(r=><td key={r.label} style={{...S.td,...S.tdWE}}/>)}
@@ -1732,7 +1746,7 @@ function ActTabView({salleFerm=null,onCellHistory=null,issMap={},title,titleColo
                 );
                 return["M","AM"].map((sl,si)=>(
                 <tr key={wY+"-"+wM+"-"+d+sl} data-day={wY+"-"+wM+"-"+d} style={{borderBottom:si===1?"1px solid var(--border)":"1px solid var(--border2)",...(isT?{background:"var(--bg-td)"}:{}),...(isMonAT&&si===0?{borderTop:"3px solid var(--border)"}:{})}}>
-                  {si===0&&<td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:42}} rowSpan={2}>
+                  {si===0&&<td data-vac={isVac&&isVac(wY,wM,d)?"1":undefined} style={{...S.tdFix,position:"sticky",left:0,zIndex:10,verticalAlign:"middle",minWidth:42,background:vacFondDate(isVac,wY,wM,d,"var(--td-fix)")}} rowSpan={2}>
                     <div style={{fontWeight:800,color:isT?"var(--today-c)":"var(--txt)",fontSize:12,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{d}{viewPeriod&&<div style={{fontSize:7,color:"var(--txt3)",fontWeight:600,lineHeight:1}}>{MOIS[wM]}</div>}</div>
                     <div style={{fontSize:8,color:"var(--txt3)",textTransform:"uppercase",textAlign:"center"}}>{JOURSC[dAT]}</div>
                   </td>}
@@ -1873,7 +1887,7 @@ function gardesControler(texte,jours,cx){
   return {rows,nOk:n("ok"),nWarn:n("warn"),nErr:n("err"),nDeja:n("deja"),horsListe};
 }
 
-function GardeView({outils=false,noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
+function GardeView({isVac=null,outils=false,noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
   /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
      l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
   const removeGarde=(d3,y3,m3)=>{ if(onRemoveGarde)onRemoveGarde(y3,m3,d3); };
@@ -2155,7 +2169,7 @@ function GardeView({outils=false,noNav=false,onRemoveGarde=null,printWk=null,onP
             const gMed=getGardeMed2(gvY,gvM,d);
             return(
               <tr key={gvY+"-"+gvM+"-"+d} style={{height:36,borderBottom:"1px solid var(--border2)",...(we?{background:"var(--bg-we)"}:{}),...(isT?{background:"var(--bg-td)"}:{})}}>
-                <td style={{...S.tdFix,position:"sticky",left:0,zIndex:5,textAlign:"center",background:isT?"var(--bg-td)":we?"var(--bg-we)":"var(--td-fix)"}}>
+                <td data-vac={isVac&&isVac(gvY,gvM,d)?"1":undefined} style={{...S.tdFix,position:"sticky",left:0,zIndex:5,textAlign:"center",background:vacFondDate(isVac,gvY,gvM,d,isT?"var(--bg-td)":we?"var(--bg-we)":"var(--td-fix)")}}>
                   <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{d} <span style={{fontSize:9,fontWeight:600}}>{MOIS[gvM].slice(0,4)}</span></div>
                   <div style={{fontSize:9,color:we?"#92400e":isT?"var(--today-c)":"var(--txt3)",fontWeight:600}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]}</div>
                 </td>
@@ -4128,7 +4142,7 @@ function TourJournal({jrn,medecins,setBuild,perKey,onPrevenir,peut,pushMeds=null
   </div>;
 }
 
-function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg=null,medecins,getEntries,isEdit:isEditIn,edReel,build,secrDif,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes=null,onDaySwap=null,setBuild=null,pushMeds=null,onPrevenir=null}){   /* v10.192 : actes, pour les couleurs HC / USIC ; v10.193 : onDaySwap, la modale « ⇄ Échanger ce jour de tour » du Planning ; v10.209 : setBuild + onPrevenir pour l'encart des changements */
+function TourTab({isVac=null,noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport,setLastReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg=null,medecins,getEntries,isEdit:isEditIn,edReel,build,secrDif,darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes=null,onDaySwap=null,setBuild=null,pushMeds=null,onPrevenir=null}){   /* v10.192 : actes, pour les couleurs HC / USIC ; v10.193 : onDaySwap, la modale « ⇄ Échanger ce jour de tour » du Planning ; v10.209 : setBuild + onPrevenir pour l'encart des changements */
   /* v10.159 : deux niveaux de droits dans la tuile Tour.
      — edReel (vrais éditeurs) : répartition automatique, 🗑 Retirer, rapport ;
      — isEdit (le geste MANUEL — attribution, échanges) : les éditeurs toujours,
@@ -5482,7 +5496,7 @@ function TourTab({noNav=false,specColors=null,tourMins,tourMinsHard,tourAvoid,to
               const busyS=[...(wm.HC||[]),...(wm.USIC||[])].map(String);
               return(
                 <tr key={w.key} data-week={w.key} style={incomplete?{background:"rgba(128,134,148,.10)"}:{}}>
-                  <td data-tourleft="1" style={{verticalAlign:"middle",whiteSpace:"nowrap",padding:tel?"2px 6px 2px 2px":"2px 8px 2px 4px",position:"sticky",left:0,zIndex:20,background:"var(--bg)"}}>{/* v10.200 : figée à gauche */}
+                  <td data-tourleft="1" data-vacsem={vacSemaine(isVac,w.key)?"1":undefined} title={vacSemaine(isVac,w.key)?"Semaine de vacances scolaires":undefined} style={{verticalAlign:"middle",whiteSpace:"nowrap",padding:tel?"2px 6px 2px 2px":"2px 8px 2px 4px",position:"sticky",left:0,zIndex:20,background:vacSemaine(isVac,w.key)?"var(--vac-bg)":"var(--bg)"}}>{/* v10.200 : figée à gauche */}
                     {tel?<>
                       <div style={{fontSize:10,fontWeight:700,color:"var(--txt2)"}}>{w.label}{lock?" 🔒":""}<span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:800,marginLeft:5}}><span style={{color:cnt(nH)}}>{nH}/2</span><span style={{color:"var(--txt3)"}}>·</span><span style={{color:cnt(nU)}}>{nU}/2</span></span></div>
                       <div style={{display:"flex",alignItems:"center",gap:4,marginTop:2,flexWrap:"wrap"}}>
@@ -6073,6 +6087,10 @@ const HELP_SECTIONS=[
   HT({children:"🏖 Les vacances scolaires"}),
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
+  HT({children:"Où voit-on les vacances ? (v10.230)"}),
+  HP({children:["Dans tous les onglets qui affichent des jours ou des semaines, avec la même teinte gris-bleu. ",HE("b",null,"Onglets par jours")," — Planning, Internes, Attachés, CHL, CHB, PT Cardio, PT Angio, Gardes : la ",HE("b",null,"case de la date"),", à gauche, est teintée, jour par jour, exactement. Seule la date l'est, jamais la case d'une salle : le gris d'une case de salle veut toujours dire « plage fermée »."]}),
+  HP({children:[HE("b",null,"Onglets par semaines")," : dans le Tour (Construire), le ",HE("b",null,"libellé de la semaine"),", à gauche, est teinté ; dans les Reports, la ",HE("b",null,"case de la semaine")," du tableau des semaines blanches est grisée (le bleu des semaines de tour reste sur les jours) ; dans l'Astreinte, un ",HE("b",null,"liseré gris avec la mention VAC")," précède la date de la tuile — du côté de la date, pas du médecin : c'est la semaine qui est en vacances, pas la personne. Il ne se confond pas avec le bord violet épaissi de la tuile, qui signale des exceptions."]}),
+  HP({children:[HE("b",null,"La règle des semaines")," : on compte les cinq jours du lundi au vendredi. ",HE("b",null,"Trois jours de vacances ou plus")," (plus de la moitié) : la semaine est marquée ; ",HE("b",null,"deux ou moins")," : elle ne l'est pas. Une semaine a donc le même statut dans le Tour, les Reports et l'Astreinte. En ouvrant une tuile d'Astreinte (▸), on retrouve l'affichage par jours : chaque date en vacances est teintée, même si la semaine n'est pas marquée VAC."]}),
   HStep({n:"1",children:[HE("b",null,"Vérifier l'Équipe")," — rôles (médecin / attaché / IDE), coche ",HChip({txt:"Garde",bg:"#16a34a"})," (elle pilote qui peut recevoir gardes et repos), coche ",HChip({txt:"TM",bg:"#1d4ed8"})," pour le tour, sur-spécialités, temps partiels, PIN individuels, et l'ordre d'affichage avec ▲▼."]}),
   HStep({n:"2",children:[HE("b",null,"Attribuer le Tour")," — tuile 2 de Construire : répartition automatique ",HBtn({kind:"ghost",children:"⚙️ Répartition auto"})," ou attribution manuelle semaine par semaine. L'algorithme respecte les minimums de sur-spécialités, absences, temps partiels et préférences ⭐/🚫, et sert d'abord les médecins les plus contraints — quota restant rapporté aux semaines encore ouvertes ; les plus larges restent en réserve pour les semaines difficiles. Les jours fériés ne comptent jamais dans le jugement d'une semaine : un médecin absent seulement un jour férié reste disponible pour le tour. Et pour les minimums de sur-spécialités, un médecin compte comme présent s'il est là plus de la moitié des demi-journées ouvrées de la semaine (fériés exclus) — 10 demi-journées en semaine normale, 8 avec un férié. Une activité déjà posée à la main dans le planning (consultation, écho…) écarte le médecin de la répartition automatique cette semaine-là et le grise « occupé » dans le tableau (non cliquable, quel que soit le profil) — le rapport le signale ✋ ; les cases venant du planning type, elles, sont retirées automatiquement des tourneurs choisis. Au retrait d'un tourneur (clic ou échange), le planning type ne revient sur sa semaine que s'il y était au moment de la prise — une semaine encore vierge à la prise reste vierge au retrait. Le rapport détaille ligne par ligne ce qui a été tenu (✓) ou non (⚠). 🗑 Retirer efface les attributions de la période et leurs suites : dérogations, remplaçants juniors et TP de dérogation — et le retour arrière ↶ restaure le tout à l'identique, échanges de jour compris (v10.160) — et dans le Planning, la case d'un remplaçant junior garde sa croix × pour l'éditeur. Le jour d'un remplaçant s'échange comme celui d'un tourneur : sa case propose ⇄ Échanger ce jour de tour, borné aux créneaux qu'il tient réellement — ses cases de tour passent alors au nouveau remplaçant. Enfin, tant que l'éditeur n'a pas cliqué « ✓ Valider le tour » (bandeau en tête de la tuile 2), les semaines de tour d'une période à venir restent invisibles de l'équipe dans le Planning — seuls les éditeurs les voient, et la tuile 2 ne passe au vert qu'une fois le tour validé ; la diffusion les révèle dans tous les cas (v10.158, v10.159). Dans la tuile Tour, la répartition automatique et le 🗑 Retirer sont réservés aux éditeurs ; l'attribution manuelle et les échanges ⇄ ne s'ouvrent aux intermédiaires qu'avec leurs droits — étape 5 validée ou diffusion (v10.159). Depuis la v10.164 la répartition tient aussi des RÈGLES D'ENCHAÎNEMENT : jamais 3 semaines de tour d'affilée, jamais 3 dans une fenêtre glissante de 4 — et les 3 dernières semaines de la période précédente comptent, pour que la règle tienne à la charnière entre deux périodes. Les 2 semaines d'affilée sont RECHERCHÉES pour qui a coché la préférence (colonnes « 2 sem. HC » et « 2 sem. USIC » de la modale) et ne sont imposées à personne d'autre qu'en dernier recours, signalées ⚠ au rapport. Une seule exception, à l'ultime palier : plutôt que de laisser une semaine incomplète — qu'il faudrait de toute façon combler à la main de la même façon — l'algorithme accepte une 3ᵉ semaine sur 4, jamais 3 d'affilée, et le dit au rapport. Enfin une dernière passe reprend chaque souhait 🚫 « pas de tour » encore violé et cherche un échange à deux qui le résolve sans dégrader les minimums de surspécialité ni l'enchaînement ; les quotas sont conservés (c'est un échange, pas un déplacement) et ce qui reste irrésoluble est nommé au rapport. Depuis la v10.165 elle veille en plus à l'ÉQUITÉ DES BINÔMES : un binôme, ce sont les 2 médecins d'une même unité sur une même semaine, HC et USIC confondus — le décompte est commun. À égalité de charge, l'algorithme sert celui qui a le moins tourné avec le médecin déjà posé dans l'unité, et les 60 essais retiennent la répartition la mieux ventilée. Le bouton 🤝 Binômes, ouvert à tout le monde en lecture, montre le tableau croisé des semaines passées ensemble : un 0 en ambre est un couple jamais formé. Les SEMAINES DE BASCULE D'INTERNE — celles dont le lundi ouvre un semestre, dates prises dans l'onglet Équipe et jamais écrites en dur — sont réparties entre ceux qui en ont fait le moins, et confiées à un junior seulement en dernier recours, avec un ⚠ au rapport : le junior arrive précisément ce lundi-là. Le décompte porte sur une fenêtre glissante de deux ans, à partir de la date réglée dans Paramètres (par défaut le 02/11/2026), et ne décide jamais du NOMBRE de semaines dû à chacun. Depuis la v10.166, le remplaçant junior d'un temps partiel en USIC est choisi sur le tour et le planning tels qu'ils sont à cet instant — jamais un junior déjà de tour cette semaine-là — et les journées de remplacement sont réparties entre les juniors, une journée comptant pour une : trois semaines, trois juniors, un jour chacun. Enfin, pendant les vacances scolaires (saisies dans Paramètres), un temps partiel posé en USIC est permuté avec un médecin HC de la même semaine quand c'est possible — jamais au prix d'une règle : si rien ne convient, il reste en USIC et le rapport le dit. Depuis la v10.167, un médecin peut ÉVITER UNE UNITÉ CERTAINES SEMAINES (garde alternée) : colonne « Éviter » de la modale ⚙️ — choisir USIC ou HC ouvre sa ligne, pré-remplie une semaine sur deux dès le premier lundi de la période ; le second bouton change de pied, et un clic sur une pastille inverse le rythme d'ici la fin de la période. Réglage propre à chaque période : une nouvelle période part vide. Sur une semaine évitée, le médecin passe en dernier dans le tri de l'unité évitée — jamais interdit, jamais de semaine incomplète — et la passe de permutation HC↔USIC le rattrape s'il y a atterri quand même ; sinon le rapport le nomme 🔁. Se cumule avec le 🚫 « pas de tour ». Dans le tableau du tour et la modale d'échange ⇄, le 🔁 et un avertissement signalent la pose dans l'unité évitée, sans l'empêcher. Depuis la v10.168 la répartition veille à l'ÉQUILIBRE HC / USIC de chacun : à une semaine près — 2 et 2 pour 4 semaines, 3 et 2 dans un sens ou l'autre pour 5. Le critère pèse dès le tirage, puis une dernière passe ⚖ permute HC↔USIC au sein d'une même semaine pour qui garde 2 semaines d'écart ou plus — le partenaire n'est jamais déséquilibré à son tour, et la passe respecte les vacances scolaires 🏖 des temps partiels et les unités évitées 🔁. Ce qui reste hors ±1 est nommé au rapport. Depuis la v10.187, le bouton 🔎 Vérifier (éditeur) relit la répartition TELLE QU'AFFICHÉE — retouches à la main comprises — et lui passe les mêmes contrôles, sans rien déplacer : semaines complètes, surspécialités, 🚫, enchaînement (3 semaines avant ET après la période comprises), semaines doublées, bascules d'interne, 🏖, 🔁, ⚖, quotas, binômes — plus trois contrôles propres aux retouches : un absent posé de tour, un médecin présent deux fois la même semaine, un exclu ou non-tourneur affecté. Il compte aussi les semaines de bascule d'interne sur la fenêtre 🤝 et nomme quiconque en a une entière de plus que la moyenne. Les réglages relus sont ceux de la dernière modale ⚙️ de la période. Le rapport, daté, remplace celui de la répartition automatique et reste affiché jusqu'au suivant. Depuis la v10.188, le rapport se lit en couleurs — ✓ en vert, ⚠ en rouge — et un rôle de Dr Junior est compté par titulaire pour l'enchaînement : la semaine du lundi de bascule et les suivantes vont au nouveau junior, les précédentes à l'ancien, et une semaine de l'un ne s'enchaîne jamais avec une semaine de l'autre. Un bouton ↑ flottant, en bas à droite, ramène en haut de la tuile dès qu'on a défilé (depuis la v10.226 c'est la flèche commune à tous les onglets : haut de la tuile dépliée, puis haut de la page au second appui). Depuis la v10.189, sous chaque constat ⚠ qui vise un médecin ou une semaine, le rapport propose jusqu'à trois ÉCHANGES À DEUX (lignes ↳) : X cède sa semaine à Y et prend la sienne — autre semaine, ou même semaine dans l'autre unité —, ce qui conserve les quotas. Un échange n'est proposé que s'il fait disparaître le constat sans en créer aucun autre : disponibilité, surspécialités, 🚫, enchaînement, 🔁, 🏖, équilibre HC/USIC, tout est rejugé. Les semaines passées et verrouillées ne sont jamais proposées. Depuis la v10.192, les semaines s'affichent en GRILLE : une colonne par médecin (sa tuile de décompte reste collée en haut au défilement), une ligne par semaine, et chaque médecin n'apparaît qu'une fois par semaine. Une case colorée porte l'unité (HC ou USIC, aux couleurs des activités « Tour médical HC / USIC » de l'onglet Activités) ; hachurée, le médecin est indisponible ou occupé (le détail au survol) ; 🚫 ⭐ 🔁 rappellent ses préférences, texte au survol. Un clic sur une case ouvre un petit menu HC / USIC / Retirer — changer d'unité se fait en un geste, sans passer par l'autre. À gauche de la ligne, le compte HC et USIC de la semaine et, depuis la v10.193, les surspécialités encore disponibles — un chiffre sous le minimum réglé passe en rouge ⚠ ; à droite, ⇄ Échanger et le remplacement TP. Depuis la v10.196, les médecins hors tour qui ont une surspécialité ont eux aussi leur colonne, dans l'ordre de l'onglet Équipe : une tuile d'initiales sans décompte, et par semaine une case jamais cliquable, portant en petit « présent hors tour » quand ils sont là, hachurée s'ils sont absents la majorité de la semaine — comme une case de tourneur indisponible. Depuis la v10.198, chaque colonne repose sur une bande de couleur continue, de la tuile au bas de la grille : la couleur de la surspécialité du médecin (réglable dans Paramètres), la même pour un hors tour, et la couleur de la personne quand sa colonne est suivie — les cases, un peu plus étroites que la bande, laissent la couleur visible de chaque côté. Sur téléphone (v10.200, v10.201), la grille défile dans son propre cadre, en hauteur comme en largeur, et non avec la page ; la colonne des semaines reste figée à gauche et l'en-tête en haut pendant le défilement, avec le bouton ⇄ et les remplacements TP sous chaque semaine ; les cases et les tuiles sont réduites, et la mention « présent hors tour » disparaît — la case blanche sur sa bande suffit. Depuis la v10.193, un clic sur une tuile d'initiales de l'en-tête suit sa colonne (bande teintée, cadre à la couleur du médecin), plusieurs à la fois pour comparer deux ou trois personnes avant un échange — un second clic la relâche. La puce d'un remplacement de temps partiel se lit « remplaçant → remplacé jour/mois » ; un clic dessus ouvre la même modale « ⇄ Échanger ce jour de tour » que la case du remplaçant dans le Planning, avec tous les médecins libres ce jour-là. Enfin, quand l'équipe grandit, les tuiles se resserrent d'elles-mêmes pour que la grille tienne dans la largeur de l'écran, jusqu'à un plancher en dessous duquel on défile. Depuis la v10.191, chaque ligne ↳ porte un bouton ⇄ Appliquer : l'échange se fait d'un clic, exactement comme par la modale ⇄ du tableau (planning type des deux médecins, temps partiels et remplaçants suivis, un seul cran ↶), et la vérification se relance toute seule. Si la répartition a changé depuis la vérification, le bouton refuse et demande de relancer 🔎. Quand un échange retire à quelqu'un les 2 semaines d'affilée qu'il a DEMANDÉES, il reste proposé mais la ligne le dit (⚠ … perd ses 2 semaines d'affilée demandées) et passe après les autres. Depuis la v10.190, un geste du tour — répartition automatique, 🗑 Retirer, échange ⇄, clic dans le tableau — ne fait qu'UN cran d'historique, même s'il écrit en plusieurs temps (tour, purge, activités, temps partiels et remplaçants) : un seul ↶ le défait, avec une seule confirmation qui annonce le vrai nombre de cases touchées."]}),
   HStep({n:"3",children:[HE("b",null,"Répartir les Gardes")," — tuile 3 de Construire : répartition automatique en respectant absences, semaines de tour, jours autorisés par médecin, volume cible, préférences ⭐/🚫 et écart minimal entre deux gardes. Le ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde est posé automatiquement le lendemain. Depuis la v10.205, un bandeau en tête de la tuile 3 permet de « ✓ Valider les gardes » d'une période à venir (comme le tour) : tant qu'elles ne le sont pas, les médecins basiques ne peuvent ni prendre ni échanger une garde ; une fois validées, un médecin basique peut, depuis la colonne Garde du Planning, se mettre de garde à la place de quelqu'un ou échanger l'une de SES gardes avec une autre — jamais retirer une garde, jamais poser quelqu'un d'autre. Éditeur et intermédiaires gardent la main entière."]}),
@@ -6170,7 +6188,7 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"La période (4 mois)")," : l'unité centrale — la navigation ‹ ›, le verrou, l'archivage, Construire, le planning type, les stats et l'export travaillent par période. Ses bornes sont RÉELLES : elle commence le lendemain de la fin de la précédente et se termine au dimanche qui clôt la dernière semaine de son dernier mois ; le lundi suivant lui est rattaché s'il est férié (1er novembre) ; et sa fin s'étend jusqu'au dernier jour des vacances scolaires quand elle tombe dedans (21 jours au plus — l'été n'est jamais absorbé). Une période ne va donc jamais « du 1er au 31 ». Longueur et mois de départ se règlent dans Paramètres."]}),
   HP({children:[HE("b",null,"Les semaines")," (tour et planning type) : toujours entières, du lundi au dimanche. Les semaines d'une période vont du lundi qui précède ou égale son premier jour au dimanche qui précède ou égale son dernier jour — autrement dit, une semaine appartient à la période de son dimanche. Quand un lundi férié est rattaché à la période précédente, la semaine de ce lundi ouvre la période suivante : le tour s'y répartit à partir du mardi."]}),
   HP({children:[HE("b",null,"Les semestres")," (internes et Dr Juniors) : six mois, bascules début mai et début novembre, reportées au lundi. Ils sont indépendants des périodes — seule la période de mars à juin contient une bascule en son milieu (début mai) ; celle de novembre tombe sur une frontière de période."]}),
-  HP({children:[HE("b",null,"L'année scolaire des vacances")," (Toussaint → Été), saisie dans Paramètres : elle sert au calcul de la fin de période et au fond coloré des jours de vacances."]}),
+  HP({children:[HE("b",null,"L'année scolaire des vacances")," (Toussaint → Été), saisie dans Paramètres : elle sert au calcul de la fin de période et au fond coloré des jours — ou des semaines — de vacances, dans tous les onglets (v10.230)."]}),
   HP({last:true,children:[HE("b",null,"En cours, close, archivée")," : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."]}))},
 
 {id:"archives",icon:"🗄️",title:"Archiver, sauvegarder, exporter",body:()=>HE("div",null,
@@ -6210,7 +6228,7 @@ const HELP_SECTIONS=[
   HP({children:["Le gel n'existe pas dans le 🧪 bac à sable. Un appareil resté sur une version plus ancienne ne connaît pas le gel, mais il est déjà en lecture seule : le garde-fou de version l'empêche d'écrire tant qu'il n'est pas à jour."]})
  )},
  {id:"fermees",icon:"🚫",title:"Plages fermées — fermer une salle sur une demi-journée",body:()=>HE("div",null,
-  HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée")," et marquée 🚫 dans CHL, CHB, PT Cardio et PT Angio, et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
+  HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée")," dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
   HT({children:"Fermer ou rouvrir un jour précis"}),
   HP({children:["Cliquez la case de la salle : en tête de la fenêtre, la ligne ",HE("b",null,"🚫 Plage fermée")," se coche pour fermer, se décoche pour rouvrir — ce jour-là seulement. Réservé aux ",HE("b",null,"éditeurs, cadres et médecins intermédiaires")," ; pour les autres, une plage fermée ne s'ouvre pas, un message le dit."]}),
   HT({children:"Fermer chaque semaine — la grille de la salle"}),
@@ -6785,7 +6803,7 @@ function ReportsView(p){
           const first=w.days[0];
           const wm=tourMed[w.key]||{};const isTW=((wm.HC||[]).includes(mid)||(wm.USIC||[]).includes(mid));
           return RE("tr",{key:w.key,style:{borderTop:"1px solid var(--border2)"}},
-            RE("td",{style:{padding:"3px 8px",fontSize:10,fontWeight:700,color:isTW?"#1d4ed8":"var(--txt)",whiteSpace:"nowrap"}},
+            RE("td",{"data-vacsem":vacSemaine(isVac,w.key)?"1":undefined,title:vacSemaine(isVac,w.key)?"Semaine de vacances scolaires":undefined,style:{padding:"3px 8px",fontSize:10,fontWeight:700,color:isTW?"#1d4ed8":"var(--txt)",whiteSpace:"nowrap",background:vacSemaine(isVac,w.key)?"var(--vac-bg)":"transparent"}},
               first.d+" "+MOIS[first.m].slice(0,4)+(isTW?" · TOUR":"")),
             [1,2,3,4,5].map(dw=>{
               const o=w.days.find(x=>new Date(x.y,x.m,x.d).getDay()===dw);
@@ -6807,6 +6825,7 @@ function ReportsView(p){
     RE("div",{style:{fontSize:9,color:"var(--txt3)",marginBottom:14}},
       RE("span",{style:{background:"rgba(245,158,11,.25)",padding:"0 6px",borderRadius:3,marginRight:6}},"blanche"),
       RE("span",{style:{background:"rgba(29,78,216,.12)",padding:"0 6px",borderRadius:3,marginRight:6}},"semaine de tour"),
+      RE("span",{style:{background:"var(--vac-bg)",padding:"0 6px",borderRadius:3,marginRight:6}},"semaine de vacances"),
       RE("span",{style:{color:"#ef4444",marginRight:6}},"date rouge = absence"),"F = férié"),
     /* ── Rapport ── */
     /* ── v10.24 : Semaine par semaine ─────────────────────────────────────── */
@@ -12889,8 +12908,8 @@ function CardioPlanning(){
     window.location.reload();};
   const verRetablir=()=>{if(!window.confirm("Déclarer CETTE version ("+APP_VERSION+") comme version en service ?\n\nÀ n'utiliser qu'après un retour volontaire à une version antérieure : toutes les copies plus récentes passeront à leur tour en lecture seule."))return;
     if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
-  const tourProps={medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes,setBuild,onPrevenir:annPrevenir,pushMeds,onDaySwap:(medId,y2,m2,d2)=>{setMData({medId,y:y2,m:m2,d:d2,fromTour:true});setModal("daySwap");}};   /* v10.193 : depuis la puce TP de la tuile Tour */
-  const gardeProps={onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
+  const tourProps={isVac,medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes,setBuild,onPrevenir:annPrevenir,pushMeds,onDaySwap:(medId,y2,m2,d2)=>{setMData({medId,y:y2,m:m2,d:d2,fromTour:true});setModal("daySwap");}};   /* v10.193 : depuis la puce TP de la tuile Tour */
+  const gardeProps={isVac,onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
       <style>{setFoldCSS()+`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -12921,6 +12940,7 @@ header::-webkit-scrollbar { display: none; }
     --bg-we: #fdf5e4 !important;    /* Weekend : crème léger */
     --bg-weh: #faefd0 !important;   /* Weekend header : crème */
     --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert très léger */
+    --vac-bg: #e2e8f0 !important;   /* v10.230 : vacances — sans cette ligne, le mode sombre imprimait la teinte foncée */
     --border: #cbd5e1 !important;
     --border2: #e2e8f0 !important;
     --txt: #1e293b !important;
@@ -13165,12 +13185,12 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onPushDemande={(l)=>annPrevenir(l,true,true)} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
+      {tab==="chl"&&<SiteView isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" salleFerm={salleFerm} intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
+        <SiteView isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" salleFerm={salleFerm} intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -13180,13 +13200,13 @@ header::-webkit-scrollbar { display: none; }
           const full=bip&&(bip.salles||[]).includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
-      {tab==="plateau"&&<ActTabView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" salleFerm={salleFerm} intCfg={intCfgAff}
+      {tab==="plateau"&&<ActTabView isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" salleFerm={salleFerm} intCfg={intCfgAff}
         rows={ptRows} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["PT"]||null} onHide={(cols)=>{setHideModal({site:"PT",cols});setModal("colHide");}} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(row&&row.salle,y,m,d,sl))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -13547,7 +13567,15 @@ header::-webkit-scrollbar { display: none; }
                       <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",flexWrap:"wrap",
                         cursor:"pointer"}} onClick={()=>setAstSemOuv(o=>({...o,[sem.wk]:!ouvert}))}>
                         <span style={{color:"var(--txt3)",fontSize:11,width:10}}>{ouvert?"▾":"▸"}</span>
-                        <span style={{fontSize:12,fontWeight:700,minWidth:130}}>{fmtJ(j0)} → {fmtJ(j9)}</span>
+                        {/* v10.230 : semaine de vacances — liseré GRIS à gauche de la DATE + « VAC ». Côté date et non côté
+                            médecin (on croirait la personne en vacances), et DANS la tuile : le bord violet épaissi du
+                            cadre reste le signe des exceptions, les deux se lisent séparément. */}
+                        <span data-vacsem={vacSemaine(isVac,sem.wk)?"1":undefined} title={vacSemaine(isVac,sem.wk)?"Semaine de vacances scolaires":undefined}
+                          style={{display:"inline-flex",alignItems:"center",gap:6,minWidth:158,boxSizing:"border-box",fontSize:12,fontWeight:700,
+                            ...(vacSemaine(isVac,sem.wk)?{borderLeft:"3px solid #64748b",background:"var(--vac-bg)",borderRadius:"0 6px 6px 0",padding:"3px 8px 3px 6px"}:{})}}>
+                          {vacSemaine(isVac,sem.wk)&&<span style={{fontSize:8.5,fontWeight:800,letterSpacing:.6,color:"var(--txt2)"}}>VAC</span>}
+                          <span>{fmtJ(j0)} → {fmtJ(j9)}</span>
+                        </span>
                         <span onClick={e=>{if(!canAst)return;e.stopPropagation();
                           /* v10.126 : semaine close = son DIMANCHE est verrouillé (arPerAst) */
                           const q=sem.wk.split("-").map(Number),su=new Date(q[0],q[1],q[2]+6);
@@ -13602,7 +13630,7 @@ header::-webkit-scrollbar { display: none; }
                             style={{display:"flex",alignItems:"center",gap:10,padding:"5px 11px 5px 32px",fontSize:12,
                               borderBottom:"1px solid var(--border)",cursor:canAst?"pointer":"default",
                               background:hasExc?"rgba(124,58,237,.06)":"transparent",fontWeight:hasExc?700:400}}>
-                            <span style={{width:112,color:"var(--txt2)"}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]} {d} {MOIS[m].slice(0,4).toLowerCase()}.</span>
+                            <span data-vac={isVac(y,m,d)?"1":undefined} title={isVac(y,m,d)?"Vacances scolaires":undefined} style={{width:112,boxSizing:"border-box",color:"var(--txt2)",...(isVac(y,m,d)?{width:117,background:"var(--vac-bg)",borderRadius:4,padding:"1px 5px",marginLeft:-5}:{})}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]} {d} {MOIS[m].slice(0,4).toLowerCase()}.</span>
                             {med?<>
                               <span style={{width:20,height:20,borderRadius:"50%",background:med.color,display:"flex",
                                 alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8.5,fontWeight:800}}>{med.init}</span>
