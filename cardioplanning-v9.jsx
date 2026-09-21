@@ -48,7 +48,21 @@ function gelMuet(){var n=Date.now();if(n-(GEL.t||0)>10000){GEL.t=n;try{jlog("GEL
    file tournante (300 entrées au plus). AUCUN état React, AUCUN affichage ici : la tuile 📡 des Paramètres ne lit ces
    compteurs que pendant qu'on lui demande de mesurer. La latence est celle des VRAIES écritures : délai entre l'envoi et
    l'accusé du serveur (la promesse de Firestore) — elle ne génère donc aucun trafic supplémentaire. */
-var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[]};
+var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[],lire:[],aff:[]};
+/* v10.234 : CE QUE COÛTE UN MESSAGE À L'APPAREIL. Le réseau mesuré (latence), restait l'appareil : à chaque message il relit
+   le planning complet (lire = durée du traitement du message) puis redessine l'écran (aff = délai jusqu'après la peinture
+   suivante). Deux relevés d'horloge par message, 20 valeurs gardées. Page en arrière-plan : pas de peinture, on ne mesure pas. */
+function trafRecu(suite,moi,args){
+  TRAFIC.recu++;trafFil("r");
+  const P=(typeof performance!=="undefined"&&performance.now)?performance:null;
+  if(!P)return suite.apply(moi,args);
+  const t=P.now();const r=suite.apply(moi,args);const t1=P.now();
+  TRAFIC.lire.push(Math.round(t1-t));if(TRAFIC.lire.length>20)TRAFIC.lire.shift();
+  if(typeof document!=="undefined"&&!document.hidden&&typeof requestAnimationFrame==="function")
+    requestAnimationFrame(()=>setTimeout(()=>{TRAFIC.aff.push(Math.round(P.now()-t));if(TRAFIC.aff.length>20)TRAFIC.aff.shift();},0));
+  return r;
+}
+function trafMed(a){if(!a||!a.length)return null;const l=a.slice().sort((x,y)=>x-y);return l[Math.floor(l.length/2)];}
 function trafFil(k){TRAFIC.fil.push({t:Date.now(),k:k});if(TRAFIC.fil.length>300)TRAFIC.fil.splice(0,TRAFIC.fil.length-300);}
 function trafEcr(p){
   TRAFIC.ecr++;trafFil("e");
@@ -60,7 +74,7 @@ function trafBilan(now){
   let e10=0,r10=0,e60=0,r60=0;const bar=[];for(let i=0;i<60;i++)bar.push(0);
   TRAFIC.fil.forEach(x=>{const a=now-x.t;if(a<0||a>=60000)return;if(x.k==="e")e60++;else r60++;if(a<10000){if(x.k==="e")e10++;else r10++;}bar[59-Math.floor(a/1000)]++;});
   const l=TRAFIC.lat.slice().sort((a,b)=>a-b);
-  return {e10,r10,e60,r60,bar,ecr:TRAFIC.ecr,recu:TRAFIC.recu,ko:TRAFIC.ko,vol:TRAFIC.vol,latDer:TRAFIC.lat.length?TRAFIC.lat[TRAFIC.lat.length-1]:null,latMed:l.length?l[Math.floor(l.length/2)]:null,nLat:l.length,depuis:Math.round((now-TRAFIC.t0)/60000)};
+  return {e10,r10,e60,r60,bar,ecr:TRAFIC.ecr,recu:TRAFIC.recu,ko:TRAFIC.ko,vol:TRAFIC.vol,latDer:TRAFIC.lat.length?TRAFIC.lat[TRAFIC.lat.length-1]:null,latMed:l.length?l[Math.floor(l.length/2)]:null,nLat:l.length,lireMed:trafMed(TRAFIC.lire),lireMax:TRAFIC.lire.length?Math.max.apply(null,TRAFIC.lire):null,affMed:trafMed(TRAFIC.aff),affMax:TRAFIC.aff.length?Math.max.apply(null,TRAFIC.aff):null,nTrt:TRAFIC.lire.length,depuis:Math.round((now-TRAFIC.t0)/60000)};
 }
 function sansIndef(v){
   if(Array.isArray(v))return v.map(x=>x===undefined?null:sansIndef(x));
@@ -69,7 +83,7 @@ function sansIndef(v){
   return v;
 }
 const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){return VER_STALE.on?verMuet():GEL.on?gelMuet():trafEcr(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
-const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? function(ref,suite,err){return window.firebaseOnSnapshot(ref,function(){TRAFIC.recu++;trafFil("r");return suite.apply(this,arguments);},err);} : null;   /* v10.233 : chaque message reçu est compté */
+const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? function(ref,suite,err){return window.firebaseOnSnapshot(ref,function(){return trafRecu(suite,this,arguments);},err);} : null;   /* v10.233 : chaque message reçu est compté */
 const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){return VER_STALE.on?verMuet():GEL.on?gelMuet():trafEcr(window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])])));} : null;
 
 /* v10.142 : JOURNAL DE BORD — l'équivalent de la console (F12) gardé en mémoire : erreurs, avertissements,
@@ -105,7 +119,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.233 — 21/09/2026";
+const APP_VERSION="v10.234 — 21/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -395,7 +409,7 @@ function applyTheme(dark){
   } else {
     r.style.setProperty("--bg","#f1f5f9");r.style.setProperty("--bg2","#ffffff");
     r.style.setProperty("--bg-n","#e2e8f0");
-    r.style.setProperty("--vac-bg","#e2e8f0");r.style.setProperty("--vac-fort","#b6c2d4");r.style.setProperty("--garde-bg","#f0fdf4");
+    r.style.setProperty("--vac-bg","#e2e8f0");r.style.setProperty("--vac-fort","#c9d3e1");r.style.setProperty("--garde-bg","#f0fdf4");
     r.style.setProperty("--ast-bg","#dcfce7");r.style.setProperty("--ast-bord","#4ade80");r.style.setProperty("--bg-we","#fef9ee");
     r.style.setProperty("--bg-weh","#fef3c7");r.style.setProperty("--bg-td","#f0fdf4");
     r.style.setProperty("--border","#cbd5e1");r.style.setProperty("--border2","#e2e8f0");
@@ -6118,7 +6132,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HT({children:"📡 Trafic et latence (v10.233)"}),
-  HP({children:["Dans Paramètres, la carte ",HE("b",null,"📡 Trafic et latence")," montre ce que l'appareil échange avec le serveur : écritures envoyées, messages reçus (10 s, 1 min, depuis l'ouverture), écritures en attente ou refusées, et la ",HE("b",null,"latence")," — le délai entre une écriture et l'accusé du serveur. Elle ne mesure que si vous appuyez sur ",HBtn({kind:"ghost",children:"▶ Mesurer"})," et s'arrête seule au bout de 2 minutes : éteinte, elle ne coûte rien. ",HBtn({kind:"ghost",children:"⏱ Tester la latence"})," envoie une écriture minuscule pour avoir une mesure tout de suite. À savoir : chaque écriture renvoie le planning à tous les appareils connectés — beaucoup de messages reçus en peu de temps signifie que quelqu'un écrit en rafale."]}),
+  HP({children:["Dans Paramètres, la carte ",HE("b",null,"📡 Trafic et latence")," montre ce que l'appareil échange avec le serveur : écritures envoyées, messages reçus (10 s, 1 min, depuis l'ouverture), écritures en attente ou refusées, et la ",HE("b",null,"latence")," — le délai entre une écriture et l'accusé du serveur. Elle ne mesure que si vous appuyez sur ",HBtn({kind:"ghost",children:"▶ Mesurer"})," et s'arrête seule au bout de 2 minutes : éteinte, elle ne coûte rien. ",HBtn({kind:"ghost",children:"⏱ Tester la latence"})," envoie une écriture minuscule pour avoir une mesure tout de suite. Depuis la v10.234 elle distingue le ",HE("b",null,"réseau")," (latence) de l'",HE("b",null,"appareil")," : temps de lecture d'un message, temps jusqu'à l'écran redessiné, et poids du planning reçu à chaque message. À savoir : chaque écriture renvoie le planning à tous les appareils connectés — beaucoup de messages reçus en peu de temps signifie que quelqu'un écrit en rafale."]}),
   HT({children:"Où voit-on les vacances ? (v10.230)"}),
   HP({children:["Dans tous les onglets qui affichent des jours ou des semaines, avec la même teinte gris-bleu. ",HE("b",null,"Onglets par jours")," — Planning, Internes, Attachés, CHL, CHB, PT Cardio, PT Angio, Gardes : la ",HE("b",null,"case de la date"),", à gauche, est teintée, jour par jour, exactement. Seule la date l'est, jamais la case d'une salle : le gris d'une case de salle veut toujours dire « plage fermée »."]}),
   HP({children:[HE("b",null,"Onglets par semaines")," : dans le Tour (Construire), le ",HE("b",null,"libellé de la semaine"),", à gauche, est teinté — d'un gris plus soutenu qu'ailleurs depuis la v10.231, le fond de cette grille étant déjà gris ; dans les Reports, la ",HE("b",null,"case de la semaine")," du tableau des semaines blanches est grisée (le bleu des semaines de tour reste sur les jours) ; dans l'Astreinte, un ",HE("b",null,"liseré gris avec la mention VAC")," précède la date de la tuile — du côté de la date, pas du médecin : c'est la semaine qui est en vacances, pas la personne. Il ne se confond pas avec le bord violet épaissi de la tuile, qui signale des exceptions."]}),
@@ -8198,7 +8212,7 @@ function CouleurOK({value,onOk,onApercu=null,w=38,h=24,title}){
 /* v10.233 : tuile 📡 Trafic des Paramètres. Rien ne tourne tant qu'on n'a pas appuyé sur ▶ Mesurer ; la mesure se rafraîchit
    une fois par seconde, s'arrête SEULE au bout de 2 minutes et au démontage (on quitte Paramètres). « Tester » envoie une
    écriture minuscule (champ _ping) : une seule, à la demande. */
-function TraficTuile({onPing=null,netOff=false}){
+function TraficTuile({onPing=null,netOff=false,docSize=null}){
   const [on,setOn]=useState(false);
   const [b,setB]=useState(null);
   useEffect(()=>{
@@ -8208,7 +8222,9 @@ function TraficTuile({onPing=null,netOff=false}){
     return ()=>clearInterval(id);
   },[on]);
   const ms=(v)=>v===null?"—":(v<1000?v+" ms":(v/1000).toFixed(1)+" s");
-  const colLat=(v)=>v===null?"var(--txt3)":v<400?"#16a34a":v<1500?"#d97706":"#dc2626";
+  const colLat=(v)=>v===null?"var(--txt3)":v<600?"#16a34a":v<1500?"#d97706":"#dc2626";   /* v10.234 : vert jusqu'à 0,6 s — 0,4 s était sévère pour un téléphone en 4G/5G */
+  const colTrt=(v)=>v===null?"var(--txt3)":v<150?"#16a34a":v<500?"#d97706":"#dc2626";
+  const duo=(a,b2)=>a===null?"—":ms(a)+" / "+ms(b2);
   const lg=(l,v,c)=><div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:11.5,padding:"2px 0",borderBottom:"1px solid var(--border2)"}}><span style={{color:"var(--txt2)"}}>{l}</span><b style={{color:c||"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{v}</b></div>;
   const mx=b?Math.max(1,...b.bar):1;
   return <div data-trafic={on?"1":"0"} style={{...S.card,marginBottom:10}}>
@@ -8224,12 +8240,15 @@ function TraficTuile({onPing=null,netOff=false}){
       </div>
       {lg("Latence — dernière écriture",ms(b.latDer),colLat(b.latDer))}
       {lg("Latence — médiane ("+b.nLat+" dernière"+(b.nLat>1?"s":"")+")",ms(b.latMed),colLat(b.latMed))}
+      {lg("Appareil — lecture d'un message (médiane / pire)",duo(b.lireMed,b.lireMax),colTrt(b.lireMed))}
+      {lg("Appareil — jusqu'à l'écran redessiné (médiane / pire)",duo(b.affMed,b.affMax),colTrt(b.affMed))}
+      {lg("Poids du planning reçu à chaque message",docSize===null?"—":Math.round(docSize/1024)+" Ko ("+Math.min(100,Math.round(docSize/10485.76))+" % de la limite)",docSize===null?undefined:docSize<629000?undefined:docSize<891000?"#d97706":"#dc2626")}
       {lg("Messages reçus — 10 s / 1 min",b.r10+" / "+b.r60,b.r60>=40?"#dc2626":b.r60>=15?"#d97706":undefined)}
       {lg("Écritures envoyées — 10 s / 1 min",b.e10+" / "+b.e60,b.e60>=40?"#dc2626":b.e60>=15?"#d97706":undefined)}
       {lg("En attente d'accusé",String(b.vol),b.vol>=5?"#d97706":undefined)}
       {lg("Écritures refusées",String(b.ko),b.ko?"#dc2626":undefined)}
       {lg("Depuis l'ouverture ("+b.depuis+" min)",b.ecr+" envoyées · "+b.recu+" reçus")}
-      <div style={{fontSize:10,color:"var(--txt3)",marginTop:6,lineHeight:1.45}}>Repères : latence verte sous 0,4 s, orange jusqu'à 1,5 s, rouge au-delà. Sans écriture depuis l'ouverture, la latence est vide : « ⏱ Tester » en mesure une.</div>
+      <div style={{fontSize:10,color:"var(--txt3)",marginTop:6,lineHeight:1.45}}>Repères : latence verte sous 0,6 s, orange jusqu'à 1,5 s, rouge au-delà ; traitement par l'appareil vert sous 0,15 s, orange jusqu'à 0,5 s. Latence = réseau et serveur ; « Appareil » = ce téléphone ou cet ordinateur — si c'est lui qui est lent, alléger le planning (archivage) est le remède. Sans écriture depuis l'ouverture, la latence est vide : « ⏱ Tester » en mesure une.</div>
     </div>}
   </div>;
 }
@@ -9963,12 +9982,16 @@ function salleFiche(base,f,s){
   return q;
 }
 function videColOk(c){return typeof c==="string"&&/^#[0-9a-fA-F]{6}$/.test(c);}
+/* v10.234 : FILET des cases colorées. Deux cases colorées voisines se fondaient : la ligne qui les sépare (1 px, gris très
+   pâle) disparaissait dans la couleur (retour du 21/09/2026, capture CHL). Chaque case colorée — salle vide ou plage
+   fermée — porte un filet intérieur de 2 px à la couleur du fond des cases : entre deux voisines, 4 px de séparation nette. */
+const FILET={boxShadow:"inset 0 0 0 2px var(--bg2)"};
 function videFond(sv,salle,vide,night){
   if(!vide||!sv||!salle||!sv.noms||!sv.noms[salle])return null;
   const c=videColOk(sv.col)?sv.col:VIDE_COL_DEF;
-  return {background:night?c+"59":c};
+  return {background:night?c+"59":c,...FILET};
 }
-function fermFond(night){return {background:night?"#3a4150":"#cfd4dc"};}   /* un seul « background » : les cases voisines posent déjà ce raccourci, React refuse le mélange */
+function fermFond(night){return {background:night?"#3a4150":"#cfd4dc",...FILET};}   /* un seul « background » : les cases voisines posent déjà ce raccourci, React refuse le mélange */
 /* la ligne « 🚫 Plage fermée » des deux modales de salle (même composant : parité des deux modales) */
 function FermLigne({ferm}){
   if(!ferm||(!ferm.on&&!ferm.can))return null;
@@ -13054,7 +13077,7 @@ header::-webkit-scrollbar { display: none; }
     --bg-we: #fdf5e4 !important;    /* Weekend : crème léger */
     --bg-weh: #faefd0 !important;   /* Weekend header : crème */
     --bg-td: #edfaf3 !important;    /* Aujourd'hui : vert très léger */
-    --vac-fort: #b6c2d4 !important; /* v10.231 : teinte soutenue du Tour */
+    --vac-fort: #c9d3e1 !important; /* v10.231 : teinte soutenue du Tour ; v10.234 : éclaircie d'un cran */
     --vac-bg: #e2e8f0 !important;   /* v10.230 : vacances — sans cette ligne, le mode sombre imprimait la teinte foncée */
     --border: #cbd5e1 !important;
     --border2: #e2e8f0 !important;
@@ -14244,7 +14267,7 @@ header::-webkit-scrollbar { display: none; }
                 <button onClick={bacEntrer} style={{width:"100%",padding:"9px",borderRadius:8,border:"1.5px solid #c2410c",background:"rgba(194,65,12,.10)",color:"#c2410c",fontWeight:800,cursor:"pointer",fontSize:13}}>🧪 Entrer dans le bac à sable</button>
               </div>}
           </div>}
-          <TraficTuile netOff={netOff} onPing={()=>{if(PLANNING_DOC&&setDoc)Promise.resolve(setDoc(PLANNING_DOC,{_ping:Date.now()},{merge:true})).catch(()=>{});}}/>
+          <TraficTuile docSize={docSize} netOff={netOff} onPing={()=>{if(PLANNING_DOC&&setDoc)Promise.resolve(setDoc(PLANNING_DOC,{_ping:Date.now()},{merge:true})).catch(()=>{});}}/>
           <div style={{...S.card,marginBottom:10}}>{/* v10.137 : Sauvegarde & archivage, carte à part */}
             <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
