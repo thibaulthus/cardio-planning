@@ -87,7 +87,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.231 — 21/09/2026";
+const APP_VERSION="v10.232 — 21/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1286,7 +1286,7 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     </div>
   );
 }
-function SiteView({isVac=null,salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
@@ -1408,8 +1408,8 @@ function SiteView({isVac=null,salleFerm=null,onCellHistory=null,issMap={},printW
     const noteTips=occ.map(x=>x.med).concat(_nInt).map(med=>{const n=notes[nk(med.id,ry,rm,d,sl)];return n?(med.init+" : "+n):null;}).filter(Boolean).join("  |  ");
     const fz=!!salleFerm&&salleFermee(salle,ry,rm,d,sl,salleFerm);   /* v10.229 : plage fermée — case grisée */
     return(
-      <td key={`${salle}-${d}-${sl}`} data-ferm={fz?"1":undefined} title={(fz?"🚫 Plage fermée"+(grps.length?" — occupant(s) à déplacer":"")+(noteTips?"  |  ":""):"")+(noteTips||"")||undefined}
-        style={{...S.td,...(conflict?conflBg(darkMode):{}),...(isTdRC?{background:"var(--bg-td)"}:{}),...(fz?fermFond(darkMode):{}),padding:2,cursor:isEdit?"pointer":"default"}}
+      <td key={`${salle}-${d}-${sl}`} data-vide={!fz&&videFond(salleVide,salle,grps.length===0,darkMode)?"1":undefined} data-ferm={fz?"1":undefined} title={(fz?"🚫 Plage fermée"+(grps.length?" — occupant(s) à déplacer":"")+(noteTips?"  |  ":""):"")+(noteTips||"")||undefined}
+        style={{...S.td,...(conflict?conflBg(darkMode):{}),...(isTdRC?{background:"var(--bg-td)"}:{}),...(videFond(salleVide,salle,grps.length===0,darkMode)||{}),...(fz?fermFond(darkMode):{}),padding:2,cursor:isEdit?"pointer":"default"}}
         onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}onPickSite({salle,siteActes:salleActes,d,sl,y:ry,m:rm});}:undefined}>
         <div style={{display:"flex",flexDirection:"column"}}>
         {grps.map((g,gi)=>(
@@ -1502,7 +1502,7 @@ function SiteView({isVac=null,salleFerm=null,onCellHistory=null,issMap={},printW
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({isVac=null,salleFerm=null,onCellHistory=null,issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+function ActTabView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -1651,7 +1651,7 @@ function ActTabView({isVac=null,salleFerm=null,onCellHistory=null,issMap={},titl
     });
     const fz=!!salleFerm&&!!row.salle&&salleFermee(row.salle,ry,rm,d,sl,salleFerm);   /* v10.229 : colonne de SALLE fermée — case grisée */
     return(
-      <td key={`${row.label}-${d}-${sl}`} data-ferm={fz?"1":undefined} title={(fz?"🚫 Plage fermée"+(_grpsA.length?" — occupant(s) à déplacer":"")+(noteTips?"  |  ":""):"")+(noteTips||"")||undefined} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),...(fz?fermFond(darkMode):{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
+      <td key={`${row.label}-${d}-${sl}`} data-vide={!fz&&videFond(salleVide,row.salle,occ.length===0&&_grpsA.length===0,darkMode)?"1":undefined} data-ferm={fz?"1":undefined} title={(fz?"🚫 Plage fermée"+(_grpsA.length?" — occupant(s) à déplacer":"")+(noteTips?"  |  ":""):"")+(noteTips||"")||undefined} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),...(videFond(salleVide,row.salle,occ.length===0&&_grpsA.length===0,darkMode)||{}),...(fz?fermFond(darkMode):{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
         onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}onPickAct({row,d,sl,y:ry,m:rm});}:undefined}>
         <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"stretch"}}
           onClick={e=>{e.stopPropagation();if(_gvLpF){_gvLpF=false;return;}if(isEdit)onPickAct({row,d,sl,y:ry,m:rm});}}>
@@ -6241,6 +6241,8 @@ const HELP_SECTIONS=[
  )},
  {id:"fermees",icon:"🚫",title:"Plages fermées — fermer une salle sur une demi-journée",body:()=>HE("div",null,
   HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée")," dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
+  HT({children:"Colorer les salles vides (v10.232)"}),
+  HP({children:["À ne pas confondre avec une plage fermée : dans Paramètres → 🏥 Salles, cliquez le nom d'une salle et cochez ",HE("b",null,"🎨 Colorer la case quand la salle est vide"),". Dans CHL, CHB, PT Angio et PT Cardio, sa case prend alors la ",HE("b",null,"couleur des salles vides")," tant que personne n'y est posé — pratique pour voir d'un coup d'œil ce qui reste à pourvoir. La couleur est ",HE("b",null,"unique"),", réglée en tête de la carte 🏥 Salles ; les salles cochées y portent une petite pastille. Si la plage est fermée, ",HE("b",null,"le gris gagne"),"."]}),
   HT({children:"Fermer ou rouvrir un jour précis"}),
   HP({children:["Cliquez la case de la salle : en tête de la fenêtre, la ligne ",HE("b",null,"🚫 Plage fermée")," se coche pour fermer, se décoche pour rouvrir — ce jour-là seulement. Réservé aux ",HE("b",null,"éditeurs, cadres et médecins intermédiaires")," ; pour les autres, une plage fermée ne s'ouvre pas, un message le dit."]}),
   HT({children:"Fermer chaque semaine — la grille de la salle"}),
@@ -9870,6 +9872,27 @@ function fermRefuse(prev,entry,y,m,d,sl){var l=entry?(Array.isArray(entry)?entry
     if(av.some(function(x){return x&&x.salle===e.salle&&!x.cond;}))continue;return e.salle;}return null;}
 /* le planning type n'envoie personne dans une plage fermée : la case est sautée (sa décision du 21/09) */
 function ptFerme(y,m,d,sl,s1,s2,s3){return [s1,s2,s3].some(function(s){return !!s&&salleFermee(s,y,m,d,sl);});}
+/* v10.232 : SALLE VIDE COLORÉE. Une coche par salle (salleReg[].vide), UNE SEULE couleur pour toutes (salleVideCol).
+   sv = {col:"#rrggbb", noms:{salle:1}}. La couleur ne vaut que pour une case VIDE (ni médecin ni interne) d'une colonne de
+   salle ; dès qu'un occupant arrive la case redevient ordinaire. PRIORITÉ : le gris d'une plage fermée GAGNE (il est posé
+   après dans le style de la case) — une salle fermée ne doit pas ressembler à une salle libre à pourvoir. En mode sombre la
+   couleur est atténuée (transparence) pour ne pas éblouir. */
+const VIDE_COL_DEF="#fde68a";
+/* la fiche d'une salle → son entrée du registre. v10.232 : un SEUL assembleur pour créer, renommer, modifier — le LIEU
+   (mData.site, boutons Lens / Béthune) n'était recopié par aucune des trois branches : le choix n'était jamais enregistré. */
+function salleFiche(base,f,s){
+  const q={...base,s};
+  if(f.site==="CHL"||f.site==="CHB")q.site=f.site;
+  if(f.offOuv!==undefined)q.offOuv=!!f.offOuv;
+  if(f.vide)q.vide=true;else delete q.vide;
+  return q;
+}
+function videColOk(c){return typeof c==="string"&&/^#[0-9a-fA-F]{6}$/.test(c);}
+function videFond(sv,salle,vide,night){
+  if(!vide||!sv||!salle||!sv.noms||!sv.noms[salle])return null;
+  const c=videColOk(sv.col)?sv.col:VIDE_COL_DEF;
+  return {background:night?c+"59":c};
+}
 function fermFond(night){return {background:night?"#3a4150":"#cfd4dc"};}   /* un seul « background » : les cases voisines posent déjà ce raccourci, React refuse le mélange */
 /* la ligne « 🚫 Plage fermée » des deux modales de salle (même composant : parité des deux modales) */
 function FermLigne({ferm}){
@@ -10076,6 +10099,7 @@ function CardioPlanning(){
   const [netOff,setNetOff]=useState(()=>typeof navigator!=="undefined"&&navigator.onLine===false);
   const [stale,setStale]=useState(false);   /* v10.135 : cette copie est dépassée par le serveur */
   const [salleFerm,setSalleFerm]=useState({type:{},jours:{}});   /* v10.229 : plages fermées */
+  const [salleVideCol,setSalleVideCol]=useState(VIDE_COL_DEF);   /* v10.232 : LA couleur des salles vides (une seule) */
   FERM.d=salleFerm;
   const [gel,setGel]=useState(null);   /* v10.229 : {by,at} tant que le planning est gelé par un éditeur */
   const gelOn=!!(gel&&gel.at)&&!BAC;
@@ -10570,6 +10594,7 @@ function CardioPlanning(){
             if(Object.keys(resend).length){Object.keys(resend).forEach(k=>{delete fieldSync.current[k];});setTimeout(()=>saveToFirebase(resend),400);}
             if(data.tourMed){tourPrevRef.current=JSON.stringify(JSON.parse(data.tourMed));setTourMed(JSON.parse(data.tourMed));}else if(tourPrevRef.current===undefined)tourPrevRef.current="{}";   /* v10.209 : dernière valeur connue, pour le journal du tour */
             if(data.notes)setNotes(JSON.parse(data.notes));
+            if(videColOk(data.salleVideCol))setSalleVideCol(data.salleVideCol);   /* v10.232 */
             if(data.salleFerm){try{const f=JSON.parse(data.salleFerm)||{};const nf={type:f.type||{},jours:f.jours||{}};FERM.d=nf;setSalleFerm(nf);}catch(e){}}   /* v10.229 */
             /* ── médecins : version découpée si elle existe, sinon migration ── */
             if(data.medecinsV2){setMedecins(readList("medecinsV2",data.medecinsV2,data.medecinsV2Order));}
@@ -11140,6 +11165,8 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astReport:astReport||""});},[astReport]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleReg:JSON.stringify(salleReg)});},[salleReg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleFerm:JSON.stringify(salleFerm)});},[salleFerm]);   /* v10.229 */
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleVideCol});},[salleVideCol]);   /* v10.232 */
+  const salleVide=useMemo(()=>{const noms={};(salleReg||[]).forEach(x=>{if(x&&x.vide)noms[x.n]=1;});return {col:salleVideCol,noms};},[salleReg,salleVideCol]);
   // Consultation des archives : charge le DOCUMENT DE PÉRIODE de la période affichée
   // (v10.110 : un doc par période — une seule lecture au lieu de cinq, débordement compris).
   useEffect(()=>{
@@ -13198,12 +13225,12 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onPushDemande={(l)=>annPrevenir(l,true,true)} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
+      {tab==="chl"&&<SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" salleFerm={salleFerm} intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
+        <SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" salleFerm={salleFerm} intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;
           const bip=actes.find(a=>a.id==="BIP");
           /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
@@ -13213,13 +13240,13 @@ header::-webkit-scrollbar { display: none; }
           const full=bip&&(bip.salles||[]).includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
           setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
-      {tab==="plateau"&&<ActTabView isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" salleFerm={salleFerm} intCfg={intCfgAff}
+      {tab==="plateau"&&<ActTabView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" salleFerm={salleFerm} intCfg={intCfgAff}
         rows={ptRows} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["PT"]||null} onHide={(cols)=>{setHideModal({site:"PT",cols});setModal("colHide");}} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(row&&row.salle,y,m,d,sl))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
 
-      {tab==="angio"&&<SiteView isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
         onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
@@ -14084,6 +14111,11 @@ header::-webkit-scrollbar { display: none; }
 
           <div style={{...S.card,marginBottom:10}}>{/* v10.137 : Salles, carte à part */}
               <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🏥 Salles</div>
+              <div data-videcol="1" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:8,fontSize:11.5,color:"var(--txt2)"}}>
+                <span>🎨 Couleur des salles vides</span>
+                <input type="color" value={videColOk(salleVideCol)?salleVideCol:VIDE_COL_DEF} onChange={e=>{if(videColOk(e.target.value))setSalleVideCol(e.target.value);}} style={{width:38,height:24,padding:0,border:"1px solid var(--border)",borderRadius:5,background:"none",cursor:"pointer"}}/>
+                <span style={{fontSize:10,color:"var(--txt3)"}}>une seule couleur, pour toutes les salles cochées « colorer quand vide » ({salleReg.filter(x=>x.vide).length}) — cliquez le nom d'une salle pour la cocher</span>
+              </div>
               {["CHL","CHB","ANGIO","PLATEAU"].map(site2=>{
                 const list=salleReg.filter(s=>Array.isArray(s.s)?s.s.indexOf(site2)>=0:s.s===site2);
                 const lbl={CHL:"CHL",CHB:"CHB",ANGIO:"PT Angio",PLATEAU:"PT Cardio"}[site2];
@@ -14093,6 +14125,7 @@ header::-webkit-scrollbar { display: none; }
                     {list.map(s=>(
                       <span key={s.n} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,padding:"3px 7px",borderRadius:12,border:salleEdit===s.n?"1.5px solid #388bfd":"1px solid var(--border)",background:"var(--bg)",color:"var(--txt)"}}>
                         <span onClick={()=>{setMData({...s,_origN:s.n});setModal("salleCfg");}} style={{cursor:"pointer",textDecoration:"underline dotted",padding:"2px 2px"}}>{s.n}</span>
+                        {s.vide&&<span data-videpastille="1" title="Case colorée quand la salle est vide" style={{width:10,height:10,borderRadius:3,background:videColOk(salleVideCol)?salleVideCol:VIDE_COL_DEF,border:"1px solid var(--border)",display:"inline-block"}}/>}
                         {fermNbType(salleFerm,s.n)>0&&<span data-fermpastille="1" title={fermNbType(salleFerm,s.n)+" demi-journée(s) fermée(s) chaque semaine — cliquez le nom de la salle, puis 🚫 Plages fermées"} style={{fontSize:10}}>🚫{fermNbType(salleFerm,s.n)}</span>}
                         <button onClick={()=>{
                             if(!window.confirm("Supprimer la salle "+s.n+" du registre ?\n(Elle sera aussi retirée des activités ; les cases déjà posées gardent leur salle.)"))return;
@@ -15519,6 +15552,8 @@ header::-webkit-scrollbar { display: none; }
                     })} style={{width:13,height:13}}/>{l2}</label>;
                 })}
               </div>
+              {/* v10.232 : une activité à salle UNIQUE n'a pas de colonne à son nom dans PT Cardio — elle vit dans la colonne de sa salle */}
+              {(mData.recapSites||[]).includes("PLATEAU")&&mData.hasSalle&&(mData.salles||[]).length===1&&<div data-ptunique="1" style={{fontSize:10,color:"var(--txt3)",marginTop:4,lineHeight:1.4}}>ℹ️ Dans PT Cardio, cette activité n'a qu'une salle : elle s'affiche dans la colonne <b>{mData.salles[0]}</b>, pas dans une colonne à son nom.</div>}
             </div>
             {mData.hasSalle&&<div style={{gridColumn:"1/-1"}}><label style={S.fl}>Salles</label>
               {(()=>{
@@ -15617,6 +15652,16 @@ header::-webkit-scrollbar { display: none; }
                 Une consultation peut s'ouvrir dans cette salle sur une demi-journée off (onglet Reports). Les activités proposées en découlent : celles de cette salle, rien d'autre.
               </div>
             </div>
+            {/* v10.232 : case colorée quand la salle est vide */}
+            <label style={{...S.fl,marginTop:10,display:"block"}}>Affichage dans les plannings de salles</label>
+            <div data-videligne={mData.vide?"1":"0"} onClick={()=>setMData(pp=>({...pp,vide:!pp.vide}))}
+              style={{display:"flex",gap:9,alignItems:"flex-start",cursor:"pointer",border:"1.5px dashed #b45309",background:"rgba(245,158,11,.06)",borderRadius:9,padding:"8px 11px",marginTop:2}}>
+              <input type="checkbox" readOnly checked={!!mData.vide} style={{width:16,height:16,accentColor:"#b45309",marginTop:1,pointerEvents:"none"}}/>
+              <div style={{fontSize:11.5,lineHeight:1.45,color:"var(--txt2)"}}>
+                <b style={{color:"var(--txt)"}}>🎨 Colorer la case quand la salle est vide</b> <span style={{display:"inline-block",width:12,height:12,borderRadius:3,verticalAlign:"middle",background:videColOk(salleVideCol)?salleVideCol:VIDE_COL_DEF,border:"1px solid var(--border)"}}/><br/>
+                Dans CHL, CHB, PT Angio et PT Cardio, la case de cette salle prend la couleur des salles vides tant que personne n'y est posé. La couleur est commune à toutes les salles (carte 🏥 Salles). Une plage fermée reste grise : le gris gagne.
+              </div>
+            </div>
             <div style={{marginTop:12}}>
               <label style={S.fl}>Activités possibles dans cette salle</label>
               {[["CHL","CHL"],["CHB","CHB"],["tous","Communes aux deux sites"]].map(([sv,sl2])=>{
@@ -15670,18 +15715,18 @@ header::-webkit-scrollbar { display: none; }
                   if(sArr.length===0)return toast("Choisissez au moins un onglet","warn");
                   if(mData._new){
                     if(salleReg.some(x=>x.n===nm))return toast("Cette salle existe déjà","warn");
-                    setSalleReg(p=>[...p,{n:nm,s:sArr.length===1?sArr[0]:sArr,...(mData.offOuv!==undefined?{offOuv:!!mData.offOuv}:{})}]);
+                    setSalleReg(p=>[...p,salleFiche({n:nm},mData,sArr.length===1?sArr[0]:sArr)]);
                     if((mData._acts||[]).length>0)setActes(p=>p.map(a=>(mData._acts.includes(a.id)&&!(a.salles||[]).includes(nm))?{...a,salles:(a.salles||[]).concat([nm])}:a));
                     toast("Salle créée : "+nm,"info");
                   }else if(nm!==mData._origN){
                     if(salleReg.some(x=>x.n===nm))return toast("Ce nom existe déjà","warn");
-                    setSalleReg(p=>p.map(x=>x.n===mData._origN?{...x,n:nm,s:mData.s,...(mData.offOuv!==undefined?{offOuv:!!mData.offOuv}:{})}:x));
+                    setSalleReg(p=>p.map(x=>x.n===mData._origN?salleFiche({...x,n:nm},mData,mData.s):x));
                     setActes(p=>p.map(a=>({...a,salles:(a.salles||[]).map(s2=>s2===mData._origN?nm:s2)})));
                     setSalleFerm(F=>fermRenomme(F,mData._origN,nm));   /* v10.229 : les plages fermées suivent le nouveau nom */
                     setPlan(p=>{const n2={};Object.keys(p).forEach(k=>{const dm={};Object.keys(p[k]).forEach(mid=>{const e=p[k][mid];const fx=(o)=>o&&o.salle===mData._origN?{...o,salle:nm}:o;dm[mid]=Array.isArray(e)?e.map(fx):fx(e);});n2[k]=dm;});return n2;});
                     toast("Salle renommée partout : "+mData._origN+" \u2192 "+nm,"info");
                   }else{
-                    setSalleReg(p=>p.map(x=>x.n===mData._origN?{...x,s:mData.s,...(mData.offOuv!==undefined?{offOuv:!!mData.offOuv}:{})}:x));
+                    setSalleReg(p=>p.map(x=>x.n===mData._origN?salleFiche(x,mData,mData.s):x));
                   }
                   setModal(null);
                 }} style={{flex:1,padding:"9px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontWeight:800,cursor:"pointer",fontSize:13}}>{mData._new?"Créer":"Enregistrer"}</button>
