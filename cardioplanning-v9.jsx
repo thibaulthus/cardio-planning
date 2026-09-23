@@ -119,7 +119,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.235 — 21/09/2026";
+const APP_VERSION="v10.236 — 22/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6260,6 +6260,8 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période. Une exception voulue : le décompte des binômes de tour. Au moment de l'archivage, les semaines de tour de la période sont recopiées dans une petite ardoise permanente qui, elle, ne part jamais avec une période — sans quoi le tableau 🤝 repartirait de zéro à chaque archivage. Elle se purge d'elle-même au-delà de deux ans."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
+  HT({children:"Vérifier qu'une modification n'a pas été faite « toute seule » (v10.236)"}),
+  HP({children:["Dans ",HBtn({kind:"ghost",children:"👁 Aperçu"})," d'une sauvegarde, choisissez avec quoi la comparer — le planning actuel, ou une ",HE("b",null,"autre sauvegarde"),", pour dater un changement — puis ",HBtn({kind:"ghost",children:"Voir les différences case par case"}),". Chaque case qui diffère est listée (jour, demi-journée, médecin, avant → après) avec ",HE("b",null,"qui l'a modifiée et quand"),", d'après le journal des cases. Les différences ",HE("b",null,"sans trace")," sont mises en tête, en rouge : ce sont soit des opérations de masse (construction, planning type, import, restauration, archivage), soit des changements sans auteur — ceux qu'on cherche. Rien n'est appliqué : c'est une lecture."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait. Depuis la v10.128, les journées verrouillées de la plage choisie sont sautées, comme pour toute opération de période — le bilan les compte à part (🔒), et le message final les rappelle."]}),
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les périodes passées si elle monte."]}),
@@ -8250,6 +8252,69 @@ function TraficTuile({onPing=null,netOff=false,docSize=null}){
       {lg("Depuis l'ouverture ("+b.depuis+" min)",b.ecr+" envoyées · "+b.recu+" reçus")}
       <div style={{fontSize:10,color:"var(--txt3)",marginTop:6,lineHeight:1.45}}>Repères : latence verte sous 0,6 s, orange jusqu'à 1,5 s, rouge au-delà ; traitement par l'appareil vert sous 0,15 s, orange jusqu'à 0,5 s. Latence = réseau et serveur ; « Appareil » = ce téléphone ou cet ordinateur — si c'est lui qui est lent, alléger le planning (archivage) est le remède. Sans écriture depuis l'ouverture, la latence est vide : « ⏱ Tester » en mesure une.</div>
     </div>}
+  </div>;
+}
+/* v10.236 : COMPARATEUR DE SAUVEGARDES, en lecture seule. Demande du 22/09/2026 : « voir les plannings enregistrés sans les
+   appliquer, pour vérifier que des modifications ne se font pas toutes seules ». L'aperçu ne donnait que des TOTAUX.
+   diffPlans liste chaque case qui diffère entre deux états (sauvegarde ↔ actuel, ou sauvegarde ↔ sauvegarde) ;
+   expliqueDiffs rapproche chaque différence du JOURNAL des cases (auteur, heure) sur la fenêtre de temps entre les deux
+   états. Une différence SANS ligne de journal est soit une opération de masse non journalisée (construction d'une période,
+   planning type, import, restauration, archivage), soit — c'est ce qu'on cherche — une modification sans auteur. */
+function diffPlans(aPlan,bPlan){
+  const out=[];const A=aPlan||{},B=bPlan||{};
+  const allK=Object.keys(A).concat(Object.keys(B)).filter((v,i,arr)=>arr.indexOf(v)===i);
+  allK.forEach(k=>{const a=A[k]||{},b=B[k]||{};
+    const mids=Object.keys(a).concat(Object.keys(b)).filter((v,i,arr)=>arr.indexOf(v)===i);
+    mids.forEach(mid=>{const ja=JSON.stringify(a[mid]||null),jb=JSON.stringify(b[mid]||null);if(ja===jb)return;
+      out.push({k,mid:String(mid),avant:a[mid]||null,apres:b[mid]||null,type:!a[mid]?"ajout":!b[mid]?"retrait":"changement"});});});
+  out.sort((x,y)=>x.k<y.k?-1:x.k>y.k?1:(x.mid<y.mid?-1:x.mid>y.mid?1:0));
+  return out;
+}
+function expliqueDiffs(diffs,journal,tA,tB){
+  const J=Object.values(journal||{}).filter(e=>e&&e.k&&e.t>tA&&e.t<=tB);
+  const par={};J.forEach(e=>{const key=e.k+"§"+String(e.md);(par[key]=par[key]||[]).push(e);});
+  return diffs.map(d=>{const l=(par[d.k+"§"+d.mid]||[]).slice().sort((x,y)=>(x.t||0)-(y.t||0));return {...d,traces:l,sansTrace:l.length===0};});
+}
+function libEntree(e,actes){
+  if(!e)return "—";if(Array.isArray(e))return e.map(x=>libEntree(x,actes)).join(" + ");
+  if(e.cond&&Array.isArray(e.cond))return "("+e.cond.map(x=>libEntree(x,actes)).join(" ou ")+")";
+  const a=(actes||[]).find(x=>x.id===e.acteId);const nom=a?(a.short||a.label):(e.acteId||"?");
+  return nom+(e.salle?" · "+e.salle:"");
+}
+function DiffPanel({res,meds,actes,tA,tB,libA,libB}){
+  const [filtre,setFiltre]=useState("");const [voirTout,setVoirTout]=useState(false);
+  const mn=id=>{const m=(meds||[]).find(x=>String(x.id)===String(id));return m?m.init:"#"+id;};
+  const f=filtre.trim().toLowerCase();
+  const liste=res.filter(d=>!f||mn(d.mid).toLowerCase().indexOf(f)>=0||d.k.indexOf(f)>=0||libEntree(d.avant,actes).toLowerCase().indexOf(f)>=0||libEntree(d.apres,actes).toLowerCase().indexOf(f)>=0);
+  const sans=liste.filter(d=>d.sansTrace),avec=liste.filter(d=>!d.sansTrace);
+  const fd=t=>{const d=new Date(t);return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
+  const jour=k=>{const [dd,sl]=k.split("|");const q=dd.split("-");return q[2]+"/"+q[1]+" "+(SLOTL[sl]||sl);};
+  const Ligne=({d})=><div data-diff={d.sansTrace?"sans":"avec"} style={{padding:"5px 0",borderBottom:"1px solid var(--border2)",fontSize:11.5,lineHeight:1.45}}>
+    <div style={{display:"flex",gap:8,alignItems:"baseline",flexWrap:"wrap"}}>
+      <span style={{fontFamily:"'JetBrains Mono',monospace",color:"var(--txt3)",minWidth:92}}>{jour(d.k)}</span>
+      <b style={{minWidth:36}}>{mn(d.mid)}</b>
+      <span style={{color:d.type==="ajout"?"#16a34a":d.type==="retrait"?"#dc2626":"#d97706",fontWeight:800}}>{d.type==="ajout"?"+ ajouté":d.type==="retrait"?"− retiré":"≠ modifié"}</span>
+      <span style={{color:"var(--txt2)"}}>{libEntree(d.avant,actes)} <span style={{color:"var(--txt3)"}}>→</span> {libEntree(d.apres,actes)}</span>
+    </div>
+    <div style={{fontSize:10.5,color:d.sansTrace?"#dc2626":"var(--txt3)",paddingLeft:8}}>
+      {d.sansTrace?"aucune trace dans le journal sur cette fenêtre":d.traces.map((e,i)=><span key={i} style={{marginRight:10}}>{fd(e.t)} · {e.x==="add"?"posé":"retiré"} par <b>{e.a||"?"}</b></span>)}
+    </div>
+  </div>;
+  const CAP=300;
+  return <div data-diffpanel="1" style={{marginTop:10,borderTop:"1px solid var(--border)",paddingTop:10}}>
+    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6,lineHeight:1.45}}>Différences case par case entre <b style={{color:"#388bfd"}}>{libA}</b> et <b style={{color:"var(--txt)"}}>{libB}</b> : {res.length} au total, dont <b style={{color:res.some(d=>d.sansTrace)?"#dc2626":"#16a34a"}}>{res.filter(d=>d.sansTrace).length} sans trace</b> dans le journal.</div>
+    <input value={filtre} onChange={e=>setFiltre(e.target.value)} placeholder="Filtrer : initiales, date (2026-10-16), activité…" style={{...S.inp,fontSize:11.5,marginBottom:8}}/>
+    {res.length===0&&<div data-diffvide="1" style={{fontSize:12,fontWeight:700,color:"#16a34a"}}>✓ Aucune différence : les deux états sont identiques, case par case.</div>}
+    {sans.length>0&&<div style={{marginBottom:10}}>
+      <div style={{fontSize:11,fontWeight:800,color:"#dc2626",marginBottom:2}}>⚠️ Sans trace dans le journal ({sans.length})</div>
+      {(voirTout?sans:sans.slice(0,CAP)).map((d,i)=><Ligne key={"s"+i} d={d}/>)}
+    </div>}
+    {avec.length>0&&<div>
+      <div style={{fontSize:11,fontWeight:800,color:"var(--txt2)",marginBottom:2}}>Avec auteur ({avec.length})</div>
+      {(voirTout?avec:avec.slice(0,Math.max(0,CAP-sans.length))).map((d,i)=><Ligne key={"a"+i} d={d}/>)}
+    </div>}
+    {!voirTout&&liste.length>CAP&&<button onClick={()=>setVoirTout(true)} style={{marginTop:6,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer"}}>Tout afficher ({liste.length})</button>}
+    <div style={{fontSize:10,color:"var(--txt3)",marginTop:8,lineHeight:1.45}}>Le journal ne couvre que les modifications faites case par case et les gardes. Une différence « sans trace » peut donc aussi venir d'une opération de masse (construction d'une période, planning type, import de gardes, restauration, archivage). Rien n'est modifié ici : cet écran ne fait que lire.</div>
   </div>;
 }
 function SetQuick({items,replies,onTout}){
@@ -10816,6 +10881,19 @@ function CardioPlanning(){
     }catch(e){console.log("backup:",e);if(manual)toast("Échec de la sauvegarde","warn");return false;}
   },[refreshBackupList]);
   const [bkPreview,setBkPreview]=useState(null); // {ts, stats}
+  /* v10.236 : le comparateur — contre = "actuel" ou l'id d'une autre sauvegarde ; UNE lecture du journal, UNE de l'autre sauvegarde */
+  const comparerSauvegarde=useCallback(async(pv,contre)=>{
+    setBkPreview(q=>q?{...q,contre,diff:"chargement"}:q);
+    try{
+      let autrePlan=planRef.current||{},tB=Date.now(),libB="le planning actuel";
+      if(contre!=="actuel"){const d=(await window.firebaseDB.collection("backups").doc(contre).get()).data()||{};autrePlan=d.planV2?d.planV2:(d.plan?JSON.parse(d.plan):{});tB=d._ts||0;libB="la sauvegarde du "+new Date(tB).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});}
+      const jd=await window.firebaseDB.collection("planning").doc(JOURNAL_ID).get();
+      const journal=(jd.data()||{}).entries||{};
+      const [tA,tZ]=pv.ts<=tB?[pv.ts,tB]:[tB,pv.ts];
+      const res=expliqueDiffs(diffPlans(pv.bPlan,autrePlan),journal,tA,tZ);
+      setBkPreview(q=>q?{...q,contre,diff:{res,tA,tB:tZ,libB}}:q);
+    }catch(e){toast("Impossible de comparer","warn");setBkPreview(q=>q?{...q,diff:null}:q);}
+  },[]);
   const statsOf=(planObj,tourObj,medsArr)=>{
     let nEntries=0,nGardes=0;const byMonth={};
     Object.keys(planObj||{}).forEach(k=>{
@@ -10859,7 +10937,7 @@ function CardioPlanning(){
           else changed++;
         });
       });
-      setBkPreview({id,ts,b:sB,c:sC,added,removed,changed});
+      setBkPreview({id,ts,b:sB,c:sC,added,removed,changed,bPlan,diff:null,contre:"actuel"});   /* v10.236 : bPlan pour le comparateur */
     }catch(e){toast("Impossible de charger l'aperçu","warn");}
   },[plan,tourMed,medecins]);
   const [docSize,setDocSize]=useState(null);
@@ -14612,7 +14690,7 @@ header::-webkit-scrollbar { display: none; }
         );
         return(
         <Ov onClose={()=>setBkPreview(null)}>
-          <div style={{...S.modal,maxWidth:520,maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{...S.modal,maxWidth:bkPreview.diff&&bkPreview.diff!=="chargement"?760:520,maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={S.mTit2}>👁 Aperçu — sauvegarde du {new Date(ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
               <button onClick={()=>setBkPreview(null)} style={S.xBtn}>×</button>
@@ -14639,7 +14717,18 @@ header::-webkit-scrollbar { display: none; }
                 ))}
               </tbody>
             </table>
-            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            {/* v10.236 : comparateur case par case, lecture seule */}
+            <div data-cmp="1" style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:8,fontSize:11.5}}>
+              <span style={{color:"var(--txt2)"}}>🔍 Comparer avec</span>
+              <select value={bkPreview.contre||"actuel"} onChange={e=>comparerSauvegarde(bkPreview,e.target.value)} style={{...S.inp,width:"auto",fontSize:11.5,padding:"3px 6px"}}>
+                <option value="actuel">le planning actuel</option>
+                {backupList.filter(b=>b.id!==bkPreview.id).map(b=><option key={b.id} value={b.id}>{"la sauvegarde du "+new Date(b.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</option>)}
+              </select>
+              {!bkPreview.diff&&<button data-cmpbtn="1" onClick={()=>comparerSauvegarde(bkPreview,bkPreview.contre||"actuel")} style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid #388bfd",background:"var(--bg2)",color:"#388bfd",fontWeight:700,cursor:"pointer"}}>Voir les différences case par case</button>}
+              {bkPreview.diff==="chargement"&&<span style={{color:"var(--txt3)"}}>Comparaison…</span>}
+            </div>
+            {bkPreview.diff&&bkPreview.diff!=="chargement"&&<DiffPanel res={bkPreview.diff.res} meds={medecins} actes={actes} tA={bkPreview.diff.tA} tB={bkPreview.diff.tB} libA={"la sauvegarde du "+new Date(ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})} libB={bkPreview.diff.libB}/>}
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}>
               <button onClick={()=>setBkPreview(null)} style={{padding:"9px 16px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,fontSize:13,cursor:"pointer"}}>Fermer</button>
               <button style={{...S.btnP,padding:"9px 18px",background:"#dc2626"}}
                 onClick={()=>{if(window.confirm("Restaurer la sauvegarde du "+new Date(ts).toLocaleString("fr-FR")+" ?\nLes données actuelles seront remplacées.")&&window.confirm("Confirmer définitivement la restauration ?")){restoreBackup(bkPreview.id);setBkPreview(null);}}}>
