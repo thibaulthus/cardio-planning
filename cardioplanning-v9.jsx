@@ -119,7 +119,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.236 — 22/09/2026";
+const APP_VERSION="v10.237 — 23/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6260,6 +6260,8 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période. Une exception voulue : le décompte des binômes de tour. Au moment de l'archivage, les semaines de tour de la période sont recopiées dans une petite ardoise permanente qui, elle, ne part jamais avec une période — sans quoi le tableau 🤝 repartirait de zéro à chaque archivage. Elle se purge d'elle-même au-delà de deux ans."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
+  HT({children:"Feuilleter une sauvegarde comme un planning (v10.237)"}),
+  HP({children:["Depuis le ",HE("b",null,"🧪 bac à sable"),", le bouton ",HBtn({kind:"ghost",children:"📥 Charger dans le bac"})," (carte 💾, ou depuis l'aperçu) recopie une sauvegarde ",HE("b",null,"dans le bac uniquement"),". Vous la parcourez alors dans tous les onglets, l'imprimez, y faites des essais : le vrai planning n'est jamais touché. Le bandeau du bas rappelle quelle sauvegarde est chargée ; la remise à zéro du bac y remet une copie du vrai planning."]}),
   HT({children:"Vérifier qu'une modification n'a pas été faite « toute seule » (v10.236)"}),
   HP({children:["Dans ",HBtn({kind:"ghost",children:"👁 Aperçu"})," d'une sauvegarde, choisissez avec quoi la comparer — le planning actuel, ou une ",HE("b",null,"autre sauvegarde"),", pour dater un changement — puis ",HBtn({kind:"ghost",children:"Voir les différences case par case"}),". Chaque case qui diffère est listée (jour, demi-journée, médecin, avant → après) avec ",HE("b",null,"qui l'a modifiée et quand"),", d'après le journal des cases. Les différences ",HE("b",null,"sans trace")," sont mises en tête, en rouge : ce sont soit des opérations de masse (construction, planning type, import, restauration, archivage), soit des changements sans auteur — ceux qu'on cherche. Rien n'est appliqué : c'est une lecture."]}),
   HP({children:[HE("b",null,"Restaurer un seul médecin, sur quelques jours")," : depuis la modale d'une case, ",HBtn({kind:"ghost",children:"↩ Restaurer depuis une sauvegarde…"})," (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ",HE("b",null,"bilan")," — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait. Depuis la v10.128, les journées verrouillées de la plage choisie sont sautées, comme pour toute opération de période — le bilan les compte à part (🔒), et le message final les rappelle."]}),
@@ -10267,7 +10269,8 @@ function CardioPlanning(){
   const [netOff,setNetOff]=useState(()=>typeof navigator!=="undefined"&&navigator.onLine===false);
   const [stale,setStale]=useState(false);   /* v10.135 : cette copie est dépassée par le serveur */
   const [salleFerm,setSalleFerm]=useState({type:{},jours:{}});   /* v10.229 : plages fermées */
-  const [salleVideCol,setSalleVideCol]=useState(VIDE_COL_DEF);   /* v10.232 : LA couleur des salles vides (une seule) */
+  const [salleVideCol,setSalleVideCol]=useState(VIDE_COL_DEF);
+  const [bacDe,setBacDe]=useState(null);   /* v10.237 : {ts,at} — la sauvegarde chargée dans le bac, ou null */   /* v10.232 : LA couleur des salles vides (une seule) */
   FERM.d=salleFerm;
   const [gel,setGel]=useState(null);   /* v10.229 : {by,at} tant que le planning est gelé par un éditeur */
   const gelOn=!!(gel&&gel.at)&&!BAC;
@@ -10763,6 +10766,7 @@ function CardioPlanning(){
             if(data.tourMed){tourPrevRef.current=JSON.stringify(JSON.parse(data.tourMed));setTourMed(JSON.parse(data.tourMed));}else if(tourPrevRef.current===undefined)tourPrevRef.current="{}";   /* v10.209 : dernière valeur connue, pour le journal du tour */
             if(data.notes)setNotes(JSON.parse(data.notes));
             if(videColOk(data.salleVideCol))setSalleVideCol(data.salleVideCol);   /* v10.232 */
+            setBacDe(BAC&&data._bacDe&&data._bacDe.ts?data._bacDe:null);   /* v10.237 */
             if(data.salleFerm){try{const f=JSON.parse(data.salleFerm)||{};const nf={type:f.type||{},jours:f.jours||{}};FERM.d=nf;setSalleFerm(nf);}catch(e){}}   /* v10.229 */
             /* ── médecins : version découpée si elle existe, sinon migration ── */
             if(data.medecinsV2){setMedecins(readList("medecinsV2",data.medecinsV2,data.medecinsV2Order));}
@@ -11025,13 +11029,18 @@ function CardioPlanning(){
       return n;
     }catch(e){console.log("restore ciblee:",e);toast("Échec de la restauration","warn");return 0;}
   },[plan]);
+  /* v10.237 : dans le BAC À SABLE, « restaurer » devient « charger dans le bac » : la sauvegarde est recopiée dans le cahier
+     du bac (PLAN_ID = "bac"), jamais dans le vrai — on la feuillette alors comme un planning ordinaire. _bacDe garde la
+     date de la sauvegarde chargée pour le bandeau ; la remise à zéro du bac (copie du vrai) l'efface. */
   const restoreBackup=useCallback(async(id)=>{
-    if(BAC){toast("🧪 Bac à sable : pas de restauration ici","warn");return;}   /* v10.175 */
     try{
       const d=await window.firebaseDB.collection("backups").doc(id).get();
       const data=d.data();
       if(!data){toast("Sauvegarde introuvable","warn");return;}
       const{_ts,gel:_gelAncien,...rest}=data;   /* v10.229 : un gel enregistré DANS la sauvegarde ne revient jamais ; le gel EN COURS, lui, survit à la restauration */
+      if(BAC){delete rest._bacDe;rest._bacDe={ts:_ts||0,at:Date.now()};planPending.current={};planSynced.current=null;
+        await window.firebaseDB.collection("planning").doc(PLAN_ID).set(rest);
+        toast("📥 Sauvegarde du "+new Date(_ts||0).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+" chargée dans le bac — le vrai planning n'a pas bougé","info");return;}
       if(GEL.on&&GEL.raw)rest.gel=GEL.raw;
       planPending.current={};planSynced.current=null;
       await window.firebaseDB.collection("planning").doc(PLAN_ID).set(rest); // remplacement complet : une restauration EST l'état intégral
@@ -13241,7 +13250,7 @@ header::-webkit-scrollbar { display: none; }
       </div>}
 
       {BAC&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#c2410c",color:"#fff",textAlign:"center",fontSize:12,padding:"6px 8px",zIndex:520,fontWeight:700,display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"center",gap:8}}>{/* v10.175 : bandeau du bac à sable — remplace les bandeaux de profil, qu'il porte lui-même */}
-        <span>🧪 BAC À SABLE — rien ici n'est réel</span>
+        <span>🧪 BAC À SABLE — rien ici n'est réel{bacDe&&<span data-bacde="1"> · 📥 sauvegarde du {new Date(bacDe.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})} chargée</span>}</span>
         <label style={{display:"flex",alignItems:"center",gap:4,fontWeight:600}}>Connecté comme
           <select value={bacProfil} onChange={e=>bacConnecter(e.target.value)} style={{fontSize:12,padding:"2px 4px",borderRadius:6,border:"none",color:"#c2410c",fontWeight:700}}>
             <option value="edit">Éditeur</option>
@@ -14356,7 +14365,7 @@ header::-webkit-scrollbar { display: none; }
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
               Tout ce qui protège vos données, regroupé ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois.
             </div>
-            {BAC&&<div style={{fontSize:11,fontWeight:700,color:"#c2410c",marginBottom:10}}>🧪 Bac à sable : sauvegardes, restauration et archivage sont désactivés ici — les boutons répondent par un simple message.</div>}{/* v10.175 */}
+            {BAC&&<div style={{fontSize:11,fontWeight:700,color:"#c2410c",marginBottom:10}}>🧪 Bac à sable : créer une sauvegarde et archiver sont désactivés ici. En revanche, <span data-bacaide="1">📥 Charger dans le bac</span> copie une sauvegarde <b>dans le bac seulement</b> — pour la feuilleter dans tous les onglets comme un planning ordinaire, sans toucher au vrai. La remise à zéro du bac efface tout cela.</div>}{/* v10.175 */}
             {isEdit&&!BAC&&<div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid #0e7490",background:"rgba(14,116,144,.07)"}}>{/* v10.229 */}
               <div style={{fontSize:11,fontWeight:700,color:"#0e7490",marginBottom:4}}>🧊 Geler le planning avant une restauration</div>
               <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Met le planning en lecture seule pour tout le monde, éditeurs compris, sur tous les appareils, en quelques secondes. À faire avant de restaurer une sauvegarde : personne ne modifie rien entre-temps. Vous dégelez ici même, une fois le planning vérifié.</div>
@@ -14406,8 +14415,8 @@ header::-webkit-scrollbar { display: none; }
                       👁 Aperçu
                     </button>
                     <button style={{padding:"3px 10px",borderRadius:6,border:"1px solid #dc2626",background:"var(--bg2)",color:"#dc2626",fontSize:10,fontWeight:700,cursor:"pointer"}}
-                      onClick={()=>{if(window.confirm("Restaurer la sauvegarde du "+new Date(b.ts).toLocaleString("fr-FR")+" ?\nLes données actuelles seront remplacées.")&&window.confirm("Confirmer définitivement la restauration ?"))restoreBackup(b.id);}}>
-                      ↩ Restaurer
+                      onClick={()=>{if(BAC){if(window.confirm("Charger la sauvegarde du "+new Date(b.ts).toLocaleString("fr-FR")+" dans le bac à sable ?\nLe contenu du bac est remplacé ; le vrai planning n'est pas touché."))restoreBackup(b.id);return;}if(window.confirm("Restaurer la sauvegarde du "+new Date(b.ts).toLocaleString("fr-FR")+" ?\nLes données actuelles seront remplacées.")&&window.confirm("Confirmer définitivement la restauration ?"))restoreBackup(b.id);}}>
+                      {BAC?"📥 Charger dans le bac":"↩ Restaurer"}
                     </button>
                   </div>
                 ))}
@@ -14731,8 +14740,8 @@ header::-webkit-scrollbar { display: none; }
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}>
               <button onClick={()=>setBkPreview(null)} style={{padding:"9px 16px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,fontSize:13,cursor:"pointer"}}>Fermer</button>
               <button style={{...S.btnP,padding:"9px 18px",background:"#dc2626"}}
-                onClick={()=>{if(window.confirm("Restaurer la sauvegarde du "+new Date(ts).toLocaleString("fr-FR")+" ?\nLes données actuelles seront remplacées.")&&window.confirm("Confirmer définitivement la restauration ?")){restoreBackup(bkPreview.id);setBkPreview(null);}}}>
-                ↩ Restaurer cette sauvegarde
+                onClick={()=>{if(BAC){if(window.confirm("Charger la sauvegarde du "+new Date(ts).toLocaleString("fr-FR")+" dans le bac à sable ?\nLe contenu du bac est remplacé ; le vrai planning n'est pas touché.")){restoreBackup(bkPreview.id);setBkPreview(null);}return;}if(window.confirm("Restaurer la sauvegarde du "+new Date(ts).toLocaleString("fr-FR")+" ?\nLes données actuelles seront remplacées.")&&window.confirm("Confirmer définitivement la restauration ?")){restoreBackup(bkPreview.id);setBkPreview(null);}}}>
+                {BAC?"📥 Charger cette sauvegarde dans le bac":"↩ Restaurer cette sauvegarde"}
               </button>
             </div>
           </div>
