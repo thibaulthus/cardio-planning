@@ -124,7 +124,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.240 — 24/09/2026";
+const APP_VERSION="v10.241 — 24/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -3042,7 +3042,8 @@ function PickMedActModal({ferm=null,mData,setMData,medecins,actes,getEntries,isM
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
             {pickMeds.length===0&&<div style={{fontSize:11,color:"var(--txt3)",padding:"4px 2px"}}>Tous les médecins autorisés sont déjà assignés sur ce créneau.</div>}
             {pickMeds.map(med=>{
-              const avail=isMedAvailable(med,y2,m2,d,sl);
+              const offR=offJour(med,y2,m2,d);   /* v10.241 : parti ou désactivé ce jour-là → grisé, comme une absence */
+              const avail=offR?"blocked":isMedAvailable(med,y2,m2,d,sl);
               // v9.52 : la salle occupée est annoncée UNE fois dans le bandeau au-dessus.
               // La ligne du médecin ne dit plus que ce qui le concerne LUI, et nomme son activité.
               const busyLabs=uniqArr((sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"])
@@ -3053,7 +3054,7 @@ function PickMedActModal({ferm=null,mData,setMData,medecins,actes,getEntries,isM
               const bgCol=avail==="cond"?COND_BG:avail==="warning"?"rgba(245,158,11,.15)":"var(--bg2)";
               const cIds=avail==="cond"?condOn(getEntries,med.id,y2,m2,d,sl):[];
               const cLab=cIds.map(id=>{const ax=actes.find(x=>x.id===id);return ax?ax.short:id;}).join(" / ");
-              const statusTxt=avail==="blocked"?"Absent/repos":avail==="cond"?("◇ Choix ouvert — "+cLab+", non tranché"):avail==="warning"?("⚠ Déjà : "+(busyLabs.join(", ")||"une activité")):"Disponible";
+              const statusTxt=avail==="blocked"?(offR?"⏸ Indisponible — "+offLib(offR):"Absent/repos"):avail==="cond"?("◇ Choix ouvert — "+cLab+", non tranché"):avail==="warning"?("⚠ Déjà : "+(busyLabs.join(", ")||"une activité")):"Disponible";
               const statusCol=avail==="blocked"?"#ef4444":avail==="cond"?COND_C:avail==="warning"?"#f59e0b":"var(--txt3)";
               return(
                 <button key={med.id} disabled={avail==="blocked"}
@@ -3328,7 +3329,8 @@ function PickMedSiteModal({ferm=null,mData,medecins,actes,getEntries,isMedAvaila
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
             {pickMeds.length===0&&<div style={{fontSize:11,color:"var(--txt3)",padding:"4px 2px"}}>Tous les médecins autorisés sont déjà dans cette salle.</div>}
             {pickMeds.map(med=>{
-              const avail=isMedAvailable(med,y2,m2,d,sl);
+              const offR=offJour(med,y2,m2,d);   /* v10.241 : parti ou désactivé ce jour-là → grisé, comme une absence */
+              const avail=offR?"blocked":isMedAvailable(med,y2,m2,d,sl);
               const cIds=avail==="cond"?condOn(getEntries,med.id,y2,m2,d,sl):[];
               const cLab=cIds.map(id=>{const a=actes.find(x=>x.id===id);return a?a.short:id;}).join(" / ");
               /* v9.74 : même formulation que la modale de PT Cardio — dire LAQUELLE. */
@@ -3344,7 +3346,7 @@ function PickMedSiteModal({ferm=null,mData,medecins,actes,getEntries,isMedAvaila
                   <div style={{width:28,height:28,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{med.init}</div>
                   <div style={{textAlign:"left"}}>
                     <div style={{fontSize:12,fontWeight:700,color:"var(--txt)"}}>{med.prenom} {med.nom}</div>
-                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="cond"?COND_C:avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?"Absent/repos":avail==="cond"?("◇ Choix ouvert — "+cLab+", non tranché"):avail==="warning"?("⚠ Déjà : "+(busyLabs.join(", ")||"une activité")):"Disponible"}</div>
+                    <div style={{fontSize:9,color:avail==="blocked"?"#ef4444":avail==="cond"?COND_C:avail==="warning"?"#f59e0b":"var(--txt3)"}}>{avail==="blocked"?(offR?"⏸ Indisponible — "+offLib(offR):"Absent/repos"):avail==="cond"?("◇ Choix ouvert — "+cLab+", non tranché"):avail==="warning"?("⚠ Déjà : "+(busyLabs.join(", ")||"une activité")):"Disponible"}</div>
                   </div>
                 </button>
               );
@@ -6351,6 +6353,7 @@ const HELP_SECTIONS=[
   HT({children:"🚪 Quand quelqu'un quitte le service"}),
   HP({children:["Ne supprimez pas sa fiche : indiquez sa ",HE("b",null,"date de départ"),", dans la fiche (Équipe › ✏️ › « Parti le »). C'est une désactivation sans fin : à partir de cette date la personne sort du tour, des gardes, des salles, du planning type, des demandes de Construire et des rappels ; les stats la comptent jusqu'au départ. Son ",HE("b",null,"PIN n'ouvre plus l'application"),", et il peut être donné à un nouveau venu. Sa fiche passe dans le groupe replié « Anciens membres » en bas d'Équipe, d'où on peut la rouvrir — ou annuler le départ (v10.151)."]}),
   HP({children:["Tout son historique ",HE("b",null,"reste lisible"),", dans les périodes vivantes comme dans les archives. La corbeille 🗑️ refuse désormais de supprimer une fiche qui a des cases dans le planning : elle ne sert plus qu'aux fiches créées par erreur. Et chaque archive emporte une copie des fiches de l'équipe : même une fiche disparue y garde son nom et sa couleur."]}),
+  HP({children:[HE("b",null,"Dans les onglets salles")," (v10.241) : les fenêtres de CHL, CHB, PT Cardio et PT Angio — et les colonnes 👁 du Planning, qui les ouvrent — montrent la personne ",HE("b",null,"grisée, « ⏸ Indisponible — parti le … »")," sur ses dates, et ne permettent plus de la poser. Avant, un départ ou une désactivation en cours de période la laissait proposée."]}),
   HT({children:"⚠ Les limites à connaître"}),
   HP({children:["• ",HE("b",null,"Retirez ses activités avant de désactiver")," : la désactivation n'efface ",HE("b",null,"rien"),'. La fenêtre compte ce qui est posé sur les dates choisies et propose « 🧹 Retirer ses activités sur ces dates » (gardes, tour et absences comprises).']}),
   HP({children:["• L'",HE("b",null,"astreinte")," n'est pas couverte : gérez-la à part dans son onglet."]}),
@@ -8450,6 +8453,9 @@ function setScan(el){
 const medOffMan=(m)=>Array.isArray(m&&m.off)?m.off.filter(r=>r&&r.du&&r.au):[];
 const medOffL=(m)=>{let a=medOffMan(m);const b=djOffRanges(m);if(b.length)a=a.concat(b);if(m&&m.depart)a=a.concat([{du:m.depart,au:"9999-12-31",parti:true}]);return a;};   /* v10.151 : le départ est une désactivation sans fin */
 const offOn=(m,y2,m2,d2)=>{const k=dKey(y2,m2,d2);return medOffL(m).some(r=>r.du<=k&&k<=r.au);};
+/* v10.241 : la plage qui rend la personne indisponible ce jour-là (départ, désactivation, junior sans nom), ou null.
+   Les fenêtres des onglets salles l'ignoraient : un médecin parti le 01/01 y restait proposé après son départ. */
+const offJour=(m,y2,m2,d2)=>{const k=dKey(y2,m2,d2);return medOffL(m).find(r=>r.du<=k&&k<=r.au)||null;};
 /* état sur une liste de jours : null (actif), "part", ou "off" (tous couverts) */
 const offEtat=(m,jours)=>{
   const L=medOffL(m);if(!L.length||!jours||!jours.length)return null;
