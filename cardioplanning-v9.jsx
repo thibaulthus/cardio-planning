@@ -124,7 +124,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.238 — 23/09/2026";
+const APP_VERSION="v10.239 — 23/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -980,7 +980,8 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                   minWidth:CG,padding:"2px",verticalAlign:"middle",
                   cursor:isEdit?"pointer":"default",
                   background:we?"var(--bg-we)":gardeMed?"var(--garde-bg)":"var(--td-fix)"}}
-                  onClick={()=>{ if(!isEdit||gardeLocked)return; if(gardeSelf&&gardeOuvert&&!gardeOuvert(ey,em,d)){toast("Les gardes de cette période ne sont pas encore validées — les échanges s'ouvriront ensuite","warn");return;} setGardeSearch(""); setPickGardeDayFull({d,y:ey,m:em}); }}>
+                  {...histProps(onCellHistory,null,ey,em,d,"GARDE")}
+                  onClick={()=>{ if(_gvLpF){_gvLpF=false;return;} if(!isEdit||gardeLocked)return; if(gardeSelf&&gardeOuvert&&!gardeOuvert(ey,em,d)){toast("Les gardes de cette période ne sont pas encore validées — les échanges s'ouvriront ensuite","warn");return;} setGardeSearch(""); setPickGardeDayFull({d,y:ey,m:em}); }}>
                   {gardeMed&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                     <div style={{width:26,height:26,borderRadius:"50%",background:gardeMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{gardeMed.init}</div>
                   </div>}
@@ -1936,7 +1937,7 @@ function gardesControler(texte,jours,cx){
   return {rows,nOk:n("ok"),nWarn:n("warn"),nErr:n("err"),nDeja:n("deja"),horsListe};
 }
 
-function GardeView({isVac=null,outils=false,noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
+function GardeView({onCellHistory=null,isVac=null,outils=false,noNav=false,onRemoveGarde=null,printWk=null,onPrint=null,year,month,prevM,nextM,medecins,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast}){
   /* v9.82 : le retrait vient désormais de l'application (prop onRemoveGarde), pour que
      l'onglet Gardes et celui du Planning partagent EXACTEMENT le même geste. */
   const removeGarde=(d3,y3,m3)=>{ if(onRemoveGarde)onRemoveGarde(y3,m3,d3); };
@@ -2222,7 +2223,7 @@ function GardeView({isVac=null,outils=false,noNav=false,onRemoveGarde=null,print
                   <div style={{fontWeight:800,color:isT?"var(--today-c)":we?"#92400e":"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{d} <span style={{fontSize:9,fontWeight:600}}>{MOIS[gvM].slice(0,4)}</span></div>
                   <div style={{fontSize:9,color:we?"#92400e":isT?"var(--today-c)":"var(--txt3)",fontWeight:600}}>{["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"][dw2]}</div>
                 </td>
-                <td style={{...S.td,padding:4,cursor:isEdit?"pointer":"default"}} onClick={isEdit?()=>setPickerDay({d,y:gvY,m:gvM}):undefined}>
+                <td {...histProps(onCellHistory,null,gvY,gvM,d,"GARDE")} style={{...S.td,padding:4,cursor:isEdit?"pointer":"default"}} onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}setPickerDay({d,y:gvY,m:gvM});}:undefined}>
                   {gMed?(<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:gMed.color+"22"}}>
                     <div style={{width:26,height:26,borderRadius:"50%",background:gMed.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800}}>{gMed.init}</div>
                     <span style={{fontSize:12,fontWeight:600,color:"var(--txt)"}}>{gMed.prenom} {gMed.nom}</span>
@@ -6215,6 +6216,7 @@ const HELP_SECTIONS=[
   HP({children:["🔐 ",HE("b",null,"Niveaux de droits")," : chaque médecin a un niveau dans sa fiche ✏️ (onglet Équipe), qui s'applique quand il se connecte avec son PIN personnel. ",HE("b",null,"Basique")," = sa propre ligne, plus ses activités dans CHL, CHB et les plateaux. ",HE("b",null,"Intermédiaire")," = le planning de tous les médecins, gardes et échanges, semaines de tour, planning type et attachés — sans Paramètres, Équipe ni Activités. ",HE("b",null,"Éditeur")," = accès complet. Récapitulatif dans Paramètres."]}),
   HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
   HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case — dans le Planning et les Attachés, sur le rond du médecin dans CHL, CHB, PT Cardio et PT Angio, sur la case dans Internes (v10.176) — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
+  HP({children:["🕘 ",HE("b",null,"Historique d'une garde")," (v10.239) : clic droit ou appui long sur la case Garde d'un jour — dans le Planning, les Attachés et la tuile Gardes de Construire. Chaque changement de main y figure : « − retiré » pour l'ancien titulaire, « + posé » pour le nouveau, avec l'auteur et l'heure ; le retrait par 🗑 aussi. La répartition automatique et « retirer toutes les gardes » ne sont pas inscrites, ni les retraits antérieurs à la v10.239."]}),
   HP({children:["Depuis la v10.238, l'historique n'a ",HE("b",null,"plus de limite de 1000 lignes"),". Chaque période a son propre cahier d'historique, qui garde toutes les modifications de ses cases — y compris les deux mois de construction qui précèdent la période. Il suit la période jusqu'à son archivage : il part alors dans le fichier téléchargé, et reste lisible dans l'application. Un cahier contient plus de dix mille modifications ; s'il approchait de sa limite, l'éditeur serait prévenu à l'ouverture avant que les lignes les plus anciennes ne s'effacent."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
 
@@ -8292,6 +8294,11 @@ function histDec(v){
   const p=String(v||"").split("\t");if(p.length<6)return null;
   return {t:parseInt(p[0],36)||0,x:p[1]==="+"?"add":"del",k:p[2],md:p[3],act:p[4]||null,a:p.slice(5).join(" ")};
 }
+/* v10.239 : qui tient la garde d'un jour, et dans quelle case (nuit N ou journée JOUR) */
+function gardeTitulaires(pl,y,m,d){const out=[];["N","JOUR"].forEach(sl=>{const dm=(pl||{})[sk(y,m,d,sl)]||{};Object.keys(dm).forEach(mid=>{if(cellHasAny(dm[mid],["GARDE"]))out.push({mid,sl});});});return out;}
+/* v10.239 : les lignes d'historique de la garde d'un jour — tous médecins, nuit et journée */
+function histGardeJour(es,y,m,d){const kN=sk(y,m,d,"N"),kJ=sk(y,m,d,"JOUR");
+  return Object.values(es||{}).filter(e=>e&&(e.k===kN||e.k===kJ)&&e.act==="GARDE").sort((a,b)=>((b.t||0)-(a.t||0))||((a.x==="del"?1:0)-(b.x==="del"?1:0)));}   /* même instant : le retrait de l'ancien a précédé la pose du nouveau */
 const HIST_PID={};   /* période d'une case, mémorisée par jour : perOfDay recalcule la liste des jours */
 function histPid(k){const j=String(k||"").slice(0,10);if(!(j in HIST_PID))HIST_PID[j]=arPerClair(j);return HIST_PID[j];}
 function histOctets(e){let n=64;Object.keys(e||{}).forEach(k=>{n+=k.length+2+unescape(encodeURIComponent(String(e[k]))).length;});return n;}
@@ -11896,8 +11903,9 @@ function CardioPlanning(){
   const openCellHistory=useCallback((medId2,y2,m2,d2,sl2)=>{
     setHistModal({medId:medId2,y:y2,m:m2,d:d2,sl:sl2,loading:true,list:[]});
     (async()=>{try{
-      const key3=sk(y2,m2,d2,sl2);
+      const key3=sk(y2,m2,d2,sl2==="GARDE"?"N":sl2);
       const es=await histLire([histPid(key3)]);   /* v10.238 : le cahier de la période de la case */
+      if(sl2==="GARDE"){setHistModal(h=>h?{...h,loading:false,list:histGardeJour(es,y2,m2,d2).slice(0,60)}:h);return;}   /* v10.239 */
       const list=Object.values(es).filter(e=>e&&e.k===key3&&String(e.md)===String(medId2)).sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,30);
       setHistModal(h=>h?{...h,loading:false,list}:h);
     }catch(e){setHistModal(h=>h?{...h,loading:false,list:[]}:h);}})();
@@ -12252,6 +12260,7 @@ function CardioPlanning(){
   const removeGardeDay=(y3,m3,d3)=>{
     if(gardeSelfId)return;   /* v10.205 : un basique ne retire jamais une garde */
     if(vBloque(vRef,y3,m3,d3)){vToast(false);return;}   /* v10.126 */
+    gardeTitulaires(planRef.current,y3,m3,d3).forEach(o=>logCell("del",o.mid,y3,m3,d3,o.sl,"GARDE"));   /* v10.239 : le retrait est inscrit */
     setPlan(p=>{
       let next={...p};const gIds=[];
       ["N","JOUR"].forEach(sl=>{const k=sk(y3,m3,d3,sl);const dm={...(next[k]||{})};let ch=false;
@@ -12274,7 +12283,10 @@ function CardioPlanning(){
     if(accessMode==="adminEdit")return false;
     if(vBloque(vRef,y2,m2,d2)){vToast(false);return false;}   /* v10.126 : le verrou couvre les gardes */
     if(vRef.current.gardeSelf&&!vRef.current.gardeOuvert(y2,m2,d2)){toast("Les gardes de cette période ne sont pas encore validées","warn");return false;}   /* v10.205 */
-    logCell("add",medId,y2,m2,d2,"N","GARDE");
+    /* v10.239 : HISTORIQUE DES GARDES — le titulaire remplacé est inscrit (« − retiré »), puis le nouveau (« + posé »),
+       dans la case où la garde vit vraiment (nuit ou journée) ; lu sur le planning courant, avant l'écriture. */
+    gardeTitulaires(planRef.current,y2,m2,d2).forEach(o=>{if(String(o.mid)!==String(medId))logCell("del",o.mid,y2,m2,d2,o.sl,"GARDE");});
+    logCell("add",medId,y2,m2,d2,gardeSlotDe(y2,m2,d2),"GARDE");
     /* v9.65 : la garde la veille d'une absence ou d'une FMC reste PERMISE (décision
        utilisateur), mais elle est signalée — le repos ne sera pas posé, la v9.64
        interdisant au repos d'écraser une exclusive. La répartition automatique, elle,
@@ -13196,7 +13208,7 @@ function CardioPlanning(){
   const verRetablir=()=>{if(!window.confirm("Déclarer CETTE version ("+APP_VERSION+") comme version en service ?\n\nÀ n'utiliser qu'après un retour volontaire à une version antérieure : toutes les copies plus récentes passeront à leur tour en lecture seule."))return;
     if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
   const tourProps={isVac,medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes,setBuild,onPrevenir:annPrevenir,pushMeds,onDaySwap:(medId,y2,m2,d2)=>{setMData({medId,y:y2,m:m2,d:d2,fromTour:true});setModal("daySwap");}};   /* v10.193 : depuis la puce TP de la tuile Tour */
-  const gardeProps={isVac,onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
+  const gardeProps={onCellHistory:isAnyEdit?openCellHistory:null,isVac,onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
     <div style={S.app}>
       <style>{setFoldCSS()+`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -15036,21 +15048,23 @@ header::-webkit-scrollbar { display: none; }
 
       {bipModal&&bipModalUI()}
       {histModal&&(()=>{
-        const med3=djAff(medecins.find(x=>x.id===histModal.medId),dKey(histModal.y,histModal.m,histModal.d));
+        const hG=histModal.sl==="GARDE";   /* v10.239 : historique de la garde du jour — une ligne peut concerner n'importe quel médecin */
+        const med3=hG?null:djAff(medecins.find(x=>x.id===histModal.medId),dKey(histModal.y,histModal.m,histModal.d));
         return(
           <Ov onClose={()=>setHistModal(null)}>
             <div style={S.mHd}>
-              <div><div style={S.mTit2}>🕘 Historique — {med3?med3.init:""} · {histModal.d} {MOIS[histModal.m]} {SLOTL[histModal.sl]||histModal.sl}</div></div>
+              <div><div style={S.mTit2}>{hG?<span data-histgarde="1">🕘 Historique de la garde · {histModal.d} {MOIS[histModal.m]}</span>:<>🕘 Historique — {med3?med3.init:""} · {histModal.d} {MOIS[histModal.m]} {SLOTL[histModal.sl]||histModal.sl}</>}</div></div>
               <button onClick={()=>setHistModal(null)} style={S.xBtn}>×</button>
             </div>
             {histModal.loading&&<div style={{fontSize:12,color:"var(--txt3)"}}>Chargement…</div>}
-            {!histModal.loading&&histModal.list.length===0&&<div style={{fontSize:12,color:"var(--txt3)"}}>Aucune modification enregistrée pour cette case (seules les modifications manuelles de cases sont inscrites).</div>}
+            {!histModal.loading&&histModal.list.length===0&&<div style={{fontSize:12,color:"var(--txt3)"}}>{hG?"Aucune modification enregistrée pour la garde de ce jour (la répartition automatique et « retirer toutes les gardes » ne sont pas inscrites).":"Aucune modification enregistrée pour cette case (seules les modifications manuelles de cases sont inscrites)."}</div>}
             {!histModal.loading&&histModal.list.map((e,i)=>{
               const a3=actes.find(x=>x.id===e.act);
               const dt=new Date(e.t);
               return <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid var(--border2)",fontSize:12}}>
                 <span style={{color:"var(--txt3)",fontSize:10,minWidth:96}}>{String(dt.getDate()).padStart(2,"0")}/{String(dt.getMonth()+1).padStart(2,"0")}/{dt.getFullYear()} {String(dt.getHours()).padStart(2,"0")}:{String(dt.getMinutes()).padStart(2,"0")}</span>
                 <span style={{fontWeight:800,color:e.x==="add"?"#16a34a":"#dc2626"}}>{e.x==="add"?"+ Posé":"− Retiré"}</span>
+                {hG&&(()=>{const mg=medecins.find(x=>String(x.id)===String(e.md));return <span data-histmed="1" style={{padding:"0 6px",borderRadius:4,fontSize:10,fontWeight:800,background:mg?mg.color:"#888",color:"#fff"}}>{mg?mg.init:"#"+e.md}</span>;})()}
                 {a3&&<span style={{padding:"0 6px",borderRadius:4,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a3.color,color:"#111"}}>{a3.short}</span>}
                 {!a3&&e.act&&<span style={{fontSize:10,color:"var(--txt2)"}}>{e.act}</span>}
                 <span style={{marginLeft:"auto",color:"var(--txt2)",fontSize:11}}>{e.a}</span>
