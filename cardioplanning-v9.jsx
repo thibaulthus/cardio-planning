@@ -124,7 +124,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.239 — 23/09/2026";
+const APP_VERSION="v10.240 — 24/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -787,7 +787,7 @@ function histProps(onCellHistory,medId,y,m,d,sl){
     onTouchEnd:()=>clearTimeout(_gvLpT),onTouchMove:()=>clearTimeout(_gvLpT)};
 }
 
-function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null,annJour=null,gardeSelf=null,gardeOuvert=null,onPrevenir=null,pushMeds=null}){   /* v10.205 : gardeSelf = médecin basique (ses gardes seulement), gardeOuvert(y,m,d) = gardes validées ? */
+function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntries,acteById,onCell,isEdit,notes={},isVac,applyGarde,allMeds,viewPeriod,allDays4,showFull,showGarde=true,intGarde=null,gardeLocked=false,onCellHistory=null,getAstreinteForDay,prefFor=null,gardePref=null,printWk=null,memX=null,selfId=null,centreId=null,lis=LIS,suiviId=null,onSuivi=null,annJour=null,gardeSelf=null,gardeOuvert=null,onPrevenir=null,pushMeds=null,extraCols=null}){   /* v10.240 : extraCols = colonnes 👁 (salles, activités) à droite des médecins ; v10.205 : gardeSelf = médecin basique (ses gardes seulement), gardeOuvert(y,m,d) = gardes validées ? */
   /* v10.41 : désactivation. Couvert sur TOUTE la période affichée → la colonne
      disparaît (sa règle : « cela simplifie l'affichage ») ; couvert sur une
      partie → la case du jour est hachurée et verrouillée, et la personne
@@ -957,6 +957,8 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
               return <th key={m.id} data-col={m.id} onClick={onSuivi?e=>{onSuivi(m.id);if(!sv)gvCentrer(e.currentTarget);}:undefined} style={{...S.th,minWidth:46,position:"sticky",top:0,zIndex:20,...(String(m.id)===String(selfId)?{...lis,borderTop:lis.borderLeft}:{}),...(onSuivi?{cursor:"pointer"}:{}),...(sv?{boxShadow:"inset 3px 0 0 "+m.color+", inset -3px 0 0 "+m.color+", inset 0 3px 0 "+m.color}:{})}} title={(onSuivi?(sv?"Relâcher le suivi — ":"Suivre cette colonne — "):"")+`Dr. ${m.prenom} ${m.nom}`}>
               <div style={{...S.avT,background:m.color,margin:"0 auto",...(sv?{boxShadow:"0 0 0 2px var(--bg), 0 0 0 4px "+m.color}:{}),...(suiviId!==null&&!sv?{opacity:.4}:{})}}>{m.init}</div>
             </th>;})}
+            {extraCols&&extraCols.length>0&&<th style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:6,width:6,padding:0,background:"var(--border)"}}/>}
+            {extraCols&&extraCols.map(c=><th key={"x"+c.k} title={c.titre} style={{...S.th,minWidth:c.w,position:"sticky",top:0,zIndex:20}}>{c.th}<div style={{fontSize:8,fontWeight:700,color:"var(--txt3)",marginTop:1}}>{c.site}</div></th>)}
           </tr>
         </thead>
         <tbody>
@@ -1033,8 +1035,11 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                     </div>}
                   </td>;
                 })}
+                {/* v10.240 : colonnes 👁 — la case vient de la fonction de l'onglet d'origine (siteCellTd, actCellTd) */}
+                {extraCols&&extraCols.length>0&&<td style={{padding:0,minWidth:6,width:6,background:"var(--border)"}}/>}
+                {extraCols&&extraCols.map(c=><React.Fragment key={"x"+c.k}>{we?<td style={{...S.td,...S.tdWE,padding:2}}/>:c.td(d,sl,ey,em)}</React.Fragment>)}
               </tr>
-            )),{n:meds.length,left:C0+C1,m:[{position:"sticky",left:0,zIndex:10,minWidth:C0},{position:"sticky",left:C0,zIndex:9,minWidth:C1},...(showGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[]),...(intGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[])],am:[{position:"sticky",left:C0,zIndex:9,minWidth:C1}]})
+            )),{n:meds.length,x:extraCols&&extraCols.length?extraCols.length+1:0,left:C0+C1,m:[{position:"sticky",left:0,zIndex:10,minWidth:C0},{position:"sticky",left:C0,zIndex:9,minWidth:C1},...(showGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[]),...(intGarde?[{minWidth:CG,borderRight:"2px solid var(--border)"}]:[])],am:[{position:"sticky",left:C0,zIndex:9,minWidth:C1}]})
           })}
         </tbody>
       </table>
@@ -1324,26 +1329,21 @@ function TableScroll({children,style,mh=150,jours=false,memId=null,fit=false,mem
     </div>
   );
 }
-function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
-  const today=new Date();
+/* ════ v10.240 : SALLES ET CASES DES ONGLETS SALLES, hors des composants ════
+   SiteView (CHL, CHB, PT Angio) et la colonne 👁 du Planning s'en servent tous deux. */
+function siteActesDe(site,actes){
   const ANGIO_SALLES_ALL=["Angio-1","Angio-2","Angio-3"];
   const EXCL_SALLES=site==="CHL"?[S_STIM,S_EEP,S_EE_CHB,...ANGIO_SALLES_ALL]:site==="ANGIO"?[]:[S_STIM,S_EEP,S_EE_CHL,...ANGIO_SALLES_ALL];
   const ANGIO_SALLES=["Angio-1","Angio-2","Angio-3"];
   const FOP_SALLES=["Angio-FOP"];
-  const EXCL_IDS=site==="CHL"?["BIP"]:[];
-  const siteActes=actes.filter(a=>{
+  const EXCL_IDS_S=site==="CHL"?["BIP"]:[];
+  return actes.filter(a=>{
     if(site==="ANGIO") return ["CORO","TAVI","FOP"].includes(a.id)||(a.salles||[]).some(s=>String(s).startsWith("Angio"));
     return (a.site===site||a.site==="tous")&&a.hasSalle&&!a.isSystem
-    &&!a.salles.every(s=>EXCL_SALLES.includes(s))&&!EXCL_IDS.includes(a.id);});
-  // Effective days for 4M mode
-  const sv_today=new Date();
-  const svEffDays=useMemo(()=>{
-    const p=perStart(year,month);
-    const base=perDaysList(p.sy,p.sm);
-    if(!showFull){const tod=new Date();tod.setHours(0,0,0,0);return base.filter(({y:ey3,m:em3,d})=>new Date(ey3,em3,d)>=tod);}
-    return base;
-  },[year,month,showFull,PCFG.len,PCFG.startM]);
-
+    &&!a.salles.every(s=>EXCL_SALLES.includes(s))&&!EXCL_IDS_S.includes(a.id);});
+}
+function siteCols(site,actes,salleReg,colOrder,siteActes=null){
+  if(!siteActes)siteActes=siteActesDe(site,actes);
   const _chlSalles=["CHL-1","CHL-2","CHL-3","CHL-4","CHL-5","CHL-6","CHL-7","Holter","HC-Exam"];
   const _chbSalles=["CHB-1","CHB-2","CHB-3","CHB-VASC","EE-CHB","Rythmo-CHB","CHB-BIP"];
   const _robustSalles=site==="CHL"?_chlSalles:site==="CHB"?_chbSalles:null;
@@ -1362,12 +1362,124 @@ function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,i
      pareil). Une colonne absente de l'ordre enregistré garde sa place d'origine, à la
      fin — une salle ajoutée plus tard n'est donc jamais perdue. */
   const _allCols=_allSallesBase.concat(_recapCols);
-  const allSalles=(()=>{
+  return (()=>{
     const ord=colOrder||[];
     if(!ord.length)return _allCols;
     const rank=k=>{const i=ord.indexOf(k);return i<0?9999:i;};
     return _allCols.map((c,i)=>({c,i})).sort((a,b)=>(rank(a.c)-rank(b.c))||(a.i-b.i)).map(x=>x.c);
   })();
+}
+function siteColLab(salle,actes){return salle==="CHB-BIP"?"BIP":String(salle).indexOf("RECAP:")===0?((actes.find(a2=>a2.id===salle.slice(6))||{}).short||salle.slice(6)):salle;}
+function siteCellTd(c,salle,d,sl,ry,rm){
+  const {year,month,actes,medecins,getEntries,intCfg,isEdit,onPickSite,darkMode,onCellHistory,siteActes,salleOcc,notes,salleFerm,salleVide,issMap}=c;
+  const sv_today=new Date();
+  if(ry===undefined)ry=year;
+  if(rm===undefined)rm=month;
+  const isTdRC=d===sv_today.getDate()&&rm===sv_today.getMonth()&&ry===sv_today.getFullYear();
+  // CHB-BIP pseudo-column: show all BIP entries across CHB-1/2/3
+  if(salle==="CHB-BIP"||String(salle).indexOf("RECAP:")===0){
+    const _rId=salle==="CHB-BIP"?"BIP":salle.slice(6);
+    const bipActe=actes.find(a=>a.id===_rId);
+    if(!bipActe)return <td key={"bip"+d+sl} style={{...S.td}}/>;
+    const bipOcc2=medecins.flatMap(med=>{
+      const es=getEntries(med.id,ry,rm,d,sl);
+      /* v9.57.1 : une branche non tranchée ne figure pas dans la colonne de reprise */
+      return es.filter(e=>e.acteId===_rId&&!e.cond).map(e=>({med,acte:bipActe,rs:e.salle}));
+    });
+    /* v10.62 : internes posés sur cette activité — affichés, jamais comptés */
+    const semJb=intMedsDuJour(intCfg,ry,rm,d);
+    const bipInt=semJb?semJb.meds.flatMap(im=>getEntries(im.id,ry,rm,d,sl).filter(e=>e&&e.acteId===_rId&&!e.cond).map(e=>({med:im,acte:bipActe,rs:e.salle,isInt:true}))):[];
+    const bipAll=bipOcc2.concat(bipInt);
+    return(
+      <td key={"bip"+d+sl} style={{...S.td,borderLeft:"3px solid var(--border)",cursor:isEdit?"pointer":"default",padding:2,verticalAlign:"middle",textAlign:"center"}}
+        onClick={()=>{if(_gvLpF){_gvLpF=false;return;}if(isEdit)onPickSite({salle,siteActes:[bipActe],d,sl,y:ry,m:rm});}}>
+        {bipAll.map(({med,acte,rs,isInt},i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
+            <div {...histProps(onCellHistory,med.id,ry,rm,d,sl)} title={isInt?med.nom:((med.prenom||"")+" "+(med.nom||"")).trim()} style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0,border:isInt?"1.5px dashed rgba(255,255,255,.95)":"none"}}>{med.init}</div>
+            {rs?<SallePill nom={rs} acte={acte} night={darkMode}/>
+              :(bipActe.hasSalle?<span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>⚠ sans salle</span>:null)}
+          </div>
+        ))}
+      </td>
+    );
+  }
+  const salleActes=siteActes.filter(a=>a.salles.includes(salle));
+  const occ=[];
+  salleActes.forEach(acte=>{
+    const o=salleOcc(acte.id,ry,rm,d,sl);
+    (o[salle]||[]).forEach(med=>{if(!occ.find(x=>x.med.id===med.id))occ.push({med,acte});});
+  });
+  /* v9.54 : une case se lit PAR ACTIVITÉ — les praticiens d'une même activité
+     s'empilent et l'activité n'est écrite qu'une fois. Le fond rouge ne signale
+     plus deux praticiens ensemble (c'est fréquent et normal dans ces salles)
+     mais DEUX ACTIVITÉS DIFFÉRENTES sur le même créneau. */
+  const grps=[];
+  occ.forEach(({med,acte})=>{
+    const k=(acte&&acte.id)||"";
+    let g=grps.find(x=>x.k===k);
+    if(!g){g={k,acte,meds:[]};grps.push(g);}
+    g.meds.push(med);
+  });
+  const conflict=grps.length>1;
+  /* v10.62 : les internes s'affichent dans la case (rond pointillé) SANS entrer
+     dans l'occupation ni dans le conflit — supervision volontaire, sa règle. */
+  const semJ=intMedsDuJour(intCfg,ry,rm,d);
+  if(semJ)semJ.meds.forEach(im=>{
+    getEntries(im.id,ry,rm,d,sl).forEach(e=>{
+      if(!(e&&e.acteId&&!e.cond&&e.salle===salle))return;
+      const a2=salleActes.find(a=>a.id===e.acteId);
+      if(!a2)return;
+      let g=grps.find(x=>x.k===a2.id);
+      if(!g){g={k:a2.id,acte:a2,meds:[]};grps.push(g);}
+      g.imeds=(g.imeds||[]);
+      if(!g.imeds.find(x=>x.id===im.id))g.imeds.push(im);
+    });
+  });
+  /* v10.53 : initiales devant chaque note — deux occupants ne se confondent plus */
+  const _nInt=[];grps.forEach(g=>(g.imeds||[]).forEach(m=>{if(!_nInt.find(x=>x.id===m.id))_nInt.push(m);}));   /* v10.178 : la note d'un interne aussi */
+  const noteTips=occ.map(x=>x.med).concat(_nInt).map(med=>{const n=notes[nk(med.id,ry,rm,d,sl)];return n?(med.init+" : "+n):null;}).filter(Boolean).join("  |  ");
+  const fz=!!salleFerm&&salleFermee(salle,ry,rm,d,sl,salleFerm);   /* v10.229 : plage fermée — case grisée */
+  return(
+    <td key={`${salle}-${d}-${sl}`} data-vide={!fz&&videFond(salleVide,salle,grps.length===0,darkMode)?"1":undefined} data-ferm={fz?"1":undefined} title={(fz?"🚫 Plage fermée"+(grps.length?" — occupant(s) à déplacer":"")+(noteTips?"  |  ":""):"")+(noteTips||"")||undefined}
+      style={{...S.td,...(conflict?conflBg(darkMode):{}),...(isTdRC?{background:"var(--bg-td)"}:{}),...(videFond(salleVide,salle,grps.length===0,darkMode)||{}),...(fz?fermFond(darkMode):{}),padding:2,cursor:isEdit?"pointer":"default"}}
+      onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}onPickSite({salle,siteActes:salleActes,d,sl,y:ry,m:rm});}:undefined}>
+      <div style={{display:"flex",flexDirection:"column"}}>
+      {grps.map((g,gi)=>(
+        <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,padding:"2px 0",
+          borderTop:gi?"1px dashed "+(conflict?conflSep(darkMode):"var(--border)"):"none"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            {g.meds.map((m,mi)=>{
+              /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
+              const iss=issMap[m.id+"|"+ry+"|"+rm+"|"+d+"|"+sl];
+              return <div key={mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(iss?" — "+iss:"")} style={{position:"relative",width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{m.init}
+                {iss&&<span style={{position:"absolute",top:-2,left:-2,width:8,height:8,borderRadius:"50%",background:"#f85149",border:"1.5px solid var(--bg2)"}}/>}
+              </div>;
+            })}
+            {(g.imeds||[]).map((m,mi)=>(
+              <div key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</div>
+            ))}
+          </div>
+          <ActPill a={g.acte} night={darkMode} hasNote={g.meds.concat(g.imeds||[]).some(m=>!!notes[nk(m.id,ry,rm,d,sl)])}/>
+        </div>
+      ))}
+      </div>
+    </td>
+  );
+}
+
+function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+  const today=new Date();
+  const siteActes=siteActesDe(site,actes);   /* v10.240 : sorti de SiteView — la colonne 👁 du Planning s'en sert aussi */
+  // Effective days for 4M mode
+  const sv_today=new Date();
+  const svEffDays=useMemo(()=>{
+    const p=perStart(year,month);
+    const base=perDaysList(p.sy,p.sm);
+    if(!showFull){const tod=new Date();tod.setHours(0,0,0,0);return base.filter(({y:ey3,m:em3,d})=>new Date(ey3,em3,d)>=tod);}
+    return base;
+  },[year,month,showFull,PCFG.len,PCFG.startM]);
+
+  const allSalles=siteCols(site,actes,salleReg,colOrder,siteActes);   /* v10.240 : même liste pour la colonne 👁 du Planning */
   /* v10.170 : colonnes de reprise (↩) masquées sur CET appareil (cp6_colHide). Les salles
      restent toujours visibles ; l'ordre partagé ↔ n'en sait rien ; l'impression suit l'écran. */
   const _cache=colHide||[];
@@ -1378,100 +1490,10 @@ function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,i
   const wdays=printWk?svEffDays.filter(o=>inPrintRange(printWk,o.y,o.m,o.d)):svEffDays; // keep full {y,m,d} objects
   const siteColor=site==="CHL"?"#388bfd":site==="ANGIO"?"#76a5af":"#3fb950";
 
-  function renderCell(salle,d,sl,ry,rm){
-    if(ry===undefined)ry=year;
-    if(rm===undefined)rm=month;
-    const isTdRC=d===sv_today.getDate()&&rm===sv_today.getMonth()&&ry===sv_today.getFullYear();
-    // CHB-BIP pseudo-column: show all BIP entries across CHB-1/2/3
-    if(salle==="CHB-BIP"||String(salle).indexOf("RECAP:")===0){
-      const _rId=salle==="CHB-BIP"?"BIP":salle.slice(6);
-      const bipActe=actes.find(a=>a.id===_rId);
-      if(!bipActe)return <td key={"bip"+d+sl} style={{...S.td}}/>;
-      const bipOcc2=medecins.flatMap(med=>{
-        const es=getEntries(med.id,ry,rm,d,sl);
-        /* v9.57.1 : une branche non tranchée ne figure pas dans la colonne de reprise */
-        return es.filter(e=>e.acteId===_rId&&!e.cond).map(e=>({med,acte:bipActe,rs:e.salle}));
-      });
-      /* v10.62 : internes posés sur cette activité — affichés, jamais comptés */
-      const semJb=intMedsDuJour(intCfg,ry,rm,d);
-      const bipInt=semJb?semJb.meds.flatMap(im=>getEntries(im.id,ry,rm,d,sl).filter(e=>e&&e.acteId===_rId&&!e.cond).map(e=>({med:im,acte:bipActe,rs:e.salle,isInt:true}))):[];
-      const bipAll=bipOcc2.concat(bipInt);
-      return(
-        <td key={"bip"+d+sl} style={{...S.td,borderLeft:"3px solid var(--border)",cursor:isEdit?"pointer":"default",padding:2,verticalAlign:"middle",textAlign:"center"}}
-          onClick={()=>{if(_gvLpF){_gvLpF=false;return;}if(isEdit)onPickSite({salle,siteActes:[bipActe],d,sl,y:ry,m:rm});}}>
-          {bipAll.map(({med,acte,rs,isInt},i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:3,margin:"1px 0"}}>
-              <div {...histProps(onCellHistory,med.id,ry,rm,d,sl)} title={isInt?med.nom:((med.prenom||"")+" "+(med.nom||"")).trim()} style={{width:26,height:26,borderRadius:"50%",background:med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0,border:isInt?"1.5px dashed rgba(255,255,255,.95)":"none"}}>{med.init}</div>
-              {rs?<SallePill nom={rs} acte={acte} night={darkMode}/>
-                :(bipActe.hasSalle?<span style={{fontSize:9,fontWeight:800,background:"#fff3cd",color:"#8a6100",border:"1px solid #f59e0b88",borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap"}}>⚠ sans salle</span>:null)}
-            </div>
-          ))}
-        </td>
-      );
-    }
-    const salleActes=siteActes.filter(a=>a.salles.includes(salle));
-    const occ=[];
-    salleActes.forEach(acte=>{
-      const o=salleOcc(acte.id,ry,rm,d,sl);
-      (o[salle]||[]).forEach(med=>{if(!occ.find(x=>x.med.id===med.id))occ.push({med,acte});});
-    });
-    /* v9.54 : une case se lit PAR ACTIVITÉ — les praticiens d'une même activité
-       s'empilent et l'activité n'est écrite qu'une fois. Le fond rouge ne signale
-       plus deux praticiens ensemble (c'est fréquent et normal dans ces salles)
-       mais DEUX ACTIVITÉS DIFFÉRENTES sur le même créneau. */
-    const grps=[];
-    occ.forEach(({med,acte})=>{
-      const k=(acte&&acte.id)||"";
-      let g=grps.find(x=>x.k===k);
-      if(!g){g={k,acte,meds:[]};grps.push(g);}
-      g.meds.push(med);
-    });
-    const conflict=grps.length>1;
-    /* v10.62 : les internes s'affichent dans la case (rond pointillé) SANS entrer
-       dans l'occupation ni dans le conflit — supervision volontaire, sa règle. */
-    const semJ=intMedsDuJour(intCfg,ry,rm,d);
-    if(semJ)semJ.meds.forEach(im=>{
-      getEntries(im.id,ry,rm,d,sl).forEach(e=>{
-        if(!(e&&e.acteId&&!e.cond&&e.salle===salle))return;
-        const a2=salleActes.find(a=>a.id===e.acteId);
-        if(!a2)return;
-        let g=grps.find(x=>x.k===a2.id);
-        if(!g){g={k:a2.id,acte:a2,meds:[]};grps.push(g);}
-        g.imeds=(g.imeds||[]);
-        if(!g.imeds.find(x=>x.id===im.id))g.imeds.push(im);
-      });
-    });
-    /* v10.53 : initiales devant chaque note — deux occupants ne se confondent plus */
-    const _nInt=[];grps.forEach(g=>(g.imeds||[]).forEach(m=>{if(!_nInt.find(x=>x.id===m.id))_nInt.push(m);}));   /* v10.178 : la note d'un interne aussi */
-    const noteTips=occ.map(x=>x.med).concat(_nInt).map(med=>{const n=notes[nk(med.id,ry,rm,d,sl)];return n?(med.init+" : "+n):null;}).filter(Boolean).join("  |  ");
-    const fz=!!salleFerm&&salleFermee(salle,ry,rm,d,sl,salleFerm);   /* v10.229 : plage fermée — case grisée */
-    return(
-      <td key={`${salle}-${d}-${sl}`} data-vide={!fz&&videFond(salleVide,salle,grps.length===0,darkMode)?"1":undefined} data-ferm={fz?"1":undefined} title={(fz?"🚫 Plage fermée"+(grps.length?" — occupant(s) à déplacer":"")+(noteTips?"  |  ":""):"")+(noteTips||"")||undefined}
-        style={{...S.td,...(conflict?conflBg(darkMode):{}),...(isTdRC?{background:"var(--bg-td)"}:{}),...(videFond(salleVide,salle,grps.length===0,darkMode)||{}),...(fz?fermFond(darkMode):{}),padding:2,cursor:isEdit?"pointer":"default"}}
-        onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}onPickSite({salle,siteActes:salleActes,d,sl,y:ry,m:rm});}:undefined}>
-        <div style={{display:"flex",flexDirection:"column"}}>
-        {grps.map((g,gi)=>(
-          <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,padding:"2px 0",
-            borderTop:gi?"1px dashed "+(conflict?conflSep(darkMode):"var(--border)"):"none"}}>
-            <div style={{display:"flex",flexDirection:"column",gap:2}}>
-              {g.meds.map((m,mi)=>{
-                /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
-                const iss=issMap[m.id+"|"+ry+"|"+rm+"|"+d+"|"+sl];
-                return <div key={mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(iss?" — "+iss:"")} style={{position:"relative",width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0}}>{m.init}
-                  {iss&&<span style={{position:"absolute",top:-2,left:-2,width:8,height:8,borderRadius:"50%",background:"#f85149",border:"1.5px solid var(--bg2)"}}/>}
-                </div>;
-              })}
-              {(g.imeds||[]).map((m,mi)=>(
-                <div key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{width:24,height:24,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:800,flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</div>
-              ))}
-            </div>
-            <ActPill a={g.acte} night={darkMode} hasNote={g.meds.concat(g.imeds||[]).some(m=>!!notes[nk(m.id,ry,rm,d,sl)])}/>
-          </div>
-        ))}
-        </div>
-      </td>
-    );
-  }
+  /* v10.240 : la case est dessinée par siteCellTd (hors du composant) — la colonne 👁 du Planning
+     appelle la même fonction : même rendu, même clic, aucune copie qui pourrait diverger. */
+  const cxS={year,month,actes,medecins,getEntries,intCfg,isEdit,onPickSite,darkMode,onCellHistory,siteActes,salleOcc,notes,salleFerm,salleVide,issMap};
+  function renderCell(salle,d,sl,ry,rm){return siteCellTd(cxS,salle,d,sl,ry,rm);}
 
   /* v10.171 : sous 760 px, les outils se replient sous ⋯ (mécanisme de Planning, v10.132) ; 📅 reste. */
   const outils=<React.Fragment>
@@ -1506,7 +1528,7 @@ function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,i
             <tr>
               <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:42}}>Jour</th>
               <th style={{...S.thFix,position:"sticky",top:0,left:42,zIndex:40,minWidth:24,borderRight:"2px solid var(--border)"}}>Sl</th>
-              {sallesVues.map(salle=><th key={salle} style={{...S.th,minWidth:80,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:10,color:"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{salle==="CHB-BIP"?"BIP":String(salle).indexOf("RECAP:")===0?((actes.find(a2=>a2.id===salle.slice(6))||{}).short||salle.slice(6)):salle}</div></th>)}
+              {sallesVues.map(salle=><th key={salle} style={{...S.th,minWidth:80,position:"sticky",top:0,zIndex:20}}><div style={{fontWeight:800,fontSize:10,color:"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{siteColLab(salle,actes)}</div></th>)}
             </tr>
           </thead>
           <tbody>
@@ -1539,6 +1561,118 @@ function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,i
   );
 }
 
+/* ════ v10.240 : OCCUPATION ET CASE DE PT CARDIO, hors du composant ════
+   ActTabView et la colonne 👁 du Planning s'en servent tous deux. */
+function actOcc(c,row,d,sl,ry,rm){
+  const {year,month,medecins,actes,getEntries}=c;
+  if(!ry)ry=year; if(!rm&&rm!==0)rm=month;
+  const occ=[];
+  row.ids.forEach(acteId=>{
+    medecins.forEach(med=>{
+      getEntries(med.id,ry,rm,d,sl).forEach(e=>{
+        const match=(!e.cond)&&(row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId);
+        if(match&&!occ.find(x=>x.med.id===med.id&&x.acteId===acteId)){
+          const acte=actes.find(a=>a.id===acteId)||{short:acteId,color:row.color,bg:"#111"};
+          occ.push({med,acte,salle:e.salle||null,dif:e.dif||null,n:null});
+        }
+      });
+    });
+    getEntries(IDE_MED.id,ry,rm,d,sl).forEach(e=>{
+      const match=row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId;
+      if(match&&!occ.find(x=>x.med.id===IDE_MED.id&&x.acte&&x.acte.id===acteId)){
+        const acte=actes.find(a=>a.id===acteId)||{id:acteId,short:acteId,color:row.color,bg:"#111"};
+        occ.push({med:IDE_MED,acte,salle:e.salle||null,dif:e.dif||null,n:(e.n===undefined||e.n===null)?null:e.n});
+      }
+    });
+  });
+  return occ;
+}
+function actCellTd(c,row,d,sl,ry,rm){
+  const {year,month,actes,getEntries,notes,intCfg,salleFerm,salleVide,darkMode,isEdit,onPickAct,issMap,onCellHistory,ideActive}=c;
+  const today=new Date();
+  const getOcc=(r2,d2,s2,y2,m2)=>actOcc(c,r2,d2,s2,y2,m2);
+  if(!ry)ry=year;
+  if(!rm&&rm!==0)rm=month;
+  const isTd=d===today.getDate()&&rm===today.getMonth()&&ry===today.getFullYear();
+  if(isWE(ry,rm,d)) return <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...S.tdWE,padding:2}}/>;
+  const occ=getOcc(row,d,sl,ry,rm);
+  /* v9.54 : deux ACTIVITÉS différentes sur le créneau passent la case en rouge —
+     deux salles d'une même activité, non. */
+  const _grpsA=salleGroups(row,occ);
+  /* v10.53 : notes par médecin — infobulle « INIT : note » sur la case */
+  const _nMeds=[];_grpsA.forEach(g=>(g.meds||[]).concat(g.imeds||[]).forEach(m=>{if(m&&m.id!==IDE_MED.id&&!_nMeds.find(x=>x.id===m.id))_nMeds.push(m);}));   /* v10.178 : internes compris */
+  const noteTips=_nMeds.map(m=>{const n=notes[nk(m.id,ry,rm,d,sl)];return n?(m.init+" : "+n):null;}).filter(Boolean).join("  |  ");
+  const _idsA={};_grpsA.forEach(g=>{if(g.acte&&g.acte.id)_idsA[g.acte.id]=1;});
+  const conflA=Object.keys(_idsA).length>1;
+  /* v10.62 : internes de la case — rond pointillé, jamais dans le conflit */
+  const semJA=intMedsDuJour(intCfg,ry,rm,d);
+  if(semJA)semJA.meds.forEach(im=>{
+    row.ids.forEach(aid=>{
+      getEntries(im.id,ry,rm,d,sl).forEach(e=>{
+        if(!(e&&e.acteId===aid&&!e.cond&&(row.salle?e.salle===row.salle:true)))return;
+        const a2=actes.find(a=>a.id===aid)||{id:aid,short:aid,color:row.color};
+        let g=_grpsA.find(x=>x.acte&&x.acte.id===aid&&((x.salle||null)===(e.salle||null)));
+        if(!g){g={acte:a2,salle:e.salle||null,meds:[],n:null,dif:null};_grpsA.push(g);}
+        g.imeds=(g.imeds||[]);
+        if(!g.imeds.find(x=>x.id===im.id))g.imeds.push(im);
+      });
+    });
+  });
+  const fz=!!salleFerm&&!!row.salle&&salleFermee(row.salle,ry,rm,d,sl,salleFerm);   /* v10.229 : colonne de SALLE fermée — case grisée */
+  return(
+    <td key={`${row.label}-${d}-${sl}`} data-vide={!fz&&videFond(salleVide,row.salle,occ.length===0&&_grpsA.length===0,darkMode)?"1":undefined} data-ferm={fz?"1":undefined} title={(fz?"🚫 Plage fermée"+(_grpsA.length?" — occupant(s) à déplacer":"")+(noteTips?"  |  ":""):"")+(noteTips||"")||undefined} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),...(videFond(salleVide,row.salle,occ.length===0&&_grpsA.length===0,darkMode)||{}),...(fz?fermFond(darkMode):{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
+      onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}onPickAct({row,d,sl,y:ry,m:rm});}:undefined}>
+      <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"stretch"}}
+        onClick={e=>{e.stopPropagation();if(_gvLpF){_gvLpF=false;return;}if(isEdit)onPickAct({row,d,sl,y:ry,m:rm});}}>
+      {_grpsA.map((g,gi)=>{
+        const monoActe=(row.ids||[]).length===1&&!row.multiActe;
+        const ideN=(g.n===null||g.n===undefined)?(g.acte.ideN||0):g.n;
+        /* v9.45 : le segment gauche porte la SALLE si la ligne en propose, sinon
+           le libellé de l'activité — jamais les deux, jamais de couleur de fond. */
+        const salleTrack=row.hasSalleChoice||(g.acte&&g.acte.hasSalle&&!g.acte.fixedSalle);
+        /* v10.14 : le libellé n'est masqué que sur une colonne d'ACTIVITÉ, où il ferait
+           doublon avec l'en-tête. Sur une colonne de SALLE, l'en-tête dit OÙ et non QUOI :
+           l'activité doit toujours s'afficher, même s'il n'y en a qu'une possible —
+           c'est ce qui rendait la salle d'EEP muette. */
+        const colSalle=!!(row.salle||row.hasSalleChoice);
+        const lieu=(salleTrack&&g.salle)?g.salle:((monoActe&&!colSalle)?null:(g.acte.short||g.acte.label||""));
+        /* v9.67 : option A — l'occupant sans salle est signalé sur sa ligne */
+        const noSalle=salleTrack&&!g.salle&&g.acte&&g.acte.hasSalle&&g.meds.some(m=>m&&m.id!==IDE_MED.id);
+        const dc=g.dif?((g.dif.c||"")+(g.dif.h?(g.dif.c?" — ":"")+g.dif.h:"")):"";
+        /* v9.46 : un groupe porté par IDE_MED n'a pas d'occupant — pas de vignette,
+           et le chiffre porte son unité puisque aucun nom ne l'éclaire. */
+        const meds=g.meds.filter(m=>m&&m.id!==IDE_MED.id);
+        const imeds=g.imeds||[];
+        const ideOnly=meds.length===0&&g.meds.length>0;
+        const showIde=ideOnly?(ideN>0):(ideActive&&(ideN>0||g.dif));
+        return(
+        <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:4,paddingTop:gi?4:0,marginTop:gi?1:0,borderTop:gi?"1px dashed "+(conflA?conflSep(darkMode):"var(--border)"):"none"}}>
+          {(meds.length>0||imeds.length>0)&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
+            {meds.map((m,mi)=>{
+              /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
+              const iss=issMap[m.id+"|"+ry+"|"+rm+"|"+d+"|"+sl];
+              return <span key={mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(iss?" — "+iss:"")+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{position:"relative",width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}{notes[nk(m.id,ry,rm,d,sl)]&&<span style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
+                {iss&&<span style={{position:"absolute",top:-2,left:-2,width:8,height:8,borderRadius:"50%",background:"#f85149",border:"1.5px solid var(--bg2)"}}/>}
+              </span>;
+            })}
+            {imeds.map((m,mi)=>(
+              <span key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</span>
+            ))}
+          </div>}
+          {(lieu||showIde||noSalle)&&
+            <span title={g.dif?("Départ différé"+(dc?" — "+dc:"")):undefined} style={{...pillCols((g.acte&&g.acte.color)||"#888888",darkMode),display:"inline-flex",alignItems:"stretch",height:22,borderRadius:4,overflow:"hidden",fontFamily:"'JetBrains Mono',monospace",fontSize:9.5,fontWeight:800,whiteSpace:"nowrap",cursor:g.dif?"help":"inherit"}}>
+              {noSalle&&<span style={{display:"flex",alignItems:"center",padding:"0 6px",background:"#fff3cd",color:"#8a6100"}}>⚠ sans salle</span>}
+              {lieu&&<span style={{display:"flex",alignItems:"center",padding:"0 6px"}}>{lieu}</span>}
+              {showIde&&<span style={{display:"flex",alignItems:"center",padding:"0 5px",background:"#e0f4e3",color:"#2f9440",borderLeft:lieu?"1px solid #95d99f":"none"}}>{ideOnly?(ideN+" IDE"):ideN}{g.dif&&<span style={{marginLeft:4,fontSize:9}}>🕙</span>}</span>}
+            </span>}
+        </div>
+      );})}
+      </div>
+      {!fz&&occ.length===0&&_grpsA.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
+    </td>
+  );
+}
+
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
 function ActTabView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
@@ -1556,29 +1690,10 @@ function ActTabView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null
   const _nMasq=rows.length-rowsVus.length;
   const _masquables=rows.map(r=>({k:r.key,lab:r.label}));
 
-  function getOcc(row,d,sl,ry,rm){
-    if(!ry)ry=year; if(!rm&&rm!==0)rm=month;
-    const occ=[];
-    row.ids.forEach(acteId=>{
-      medecins.forEach(med=>{
-        getEntries(med.id,ry,rm,d,sl).forEach(e=>{
-          const match=(!e.cond)&&(row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId);
-          if(match&&!occ.find(x=>x.med.id===med.id&&x.acteId===acteId)){
-            const acte=actes.find(a=>a.id===acteId)||{short:acteId,color:row.color,bg:"#111"};
-            occ.push({med,acte,salle:e.salle||null,dif:e.dif||null,n:null});
-          }
-        });
-      });
-      getEntries(IDE_MED.id,ry,rm,d,sl).forEach(e=>{
-        const match=row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId;
-        if(match&&!occ.find(x=>x.med.id===IDE_MED.id&&x.acte&&x.acte.id===acteId)){
-          const acte=actes.find(a=>a.id===acteId)||{id:acteId,short:acteId,color:row.color,bg:"#111"};
-          occ.push({med:IDE_MED,acte,salle:e.salle||null,dif:e.dif||null,n:(e.n===undefined||e.n===null)?null:e.n});
-        }
-      });
-    });
-    return occ;
-  }
+  /* v10.240 : occupation et case calculées hors du composant (actOcc, actCellTd) — la colonne 👁
+     du Planning appelle les mêmes fonctions. */
+  const cxA={year,month,medecins,actes,getEntries,notes,intCfg,salleFerm,salleVide,darkMode,isEdit,onPickAct,issMap,onCellHistory,ideActive:!!(ideFeature&&ideOn)};
+  function getOcc(row,d,sl,ry,rm){return actOcc(cxA,row,d,sl,ry,rm);}
 
   /* ── v9.35 : volet IDE (PT Cardio) ── */
   const [idePanel,setIdePanel]=useState(false);
@@ -1659,88 +1774,7 @@ function ActTabView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null
       </div>
     </div>}
   </div>:null);
-  function renderActCell(row,d,sl,ry,rm){
-    if(!ry)ry=year;
-    if(!rm&&rm!==0)rm=month;
-    const isTd=d===today.getDate()&&rm===today.getMonth()&&ry===today.getFullYear();
-    if(isWE(ry,rm,d)) return <td key={`${row.label}-${d}-${sl}`} style={{...S.td,...S.tdWE,padding:2}}/>;
-    const occ=getOcc(row,d,sl,ry,rm);
-    /* v9.54 : deux ACTIVITÉS différentes sur le créneau passent la case en rouge —
-       deux salles d'une même activité, non. */
-    const _grpsA=salleGroups(row,occ);
-    /* v10.53 : notes par médecin — infobulle « INIT : note » sur la case */
-    const _nMeds=[];_grpsA.forEach(g=>(g.meds||[]).concat(g.imeds||[]).forEach(m=>{if(m&&m.id!==IDE_MED.id&&!_nMeds.find(x=>x.id===m.id))_nMeds.push(m);}));   /* v10.178 : internes compris */
-    const noteTips=_nMeds.map(m=>{const n=notes[nk(m.id,ry,rm,d,sl)];return n?(m.init+" : "+n):null;}).filter(Boolean).join("  |  ");
-    const _idsA={};_grpsA.forEach(g=>{if(g.acte&&g.acte.id)_idsA[g.acte.id]=1;});
-    const conflA=Object.keys(_idsA).length>1;
-    /* v10.62 : internes de la case — rond pointillé, jamais dans le conflit */
-    const semJA=intMedsDuJour(intCfg,ry,rm,d);
-    if(semJA)semJA.meds.forEach(im=>{
-      row.ids.forEach(aid=>{
-        getEntries(im.id,ry,rm,d,sl).forEach(e=>{
-          if(!(e&&e.acteId===aid&&!e.cond&&(row.salle?e.salle===row.salle:true)))return;
-          const a2=actes.find(a=>a.id===aid)||{id:aid,short:aid,color:row.color};
-          let g=_grpsA.find(x=>x.acte&&x.acte.id===aid&&((x.salle||null)===(e.salle||null)));
-          if(!g){g={acte:a2,salle:e.salle||null,meds:[],n:null,dif:null};_grpsA.push(g);}
-          g.imeds=(g.imeds||[]);
-          if(!g.imeds.find(x=>x.id===im.id))g.imeds.push(im);
-        });
-      });
-    });
-    const fz=!!salleFerm&&!!row.salle&&salleFermee(row.salle,ry,rm,d,sl,salleFerm);   /* v10.229 : colonne de SALLE fermée — case grisée */
-    return(
-      <td key={`${row.label}-${d}-${sl}`} data-vide={!fz&&videFond(salleVide,row.salle,occ.length===0&&_grpsA.length===0,darkMode)?"1":undefined} data-ferm={fz?"1":undefined} title={(fz?"🚫 Plage fermée"+(_grpsA.length?" — occupant(s) à déplacer":"")+(noteTips?"  |  ":""):"")+(noteTips||"")||undefined} style={{...S.td,...(conflA?conflBg(darkMode):{}),...(isTd?{background:"var(--bg-td)"}:{}),...(videFond(salleVide,row.salle,occ.length===0&&_grpsA.length===0,darkMode)||{}),...(fz?fermFond(darkMode):{}),padding:3,maxWidth:150,cursor:isEdit?"pointer":"default"}}
-        onClick={isEdit?()=>{if(_gvLpF){_gvLpF=false;return;}onPickAct({row,d,sl,y:ry,m:rm});}:undefined}>
-        <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"stretch"}}
-          onClick={e=>{e.stopPropagation();if(_gvLpF){_gvLpF=false;return;}if(isEdit)onPickAct({row,d,sl,y:ry,m:rm});}}>
-        {_grpsA.map((g,gi)=>{
-          const monoActe=(row.ids||[]).length===1&&!row.multiActe;
-          const ideN=(g.n===null||g.n===undefined)?(g.acte.ideN||0):g.n;
-          /* v9.45 : le segment gauche porte la SALLE si la ligne en propose, sinon
-             le libellé de l'activité — jamais les deux, jamais de couleur de fond. */
-          const salleTrack=row.hasSalleChoice||(g.acte&&g.acte.hasSalle&&!g.acte.fixedSalle);
-          /* v10.14 : le libellé n'est masqué que sur une colonne d'ACTIVITÉ, où il ferait
-             doublon avec l'en-tête. Sur une colonne de SALLE, l'en-tête dit OÙ et non QUOI :
-             l'activité doit toujours s'afficher, même s'il n'y en a qu'une possible —
-             c'est ce qui rendait la salle d'EEP muette. */
-          const colSalle=!!(row.salle||row.hasSalleChoice);
-          const lieu=(salleTrack&&g.salle)?g.salle:((monoActe&&!colSalle)?null:(g.acte.short||g.acte.label||""));
-          /* v9.67 : option A — l'occupant sans salle est signalé sur sa ligne */
-          const noSalle=salleTrack&&!g.salle&&g.acte&&g.acte.hasSalle&&g.meds.some(m=>m&&m.id!==IDE_MED.id);
-          const dc=g.dif?((g.dif.c||"")+(g.dif.h?(g.dif.c?" — ":"")+g.dif.h:"")):"";
-          /* v9.46 : un groupe porté par IDE_MED n'a pas d'occupant — pas de vignette,
-             et le chiffre porte son unité puisque aucun nom ne l'éclaire. */
-          const meds=g.meds.filter(m=>m&&m.id!==IDE_MED.id);
-          const imeds=g.imeds||[];
-          const ideOnly=meds.length===0&&g.meds.length>0;
-          const showIde=ideOnly?(ideN>0):(ideActive&&(ideN>0||g.dif));
-          return(
-          <div key={gi} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:4,paddingTop:gi?4:0,marginTop:gi?1:0,borderTop:gi?"1px dashed "+(conflA?conflSep(darkMode):"var(--border)"):"none"}}>
-            {(meds.length>0||imeds.length>0)&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
-              {meds.map((m,mi)=>{
-                /* v10.74 : meme alerte que le triangle du Planning, sur le rond de l'occupant */
-                const iss=issMap[m.id+"|"+ry+"|"+rm+"|"+d+"|"+sl];
-                return <span key={mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={((m.prenom||"")+" "+(m.nom||"")).trim()+(iss?" — "+iss:"")+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{position:"relative",width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{m.init}{notes[nk(m.id,ry,rm,d,sl)]&&<span style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
-                  {iss&&<span style={{position:"absolute",top:-2,left:-2,width:8,height:8,borderRadius:"50%",background:"#f85149",border:"1.5px solid var(--bg2)"}}/>}
-                </span>;
-              })}
-              {imeds.map((m,mi)=>(
-                <span key={"i"+mi} {...histProps(onCellHistory,m.id,ry,rm,d,sl)} title={m.nom+(notes[nk(m.id,ry,rm,d,sl)]?" — 📝 "+notes[nk(m.id,ry,rm,d,sl)]:"")} style={{width:22,height:22,borderRadius:"50%",background:m.color,color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,border:"1.5px dashed rgba(255,255,255,.95)"}}>{m.init}</span>
-              ))}
-            </div>}
-            {(lieu||showIde||noSalle)&&
-              <span title={g.dif?("Départ différé"+(dc?" — "+dc:"")):undefined} style={{...pillCols((g.acte&&g.acte.color)||"#888888",darkMode),display:"inline-flex",alignItems:"stretch",height:22,borderRadius:4,overflow:"hidden",fontFamily:"'JetBrains Mono',monospace",fontSize:9.5,fontWeight:800,whiteSpace:"nowrap",cursor:g.dif?"help":"inherit"}}>
-                {noSalle&&<span style={{display:"flex",alignItems:"center",padding:"0 6px",background:"#fff3cd",color:"#8a6100"}}>⚠ sans salle</span>}
-                {lieu&&<span style={{display:"flex",alignItems:"center",padding:"0 6px"}}>{lieu}</span>}
-                {showIde&&<span style={{display:"flex",alignItems:"center",padding:"0 5px",background:"#e0f4e3",color:"#2f9440",borderLeft:lieu?"1px solid #95d99f":"none"}}>{ideOnly?(ideN+" IDE"):ideN}{g.dif&&<span style={{marginLeft:4,fontSize:9}}>🕙</span>}</span>}
-              </span>}
-          </div>
-        );})}
-        </div>
-        {!fz&&occ.length===0&&_grpsA.length===0&&<div style={{color:"var(--border)",textAlign:"center",fontSize:13}}>·</div>}
-      </td>
-    );
-  }
+  function renderActCell(row,d,sl,ry,rm){return actCellTd(cxA,row,d,sl,ry,rm);}
 
   /* v10.171 : sous 760 px, les outils (IDE et ⚙️ compris) se replient sous ⋯ (mécanisme de Planning, v10.132) ; 📅 reste. */
   const outils=<React.Fragment>
@@ -6297,6 +6331,10 @@ const HELP_SECTIONS=[
   HT({children:"Ce qui se passe autour"}),
   HP({children:[HE("b",null,"Un médecin déjà posé")," dans une plage qu'on ferme n'est pas retiré : il reste affiché sur la case grisée et entre dans le bandeau ⚠ des problèmes de planning (« en plage fermée »), à déplacer à la main. ",HE("b",null,"Le planning type")," ne pose rien dans une plage fermée : la case est sautée et le message de fin le compte. Renommer une salle emporte ses fermetures ; la supprimer les efface."]})
  )},
+ {id:"colplanning",icon:"👁",title:"Colonnes de salles et d'activités dans le Planning",body:()=>HE("div",null,
+  HP({children:["Accès : éditeur et intermédiaires. Pour construire le planning en voyant tout le monde, le bouton ",HBtn({kind:"ghost",children:"👁"})," de la barre du Planning ouvre la liste de ",HE("b",null,"toutes les colonnes des onglets salles")," — CHL, CHB (avec le BIP), PT Cardio (avec la Stimulation) et PT Angio — et un champ de recherche (« bip », « stim », « CHB-2 »…). Chaque colonne cochée s'ajoute ",HE("b",null,"tout à droite, après les médecins"),", derrière un trait vertical (v10.240)."]}),
+  HP({children:["La colonne est ",HE("b",null,"exactement celle de son onglet"),", dessinée par le même code : mêmes ronds, mêmes couleurs, salle vide colorée, plage fermée grisée, alertes et notes. Un clic ouvre la même fenêtre que dans l'onglet d'origine, avec les mêmes droits et les mêmes verrous. Poser un médecin depuis cette colonne revient à le poser dans sa propre colonne : tout se met à jour en même temps, rien n'est écrit deux fois."]}),
+  HP({last:true,children:["Réglage ",HE("b",null,"propre à cet appareil"),", vide par défaut : personne d'autre ne voit vos colonnes, et elles disparaissent dès qu'on les décoche (",HBtn({kind:"ghost",children:"✕ Tout décocher"}),"). Le bouton 👁 prend un liseré tant qu'une colonne est cochée. Ces colonnes ne sont pas imprimées. Seul ce qui est déjà une colonne dans un onglet salle peut être affiché : pour une activité qui n'en a pas, cochez-lui une colonne de reprise ↩ dans Paramètres → Activités."]}))},
  {id:"bac",icon:"🧪",title:"Bac à sable — tester sans risque",body:()=>HE("div",null,
   HP({children:["Un espace de test à part, réservé à l'éditeur (Paramètres → 🧪 Bac à sable). En y entrant, l'application recopie le planning réel dans un cahier Firebase distinct, puis se recharge dessus : tout ce que vous y faites reste dans cette copie. Le bac est propre au navigateur qui l'a activé — vos collègues continuent de voir le vrai planning, et d'y travailler."]}),
   HP({children:[HE("b",null,"Ce qui s'y comporte comme dans le vrai")," : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."]}),
@@ -7822,7 +7860,7 @@ function annEvtRows(evts,rows,fix){
     evts.filter(e=>i===0?(un||e.slot!=="AM"):e.slot==="AM").forEach(e=>out.push(
       <tr key={"ann-"+e.id} style={{height:22}}>
         {(i===0?F.m:F.am).map((st,k)=><td key={k} style={{...S.tdFix,background:"var(--td-fix)",...st}}/>)}
-        <td colSpan={F.n||1} style={{background:e.color||ANN_COLORS[0],padding:"2px 6px",borderBottom:"1px solid var(--border)",fontSize:12,fontWeight:700,color:"#0f172a",whiteSpace:"nowrap",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis"}}>{e.txt}</td></tr>));
+        <td colSpan={F.n||1} style={{background:e.color||ANN_COLORS[0],padding:"2px 6px",borderBottom:"1px solid var(--border)",fontSize:12,fontWeight:700,color:"#0f172a",whiteSpace:"nowrap",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis"}}>{e.txt}</td>{Array.from({length:F.x||0}).map((_,k)=><td key={"x"+k}/>)}</tr>));
     out.push(r);
   });
   return out;
@@ -10435,6 +10473,11 @@ function CardioPlanning(){
   const [colHide,setColHide]=useState(()=>{const v=ld("cp6_colHide",{});return v&&typeof v==="object"?v:{};});
   useEffect(()=>{sv("cp6_colHide",colHide);},[colHide]);
   const [hideModal,setHideModal]=useState(null);
+  /* v10.240 : colonnes 👁 du Planning (éditeur, intermédiaires) — salles et activités des onglets salles affichées
+     à droite des médecins. Réglage propre à CET appareil, vide par défaut : rien ne s'affiche tant qu'on ne coche pas. */
+  const [planCols,setPlanCols]=useState(()=>{const v=ld("cp6_planCols",[]);return Array.isArray(v)?v:[];});
+  useEffect(()=>{sv("cp6_planCols",planCols);},[planCols]);
+  const [planColQ,setPlanColQ]=useState("");
   const colHideToggle=(site,k)=>setColHide(p=>{const cur=(p&&p[site])||[];return {...p,[site]:cur.includes(k)?cur.filter(x=>x!==k):cur.concat([k])};});
   const viewPeriod=true;const setViewPeriod=()=>{};
   const snapToPeriodStart=React.useCallback((y,m)=>{
@@ -13192,6 +13235,46 @@ function CardioPlanning(){
      dans un plateau qui se referme au geste suivant ; le bouton « ce jour / toute la période »
      reste visible car c'est le plus utilisé. Le filtre devient un menu déroulant, partout,
      Garde int. reste à côté. Sur ordinateur, rien ne bouge. Les mêmes boutons servent aux deux onglets. */
+  /* v10.240 : UN SEUL jeu de gestionnaires pour les onglets salles ET les colonnes 👁 du Planning —
+     même droit de modifier (peutSalles), même fenêtre au clic, mêmes verrous (jour passé, plage fermée). */
+  const peutSalles=isEdit||isAdminEdit||(isMedEdit&&!isAttEdit);
+  const pickSiteDe=(site)=>({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;
+    let full=siteActes;
+    if(site==="CHB"){const bip=actes.find(a=>a.id==="BIP");
+      /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
+         figée. Une salle ajoutée à Béthune et autorisée pour le BIP est reconnue sans
+         modification du code — dernier endroit où un nom de salle était comparé à une
+         liste écrite en dur. */
+      full=bip&&(bip.salles||[]).includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;}
+    setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");};
+  const pickAct=({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(row&&row.salle,y,m,d,sl))return;setMData({row,d,sl,y,m});setModal("pickMedAct");};
+  const canPlanCols=(isEdProfil||isInterProfil)&&!isAttProfil;
+  const PC_SITES=[["CHL","🏥 CHL","CHL"],["CHB","🏥 CHB","CHB"],["PT","❤️ PT Cardio","PT Cardio"],["ANGIO","🔬 PT Angio","PT Angio"]];
+  /* catalogue : toutes les colonnes des 4 onglets salles, dans leur ordre ; lab = libellé long pour la liste */
+  const planColCat=()=>PC_SITES.map(([s,lab,court])=>({s,lab,court,cols:s==="PT"
+    ?ptRows.map(r=>({k:"PT|"+r.key,lab:r.label,row:r}))
+    :siteCols(s,actes,salleReg,colOrder[s]||null).map(c=>({k:s+"|"+c,salle:c,lab:c==="CHB-BIP"?"BIP":String(c).indexOf("RECAP:")===0?(((actes.find(a2=>a2.id===c.slice(6))||{}).label)||c.slice(6))+" (↩ reprise)":c}))}));
+  const planColsVues=(()=>{
+    if(!canPlanCols||printWk||!planCols.length)return null;
+    const out=[],hist=isAnyEdit?openCellHistory:null;
+    planColCat().forEach(g=>{
+      const pris=g.cols.filter(c=>planCols.includes(c.k));if(!pris.length)return;
+      if(g.s==="PT"){
+        const cx={year,month,medecins:medsAff,actes,getEntries,notes:notesAff,intCfg:intCfgAff,salleFerm,salleVide,darkMode,isEdit:peutSalles,onPickAct:pickAct,issMap:issAllMap,onCellHistory:hist,ideActive:!!ideOn};
+        pris.forEach(c=>out.push({k:c.k,site:g.court,titre:c.lab+" — "+g.court,w:105,
+          th:<div style={{fontWeight:800,fontSize:13,color:darkMode?lightenHex(c.row.color,.55):c.row.color,fontFamily:"'JetBrains Mono',monospace"}}>{c.row.label}</div>,
+          td:(d,sl,y,m)=>actCellTd(cx,c.row,d,sl,y,m)}));
+      }else{
+        const sa=siteActesDe(g.s,actes);
+        const cx={year,month,actes,medecins:medsAff,getEntries,intCfg:intCfgAff,isEdit:peutSalles,onPickSite:pickSiteDe(g.s),darkMode,onCellHistory:hist,siteActes:sa,salleOcc,notes:notesAff,salleFerm,salleVide,issMap:issAllMap};
+        pris.forEach(c=>out.push({k:c.k,site:g.court,titre:c.lab+" — "+g.court,w:80,
+          th:<div style={{fontWeight:800,fontSize:10,color:"var(--txt)",fontFamily:"'JetBrains Mono',monospace"}}>{siteColLab(c.salle,actes)}</div>,
+          td:(d,sl,y,m)=>siteCellTd(cx,c.salle,d,sl,y,m)}));
+      }
+    });
+    return out.length?out:null;
+  })();
+  const btnCols=canPlanCols?<button onClick={()=>{setPlanColQ("");setModal("planCols");}} title="Colonnes de salles et d'activités" style={{...S.arr,fontSize:13,width:30,color:planCols.length?"var(--today-c)":"var(--txt2)",border:`1px solid ${planCols.length?"var(--today-c)":"var(--border)"}`}}>👁</button>:null;
   const btnPrint=<button onClick={()=>setModal("print")} title="Imprimer" style={{...S.arr,fontSize:13,width:30}}>🖨️</button>;
   const btnDark=<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button>;
   const btnSig=<React.Fragment><ZoomBtn/><button onClick={()=>setModal("signal")} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button></React.Fragment>;   /* v10.142 ; v10.179 : le 🔍 devant */
@@ -13456,10 +13539,10 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={nextM} style={S.arr}>›</button>
             </div>
             <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-              {iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}{btnPref}</React.Fragment>)}
+              {iconsFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnFull}{btnPref}{btnCols}</React.Fragment>)}
             </div>
           </div>
-          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnPref}</React.Fragment>)}
+          {trayFold(<React.Fragment>{btnPrint}{btnDark}{btnSig}{btnPref}{btnCols}</React.Fragment>)}
           {prefOn&&<div style={{display:"flex",flexWrap:"wrap",gap:"4px 10px",alignItems:"center",marginBottom:8,fontSize:10,color:"var(--txt3)"}}>
             <span style={{fontWeight:700,textTransform:"uppercase"}}>Préférences :</span>
             <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"rgba(56,139,253,.20)",border:"1px solid #388bfd"}}></span>souhaite tourner</span>
@@ -13475,7 +13558,7 @@ header::-webkit-scrollbar { display: none; }
               {medPlan.map(m=>{const on=planFilter.includes(m.id);return <button key={m.id} onClick={()=>setPlanFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={{padding:"2px 7px",borderRadius:10,border:`1px solid ${on?m.color:"var(--border)"}`,background:on?m.color:"var(--bg2)",color:on?"#fff":"var(--txt2)",fontSize:11,cursor:"pointer",fontWeight:on?700:400}}>{m.init}</button>;})}
             </div>}
           </div>
-          {<GridV annJour={annJourDe("planning")} onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} gardeSelf={gardeSelfId} gardeOuvert={gardeOuvert} onPrevenir={annPrevenir} pushMeds={pushMeds} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
+          {<GridV annJour={annJourDe("planning")} onRemoveGarde={removeGardeDay} planIssues={planIssues.map} intGarde={intGardeOn?((y2,m2,d2)=>intGardeDuJour(getEntries,intCfgAff,y2,m2,d2)):null} printWk={printWk} allDays4={allDays4} allDays={allDays} year={year} month={month} meds={filteredMeds} getEntries={getEntries} acteById={acteById} onCell={openCell} isEdit={isAnyEdit} gardeSelf={gardeSelfId} gardeOuvert={gardeOuvert} onPrevenir={annPrevenir} pushMeds={pushMeds} notes={notesAff} isVac={isVac} applyGarde={applyGarde} allMeds={medsAff} viewPeriod={viewPeriod} allDays4={allDays4} showFull={showFull} gardeLocked={isAdminEdit||isAttEdit} onCellHistory={isAnyEdit?openCellHistory:null} prefFor={prefOn?prefFor:null} gardePref={gardePrefFor} getAstreinteForDay={prefOn?null:astSelf} extraCols={planColsVues} memX="planning" selfId={selfLis} centreId={selfMedId} lis={lisCur} suiviId={suiviCur} onSuivi={suiviTap}/>}
         </div>
       )}
 
@@ -13485,31 +13568,24 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onPushDemande={(l)=>annPrevenir(l,true,true)} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
-        onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
+      {tab==="chl"&&<SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={peutSalles} notes={notesAff}
+        onPickSite={pickSiteDe("CHL")}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" salleFerm={salleFerm} intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
-        onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;
-          const bip=actes.find(a=>a.id==="BIP");
-          /* v9.86 : les salles du BIP viennent de l'activité elle-même, plus d'une liste
-             figée. Une salle ajoutée à Béthune et autorisée pour le BIP est reconnue sans
-             modification du code — dernier endroit où un nom de salle était comparé à une
-             liste écrite en dur. */
-          const full=bip&&(bip.salles||[]).includes(salle)?[...siteActes.filter(a=>a.id!=="BIP"),bip]:siteActes;
-          setMData({salle,siteActes:full,d,sl,y,m});setModal("pickMedSite");}} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
+        <SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" salleFerm={salleFerm} intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={peutSalles} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
+        onPickSite={pickSiteDe("CHB")} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
       {tab==="plateau"&&<ActTabView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" salleFerm={salleFerm} intCfg={intCfgAff}
         rows={ptRows} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["PT"]||null} onHide={(cols)=>{setHideModal({site:"PT",cols});setModal("colHide");}} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
-        getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
-        onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(row&&row.salle,y,m,d,sl))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
+        getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={peutSalles} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
+        onPickAct={pickAct}/>}
 
       {tab==="angio"&&<SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
-        allDays={allDays} isEdit={isEdit||isAdminEdit||(isMedEdit&&!isAttEdit)} notes={notesAff}
-        onPickSite={({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;setMData({salle,siteActes,d,sl,y,m});setModal("pickMedSite");}}
+        allDays={allDays} isEdit={peutSalles} notes={notesAff}
+        onPickSite={pickSiteDe("ANGIO")}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
       {false&&null&&<ActTabView title="🔬 PT Angio" titleColor="#c084fc"
         rows={[
@@ -13519,7 +13595,7 @@ header::-webkit-scrollbar { display: none; }
         ]}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} isEdit={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
-        onPickAct={({row,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(row&&row.salle,y,m,d,sl))return;setMData({row,d,sl,y,m});setModal("pickMedAct");}}/>}
+        onPickAct={pickAct}/>}
 
       {tab==="garde"&&<GardeView {...gardeProps}/>}
 
@@ -15714,6 +15790,30 @@ header::-webkit-scrollbar { display: none; }
           <button style={{...S.icnBtn,width:"100%",marginTop:10}} onClick={()=>{setColOrder(p=>({...p,[colModal.site]:[]}));setModal(null);setColModal(null);}}>↩ Ordre par défaut</button>
         </div>
       </div>}
+      {modal==="planCols"&&canPlanCols&&(()=>{   /* v10.240 : colonnes 👁 du Planning */
+        const ferme=()=>setModal(null);
+        const q=planColQ.trim().toLowerCase();
+        const cat=planColCat().map(g=>({...g,cols:g.cols.filter(c=>!q||(c.lab+" "+g.court).toLowerCase().indexOf(q)>=0)})).filter(g=>g.cols.length);
+        const bascule=k=>setPlanCols(p=>p.includes(k)?p.filter(x=>x!==k):p.concat([k]));
+        return <div style={S.ov} onClick={ferme}>
+          <div style={{...S.mb,width:360}} onClick={e=>e.stopPropagation()}>
+            <div style={S.mHd}><div style={S.mTit2}>👁 Colonnes à droite des médecins</div><button style={S.xBtn} onClick={ferme}>×</button></div>
+            <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8,lineHeight:1.45}}>Chaque colonne cochée s'affiche à droite du Planning exactement comme dans son onglet, et se remplit d'un clic. Réglage propre à cet appareil : personne d'autre ne la voit. Ces colonnes ne sont pas imprimées.</div>
+            <input value={planColQ} onChange={e=>setPlanColQ(e.target.value)} placeholder="🔍 Rechercher (ex. bip, stim, CHB-2)…" style={{...S.fi,width:"100%",marginBottom:8}}/>
+            <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:"55vh",overflowY:"auto"}}>
+              {cat.length===0&&<div style={{fontSize:12,color:"var(--txt3)",padding:8,textAlign:"center"}}>Aucune colonne ne correspond.</div>}
+              {cat.map(g=><React.Fragment key={g.s}>
+                <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",margin:"6px 0 2px"}}>{g.lab}</div>
+                {g.cols.map(c=>{const on=planCols.includes(c.k);return(
+                  <label key={c.k} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 6px",border:"1px solid "+(on?"var(--today-c)":"var(--border)"),borderRadius:6,background:"var(--bg2)",cursor:"pointer"}}>
+                    <input type="checkbox" checked={on} onChange={()=>bascule(c.k)}/>
+                    <span style={{flex:1,fontSize:12,fontWeight:700}}>{c.lab}</span>
+                  </label>);})}
+              </React.Fragment>)}
+            </div>
+            <button style={{...S.icnBtn,width:"100%",marginTop:10}} disabled={!planCols.length} onClick={()=>setPlanCols([])}>✕ Tout décocher</button>
+          </div>
+        </div>;})()}
       {modal==="colHide"&&hideModal&&(()=>{
         const cur=colHide[hideModal.site]||[];
         const nomSite=hideModal.site==="PT"?"PT Cardio":hideModal.site==="ANGIO"?"PT Angio":hideModal.site;
