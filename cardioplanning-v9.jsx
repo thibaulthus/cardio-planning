@@ -9,7 +9,12 @@ const db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseD
    archivage, ni signalement ; tout le reste (verrous, notifications, Construire) est identique. */
 var BAC=(function(){try{return localStorage.getItem("cp6_bac")==="1";}catch(e){return false;}})();
 var PLAN_ID=BAC?"bac":"main";
-var JOURNAL_ID=BAC?"journalBac":"journal";   /* v10.176 : l'historique des cases du bac ne se mêle pas au vrai */
+/* v10.238 : HISTORIQUE DES CASES — un cahier PAR PÉRIODE (planning/hist-<période>), une ligne compacte par
+   modification. Plus de purge à 1000 lignes : le cahier d'une période garde tout, et suit la période jusqu'à son
+   archivage (il part alors dans le fichier téléchargé). Le bac a son cahier à lui (hist-bac), remis à zéro à chaque
+   copie ; il lit le VRAI historique jusqu'à son heure de départ (BAC_DEP). */
+var HIST_PFX="hist-";
+var BAC_DEP={t:null};
 const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", PLAN_ID) : null;
 /* v10.135 : garde-fou de version. Le 28/08, après un plantage, le cache a resservi une
    v9.22 — une copie de juillet qui aurait écrit avec ses règles d'alors, sans verrou du
@@ -119,7 +124,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.237 — 23/09/2026";
+const APP_VERSION="v10.238 — 23/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6210,6 +6215,7 @@ const HELP_SECTIONS=[
   HP({children:["🔐 ",HE("b",null,"Niveaux de droits")," : chaque médecin a un niveau dans sa fiche ✏️ (onglet Équipe), qui s'applique quand il se connecte avec son PIN personnel. ",HE("b",null,"Basique")," = sa propre ligne, plus ses activités dans CHL, CHB et les plateaux. ",HE("b",null,"Intermédiaire")," = le planning de tous les médecins, gardes et échanges, semaines de tour, planning type et attachés — sans Paramètres, Équipe ni Activités. ",HE("b",null,"Éditeur")," = accès complet. Récapitulatif dans Paramètres."]}),
   HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
   HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case — dans le Planning et les Attachés, sur le rond du médecin dans CHL, CHB, PT Cardio et PT Angio, sur la case dans Internes (v10.176) — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
+  HP({children:["Depuis la v10.238, l'historique n'a ",HE("b",null,"plus de limite de 1000 lignes"),". Chaque période a son propre cahier d'historique, qui garde toutes les modifications de ses cases — y compris les deux mois de construction qui précèdent la période. Il suit la période jusqu'à son archivage : il part alors dans le fichier téléchargé, et reste lisible dans l'application. Un cahier contient plus de dix mille modifications ; s'il approchait de sa limite, l'éditeur serait prévenu à l'ouverture avant que les lignes les plus anciennes ne s'effacent."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
 
  {id:"cellules",icon:"🔲",title:"Les cellules du planning",body:()=>HE("div",null,
@@ -6258,7 +6264,7 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Le balai des fiches (« Retirer ces activités »)")," suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."]}),
   HP({children:[HE("b",null,"Les périodes à venir")," (v10.146) : fermées à tous sauf l'éditeur, badge « 🚧 En préparation ». Dès qu'il ouvre la demande de congés dans Construire, badge « 🏖️ Congés ouverts » : chacun pose congés, FMC et préférences, et rien d'autre, jusqu'à ce qu'il referme la demande. À la diffusion du planning, la période s'ouvre comme la période en cours. L'éditeur peut déroger pour un profil dans Paramètres. Les semaines de tour, elles, restent invisibles tant que l'éditeur n'a pas validé le tour dans Construire (v10.158)."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
-  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période. Une exception voulue : le décompte des binômes de tour. Au moment de l'archivage, les semaines de tour de la période sont recopiées dans une petite ardoise permanente qui, elle, ne part jamais avec une période — sans quoi le tableau 🤝 repartirait de zéro à chaque archivage. Elle se purge d'elle-même au-delà de deux ans."]}),
+  HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase — il contient aussi l'historique des cases de la période), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période. Une exception voulue : le décompte des binômes de tour. Au moment de l'archivage, les semaines de tour de la période sont recopiées dans une petite ardoise permanente qui, elle, ne part jamais avec une période — sans quoi le tableau 🤝 repartirait de zéro à chaque archivage. Elle se purge d'elle-même au-delà de deux ans."]}),
   HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
   HT({children:"Feuilleter une sauvegarde comme un planning (v10.237)"}),
   HP({children:["Depuis le ",HE("b",null,"🧪 bac à sable"),", le bouton ",HBtn({kind:"ghost",children:"📥 Charger dans le bac"})," (carte 💾, ou depuis l'aperçu) recopie une sauvegarde ",HE("b",null,"dans le bac uniquement"),". Vous la parcourez alors dans tous les onglets, l'imprimez, y faites des essais : le vrai planning n'est jamais touché. Le bandeau du bas rappelle quelle sauvegarde est chargée ; la remise à zéro du bac y remet une copie du vrai planning."]}),
@@ -6292,7 +6298,8 @@ const HELP_SECTIONS=[
  {id:"bac",icon:"🧪",title:"Bac à sable — tester sans risque",body:()=>HE("div",null,
   HP({children:["Un espace de test à part, réservé à l'éditeur (Paramètres → 🧪 Bac à sable). En y entrant, l'application recopie le planning réel dans un cahier Firebase distinct, puis se recharge dessus : tout ce que vous y faites reste dans cette copie. Le bac est propre au navigateur qui l'a activé — vos collègues continuent de voir le vrai planning, et d'y travailler."]}),
   HP({children:[HE("b",null,"Ce qui s'y comporte comme dans le vrai")," : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."]}),
-  HP({children:[HE("b",null,"Ce qui est désactivé")," : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles. L'historique des cases du bac est tenu à part, sans se mêler au vrai."]}),
+  HP({children:[HE("b",null,"Ce qui est désactivé")," : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."]}),
+  HP({children:[HE("b",null,"L'historique des cases dans le bac"),", depuis la v10.238 : il montre le vrai historique jusqu'au moment où le bac a été copié — ou, si vous avez chargé une sauvegarde, jusqu'à l'heure de cette sauvegarde — puis vos essais du bac, à la suite. Vos essais ne se mêlent jamais au vrai historique, et la remise à zéro (ou le chargement d'une autre sauvegarde) les efface."]}),
   HP({children:[HE("b",null,"Le bandeau orange"),", en bas de l'écran, rappelle où vous êtes et porte trois commandes. ",HE("b",null,"Connecté comme"),", pour passer d'un profil à l'autre sans PIN — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation. ",HBtn({kind:"ghost",children:"↺ Remettre à zéro"}),", qui remplace le bac par une copie fraîche du planning réel. ",HBtn({kind:"ghost",children:"🚪 Sortir du bac"}),", qui ramène au vrai planning. L'écran d'accueil (PIN) affiche le même rappel, avec son bouton Sortir."]})
  )},
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
@@ -8276,6 +8283,31 @@ function expliqueDiffs(diffs,journal,tA,tB){
   const J=Object.values(journal||{}).filter(e=>e&&e.k&&e.t>tA&&e.t<=tB);
   const par={};J.forEach(e=>{const key=e.k+"§"+String(e.md);(par[key]=par[key]||[]).push(e);});
   return diffs.map(d=>{const l=(par[d.k+"§"+d.mid]||[]).slice().sort((x,y)=>(x.t||0)-(y.t||0));return {...d,traces:l,sansTrace:l.length===0};});
+}
+/* v10.238 : historique des cases — une ligne = « t(base 36) ⇥ +/- ⇥ case ⇥ médecin ⇥ activité ⇥ auteur », UN seul champ
+   Firebase par modification (l'ancien format en prenait 7 : plafond de 20 000 champs ≈ 2 800 lignes par cahier). */
+function histEnc(e){return [Math.round(+e.t||0).toString(36),e.x==="add"?"+":"-",String(e.k||""),String(e.md),String(e.act||""),String(e.a||"").replace(/\t/g," ")].join("\t");}
+function histDec(v){
+  if(v&&typeof v==="object")return v.k?v:null;   /* ancien format (planning/journal, avant la v10.238) */
+  const p=String(v||"").split("\t");if(p.length<6)return null;
+  return {t:parseInt(p[0],36)||0,x:p[1]==="+"?"add":"del",k:p[2],md:p[3],act:p[4]||null,a:p.slice(5).join(" ")};
+}
+const HIST_PID={};   /* période d'une case, mémorisée par jour : perOfDay recalcule la liste des jours */
+function histPid(k){const j=String(k||"").slice(0,10);if(!(j in HIST_PID))HIST_PID[j]=arPerClair(j);return HIST_PID[j];}
+function histOctets(e){let n=64;Object.keys(e||{}).forEach(k=>{n+=k.length+2+unescape(encodeURIComponent(String(e[k]))).length;});return n;}
+var HIST_ALERTE=700000,HIST_MAX=900000,HIST_GARDE=800000;   /* octets : Firebase refuse un cahier de plus de 1 Mo */
+/* lecture : les cahiers des périodes demandées (+ l'ancien journal tant qu'il n'est pas migré). Dans le bac : le vrai
+   historique jusqu'à l'heure de départ du bac, puis les lignes du bac lui-même. Rend {id: {t,x,k,md,act,a}}. */
+async function histLire(pids){
+  const out={},dep=BAC?BAC_DEP.t:null;
+  const lit=async(id,champ,garde)=>{try{const d=(await window.firebaseDB.collection("planning").doc(id).get()).data()||{};const e=d[champ]||{};
+    Object.keys(e).forEach(k=>{const x=histDec(e[k]);if(x&&(!garde||garde(x)))out[k]=x;});}catch(err){}};
+  const avant=dep?(x=>x.t<=dep):null;
+  const l=[lit("journal","entries",avant)];
+  Array.from(new Set((pids||[]).filter(Boolean))).forEach(pid=>l.push(lit(HIST_PFX+pid,"e",avant)));
+  if(BAC)l.push(lit(HIST_PFX+"bac","e",dep?(x=>x.t>dep):null));
+  await Promise.all(l);
+  return out;
 }
 function libEntree(e,actes){
   if(!e)return "—";if(Array.isArray(e))return e.map(x=>libEntree(x,actes)).join(" + ");
@@ -10286,11 +10318,12 @@ function CardioPlanning(){
   const logCell=useCallback((action,medId2,y2,m2,d2,sl2,acteId2)=>{
     try{
       if(!window.firebaseDB||!window.firebaseDoc)return;
-      const jdoc=window.firebaseDoc(window.firebaseDB,"planning",JOURNAL_ID);
-      const eid="e"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-      const je={t:Date.now(),k:sk(y2,m2,d2,sl2),md:medId2,x:action,act:acteId2||null,a:authorRef.current};
-      if(updatePaths)Promise.resolve(updatePaths(jdoc,[[["entries",eid],je]])).catch(()=>{if(setDoc)Promise.resolve(setDoc(jdoc,{entries:{[eid]:je}},{merge:true})).catch(()=>{});});
-      else if(setDoc)Promise.resolve(setDoc(jdoc,{entries:{[eid]:je}},{merge:true})).catch(()=>{});
+      const k2=sk(y2,m2,d2,sl2),pid2=BAC?"bac":histPid(k2);if(!pid2)return;   /* v10.238 : le cahier de la période de la case */
+      const jdoc=window.firebaseDoc(window.firebaseDB,"planning",HIST_PFX+pid2);
+      const eid="e"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+      const je=histEnc({t:Date.now(),k:k2,md:medId2,x:action,act:acteId2||null,a:authorRef.current});
+      if(updatePaths)Promise.resolve(updatePaths(jdoc,[[["e",eid],je]])).catch(()=>{if(setDoc)Promise.resolve(setDoc(jdoc,{e:{[eid]:je}},{merge:true})).catch(()=>{});});
+      else if(setDoc)Promise.resolve(setDoc(jdoc,{e:{[eid]:je}},{merge:true})).catch(()=>{});
     }catch(e){}
   },[]);
   const [editMedId,setEditMedId]=useState(null); // medecin logged in with personal PIN
@@ -10767,6 +10800,7 @@ function CardioPlanning(){
             if(data.notes)setNotes(JSON.parse(data.notes));
             if(videColOk(data.salleVideCol))setSalleVideCol(data.salleVideCol);   /* v10.232 */
             setBacDe(BAC&&data._bacDe&&data._bacDe.ts?data._bacDe:null);   /* v10.237 */
+            BAC_DEP.t=BAC?((data._bacDe&&data._bacDe.ts)||data._bacDep||null):null;   /* v10.238 : jusqu'où le vrai historique vaut dans le bac */
             if(data.salleFerm){try{const f=JSON.parse(data.salleFerm)||{};const nf={type:f.type||{},jours:f.jours||{}};FERM.d=nf;setSalleFerm(nf);}catch(e){}}   /* v10.229 */
             /* ── médecins : version découpée si elle existe, sinon migration ── */
             if(data.medecinsV2){setMedecins(readList("medecinsV2",data.medecinsV2,data.medecinsV2Order));}
@@ -10891,10 +10925,10 @@ function CardioPlanning(){
     try{
       let autrePlan=planRef.current||{},tB=Date.now(),libB="le planning actuel";
       if(contre!=="actuel"){const d=(await window.firebaseDB.collection("backups").doc(contre).get()).data()||{};autrePlan=d.planV2?d.planV2:(d.plan?JSON.parse(d.plan):{});tB=d._ts||0;libB="la sauvegarde du "+new Date(tB).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});}
-      const jd=await window.firebaseDB.collection("planning").doc(JOURNAL_ID).get();
-      const journal=(jd.data()||{}).entries||{};
+      const dfs=diffPlans(pv.bPlan,autrePlan);
+      const journal=await histLire(dfs.map(d=>histPid(d.k)));   /* v10.238 : les cahiers des périodes concernées */
       const [tA,tZ]=pv.ts<=tB?[pv.ts,tB]:[tB,pv.ts];
-      const res=expliqueDiffs(diffPlans(pv.bPlan,autrePlan),journal,tA,tZ);
+      const res=expliqueDiffs(dfs,journal,tA,tZ);
       setBkPreview(q=>q?{...q,contre,diff:{res,tA,tB:tZ,libB}}:q);
     }catch(e){toast("Impossible de comparer","warn");setBkPreview(q=>q?{...q,diff:null}:q);}
   },[]);
@@ -11038,7 +11072,8 @@ function CardioPlanning(){
       const data=d.data();
       if(!data){toast("Sauvegarde introuvable","warn");return;}
       const{_ts,gel:_gelAncien,...rest}=data;   /* v10.229 : un gel enregistré DANS la sauvegarde ne revient jamais ; le gel EN COURS, lui, survit à la restauration */
-      if(BAC){delete rest._bacDe;rest._bacDe={ts:_ts||0,at:Date.now()};planPending.current={};planSynced.current=null;
+      if(BAC){delete rest._bacDe;delete rest._bacDep;rest._bacDe={ts:_ts||0,at:Date.now()};planPending.current={};planSynced.current=null;
+        try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : l'historique repart de l'heure de la sauvegarde */
         await window.firebaseDB.collection("planning").doc(PLAN_ID).set(rest);
         toast("📥 Sauvegarde du "+new Date(_ts||0).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+" chargée dans le bac — le vrai planning n'a pas bougé","info");return;}
       if(GEL.on&&GEL.raw)rest.gel=GEL.raw;
@@ -11825,23 +11860,44 @@ function CardioPlanning(){
   const gardePrefFor=(medId,y2,m2,d2)=>{const dkP=dKey(y2,m2,d2);
     return ((gardeWish[dkP]||{})[medId])?"wish":(((gardeAvoid[dkP]||{})[medId])?"avoid":null);};
   useEffect(()=>{authorRef.current=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):(isAdminEdit?((adminName||"?")+(isCadre?" (cadre)":" (secrétaire)")):(isInterne?((interneName||"?")+" (interne)"):(isEdit?"Éditeur":"?")));},[accessMode,isEdit,isMedEdit,isAdminEdit,isInterne,editMedId,adminName,interneName,medecins]);
-  useEffect(()=>{ // purge du journal au-delà de 1200 entrées (éditeur uniquement, garde les 1000 plus récentes)
-    if(!isEdit||!window.firebaseDB)return;
-    (async()=>{try{
-      const d3=await window.firebaseDB.collection("planning").doc(JOURNAL_ID).get();
-      const es=(d3.data()||{}).entries||{};const ks=Object.keys(es);
-      if(ks.length>1200){
-        const kept={};ks.map(k2=>[k2,es[k2]&&es[k2].t||0]).sort((a,b)=>b[1]-a[1]).slice(0,1000).forEach(([k2])=>{kept[k2]=es[k2];});
-        await window.firebaseDB.collection("planning").doc(JOURNAL_ID).set({entries:kept});
-      }
-    }catch(e){}})();
+  /* v10.238 : plus de purge à 1000 lignes. À l'ouverture par l'éditeur (hors bac) : (1) MIGRATION, une fois — l'ancien
+     journal unique (planning/journal) est réparti dans les cahiers de période, puis effacé ; (2) CAPACITÉ des cahiers
+     où l'on écrit (période en cours et les deux suivantes) : alerte au-delà de ~700 Ko, et seulement au-delà de ~900 Ko
+     les lignes les plus anciennes s'effacent (Firebase refuse un cahier de plus de 1 Mo : sinon plus rien ne s'écrirait). */
+  useEffect(()=>{
+    if(!isEdit||BAC||!window.firebaseDB)return;
+    (async()=>{
+      try{
+        const ref=window.firebaseDB.collection("planning").doc("journal");
+        const es=((await ref.get()).data()||{}).entries||{};const ks=Object.keys(es);
+        if(ks.length){
+          const par={};ks.forEach(k2=>{const x=es[k2];if(!x||!x.k)return;const pid=histPid(x.k);if(pid)(par[pid]=par[pid]||{})[k2]=histEnc(x);});
+          for(const pid of Object.keys(par))await window.firebaseDB.collection("planning").doc(HIST_PFX+pid).set({e:par[pid]},{merge:true});
+          await ref.delete();
+        }
+      }catch(e){}
+      try{
+        const t=new Date();let p=perOfDay(t.getFullYear(),t.getMonth(),t.getDate());const pids=[];
+        for(let i=0;i<3;i++){pids.push(perIdOf(p.sy,p.sm));p=perNext(p.sy,p.sm);}
+        for(const pid of pids){
+          const jdoc=window.firebaseDoc(window.firebaseDB,"planning",HIST_PFX+pid);
+          const e=((await window.firebaseDB.collection("planning").doc(HIST_PFX+pid).get()).data()||{}).e||{};
+          const n=histOctets(e);if(n<=HIST_ALERTE)continue;
+          const a=pid.split("-"),lib=perLibelle(+a[0],+a[1]),nb=Object.keys(e).length;
+          if(n<=HIST_MAX){toast("🕘 L'historique des cases de "+lib+" approche de sa limite ("+nb+" modifications) : au-delà d'environ "+Math.round(nb*HIST_MAX/n/100)*100+", les plus anciennes lignes seront effacées","warn");continue;}
+          const tri=Object.keys(e).map(k2=>[k2,(histDec(e[k2])||{}).t||0]).sort((x,y)=>x[1]-y[1]);
+          let reste=n;const del=[];for(const [k2] of tri){if(reste<=HIST_GARDE)break;reste-=k2.length+2+unescape(encodeURIComponent(String(e[k2]))).length;del.push([["e",k2],"__DELETE__"]);}
+          if(updatePaths&&del.length){for(let i2=0;i2<del.length;i2+=400)await updatePaths(jdoc,del.slice(i2,i2+400));
+            toast("🕘 Historique des cases de "+lib+" plein : les "+del.length+" lignes les plus anciennes ont été effacées","warn");}
+        }
+      }catch(e){}
+    })();
   },[isEdit]);
   const openCellHistory=useCallback((medId2,y2,m2,d2,sl2)=>{
     setHistModal({medId:medId2,y:y2,m:m2,d:d2,sl:sl2,loading:true,list:[]});
     (async()=>{try{
-      const d3=await window.firebaseDB.collection("planning").doc(JOURNAL_ID).get();
-      const es=(d3.data()||{}).entries||{};
       const key3=sk(y2,m2,d2,sl2);
+      const es=await histLire([histPid(key3)]);   /* v10.238 : le cahier de la période de la case */
       const list=Object.values(es).filter(e=>e&&e.k===key3&&String(e.md)===String(medId2)).sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,30);
       setHistModal(h=>h?{...h,loading:false,list}:h);
     }catch(e){setHistModal(h=>h?{...h,loading:false,list:[]}:h);}})();
@@ -12999,7 +13055,9 @@ function CardioPlanning(){
      planning et écrit le bac : c'est le seul endroit du code qui nomme les deux cahiers ; partout ailleurs,
      l'application ne connaît que PLANNING_DOC / PLAN_ID. Le changement de profil refait ce que fait le PIN
      (mêmes setAccessMode / setEditMedId / setIsCadre), la vérification du code en moins. */
-  const bacCopie=async()=>{const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};await window.firebaseDB.collection("planning").doc("bac").set(d);};
+  const bacCopie=async()=>{const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};
+    try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : les essais précédents s'effacent */
+    await window.firebaseDB.collection("planning").doc("bac").set({...d,_bacDep:Date.now()});};   /* v10.238 : l'heure de la copie borne le vrai historique */
   const bacEntrer=async()=>{if(!window.confirm("Entrer dans le bac à sable ?\n\nLe planning réel est recopié dans un espace de test à part, puis l'application se recharge. Rien de ce que vous y ferez ne touchera au vrai planning."))return;
     try{await bacCopie();localStorage.setItem("cp6_bac","1");window.location.reload();}catch(e){toast("Échec de la copie vers le bac à sable","warn");}};
   const bacRaz=async()=>{if(!window.confirm("Remettre le bac à sable à zéro ?\n\nSon contenu est remplacé par une copie fraîche du planning réel, puis l'application se recharge."))return;
@@ -14590,7 +14648,9 @@ header::-webkit-scrollbar { display: none; }
                 toast("Archivage terminé : "+(list.length>1?list.length+" périodes copiées puis retirées":"1 période copiée puis retirée")+" des données actives","info");
                 /* le fichier part en dernier, une fois les écritures critiques confirmées ;
                    le court délai laisse aussi partir l'enregistrement des annexes */
-                const blob=new Blob([JSON.stringify({version:"arch-per-1",plan:byPer,annexes:anxL.parts},null,1)],{type:"application/json"});
+                /* v10.238 : l'historique des cases de la période part avec elle, dans le fichier ; il reste lisible (un clic droit sur une case archivée le relit) */
+                const histArch={};for(const pid of list){try{const hd=((await window.firebaseDB.collection("planning").doc(HIST_PFX+pid).get()).data()||{}).e||{};if(Object.keys(hd).length)histArch[pid]=hd;}catch(e){}}
+                const blob=new Blob([JSON.stringify({version:"arch-per-1",plan:byPer,annexes:anxL.parts,historique:histArch},null,1)],{type:"application/json"});
                 const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="archive-cardio-"+list[0]+"_"+list[list.length-1]+".json";
                 setTimeout(()=>{a2.click();},800);
               };
@@ -14984,7 +15044,7 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={()=>setHistModal(null)} style={S.xBtn}>×</button>
             </div>
             {histModal.loading&&<div style={{fontSize:12,color:"var(--txt3)"}}>Chargement…</div>}
-            {!histModal.loading&&histModal.list.length===0&&<div style={{fontSize:12,color:"var(--txt3)"}}>Aucune modification enregistrée pour cette case (le journal démarre avec la v9.9 et ne couvre que les modifications manuelles de cases).</div>}
+            {!histModal.loading&&histModal.list.length===0&&<div style={{fontSize:12,color:"var(--txt3)"}}>Aucune modification enregistrée pour cette case (seules les modifications manuelles de cases sont inscrites).</div>}
             {!histModal.loading&&histModal.list.map((e,i)=>{
               const a3=actes.find(x=>x.id===e.act);
               const dt=new Date(e.t);
