@@ -129,7 +129,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.242 — 25/09/2026";
+const APP_VERSION="v10.243 — 25/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -685,6 +685,9 @@ const vacGroupes=(list)=>{
   return Object.keys(g).sort().map(an=>[an,g[an]]);
 };
 
+/* v10.243 : la pastille « note » était orange, invisible sur les pastilles de même teinte et sur le fond des week-ends —
+   rouge, cerclée de blanc, un peu plus grande. */
+const NOTE_PT={position:"absolute",top:-3,right:-3,width:6,height:6,borderRadius:"50%",background:"#dc2626",border:"1.5px solid #fff",boxSizing:"content-box",zIndex:1};
 function ActPill({a,night,hasNote}){
   if(!a)return null;
   return(
@@ -697,7 +700,7 @@ function ActPill({a,night,hasNote}){
    long fait grandir la pastille au lieu d'être coupé. Vaut pour les 4 onglets et pour
    toute salle ou activité future au nom plus long. */
 minWidth:48,maxWidth:"100%",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{a.short}</div>
-      {hasNote&&<div style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
+      {hasNote&&<div data-note="1" style={NOTE_PT}/>}
     </div>
   );
 }
@@ -715,7 +718,7 @@ function Badge({a,salle,hasNote,hideSalle=false}){
         <span style={{display:"block",padding:"0 3px"}}>{a.short}</span>
         {!hideSalle&&salle&&<span style={{display:"block",fontSize:7,opacity:.85,padding:"0 2px"}}>{salle}</span>}
       </div>
-      {hasNote&&<div style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
+      {hasNote&&<div data-note="1" style={NOTE_PT}/>}
     </div>
   );
 }
@@ -6280,7 +6283,7 @@ const HELP_SECTIONS=[
   HP({children:["Repères visuels : cases grisées = bloquées par une semaine de tour · fond jaune pâle = week-end · fond et contour verts = semaine d'astreinte · ",HBadg({txt:"G",color:"#93c47d"})," garde · ",HBadg({txt:"RG",color:"#ffe599"})," repos post-garde · cases ",HE("b",null,"hachurées")," = personne indisponible (section ⏸)."]}),
   HP({children:["Les activités cochées « reprise » affichent le nom du médecin seul dans les onglets concernés."]}),
   HT({children:"📝 Les notes"}),
-  HP({children:["Une note s'écrit depuis la modale de case, et aussi depuis les fenêtres des onglets ",HE("b",null,"CHL, CHB, PT Cardio et PT Angio"),", où chaque occupant a son propre champ — et, depuis la v10.173, dès la pose : choisir le médecin et l'activité n'écrit plus tout de suite, un écran « À poser » présente le champ de note, puis « ✓ Valider » pose et ferme. Elle est donc toujours ",HE("b",null,"rattachée à un médecin"),", ce qui compte quand deux personnes se succèdent dans la même salle : au survol de la case, les notes s'affichent préfixées des initiales (« ND : 4 cs · TH : 3 cs »). Un point orange sur la vignette signale qui en porte une."]}),
+  HP({children:["Une note s'écrit depuis la modale de case, et aussi depuis les fenêtres des onglets ",HE("b",null,"CHL, CHB, PT Cardio et PT Angio"),", où chaque occupant a son propre champ — et, depuis la v10.173, dès la pose : choisir le médecin et l'activité n'écrit plus tout de suite, un écran « À poser » présente le champ de note, puis « ✓ Valider » pose et ferme. Elle est donc toujours ",HE("b",null,"rattachée à un médecin"),", ce qui compte quand deux personnes se succèdent dans la même salle : au survol de la case, les notes s'affichent préfixées des initiales (« ND : 4 cs · TH : 3 cs »). Un point rouge cerclé de blanc sur la vignette (orange avant la v10.243) signale qui en porte une."]}),
   HT({children:"◇ Le choix ouvert"}),
   HP({children:["Un ",HE("b",null,"choix ouvert")," est une activité (une, deux ou trois) posée sans être tranchée : « ce sera l'une de celles-là ». Il se crée dans le ",HE("b",null,"planning type")," (fenêtre d'une case → « ◇ Transformer en choix ouvert »), et se reconnaît dans les grilles à son ",HE("b",null,"cadre pointillé violet"),"."]}),
   HP({children:["Tant qu'il n'est pas tranché, le médecin reste ",HE("b",null,"disponible")," pour ces activités : il n'occupe aucune salle, ne consomme aucune IDE, et reste proposé dans les fenêtres — c'est tout l'intérêt, notamment pour le bip. Un compteur violet à part, en haut du Planning, dit combien il en reste à trancher."]}),
@@ -6385,7 +6388,7 @@ const HELP_SECTIONS=[
   HP({children:["C'est l'onglet ",HE("b",null,"Activités")," qui décide, avec la coche ",HChip({txt:"🎓 Internes",bg:"#0e9f9f"})," : une activité cochée peut leur être posée. Une ",HE("b",null,"seconde coche")," dit s'ils peuvent la poser ",HE("b",null,"eux-mêmes")," (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur ou un intermédiaire — une secrétaire ou un cadre ne pose et ne retire que les activités cochées pour son rôle (celles des plannings CHL, CHB, PT Cardio, PT Angio) : tour, absences, FMC et gardes d'internes leur restent fermés. Les activités ",HE("b",null,"à salle")," ne sont jamais posées par eux — elles le sont depuis leur onglet ou depuis les onglets de salle, avec choix de la salle."]}),
   HP({children:["Sur un ",HE("b",null,"lundi"),", poser HC, USIC ou une activité sans salle propose de ",HE("b",null,"remplir la semaine")," : le remplissage saute les repos de garde, absences et FMC déjà posés. Le ",HE("b",null,"samedi")," n'a qu'une case, pour le HC du samedi matin."]}),
   HP({children:[HE("b",null,"Absence et FMC")," (v10.177) : après le clic, la fenêtre demande la ",HE("b",null,"durée"),". Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du ",HE("b",null,"lundi au vendredi")," de la semaine cliquée, sans week-end. FMC : ce créneau, 1, 2 ou 3 jours, à la suite du jour cliqué. Ce sont des journées entières : elles remplacent ce qui s'y trouve, repos de garde compris ; les jours hors semestre sont sautés."]}),
-  HP({children:[HE("b",null,"Activité avec salle")," (v10.177) : la salle choisie, un écran ",HE("b",null,"✓ Valider")," affiche l'interne, l'activité et la salle, avec une ",HE("b",null,"note facultative"),". Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille orange, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ",HE("b",null,"← Retour")," revient en arrière sans rien poser."]}),
+  HP({children:[HE("b",null,"Activité avec salle")," (v10.177) : la salle choisie, un écran ",HE("b",null,"✓ Valider")," affiche l'interne, l'activité et la salle, avec une ",HE("b",null,"note facultative"),". Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille rouge cerclée de blanc, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ",HE("b",null,"← Retour")," revient en arrière sans rien poser."]}),
   HT({children:"Les gardes"}),
   HP({children:["La colonne ",HE("b",null,"Garde")," de l'onglet fonctionne comme celle des médecins, ",HE("b",null,"sans répartition automatique"),". La garde se pose sur la nuit et le ",HBadg({txt:"RG",color:"#ffe599"})," repos est posé tout seul le lendemain — sauté, avec un avertissement, si l'interne est absent ou en FMC ce jour-là. ⇄ échange deux gardes directement, dans la liste de celles du semestre."]}),
   HP({children:["Un ",HE("b",null,"interne extérieur")," au service se saisit au nom libre : il apparaît dans la colonne, sans repos chez nous. Un jour ",HE("b",null,"sans personne de garde")," est signalé en rouge. Dans le Planning, la colonne « 🎓 Garde int. » s'affiche à la demande depuis la ligne Filtre, en ",HE("b",null,"lecture seule"),", et se remasque à chaque ouverture."]}),
