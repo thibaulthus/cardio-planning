@@ -53,7 +53,7 @@ function gelMuet(){var n=Date.now();if(n-(GEL.t||0)>10000){GEL.t=n;try{jlog("GEL
    file tournante (300 entrées au plus). AUCUN état React, AUCUN affichage ici : la tuile 📡 des Paramètres ne lit ces
    compteurs que pendant qu'on lui demande de mesurer. La latence est celle des VRAIES écritures : délai entre l'envoi et
    l'accusé du serveur (la promesse de Firestore) — elle ne génère donc aucun trafic supplémentaire. */
-var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[],lire:[],aff:[]};
+var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[],lire:[],aff:[],poids:null};   /* v10.242 : poids = dernier poids du planning mesuré (pour les signalements) */
 /* v10.234 : CE QUE COÛTE UN MESSAGE À L'APPAREIL. Le réseau mesuré (latence), restait l'appareil : à chaque message il relit
    le planning complet (lire = durée du traitement du message) puis redessine l'écran (aff = délai jusqu'après la peinture
    suivante). Deux relevés d'horloge par message, 20 valeurs gardées. Page en arrière-plan : pas de peinture, on ne mesure pas. */
@@ -75,6 +75,11 @@ function trafEcr(p){
     p.then(()=>{TRAFIC.vol--;TRAFIC.lat.push(Date.now()-t);if(TRAFIC.lat.length>20)TRAFIC.lat.shift();},()=>{TRAFIC.vol--;TRAFIC.ko++;});}
   return p;
 }
+/* v10.242 : la ligne « Trafic » d'un signalement 🐞 (et du rapport de plantage) — les compteurs de la tuile 📡,
+   relevés au moment de l'envoi. Lecture seule de TRAFIC : ne coûte rien, n'écrit rien. */
+function trafLigne(){try{const b=trafBilan(Date.now());const ms=v=>v===null?"—":(v<1000?v+" ms":(v/1000).toFixed(1)+" s");const P=TRAFIC.poids;
+  return "latence dernière "+ms(b.latDer)+" · médiane "+ms(b.latMed)+(b.nLat?" ("+b.nLat+")":"")+" · lecture "+ms(b.lireMed)+" (pire "+ms(b.lireMax)+") · redessin "+ms(b.affMed)+" (pire "+ms(b.affMax)+")"
+    +" · 1 min : "+b.r60+" reçus, "+b.e60+" envoyées · en attente "+b.vol+" · refusées "+b.ko+" · poids "+(P==null?"—":Math.round(P/1024)+" Ko ("+Math.min(100,Math.round(P/10485.76))+" %)");}catch(e){return "?";}}
 function trafBilan(now){
   let e10=0,r10=0,e60=0,r60=0;const bar=[];for(let i=0;i<60;i++)bar.push(0);
   TRAFIC.fil.forEach(x=>{const a=now-x.t;if(a<0||a>=60000)return;if(x.k==="e")e60++;else r60++;if(a<10000){if(x.k==="e")e10++;else r10++;}bar[59-Math.floor(a/1000)]++;});
@@ -124,7 +129,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.241 — 24/09/2026";
+const APP_VERSION="v10.242 — 25/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -415,8 +420,8 @@ function applyTheme(dark){
     r.style.setProperty("--bg","#f1f5f9");r.style.setProperty("--bg2","#ffffff");
     r.style.setProperty("--bg-n","#e2e8f0");
     r.style.setProperty("--vac-bg","#e2e8f0");r.style.setProperty("--vac-fort","#c9d3e1");r.style.setProperty("--garde-bg","#f0fdf4");
-    r.style.setProperty("--ast-bg","#dcfce7");r.style.setProperty("--ast-bord","#4ade80");r.style.setProperty("--bg-we","#fef9ee");
-    r.style.setProperty("--bg-weh","#fef3c7");r.style.setProperty("--bg-td","#f0fdf4");
+    r.style.setProperty("--ast-bg","#dcfce7");r.style.setProperty("--ast-bord","#4ade80");r.style.setProperty("--bg-we","#fdefcc");   /* v10.242 : plus soutenu (était #fef9ee, trop pâle) */
+    r.style.setProperty("--bg-weh","#fbe2a6");r.style.setProperty("--bg-td","#f0fdf4");
     r.style.setProperty("--border","#cbd5e1");r.style.setProperty("--border2","#e2e8f0");
     r.style.setProperty("--txt","#1e293b");r.style.setProperty("--txt2","#475569");r.style.setProperty("--txt3","#94a3b8");
     r.style.setProperty("--nav-act","#dcfce7");r.style.setProperty("--nav-act-c","#15803d");
@@ -767,7 +772,7 @@ function ZoomBtn(){
   return <button onClick={()=>{zoomApply(suiv);try{localStorage.setItem("cp6_zoom",String(suiv));}catch(e){}window.dispatchEvent(new Event("resize"));tick(t=>t+1);}} title={"Zoom "+ZOOM.z+" % — cliquer pour "+suiv+" % (réglage de cet appareil)"} style={{...S.arr,fontSize:10,width:46,fontWeight:800}}>{"🔍"+ZOOM.z}</button>;
 }
 function SigBtn(){return <><ZoomBtn/><button onClick={()=>window.dispatchEvent(new Event("cp-signal"))} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button></>;}
-function Ov({children,onClose,wide=false}){return <div style={S.ov} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div style={wide?{...S.mb,width:"96vw",maxWidth:"96vw"}:S.mb}>{children}</div></div>;}   /* v10.176 : wide — la modale 🤝 restait dans les 500 px de S.mb */
+function Ov({children,onClose,wide=false,liste=false}){return <div style={S.ov} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div data-ovliste={liste?"1":undefined} style={wide?{...S.mb,width:"96vw",maxWidth:"96vw"}:S.mb}>{children}</div></div>;}   /* v10.242 : liste — fenêtre de choix d'un médecin, élargie sur ordinateur (CSS [data-ovliste]) */   /* v10.176 : wide — la modale 🤝 restait dans les 500 px de S.mb */
 function FF({l,v,c}){return <div><label style={S.fl}>{l}</label><input value={v} onChange={e=>c(e.target.value)} style={{...S.fi,width:"100%"}}/></div>;}
 /* ════ GRID H ════ */
 /* v10.12 : ces deux variables servent à distinguer un APPUI LONG (téléphone) d'un clic.
@@ -838,7 +843,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
   const gardeActe={id:"GARDE",label:"Garde nuit",short:"G",color:"#93c47d"};
   return(
     <>
-    {pickGardeDay&&<Ov onClose={()=>setPickGardeDay(null)}>
+    {pickGardeDay&&<Ov liste onClose={()=>setPickGardeDay(null)}>
       {pickGardeDayFull&&pickGardeDayFull.done?(()=>{   /* v10.209 : après la prise ou l'échange d'un médecin basique — prévenir l'autre ? */
         const D=pickGardeDayFull.done;
         return <div style={{minWidth:280}}>
@@ -1859,7 +1864,7 @@ function ActTabView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null
                 fréquent est protégé de l'erreur. */
 function GardeCandidateList({meds,isAbsDay,isAbsNext,tourNext=null,prefOf=null,currentId,onPick,maxHeight=340}){
   return(
-    <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight,overflowY:"auto"}}>
+    <div data-medliste="1" style={{display:"flex",flexDirection:"column",gap:5,maxHeight,overflowY:"auto"}}>
       {meds.map(m=>{
         const isOn=currentId!=null&&m.id===currentId;
         const dayAbs=!isOn&&isAbsDay(m.id);
@@ -2513,7 +2518,7 @@ function GardeView({onCellHistory=null,isVac=null,outils=false,noNav=false,onRem
             </div>
           </Ov>);
         return(
-          <Ov onClose={()=>{setGvSearch("");setPickerDay(null);}}>
+          <Ov liste onClose={()=>{setGvSearch("");setPickerDay(null);}}>
             <div style={S.mHd}>
               <div>
                 <div style={S.mTit2}>{pd.chaine?"⏩ Saisie en chaîne":"🌙 Garde"} — {JOURSC[dw2]} {pd.d} {MOIS[pd.m]}</div>
@@ -2950,7 +2955,7 @@ function PickMedActModal({ferm=null,mData,setMData,medecins,actes,getEntries,isM
   }
 
   return(
-    <Ov onClose={onClose}>
+    <Ov liste onClose={onClose}>
       <div style={S.mHd}>
         <div>
           <div style={S.mTit2}>{row.label} — {JOURSL[dow(y2,m2,d)]} {d} {MOIS[m2]}</div>
@@ -3039,7 +3044,7 @@ function PickMedActModal({ferm=null,mData,setMData,medecins,actes,getEntries,isM
               </span>
             </div>
           )}
-          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
+          <div data-medliste="1" style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
             {pickMeds.length===0&&<div style={{fontSize:11,color:"var(--txt3)",padding:"4px 2px"}}>Tous les médecins autorisés sont déjà assignés sur ce créneau.</div>}
             {pickMeds.map(med=>{
               const offR=offJour(med,y2,m2,d);   /* v10.241 : parti ou désactivé ce jour-là → grisé, comme une absence */
@@ -3087,7 +3092,7 @@ function PickMedActModal({ferm=null,mData,setMData,medecins,actes,getEntries,isM
       {!selMedId&&!noMedMode&&intPick.length>0&&(
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",margin:"12px 0 8px",paddingTop:10,borderTop:"1px solid var(--border)"}}>{"🎓 Internes — "+intDay.lbl}</div>
-          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
+          <div data-medliste="1" style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
             {intPick.map(im=>{
               const ids=[];(sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"]).forEach(s2=>getEntries(im.id,y2,m2,d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)ids.push(e.acteId);}));
               const labs=uniqArr(ids.map(id=>{if(id==="TOUR_HC")return "HC";if(id==="TOUR_USIC")return "USIC";const ax=actes.find(x=>x.id===id);return (ax&&(ax.short||ax.label))||id;}));
@@ -3290,7 +3295,7 @@ function PickMedSiteModal({ferm=null,mData,medecins,actes,getEntries,isMedAvaila
   }
 
   return(
-    <Ov onClose={onClose}>
+    <Ov liste onClose={onClose}>
       <div style={S.mHd}>
         <div>
           <div style={S.mTit2}>{isRecapCol&&recapActe?("↩ "+(recapActe.label||recapActe.short)):salle} — {JOURSL[dow(y2,m2,d)]} {d} {MOIS[m2]}</div>
@@ -3326,7 +3331,7 @@ function PickMedSiteModal({ferm=null,mData,medecins,actes,getEntries,isMedAvaila
       {step==="med"&&!(ferm&&ferm.on)&&(
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Choisir un médecin</div>
-          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
+          <div data-medliste="1" style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
             {pickMeds.length===0&&<div style={{fontSize:11,color:"var(--txt3)",padding:"4px 2px"}}>Tous les médecins autorisés sont déjà dans cette salle.</div>}
             {pickMeds.map(med=>{
               const offR=offJour(med,y2,m2,d);   /* v10.241 : parti ou désactivé ce jour-là → grisé, comme une absence */
@@ -3357,7 +3362,7 @@ function PickMedSiteModal({ferm=null,mData,medecins,actes,getEntries,isMedAvaila
       {step==="med"&&!(ferm&&ferm.on)&&intPick.length>0&&(
         <>
           <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",margin:"12px 0 8px",paddingTop:10,borderTop:"1px solid var(--border)"}}>{"🎓 Internes — "+intDay.lbl}</div>
-          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
+          <div data-medliste="1" style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
             {intPick.map(im=>{
               const ids=[];(sl==="JOUR"?["JOUR","M","AM"]:[sl,"JOUR"]).forEach(s2=>getEntries(im.id,y2,m2,d,s2).forEach(e=>{if(e&&e.acteId&&!e._blocked)ids.push(e.acteId);}));
               const labs=uniqArr(ids.map(id=>{if(id==="TOUR_HC")return "HC";if(id==="TOUR_USIC")return "USIC";const ax=actes.find(x=>x.id===id);return (ax&&(ax.short||ax.label))||id;}));
@@ -5984,15 +5989,19 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
   // Count per med per acte
   const allStatMeds=djListePeriode(medecins,days).filter(m=>m.role==="medecin"&&!m._nonPourvu);   /* v10.123 */
   const [medFilter,setMedFilter]=useOngletMem("stats.meds",[]);
-  const [sortCol,setSortCol]=useOngletMem("stats.tri",null); // {col,dir:'desc'|'asc'}
+  const [actFilter,setActFilter]=useOngletMem("stats.actes",[]);   /* v10.242 : sélecteur d'activités, comme celui des médecins */
+  const [sortCol,setSortCol]=useOngletMem("stats.tri",null); // {col,dir:'desc'|'asc'} — col = activité ; trie les colonnes de médecins
   const meds=medFilter.length>0?allStatMeds.filter(m=>medFilter.includes(m.id)):allStatMeds;
+  /* v10.242 : on compte pour TOUS les médecins de la période (le sélecteur d'activités ne doit pas changer selon le filtre
+     des médecins). Ne comptent pas : un choix conditionnel ◇ non tranché (e.cond), et une activité qui demande une salle
+     posée sans sa salle (acte.hasSalle sans e.salle — le « ⚠ sans salle » des onglets salles). */
+  const acteDe={};actes.forEach(a=>{acteDe[a.id]=a;});
   const counts={};
-  meds.forEach(m=>{counts[m.id]={};allTrack.forEach(a=>{counts[m.id][a.id]=0;});});
+  allStatMeds.forEach(m=>{counts[m.id]={};allTrack.forEach(a=>{counts[m.id][a.id]=0;});});
 
   days.forEach(({y:y2,m:m2,d})=>{
     ["M","AM","JOUR","N"].forEach(sl=>{
       const slotData=plan[y2+"-"+String(m2+1).padStart(2,"0")+"-"+String(d).padStart(2,"0")+"|"+sl]||{};
-      // Use sk function equivalent
       Object.keys(slotData).forEach(mid=>{
         const medId=parseInt(mid);
         if(!counts[medId])return;
@@ -6000,6 +6009,9 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
         const entries=Array.isArray(e)?e:[e];
         entries.forEach(entry=>{
           if(!entry||!entry.acteId)return;
+          if(entry.cond)return;   /* v10.242 : choix ◇ non tranché */
+          const ac=acteDe[entry.acteId];
+          if(ac&&ac.hasSalle&&!entry.salle)return;   /* v10.242 : ⚠ sans salle */
           if(counts[medId][entry.acteId]!==undefined) counts[medId][entry.acteId]++;
           // Garde: split by weekday (ven/sam/dim = weekend)
           if(entry.acteId==="GARDE"){
@@ -6015,28 +6027,31 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
     });
   });
 
-  // Column totals
-  const colTotals={};
-  allTrack.forEach(a=>{colTotals[a.id]=meds.reduce((n,m)=>n+(counts[m.id]?counts[m.id][a.id]||0:0),0);});
-  // Only show columns with at least 1 entry
-  const usedActes=allTrack.filter(a=>colTotals[a.id]>0);
-  const displayMeds=sortCol?[...meds].sort((a,b)=>{
+  const totDe=(liste,aid)=>liste.reduce((n,m)=>n+(counts[m.id]?counts[m.id][aid]||0:0),0);
+  // Activités présentes sur la période (tous médecins) : ce sont les pastilles du sélecteur
+  const actsPeriode=allTrack.filter(a=>totDe(allStatMeds,a.id)>0);
+  const actSel=actFilter.filter(id=>actsPeriode.some(a=>a.id===id));
+  // Lignes : les activités choisies, sinon celles qui comptent au moins 1 chez les médecins affichés
+  const usedActes=actSel.length>0?actsPeriode.filter(a=>actSel.includes(a.id)):actsPeriode.filter(a=>totDe(meds,a.id)>0);
+  const sortOk=sortCol&&usedActes.some(a=>a.id===sortCol.col);
+  const displayMeds=sortOk?[...meds].sort((a,b)=>{
     const va=(counts[a.id]&&counts[a.id][sortCol.col])||0;
     const vb=(counts[b.id]&&counts[b.id][sortCol.col])||0;
     return sortCol.dir==="desc"?vb-va:va-vb;
   }):meds;
 
-  const exportCSV=()=>{
-    const header=["Médecin",...usedActes.map(a=>a.short),"Total"].join(";");
-    const rows=meds.map(m=>{
-      const row=[m.prenom+" "+m.nom,...usedActes.map(a=>counts[m.id][a.id]||0),usedActes.reduce((n,a)=>n+(counts[m.id][a.id]||0),0)];
-      return row.join(";");
-    });
+  const exportCSV=()=>{   /* v10.242 : même sens que l'écran — une ligne par activité, une colonne par médecin */
+    const header=["Activité",...displayMeds.map(m=>m.prenom+" "+m.nom)].join(";");
+    const rows=usedActes.map(a=>[a.label,...displayMeds.map(m=>(counts[m.id]&&counts[m.id][a.id])||0)].join(";"));
     const csv=[header,...rows].join("\n");
     const blob=new Blob([csv],{type:"text/csv"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");a.href=url;a.download="stats_cardio.csv";a.click();
   };
+  const puce=(on,col)=>({padding:"4px 10px",borderRadius:20,border:"1px solid "+(on?col:"var(--border)"),cursor:"pointer",fontSize:11,fontWeight:700,
+    background:on?col:"var(--bg2)",color:on?"#111":"var(--txt2)"});
+  const tous=(on)=>({padding:"4px 10px",borderRadius:20,border:"1px solid var(--border)",cursor:"pointer",fontSize:11,fontWeight:700,
+    background:on?"#1d4ed8":"var(--bg2)",color:on?"#fff":"var(--txt2)"});
 
   return(
     <div>
@@ -6053,58 +6068,59 @@ function StatsTab({medecins,actes,plan,year,month,darkMode,setDarkMode,tourMed})
         <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
           <button onClick={exportCSV} style={{...S.btnP,fontSize:11,padding:"3px 10px"}}>🖨️ Export</button>
         </div>
-      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
-        <button onClick={()=>setMedFilter([])}
-          style={{padding:"4px 10px",borderRadius:20,border:"1px solid var(--border)",cursor:"pointer",fontSize:11,fontWeight:700,
-            background:medFilter.length===0?"#1d4ed8":"var(--bg2)",color:medFilter.length===0?"#fff":"var(--txt2)"}}>Tous</button>
+      <div data-statfiltre="meds" style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6,alignItems:"center"}}>
+        <span style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",width:62}}>Médecins</span>
+        <button onClick={()=>setMedFilter([])} style={tous(medFilter.length===0)}>Tous</button>
         {allStatMeds.map(m=>{
           const on=medFilter.includes(m.id);
-          return <button key={m.id} onClick={()=>setMedFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])}
-            style={{padding:"4px 10px",borderRadius:20,border:"1px solid "+(on?m.color:"var(--border)"),cursor:"pointer",fontSize:11,fontWeight:700,
-              background:on?m.color:"var(--bg2)",color:on?"#111":"var(--txt2)"}}>{m.init}</button>;
+          return <button key={m.id} onClick={()=>setMedFilter(p=>on?p.filter(x=>x!==m.id):[...p,m.id])} style={puce(on,m.color)}>{m.init}</button>;
         })}
       </div>
-      <TableScroll memId="stats" mh={190}>
+      <div data-statfiltre="actes" style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10,alignItems:"center"}}>
+        <span style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",width:62}}>Activités</span>
+        <button onClick={()=>setActFilter([])} style={tous(actSel.length===0)}>Toutes</button>
+        {actsPeriode.map(a=>{
+          const on=actSel.includes(a.id);
+          return <button key={a.id} data-statacte={a.id} title={a.label} onClick={()=>setActFilter(p=>{const q=p.filter(x=>actsPeriode.some(b=>b.id===x));return on?q.filter(x=>x!==a.id):[...q,a.id];})} style={{...puce(on,a.color),fontFamily:"'JetBrains Mono',monospace"}}>{a.short}</button>;
+        })}
+      </div>
+      <TableScroll memId="stats" mh={220}>
         <table style={{borderCollapse:"collapse",fontSize:11}}>
           <thead>
             <tr>
-              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:120,textAlign:"left",padding:"6px 10px"}}>Médecin</th>
-              {usedActes.map(a=>{
-                const isSorted=sortCol&&sortCol.col===a.id;
-                return(
-                <th key={a.id} onClick={()=>setSortCol(s=>{
-                    if(!s||s.col!==a.id)return{col:a.id,dir:"desc"};
-                    if(s.dir==="desc")return{col:a.id,dir:"asc"};
-                    return null;
-                  })}
-                  title={!isSorted?"Trier par "+a.label+" (décroissant)":sortCol.dir==="desc"?"Trier croissant":"Revenir à l'ordre initial"}
-                  style={{...S.thFix,position:"sticky",top:0,zIndex:20,minWidth:44,textAlign:"center",padding:"4px 2px",cursor:"pointer"}}>
-                  <div style={{background:a.color,color:"#111",borderRadius:4,padding:"2px 4px",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",outline:isSorted?"2px solid var(--txt)":"none"}}>{a.short}{isSorted?(sortCol.dir==="desc"?" ▼":" ▲"):""}</div>
+              <th style={{...S.thFix,position:"sticky",top:0,left:0,zIndex:40,minWidth:150,textAlign:"left",padding:"6px 10px"}}>Activité</th>
+              {displayMeds.map(m=>(
+                <th key={m.id} data-col={m.id} title={((m.prenom||"")+" "+(m.nom||"")).trim()} style={{...S.th,position:"sticky",top:0,zIndex:20,minWidth:46,padding:"4px 2px"}}>
+                  <div style={{...S.avT,background:m.color,margin:"0 auto"}}>{m.init}</div>
                 </th>
-                );
-              })}
-
+              ))}
             </tr>
           </thead>
           <tbody>
-            {displayMeds.map((m,ri)=>{
+            {usedActes.map((a,ri)=>{
+              const isSorted=sortOk&&sortCol.col===a.id;
               return(
-                <tr key={m.id} style={{background:ri%2===0?"var(--bg2)":"var(--bg)",borderBottom:"1px solid var(--border2)"}}>
-                  <td style={{...S.tdFix,position:"sticky",left:0,zIndex:10,padding:"5px 10px",fontWeight:700,color:m.color,minWidth:120}}>
+                <tr key={a.id} data-statligne={a.id} style={{background:ri%2===0?"var(--bg2)":"var(--bg)",borderBottom:"1px solid var(--border2)"}}>
+                  <td onClick={()=>setSortCol(s=>{
+                      if(!s||s.col!==a.id)return{col:a.id,dir:"desc"};
+                      if(s.dir==="desc")return{col:a.id,dir:"asc"};
+                      return null;
+                    })}
+                    title={!isSorted?"Trier les médecins par "+a.label+" (décroissant)":sortCol.dir==="desc"?"Trier croissant":"Revenir à l'ordre initial"}
+                    style={{...S.tdFix,position:"sticky",left:0,zIndex:10,padding:"4px 8px",minWidth:150,cursor:"pointer"}}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <div style={{width:26,height:26,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,flexShrink:0}}>{m.init}</div>
-                      {m.prenom} {m.nom}
+                      <span style={{background:a.color,color:"#111",borderRadius:4,padding:"2px 5px",fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",outline:isSorted?"2px solid var(--txt)":"none",whiteSpace:"nowrap"}}>{a.short}{isSorted?(sortCol.dir==="desc"?" ▼":" ▲"):""}</span>
+                      <span style={{fontSize:10,color:"var(--txt2)",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:140}}>{a.label}</span>
                     </div>
                   </td>
-                  {usedActes.map(a=>{
+                  {displayMeds.map(m=>{
                     const v=counts[m.id]?counts[m.id][a.id]||0:0;
-                    return <td key={a.id} style={{textAlign:"center",padding:"4px 2px",color:v>0?"var(--txt)":"var(--txt3)",fontWeight:v>0?700:400,background:v>0?a.color+"22":"transparent"}}>{v||"—"}</td>;
+                    return <td key={m.id} style={{textAlign:"center",padding:"4px 2px",color:v>0?"var(--txt)":"var(--txt3)",fontWeight:v>0?700:400,background:v>0?a.color+"22":"transparent"}}>{v||"—"}</td>;
                   })}
-
                 </tr>
               );
             })}
-
+            {usedActes.length===0&&<tr><td colSpan={displayMeds.length+1} style={{padding:"10px",fontSize:11,color:"var(--txt3)"}}>Aucune activité comptée sur cette période.</td></tr>}
           </tbody>
         </table>
       </TableScroll>
@@ -6240,7 +6256,7 @@ const HELP_SECTIONS=[
   HTab({t:"⚙️ Activités",children:["le catalogue : couleur, abréviation, salles, médecins autorisés. Les activités Garde et Repos post-garde sont synchronisées avec la coche Garde de l'Équipe (note verte)."]}),
   HTab({t:"👥 Équipe",children:["les fiches : rôle, coches Garde/TM/Astreinte, sur-spécialités, activités autorisées (dans la fiche ✏️, groupées Général / CHL / CHB), PIN 🔑, ordre d'affichage ▲▼, temps partiel."]}),
   HTab({t:"⚙️ Paramètres",children:["registre des salles, PIN éditeur, archives, sauvegardes automatiques, export, jauge de taille Firebase, boîte des signalements 🐞, verrous du passé et de l'avenir 🚧. Les encarts arrivent repliés : cliquez un titre pour l\'ouvrir, « Tout déplier » en haut."]}),
-  HTab({t:"📊 Stats",children:["compteurs d'activités par médecin sur la période, tri par colonne, export CSV. Réservé à l'éditeur et aux médecins intermédiaires."]}),
+  HTab({t:"📊 Stats",children:["compteurs d'activités sur la période, dans le sens du Planning : les médecins en colonnes, les activités en lignes. Deux sélecteurs, médecins et activités ; un clic sur une activité trie les médecins ; export CSV dans le même sens. Ne comptent pas (v10.242) : un choix ◇ non tranché, et une activité à salle posée sans sa salle (⚠ sans salle). Réservé à l'éditeur et aux médecins intermédiaires."]}),
   HTab({t:"📥 Reports",children:["outil individuel et facultatif : cochez vos semaines blanches, puis un tableau chronologique signale les semaines de tour reportées sur vos blanches (dates habituelles), celles sans report possible, celles déjà blanches, et les dates fermées à réouvrir ; suivi des offs par semaine. Les activités concernées se cochent « 📥 à reporter » dans l'onglet Activités. Export CSV."]}))},
 
  {id:"edition",icon:"🔒",title:"Modes d'accès et PIN",body:()=>HE("div",null,
@@ -6286,11 +6302,11 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Le vrai nom du junior dans les modales")," (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."]}),
   HP({children:[HE("b",null,"Une seule barre de défilement sur ordinateur")," (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."]}),
   HP({children:[HE("b",null,"Deux filets de sécurité")," (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."]}),
-  HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre. Depuis la v10.158 : la fin de l'étape 1 de Construire referme d'elle-même les demandes (la période se verrouille), les semaines de tour d'une période à venir restent invisibles des non-éditeurs tant que le tour n'est pas validé (tuile 2), et valider l'étape 5 ouvre automatiquement la dérogation des intermédiaires — la dévalider la referme."]}),
+  HP({children:[HE("b",null,"Verrou de l'avenir")," (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil (secrétaires et cadres ont chacun leur case depuis la v10.242) — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre. Depuis la v10.158 : la fin de l'étape 1 de Construire referme d'elle-même les demandes (la période se verrouille), les semaines de tour d'une période à venir restent invisibles des non-éditeurs tant que le tour n'est pas validé (tuile 2), et valider l'étape 5 ouvre automatiquement la dérogation des intermédiaires — la dévalider la referme."]}),
   HP({children:[HE("b",null,"Garde int., aller-retour")," (v10.145) : éteindre 🎓 Garde int. ramène le cadre là où il était avant de l'allumer — à condition qu'on n'ait rien fait entre-temps. Un défilement, un changement d'onglet ou de période, et le cadre reste où il est."]}),
   HP({children:[HE("b",null,"Pointillé « moi » fermé")," (v10.144) : le pointillé violet de sa propre colonne ferme désormais son cadre, en haut sur l'initiale et en bas sur la dernière ligne, comme le cadre plein de la colonne suivie."]}),
   HP({children:[HE("b",null,"Plus de zoom intempestif sur iPhone")," (v10.143) : toucher un champ de saisie (PIN, note, filtre, fenêtre 🐞…) faisait grossir la page, qui restait ainsi ensuite — Safari agrandit tout champ dont le texte fait moins de 16 px. Sur téléphone, les champs font désormais 16 px : plus de zoom. Le pincement pour agrandir la grille reste possible ; si votre page est déjà zoomée, un pincement la remet à sa taille."]}),
-  HP({children:[HE("b",null,"Signaler un problème")," (v10.142) : le bouton 🐞 — dans l'onglet Aide, et dans Planning et Attachés (à côté de 🌓, ou sous ⋯ sur téléphone) — ouvre une petite fenêtre : on décrit ce qui s'est passé, on appuie sur Envoyer, c'est tout. Version, onglet, période, jour regardé, mode d'accès, appareil, navigateur, état du réseau et journal de la page (les erreurs et avertissements de la console, avec les derniers changements d'onglet) partent avec, automatiquement — jamais le PIN, jamais d'image. L'envoi demande du réseau. L'éditeur retrouve les tickets dans Paramètres, carte 🐞 Signalements (un badge rouge sur l'onglet compte ceux à traiter) : ▸ déroule le détail, Copier donne un texte prêt à coller, ✓ Traité le classe."]}),
+  HP({children:[HE("b",null,"Signaler un problème")," (v10.142) : le bouton 🐞 — dans l'onglet Aide, et dans Planning et Attachés (à côté de 🌓, ou sous ⋯ sur téléphone) — ouvre une petite fenêtre : on décrit ce qui s'est passé, on appuie sur Envoyer, c'est tout. Version, onglet, période, jour regardé, mode d'accès, appareil, navigateur, état du réseau, trafic (v10.242 : les compteurs de la tuile 📡 relevés à l'envoi — latence, temps de l'appareil, messages et écritures de la dernière minute, écritures en attente et refusées, poids du planning) et journal de la page (les erreurs et avertissements de la console, avec les derniers changements d'onglet) partent avec, automatiquement — jamais le PIN, jamais d'image. L'envoi demande du réseau. L'éditeur retrouve les tickets dans Paramètres, carte 🐞 Signalements (un badge rouge sur l'onglet compte ceux à traiter) : ▸ déroule le détail, Copier donne un texte prêt à coller, ✓ Traité le classe."]}),
   HP({children:[HE("b",null,"Colonne suivie")," (v10.140) : dans Planning et Attachés, l'éditeur et les médecins de niveau intermédiaire peuvent appuyer sur l'initiale en tête d'une colonne pour la suivre : cadre plein de la couleur du médecin, anneau autour de son initiale, teinte légère sur ses cases vides, et les autres colonnes s'estompent à 40 %. Un second appui relâche, une autre initiale déplace le suivi ; une seule colonne à la fois, conservée le temps de la session, d'un onglet et d'une période à l'autre — elle cohabite avec le pointillé violet de sa propre colonne. Sur téléphone, la colonne suivie vient se centrer à l'écran. Le bouton 🎓 Garde int. ramène le cadre tout à gauche pour montrer la colonne 🎓 Int., sans changer ni le jour regardé ni la hauteur (v10.141). À l'extinction, retour à la position d'avant si rien n'a bougé (v10.145). La carte 🌓 Thème de Paramètres est retirée : c'est un réglage par appareil, que le bouton 🌓 des onglets couvre (voir 📱 Installer sur votre téléphone)."]}),
             HP({children:[HE("b",null,"Bornes de navigation")," (v10.138) : les flèches ‹ › ne remontent pas avant la plus ancienne archive (à défaut deux ans en arrière) et ne vont pas au-delà de six périodes — deux ans — devant la période en cours ; un message le dit à la borne. Cela vaut pour tous les onglets qui naviguent par période : Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Planning type, Tour, Reports, Construire, Astreinte, Stats et l'export. Les Internes naviguent par semestre, entre les semestres déclarés. Naviguer ne crée aucune donnée ; la borne évite qu'une case posée par erreur très loin dans le futur ne pèse sans que personne ne la voie. La carte Poids affiche aussi le poids des archives, rangées dans leur propre collection et donc hors de la jauge du document actif."]}),
   HP({children:[HE("b",null,"Paramètres réorganisés")," (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles et Sauvegarde & archivage sont trois cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto avec un message à chaque appui (v10.139), donc chacun choisit son mode sans Paramètres ; à la reprise de l'application en veille, le réglage du téléphone est relu. La carte Thème de Paramètres, devenue redondante, est retirée en v10.140. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."]}),
@@ -6429,7 +6445,7 @@ CpGarde.prototype.componentDidCatch=function(e,info){jlog("PLANTAGE RENDU",[(e&&
 CpGarde.prototype.render=function(){
   if(!this.state.err)return this.props.children;
   var RE=React.createElement,e=this.state.err;
-  var rapport=["🐞 Plantage CardioPlanning — "+sigDate(Date.now()),"Version : "+APP_VERSION,"Erreur : "+((e&&e.message)||String(e)),(e&&e.stack?String(e.stack).split("\n").slice(0,4).join("\n"):""),"—","Journal :"].concat(JOURNAL).join("\n");
+  var rapport=["🐞 Plantage CardioPlanning — "+sigDate(Date.now()),"Version : "+APP_VERSION,"Trafic : "+trafLigne(),"Erreur : "+((e&&e.message)||String(e)),(e&&e.stack?String(e.stack).split("\n").slice(0,4).join("\n"):""),"—","Journal :"].concat(JOURNAL).join("\n");
   return RE("div",{style:{padding:"24px 18px",maxWidth:520,margin:"0 auto",fontFamily:"'Sora',sans-serif",color:"var(--txt,#e6edf3)"}},
     RE("div",{style:{fontSize:16,fontWeight:800,marginBottom:8}},"⚠️ L'application a rencontré une erreur"),
     RE("div",{style:{fontSize:12,lineHeight:1.6,marginBottom:12}},"Rien n'est perdu : vos données sont dans Firebase. Rechargez la page ; si cela se reproduit, copiez le rapport et envoyez un 🐞 après le rechargement — il emportera ce plantage."),
@@ -6440,7 +6456,9 @@ CpGarde.prototype.render=function(){
 };
 
 /* ════ v10.146 : PÉRIODES À VENIR — carte de Paramètres, composant partagé jsx/html ════ */
-const FUT_PROFILS=[["inter","intermédiaires"],["basic","basiques"],["admin","secrétaires et cadres"],["att","attachés et IDE"]];
+const FUT_PROFILS=[["inter","intermédiaires"],["basic","basiques"],["sec","secrétaires"],["cad","cadres"],["att","attachés et IDE"]];   /* v10.242 : secrétaires et cadres séparés */
+/* v10.242 : une ancienne coche « admin » (secrétaires ET cadres) vaut pour les deux nouvelles cases */
+function futCoche(D,k){D=D||{};return !!(D[k]||((k==="sec"||k==="cad")&&D.admin));}
 const FUT_ETATS={fermee:["⛔ Fermée","#6b7280","personne, sauf l'éditeur"],phase1:["🏖️ Congés ouverts","#0e7490","congés, FMC et préférences, chacun pour soi"],constr:["🚧 En construction","#b45309","personne, sauf l'éditeur"],dif:["📢 Diffusée","#16a34a","tout le monde, comme la période en cours"]};
 function FuturBox(p){
   const RE=React.createElement;
@@ -6455,8 +6473,8 @@ function FuturBox(p){
       RE("div",{style:{fontSize:10,color:"var(--txt3)",margin:"3px 0 5px"}},"Peuvent modifier : "+e[2]+"."),
       x.etat!=="dif"&&RE("div",{style:{display:"flex",gap:10,flexWrap:"wrap",fontSize:11}},
         RE("span",{style:{color:"var(--txt2)",fontWeight:700}},"Déroger pour :"),
-        FUT_PROFILS.map(pr=>RE("label",{key:pr[0],style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",color:(x.derog||{})[pr[0]]?"#b45309":"var(--txt2)"}},
-          RE("input",{type:"checkbox",checked:!!(x.derog||{})[pr[0]],onChange:ev=>p.onDerog(x.key,pr[0],ev.target.checked)}),pr[1]))));}));
+        FUT_PROFILS.map(pr=>RE("label",{key:pr[0],style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",color:futCoche(x.derog,pr[0])?"#b45309":"var(--txt2)"}},
+          RE("input",{type:"checkbox",checked:futCoche(x.derog,pr[0]),onChange:ev=>p.onDerog(x.key,pr[0],ev.target.checked)}),pr[1]))));}));
 }
 
 /* ════ v10.142 : SIGNALEMENT IN-APP — composants partagés jsx/html, React.createElement pur ════
@@ -6468,7 +6486,7 @@ function sigLignes(s){var c=s.ctx||{};return [
   "Onglet : "+(c.onglet||"?")+" · Période : "+(c.periode||"?")+" · Jour regardé : "+(c.jour||"—"),
   "Mode : "+(c.mode||"?")+" · "+(c.reseau||"?")+" · "+(c.theme||"?"),
   "Version : "+(c.version||"?")+" · "+(c.appareil||"?"),
-  "Navigateur : "+(c.navigateur||"?")];}
+  "Navigateur : "+(c.navigateur||"?")].concat(c.trafic?["Trafic : "+c.trafic]:[]);}   /* v10.242 : ligne Trafic (absente des anciens tickets) */
 function sigTexte(s){var j=s.journal||[],q=s.prec||[];return ["🐞 Signalement CardioPlanning — "+sigDate(s.ts)+" — "+(s.auteur||"?")].concat(sigLignes(s),["—",s.texte||"","—","Journal de la page ("+j.length+" ligne"+(j.length>1?"s":"")+") :"],j.length?j:["(vide)"],q.length?["—","Session précédente ("+q.length+" ligne"+(q.length>1?"s":"")+", avant le dernier redémarrage) :"].concat(q):[]).join("\n");}
 function sigCopier(txt,toast){var fin=function(ok){if(toast)toast(ok?"Signalement copié":"Copie impossible — sélectionnez le texte à la main",ok?"ok":"warn");};
   try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){fin(true);},function(){fin(false);});return;}}catch(e){}
@@ -11070,7 +11088,7 @@ function CardioPlanning(){
           const b2=new Blob([k]).size+new Blob([s||""]).size+2;
           bytes+=b2;det[k]=b2;
         });
-        setDocSize(bytes);setDocDet(det);
+        setDocSize(bytes);setDocDet(det);TRAFIC.poids=bytes;
       }catch(e){setDocSize(null);setDocDet(null);}
     })();
   },[tab]);
@@ -11877,11 +11895,11 @@ function CardioPlanning(){
      et dans les diffusions), dérogations. Posé dans vRef pour que les fonctions d'écriture le lisent sans dépendance. */
   const vProfil=isEdit?"edit":isAttEdit?"att":isInterEdit?"inter":isMedEdit?"basic":isAdminEdit?"admin":isInterne?"interne":"view";
   const vFutEtatDe=(sy,sm)=>{const B=(build||{})[sy+"_"+sm]||{};if((secrCfg.dif||{})[perIdOf(sy,sm)])return "dif";if(B.dem&&B.dem.conges)return "phase1";return (B.dem||B.pers||B.etapes||B.prefT||B.prefG)?"constr":"fermee";};
-  vRef.current.fut={deb:futDebut(),profil:vProfil,etat:(y,m,d)=>{const p=perOfDay(y,m,d);return vFutEtatDe(p.sy,p.sm);},derog:(y,m,d,pr)=>{const p=perOfDay(y,m,d);return !!((((build||{})[p.sy+"_"+p.sm]||{}).derog||{})[pr]);}};
+  vRef.current.fut={deb:futDebut(),profil:vProfil,etat:(y,m,d)=>{const p=perOfDay(y,m,d);return vFutEtatDe(p.sy,p.sm);},derog:(y,m,d,pr)=>{const p=perOfDay(y,m,d);const D=(((build||{})[p.sy+"_"+p.sm]||{}).derog||{});return pr==="admin"?futCoche(D,isCadre?"cad":"sec"):!!D[pr];}};   /* v10.242 */
   const perFut=(()=>{const t=new Date();const p0=perStart(t.getFullYear(),t.getMonth());const pF=perStart(year,month);return (pF.sy*12+pF.sm>p0.sy*12+p0.sm)?vFutEtatDe(pF.sy,pF.sm):null;})();
   const perFutFin=(()=>{const pF=perStart(year,month);return ((build||{})[pF.sy+"_"+pF.sm]||{}).demFin||null;})();
   const futPers=(()=>{const t=new Date();let p=perStart(t.getFullYear(),t.getMonth());const out=[];for(let i=0;i<3;i++){p=perNext(p.sy,p.sm);const k=p.sy+"_"+p.sm;const B=(build||{})[k]||{};out.push({key:k,lib:perLibelle(p.sy,p.sm),etat:vFutEtatDe(p.sy,p.sm),fin:B.demFin||null,derog:B.derog||{}});}return out;})();
-  const futDerog=(k,pr,v)=>{setBuild(b=>{const cur=(b||{})[k]||{};const d={...(cur.derog||{})};if(v)d[pr]=1;else delete d[pr];return {...(b||{}),[k]:{...cur,derog:d}};});toast(v?"Dérogation ouverte pour les "+(FUT_PROFILS.find(x=>x[0]===pr)||["",pr])[1]:"Dérogation retirée");};
+  const futDerog=(k,pr,v)=>{setBuild(b=>{const cur=(b||{})[k]||{};const d={...(cur.derog||{})};if(d.admin&&(pr==="sec"||pr==="cad")){delete d.admin;d.sec=1;d.cad=1;}if(v)d[pr]=1;else delete d[pr];return {...(b||{}),[k]:{...cur,derog:d}};});toast(v?"Dérogation ouverte pour les "+(FUT_PROFILS.find(x=>x[0]===pr)||["",pr])[1]:"Dérogation retirée");};
   /* v10.100 : le bandeau de role du bas confirme sous quel acces on est entre,
      puis ne sert plus a rien et mange de la hauteur. Il s'efface au bout de
      6 secondes. doFit mesure les bandeaux a CHAQUE rendu : ce changement
@@ -13227,7 +13245,7 @@ function CardioPlanning(){
     return {version:APP_VERSION,onglet:lib,periode:perLibelle(ps.sy,ps.sm),jour:jr&&jr.length===3?(("0"+jr[2]).slice(-2)+"/"+("0"+(+jr[1]+1)).slice(-2)+"/"+jr[0]):"—",
       mode:(accessMode==="edit"?"éditeur":accessMode==="medecinEdit"?"médecin "+(authorRef.current||"?"):accessMode==="adminEdit"?"administratif "+(authorRef.current||"?"):accessMode==="interneEdit"?"interne "+(authorRef.current||"?"):"consultation")+(VER_STALE.on?" — version périmée":""),
       appareil:(narrow?"téléphone":"ordinateur")+" "+window.innerWidth+"×"+window.innerHeight+(inst?", installée sur l'écran d'accueil":", dans le navigateur"),
-      reseau:(netOff||navigator.onLine===false)?"hors ligne":"en ligne",theme:darkMode?"nuit":"jour",navigateur:String(navigator.userAgent||"?").slice(0,200)};};
+      reseau:(netOff||navigator.onLine===false)?"hors ligne":"en ligne",theme:darkMode?"nuit":"jour",navigateur:String(navigator.userAgent||"?").slice(0,200),trafic:trafLigne()};};
   const sigEnvoyer=async(texte)=>{if(BAC){toast("🧪 Bac à sable : pas de signalement d'ici","warn");return;}const ts=Date.now();await window.firebaseDB.collection("signalements").doc("s"+ts).set({ts,auteur:authorRef.current||"?",texte:String(texte||"").slice(0,2000),ctx:sigCtx(),journal:JOURNAL.slice(),prec:JOURNAL_PREC.slice(),traite:false});toast("Signalement envoyé — merci");refreshSig();
     /* v10.219 : un signalement fait par quelqu'un d'autre que l'éditeur → notification seule aux médecins éditeurs
        (sa demande du 15/09). Le code éditeur 1234 n'a pas de nom, donc pas d'appareil : seuls les médecins de niveau
@@ -13316,6 +13334,13 @@ nav::-webkit-scrollbar { display: none; }
   nav::-webkit-scrollbar{display:block;height:5px}
 }
 header::-webkit-scrollbar { display: none; }
+/* v10.242 : fenêtres de choix d'un médecin — sur ORDINATEUR seulement (pointeur souris, écran large), fenêtre plus
+   large et liste en colonnes pour que toute l'équipe (≈ 18 noms) tienne sans défiler. Téléphone : inchangé. */
+@media (pointer:fine) and (min-width:760px){
+  [data-ovliste]{width:min(960px,94vw) !important;max-width:94vw !important;max-height:94vh !important}
+  [data-medliste]{display:grid !important;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:5px;align-content:start;max-height:none !important;overflow:visible !important}
+  [data-medliste]>*{margin-bottom:0 !important}
+}
 
 @media print {
   html { font-size: 90% !important; overflow: visible !important; zoom: 1 !important; }   /* v10.161 : le verrou de page ne gêne pas l'impression */
@@ -14068,7 +14093,7 @@ header::-webkit-scrollbar { display: none; }
           setAstPickModal(null);
         }};
         return(
-          <Ov onClose={()=>setAstPickModal(null)}>
+          <Ov liste onClose={()=>setAstPickModal(null)}>
             <div style={{minWidth:300}}>
               <div style={S.mHd}>
                 <div style={S.mTit2}>📞 Astreinte — {label}</div>
@@ -14079,7 +14104,7 @@ header::-webkit-scrollbar { display: none; }
               <input autoFocus value={astSearch} onChange={e=>setAstSearch(e.target.value.toUpperCase())} onKeyDown={onEnter}
                 placeholder="Initiales..." style={{width:"100%",padding:"7px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",fontSize:13,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:2,marginBottom:8,boxSizing:"border-box"}}/>
               {filtered.length===1&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:4,textAlign:"center"}}>↵ Entrée pour confirmer</div>}
-              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:300,overflowY:"auto"}}>
+              <div data-medliste="1" style={{display:"flex",flexDirection:"column",gap:4,maxHeight:300,overflowY:"auto"}}>
                 {filtered.map(m=>{
                   const on=String(m.id)===String(curId);
                   const absent=isAbsentForPick(m.id);
@@ -14989,7 +15014,7 @@ header::-webkit-scrollbar { display: none; }
             </div>
           </Ov>);}
         return(
-        <Ov onClose={()=>setModal(mData.fromTour?null:"cell")}>
+        <Ov liste onClose={()=>setModal(mData.fromTour?null:"cell")}>
           <div style={{...S.modal,maxWidth:430}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={S.mTit2}>⇄ Échanger ce jour de tour</div>
@@ -15006,7 +15031,7 @@ header::-webkit-scrollbar { display: none; }
                     background:spanSel===v?"rgba(56,139,253,.14)":"var(--bg2)",color:spanSel===v?"#388bfd":"var(--txt2)"}}>{lb}</button>
               ))}
             </div>
-            <div style={{maxHeight:"46vh",overflowY:"auto"}}>
+            <div data-medliste="1" style={{maxHeight:"46vh",overflowY:"auto"}}>
               {cands.map(({m:m2,blocked,reason})=>(
                 <div key={m2.id} onClick={()=>{if(!blocked)doDaySwap(m2.id);}}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,marginBottom:5,
