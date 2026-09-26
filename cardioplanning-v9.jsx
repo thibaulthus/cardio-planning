@@ -129,7 +129,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.243 — 25/09/2026";
+const APP_VERSION="v10.244 — 26/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6270,7 +6270,8 @@ const HELP_SECTIONS=[
   HP({children:["• ",HE("b",null,"PIN éditeur")," — édition complète de tout le planning. Défini dans Paramètres."]}),
   HP({children:["🔐 ",HE("b",null,"Niveaux de droits")," : chaque médecin a un niveau dans sa fiche ✏️ (onglet Équipe), qui s'applique quand il se connecte avec son PIN personnel. ",HE("b",null,"Basique")," = sa propre ligne, plus ses activités dans CHL, CHB et les plateaux. ",HE("b",null,"Intermédiaire")," = le planning de tous les médecins, gardes et échanges, semaines de tour, planning type et attachés — sans Paramètres, Équipe ni Activités. ",HE("b",null,"Éditeur")," = accès complet. Récapitulatif dans Paramètres."]}),
   HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
-  HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case — dans le Planning et les Attachés, sur le rond du médecin dans CHL, CHB, PT Cardio et PT Angio, sur la case dans Internes (v10.176) — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Seules les modifications manuelles de cases sont journalisées, pas le planning type ni les répartitions automatiques."]}),
+  HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case — dans le Planning et les Attachés, sur le rond du médecin dans CHL, CHB, PT Cardio et PT Angio, sur la case dans Internes (v10.176) — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Depuis la v10.244, y figurent aussi, en une ligne 📅 « du … au … », les gestes sur plusieurs jours qui couvrent la case — absence ou FMC posée ou retirée, effacement par la fenêtre Période, désactivation, planning type posé ou retiré, restauration d'une sauvegarde, annulation ↶ — et, case par case, ce qui a été ÉCRASÉ : une consultation remplacée par une absence, ou par la garde ou le repos de garde d'un collègue (« − Retiré … · repos de garde du 15/11 »). La répartition automatique n'est pas inscrite."]}),
+  HP({children:["↩ ",HE("b",null,"Retirer une absence")," (v10.244) : cliquer sur un jour d'une absence qui dure plusieurs jours propose « 1️⃣ Seulement ce jour », « ⏭ Jusqu'à la fin » (sauf au premier jour, où cela reviendrait à tout retirer) et « ⏮⏭ Toute l'absence ». Pour retirer quelques jours au début, retirez-les jour par jour. ",HE("b",null,"Repos de garde")," : une garde posée la veille d'une absence ou d'une FMC est posée SANS repos (l'absence l'emporte). Quand cette absence est retirée ensuite — par la croix, « Seulement ce jour », « Jusqu'à la fin » ou « Toute l'absence » — le repos revient de lui-même sur les créneaux redevenus vides, sans rien écraser."]}),
   HP({children:["🕘 ",HE("b",null,"Historique d'une garde")," (v10.239) : clic droit ou appui long sur la case Garde d'un jour — dans le Planning, les Attachés et la tuile Gardes de Construire. Chaque changement de main y figure : « − retiré » pour l'ancien titulaire, « + posé » pour le nouveau, avec l'auteur et l'heure ; le retrait par 🗑 aussi. La répartition automatique et « retirer toutes les gardes » ne sont pas inscrites, ni les retraits antérieurs à la v10.239."]}),
   HP({children:["Depuis la v10.238, l'historique n'a ",HE("b",null,"plus de limite de 1000 lignes"),". Chaque période a son propre cahier d'historique, qui garde toutes les modifications de ses cases — y compris les deux mois de construction qui précèdent la période. Il suit la période jusqu'à son archivage : il part alors dans le fichier téléchargé, et reste lisible dans l'application. Un cahier contient plus de dix mille modifications ; s'il approchait de sa limite, l'éditeur serait prévenu à l'ouverture avant que les lignes les plus anciennes ne s'effacent."]}),
   HP({last:true,children:["Les boutons d'édition (répartitions automatiques, ",HBtn({kind:"green",children:"+ Ajouter"}),", 🗑️, ▲▼…) n'apparaissent qu'en édition complète."]}))},
@@ -8346,7 +8347,8 @@ function diffPlans(aPlan,bPlan){
 function expliqueDiffs(diffs,journal,tA,tB){
   const J=Object.values(journal||{}).filter(e=>e&&e.k&&e.t>tA&&e.t<=tB);
   const par={};J.forEach(e=>{const key=e.k+"§"+String(e.md);(par[key]=par[key]||[]).push(e);});
-  return diffs.map(d=>{const l=(par[d.k+"§"+d.mid]||[]).slice().sort((x,y)=>(x.t||0)-(y.t||0));return {...d,traces:l,sansTrace:l.length===0};});
+  const G=J.filter(e=>histGrp(e));   /* v10.244 : lignes groupées */
+  return diffs.map(d=>{const l=(par[d.k+"§"+d.mid]||[]).concat(G.filter(e=>histCouvre(e,String(d.k).slice(0,10),d.mid))).sort((x,y)=>(x.t||0)-(y.t||0));return {...d,traces:l,sansTrace:l.length===0};});
 }
 /* v10.238 : historique des cases — une ligne = « t(base 36) ⇥ +/- ⇥ case ⇥ médecin ⇥ activité ⇥ auteur », UN seul champ
    Firebase par modification (l'ancien format en prenait 7 : plafond de 20 000 champs ≈ 2 800 lignes par cahier). */
@@ -8355,6 +8357,30 @@ function histDec(v){
   if(v&&typeof v==="object")return v.k?v:null;   /* ancien format (planning/journal, avant la v10.238) */
   const p=String(v||"").split("\t");if(p.length<6)return null;
   return {t:parseInt(p[0],36)||0,x:p[1]==="+"?"add":"del",k:p[2],md:p[3],act:p[4]||null,a:p.slice(5).join(" ")};
+}
+/* v10.244 : LIGNES GROUPÉES de l'historique — un geste qui touche une plage de jours (absence posée ou retirée,
+   fenêtre Période, désactivation, planning type, restauration, annulation) s'inscrit en UNE ligne par médecin,
+   case « ~du~au~quoi ». L'historique d'une case l'affiche quand la case tombe dans la plage. Coût : une ligne et
+   une écriture par geste, quelle que soit sa durée. */
+const HIST_GRP={abs:"posée",absret:"retirée",eff:"Activités effacées (fenêtre Période)",effabs:"Activités et absences effacées (fenêtre Période)",efftout:"Tout effacé (fenêtre Période), gardes comprises",desact:"Désactivation — tout effacé",pt:"Planning type posé",ptret:"Planning type retiré",rest:"Sauvegarde restaurée",annul:"↶ Annulation d'une action",retab:"↷ Action rétablie"};
+function histGrp(e){if(!e||typeof e.k!=="string"||e.k.charAt(0)!=="~")return null;const q=e.k.split("~");return q.length>=4?{du:q[1],au:q[2],quoi:q[3]}:null;}
+function histCouvre(e,ds,md){const g=histGrp(e);return !!g&&String(e.md)===String(md)&&ds>=g.du&&ds<=g.au;}
+function histGrpLib(e){const g=histGrp(e);if(!g)return "";const f=x=>x.slice(8,10)+"/"+x.slice(5,7);
+  const nom=(g.quoi==="abs"||g.quoi==="absret")?((e.act==="FORMATION"?"FMC ":e.act==="ABSENCE"?"Absence ":"Absence / FMC ")+HIST_GRP[g.quoi]):(HIST_GRP[g.quoi]||g.quoi);
+  return nom+(g.du===g.au?" · le "+f(g.du):" · du "+f(g.du)+" au "+f(g.au));}
+function histPidsPlage(du,au){const out=[];const a=du.split("-").map(Number),b=au.split("-").map(Number);const fin=new Date(b[0],b[1]-1,b[2]).getTime();
+  for(let t=new Date(a[0],a[1]-1,a[2]),i=0;t.getTime()<=fin&&i<400;t.setDate(t.getDate()+1),i++){const pid=histPid(dKey(t.getFullYear(),t.getMonth(),t.getDate())+"|M");if(pid&&out.indexOf(pid)<0)out.push(pid);}
+  return out;}
+/* v10.244 : REPOS RÉTABLI — quand une absence ou une FMC est retirée le lendemain d'une garde du même médecin, le repos
+   (que l'absence avait empêché) est reposé sur les créneaux redevenus VIDES ; rien n'est écrasé. Rend {next,keys}. */
+function reposRetablir(next,medId,y,m,d){
+  const pv=new Date(y,m,d-1);
+  if(!gardeTitulaires(next,pv.getFullYear(),pv.getMonth(),pv.getDate()).some(o=>String(o.mid)===String(medId)))return {next,keys:[]};
+  const keys=[],we=isWE(y,m,d);
+  if(!we&&cellHasAny((next[sk(y,m,d,"JOUR")]||{})[medId],EXCL_IDS))return {next,keys};
+  (we?["JOUR"]:["M","AM"]).forEach(sl=>{const k=sk(y,m,d,sl);const dm={...(next[k]||{})};if(cellEs(dm[medId]).length)return;
+    dm[medId]={acteId:"REPOS_GARDE",salle:null};next={...next,[k]:dm};keys.push(k);});
+  return {next,keys};
 }
 /* v10.239 : qui tient la garde d'un jour, et dans quelle case (nuit N ou journée JOUR) */
 function gardeTitulaires(pl,y,m,d){const out=[];["N","JOUR"].forEach(sl=>{const dm=(pl||{})[sk(y,m,d,sl)]||{};Object.keys(dm).forEach(mid=>{if(cellHasAny(dm[mid],["GARDE"]))out.push({mid,sl});});});return out;}
@@ -8400,7 +8426,7 @@ function DiffPanel({res,meds,actes,tA,tB,libA,libB}){
       <span style={{color:"var(--txt2)"}}>{libEntree(d.avant,actes)} <span style={{color:"var(--txt3)"}}>→</span> {libEntree(d.apres,actes)}</span>
     </div>
     <div style={{fontSize:10.5,color:d.sansTrace?"#dc2626":"var(--txt3)",paddingLeft:8}}>
-      {d.sansTrace?"aucune trace dans le journal sur cette fenêtre":d.traces.map((e,i)=><span key={i} style={{marginRight:10}}>{fd(e.t)} · {e.x==="add"?"posé":"retiré"} par <b>{e.a||"?"}</b></span>)}
+      {d.sansTrace?"aucune trace dans le journal sur cette fenêtre":d.traces.map((e,i)=><span key={i} style={{marginRight:10}}>{fd(e.t)} · {histGrp(e)?histGrpLib(e):(e.x==="add"?"posé":"retiré")} par <b>{e.a||"?"}</b></span>)}
     </div>
   </div>;
   const CAP=300;
@@ -8417,7 +8443,7 @@ function DiffPanel({res,meds,actes,tA,tB,libA,libB}){
       {(voirTout?avec:avec.slice(0,Math.max(0,CAP-sans.length))).map((d,i)=><Ligne key={"a"+i} d={d}/>)}
     </div>}
     {!voirTout&&liste.length>CAP&&<button onClick={()=>setVoirTout(true)} style={{marginTop:6,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer"}}>Tout afficher ({liste.length})</button>}
-    <div style={{fontSize:10,color:"var(--txt3)",marginTop:8,lineHeight:1.45}}>Le journal ne couvre que les modifications faites case par case et les gardes. Une différence « sans trace » peut donc aussi venir d'une opération de masse (construction d'une période, planning type, import de gardes, restauration, archivage). Rien n'est modifié ici : cet écran ne fait que lire.</div>
+    <div style={{fontSize:10,color:"var(--txt3)",marginTop:8,lineHeight:1.45}}>Depuis la v10.244, le journal couvre aussi les gestes sur plusieurs jours (absences posées ou retirées, fenêtre Période, désactivation, planning type, restauration, annulation) et ce qu'une garde, un repos ou une absence a écrasé. Une différence « sans trace » peut venir d'un geste antérieur à la v10.244, de la répartition automatique ou de l'archivage. Rien n'est modifié ici : cet écran ne fait que lire.</div>
   </div>;
 }
 function SetQuick({items,replies,onTout}){
@@ -10398,6 +10424,30 @@ function CardioPlanning(){
       else if(setDoc)Promise.resolve(setDoc(jdoc,{e:{[eid]:je}},{merge:true})).catch(()=>{});
     }catch(e){}
   },[]);
+  /* v10.244 : plusieurs lignes d'historique en UNE écriture par cahier (200 lignes au plus par envoi). Une ligne =
+     {x:"add"|"del", md, k (case ou "~du~au~quoi"), act, pour (cause ajoutée à l'auteur), pids (cahiers, sinon celui de k)}. */
+  const logLots=useCallback((lignes)=>{
+    try{
+      if(!window.firebaseDB||!window.firebaseDoc||!lignes||!lignes.length)return;
+      const t0=Date.now(),parPid={};
+      lignes.forEach((l,i)=>{
+        const pids=BAC?["bac"]:(l.pids||[histPid(l.k)]);
+        const je=histEnc({t:t0,k:l.k,md:l.md,x:l.x,act:l.act||null,a:authorRef.current+(l.pour?" · "+l.pour:"")});
+        pids.forEach(pid=>{if(!pid)return;const eid="e"+t0.toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5);(parPid[pid]=parPid[pid]||[]).push([["e",eid],je]);});
+      });
+      Object.keys(parPid).forEach(pid=>{
+        const jdoc=window.firebaseDoc(window.firebaseDB,"planning",HIST_PFX+pid),pr=parPid[pid];
+        for(let i=0;i<pr.length;i+=200){const lot=pr.slice(i,i+200);
+          const repli=()=>{if(!setDoc)return;const o={};lot.forEach(q=>{o[q[0][1]]=q[1];});Promise.resolve(setDoc(jdoc,{e:o},{merge:true})).catch(()=>{});};
+          if(updatePaths)Promise.resolve(updatePaths(jdoc,lot)).catch(repli);else repli();}
+      });
+    }catch(e){}
+  },[]);
+  /* v10.244 : ligne groupée d'un geste sur une plage de jours, pour un médecin */
+  const logPlage=useCallback((x,md,du,au,quoi,act,pour)=>{
+    if(!du||!au||md==null)return;if(au<du){const t=du;du=au;au=t;}
+    logLots([{x,md,k:"~"+du+"~"+au+"~"+quoi,act:act||null,pour:pour||null,pids:histPidsPlage(du,au)}]);
+  },[logLots]);
   const [editMedId,setEditMedId]=useState(null); // medecin logged in with personal PIN
   /* v9.99 : l'onglet Paramètres défile avec la PAGE, pas dans un cadre — la mémoire de
      TableScroll ne le couvre donc pas. C'est le seul onglet où la perte de position le
@@ -11132,6 +11182,7 @@ function CardioPlanning(){
       });
       if(n===0){if(nLock)vToast(false);else toast("Rien à restaurer — déjà identique","info");return 0;}
       setPlan(p=>{const next={...p};Object.keys(maj).forEach(k=>{next[k]=maj[k];});return next;});
+      logPlage("add",medId,dateFrom,dateTo,"rest");   /* v10.244 */
       if(updatePaths){
         for(let i2=0;i2<pairs.length;i2+=400)await updatePaths(PLANNING_DOC,pairs.slice(i2,i2+400));
       }
@@ -11811,6 +11862,18 @@ function CardioPlanning(){
       dCh[c]=d;
     });
     histRef.current.restoring=1;   /* React regroupe les dix changements en un seul rendu */
+    try{   /* v10.244 : l'annulation (ou le rétablissement) s'inscrit — case par case, ou groupée au-delà de 150 cases */
+      const quoi=sens<0?"annul":"retab",pour=sens<0?"↶ annulation":"↷ rétablissement",L=[],parMed={};
+      Object.keys(dPlan).forEach(k=>Object.keys(dPlan[k]).forEach(mid=>{
+        const av=cellEs(((cur.plan||{})[k]||{})[mid]),ap=cellEs(dPlan[k][mid]);
+        const ids=x=>x.filter(e=>e&&e.acteId).map(e=>e.acteId);
+        ids(av).filter(a=>ids(ap).indexOf(a)<0).forEach(a=>L.push({x:"del",md:mid,k,act:a,pour}));
+        ids(ap).filter(a=>ids(av).indexOf(a)<0).forEach(a=>L.push({x:"add",md:mid,k,act:a,pour}));
+        const j=k.slice(0,10),o=parMed[mid]||(parMed[mid]={du:j,au:j});if(j<o.du)o.du=j;if(j>o.au)o.au=j;
+      }));
+      if(L.length>150)logLots(Object.keys(parMed).map(mid=>({x:"del",md:mid,k:"~"+parMed[mid].du+"~"+parMed[mid].au+"~"+quoi,act:null,pids:histPidsPlage(parMed[mid].du,parMed[mid].au)})));
+      else if(L.length)logLots(L);
+    }catch(e){}
     setPlan(c=>posePlan(c,dPlan));
     setTourMed(c=>poseObj(c,dCh.tourMed));
     setTourDerog(c=>poseObj(c,dCh.tourDerog));   /* v10.160 */
@@ -11976,7 +12039,8 @@ function CardioPlanning(){
       const key3=sk(y2,m2,d2,sl2==="GARDE"?"N":sl2);
       const es=await histLire([histPid(key3)]);   /* v10.238 : le cahier de la période de la case */
       if(sl2==="GARDE"){setHistModal(h=>h?{...h,loading:false,list:histGardeJour(es,y2,m2,d2).slice(0,60)}:h);return;}   /* v10.239 */
-      const list=Object.values(es).filter(e=>e&&e.k===key3&&String(e.md)===String(medId2)).sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,30);
+      const ds3=dKey(y2,m2,d2);   /* v10.244 : + les lignes groupées dont la plage couvre ce jour */
+      const list=Object.values(es).filter(e=>e&&((e.k===key3&&String(e.md)===String(medId2))||histCouvre(e,ds3,medId2))).sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,30);
       setHistModal(h=>h?{...h,loading:false,list}:h);
     }catch(e){setHistModal(h=>h?{...h,loading:false,list:[]}:h);}})();
   },[]);
@@ -12362,6 +12426,8 @@ function CardioPlanning(){
        interdisant au repos d'écraser une exclusive. La répartition automatique, elle,
        ÉVITE ces gardes depuis toujours (canTake teste le lendemain). */
     let nxWarn=false;
+    const efface={};   /* v10.244 : activités ÉCRASÉES par la garde ou par son repos — inscrites dans l'historique (clé = case|médecin|activité) */
+    const noteEff=(k,mid,cell,garder)=>{cellEs(cell).forEach(e=>{if(e&&e.acteId&&garder.indexOf(e.acteId)<0)efface[k+"|"+mid+"|"+e.acteId]={k,md:mid,act:e.acteId};});};
     const gardeSlot=gardeSlotDe(y2,m2,d2);   /* v10.218 */
     const dt=new Date(y2,m2,d2+1);
     const ny=dt.getFullYear(),nm=dt.getMonth(),nd2=dt.getDate();
@@ -12380,10 +12446,11 @@ function CardioPlanning(){
       next={...next,[gk]:gdm};
       /* v10.218 : férié en semaine — une garde rangée à l'ancienne dans la nuit est retirée, pour ne pas en avoir deux */
       if(gardeFerieSem(y2,m2,d2)){const nk2=sk(y2,m2,d2,"N"),ndm={...(next[nk2]||{})};let ch=false;Object.keys(ndm).forEach(mid=>{if(cellHasAny(ndm[mid],["GARDE"])){const r=cellDrop(ndm[mid],["GARDE"]);if(r)ndm[mid]=r;else delete ndm[mid];ch=true;}});if(ch)next={...next,[nk2]:ndm};}
+      noteEff(gk,medId,(next[gk]||{})[medId],["GARDE"]);
       next[gk]={...next[gk],[medId]:{acteId:"GARDE",salle:null}};
       if(isWE(ny,nm,nd2)){
         const k=sk(ny,nm,nd2,"JOUR"),dm={...(next[k]||{})};
-        if(!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};
+        if(!cellHasAny(dm[medId],EXCL_IDS)){noteEff(k,medId,dm[medId],["REPOS_GARDE"]);dm[medId]={acteId:"REPOS_GARDE",salle:null};}
         else if(cellHasAny(dm[medId],ABS_IDS))nxWarn=true;
         next={...next,[k]:dm};
       } else {
@@ -12394,10 +12461,11 @@ function CardioPlanning(){
         const jC=(next[sk(ny,nm,nd2,"JOUR")]||{})[medId];
         const jBlk=cellHasAny(jC,EXCL_IDS);
         if(cellHasAny(jC,ABS_IDS))nxWarn=true;
-        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!jBlk&&!cellHasAny(dm[medId],EXCL_IDS))dm[medId]={acteId:"REPOS_GARDE",salle:null};else if(cellHasAny(dm[medId],ABS_IDS))nxWarn=true;next={...next,[k]:dm};});
+        ["M","AM"].forEach(sl=>{const k=sk(ny,nm,nd2,sl),dm={...(next[k]||{})};if(!jBlk&&!cellHasAny(dm[medId],EXCL_IDS)){noteEff(k,medId,dm[medId],["REPOS_GARDE"]);dm[medId]={acteId:"REPOS_GARDE",salle:null};}else if(cellHasAny(dm[medId],ABS_IDS))nxWarn=true;next={...next,[k]:dm};});
       }
       return next;
     });
+    setTimeout(()=>{const L=Object.values(efface);if(L.length)logLots(L.map(o=>({x:"del",md:o.md,k:o.k,act:o.act,pour:(o.k===sk(y2,m2,d2,gardeSlot)?"garde":"repos de garde")+" du "+String(d2).padStart(2,"0")+"/"+String(m2+1).padStart(2,"0")})));},0);   /* v10.244 */
     if(!silencieux)setTimeout(()=>{
       if(vAvertit(vRef,y2,m2,d2))vToast(true);   /* v10.126 : déverrouillé — écrit, mais averti */
       else if(nxWarn)toast("⚠ Absence ou FMC le lendemain — garde posée SANS repos","warn");
@@ -12406,6 +12474,12 @@ function CardioPlanning(){
     return true;
   },[]);
 
+  /* v10.244 : après le retrait d'une absence ou d'une FMC par la croix — le repos de la garde de la veille revient */
+  const reposApresRetrait=useCallback((medId,y2,m2,d2)=>{
+    let keys=[];
+    setPlan(p=>{const r=reposRetablir(p,medId,y2,m2,d2);keys=r.keys;return r.next;});
+    setTimeout(()=>{if(!keys.length)return;logLots(keys.map(k=>({x:"add",md:medId,k,act:"REPOS_GARDE",pour:"repos rétabli (absence retirée)"})));toast("Repos de garde rétabli","info");},0);
+  },[logLots]);
   /* ── applyAbsence ── */
   /* v10.172 : accepte aussi une liste explicite de cases (absCases) et des clés à laisser
      telles quelles (« garder »). Une garde, un repos de garde ou un tour réel ne se
@@ -12417,6 +12491,8 @@ function CardioPlanning(){
         (isWE(cy,cm,d)?["JOUR"]:(slotsParJour?slotsParJour(cy,cm,d):slots)).forEach(sl=>out.push({y:cy,m:cm,d,sl}));}
       return out;})();
     let vSkip=false,vWarn=false;
+    const efface={},poses={};   /* v10.244 : ce que l'absence remplace, et les cases réellement posées */
+    const aT=absType||"ABSENCE";
     setPlan(p=>{
       let next={...p};
       liste.forEach(c=>{
@@ -12427,10 +12503,20 @@ function CardioPlanning(){
         if(skip&&skip.indexOf(k)>=0)return;
         const dm={...(next[k]||{})};
         if(cellHasAny(dm[medId],["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC"]))return;
-        dm[medId]={acteId:absType||"ABSENCE",salle:null};next={...next,[k]:dm};
+        cellEs(dm[medId]).forEach(e=>{if(e&&e.acteId&&e.acteId!==aT)efface[k+"|"+e.acteId]={k,act:e.acteId};});
+        poses[k]=1;
+        dm[medId]={acteId:aT,salle:null};next={...next,[k]:dm};
       });
       return next;
     });
+    setTimeout(()=>{   /* v10.244 : historique — une ligne groupée (plus d'un jour) ou une ligne par case, + ce qui a été remplacé */
+      const ks=Object.keys(poses).sort();if(!ks.length)return;
+      const du=ks[0].slice(0,10),au=ks[ks.length-1].slice(0,10),lib=(aT==="FORMATION"?"FMC":"absence")+" posée"+(du===au?" le "+du.slice(8,10)+"/"+du.slice(5,7):" du "+du.slice(8,10)+"/"+du.slice(5,7)+" au "+au.slice(8,10)+"/"+au.slice(5,7));
+      const L=Object.values(efface).map(o=>({x:"del",md:medId,k:o.k,act:o.act,pour:"remplacé par "+lib}));
+      if(du===au)ks.forEach(k=>L.push({x:"add",md:medId,k,act:aT}));
+      else L.push({x:"add",md:medId,k:"~"+du+"~"+au+"~abs",act:aT,pids:histPidsPlage(du,au)});
+      logLots(L);
+    },0);
     if(vSkip||vWarn)vToast(!vSkip);else toast(absType==="FORMATION"?"Formation appliquée":"Absence appliquée");
   },[]);
 
@@ -12438,6 +12524,7 @@ function CardioPlanning(){
     const [fy,fm,fd]=parseDate(dateFrom);
     const fromT=new Date(fy,fm,fd).getTime(),toT=new Date(...parseDate(dateTo)).getTime();
     let vSkip=false,vWarn=false;
+    const retires={},repos={};   /* v10.244 : jours où quelque chose a été retiré ; repos rétablis */
     setPlan(p=>{
       let next={...p};
       let cy=fy,cm=fm;
@@ -12454,13 +12541,22 @@ function CardioPlanning(){
             if(cellHasAny(next[k][medId],["ABSENCE","FORMATION"])){
               const r=cellDrop(next[k][medId],["ABSENCE","FORMATION"]);
               const dm={...next[k]};if(r)dm[medId]=r;else delete dm[medId];next={...next,[k]:dm};
+              retires[dKey(cy,cm,d)]=[cy,cm,d];
             }
           });
         }
         if(cm===11){cy++;cm=0;}else cm++;
       }
+      Object.keys(retires).sort().forEach(j=>{const q=retires[j];const r=reposRetablir(next,medId,q[0],q[1],q[2]);next=r.next;r.keys.forEach(k=>{repos[k]=1;});});   /* v10.244 */
       return next;
     });
+    setTimeout(()=>{   /* v10.244 : historique — une ligne groupée pour le retrait, une par repos rétabli */
+      const js=Object.keys(retires).sort();if(!js.length)return;
+      const L=[{x:"del",md:medId,k:"~"+js[0]+"~"+js[js.length-1]+"~absret",act:null,pids:histPidsPlage(js[0],js[js.length-1])}];
+      Object.keys(repos).forEach(k=>L.push({x:"add",md:medId,k,act:"REPOS_GARDE",pour:"repos rétabli (absence retirée)"}));
+      logLots(L);
+      if(Object.keys(repos).length)toast("Absence retirée — repos de garde rétabli","info");
+    },0);
     if(vSkip||vWarn)vToast(!vSkip);else toast("Absence retirée");
   },[]);
 
@@ -12508,10 +12604,22 @@ function CardioPlanning(){
     return {map,list,condList,counts};
   },[getEntries,acteById,allDays4,actes,salleReg,salleFerm]);
   /* ── Application flexible du planning type (multi-mois, départ configurable) ── */
+  /* v10.244 : plage couverte par une application (ou un retrait) du planning type, pour l'historique */
+  const ptPlage=(monthsList,fromToday,bornes)=>{
+    let du,au;
+    if(bornes&&bornes.ranges&&bornes.ranges.length){du=bornes.ranges.map(r=>r.deb).sort()[0];au=bornes.ranges.map(r=>r.fin).sort().pop();}
+    else if(bornes&&bornes.deb){du=bornes.deb;au=bornes.fin;}
+    else if(monthsList&&monthsList.length){const a=monthsList[0],b=monthsList[monthsList.length-1];du=dKey(a.y,a.m,1);au=dKey(b.y,b.m,new Date(b.y,b.m+1,0).getDate());}
+    if(du&&fromToday){const t=dKey(new Date().getFullYear(),new Date().getMonth(),new Date().getDate());if(t>du)du=t;}
+    return du&&au&&du<=au?{du,au}:null;
+  };
+  const ptJournal=(x,quoi,medId,monthsList,fromToday,bornes,liste)=>{const r=ptPlage(monthsList,fromToday,bornes);if(!r)return;
+    logLots((medId?[medId]:liste.map(m=>m.id)).map(id=>({x,md:id,k:"~"+r.du+"~"+r.au+"~"+quoi,act:null,pids:histPidsPlage(r.du,r.au)})));};
   const applyPTFlex=useCallback((medId,monthsList,fromToday,bornes)=>{
     secrMuteRef.current=Date.now();   /* v10.115 : le planning type n'émet pas de notification */
     const tod=new Date();tod.setHours(0,0,0,0);
     const targets=medId?medecins.filter(m=>m.id===medId):medecins;
+    ptJournal("add","pt",medId,monthsList,fromToday,bornes,targets);   /* v10.244 */
     let nApplied=0;const garde=[];   /* v10.118 : cases manuelles épargnées */
     const fermees={};   /* v10.229 : cases NON posées parce que la salle est fermée ce jour-là (clé = case : le réducteur peut passer deux fois) */
     setPlan(p=>{
@@ -12598,6 +12706,7 @@ function CardioPlanning(){
   },[ptModal,year,month,PCFG.len,PCFG.startM]);
   const removePTFlex=useCallback((medId,monthsList,fromToday,bornes)=>{
     secrMuteRef.current=Date.now();   /* v10.115 : le planning type n'émet pas de notification */
+    ptJournal("del","ptret",medId,monthsList,fromToday,bornes,medecins);   /* v10.244 */
     const tod=new Date();tod.setHours(0,0,0,0);
     const KEEP=["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"];
     const targetIds=medId?[medId]:medecins.map(m=>m.id);
@@ -12870,7 +12979,8 @@ function CardioPlanning(){
     setTourPtOte(pt=>{const n2={...pt};let ch=false;Object.keys(n2).forEach(wk=>{const q=wk.split("-").map(Number);const t=new Date(q[0],q[1],q[2]).getTime();if(isNaN(t))return;if(vBloque(vRef,q[0],q[1],q[2]))return;const fin=t+6*86400000;if(fin<fromT||t>toT)return;if(n2[wk]&&n2[wk][medId]){const o={...n2[wk]};delete o[medId];if(Object.keys(o).length===0)delete n2[wk];else n2[wk]=o;ch=true;}});return ch?n2:pt;});
   },[]);
 
-  const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,keepGardes=true,slotsParJour=null})=>{
+  const clearPeriodActs=useCallback(({medId,dateFrom,dateTo,keepAbs=true,keepGardes=true,slotsParJour=null,quoi=null})=>{
+    logPlage("del",medId,dateFrom,dateTo,quoi||(keepGardes?(keepAbs?"eff":"effabs"):"efftout"));   /* v10.244 */
     /* v10.10 : `keepGardes` à false retire aussi gardes, repos et tour. Une garde et son
        repos partent TOUJOURS ensemble — jamais l'un sans l'autre, sinon on laisserait
        quelqu'un de garde sans repos le lendemain, incohérence que l'application signale. */
@@ -12934,7 +13044,7 @@ function CardioPlanning(){
     return r;
   },[getEntries,plan,archPlan]);
   const offClear=useCallback((medId,du,au)=>{
-    clearPeriodActs({medId:medId,dateFrom:du,dateTo:au,keepAbs:false,keepGardes:false});
+    clearPeriodActs({medId:medId,dateFrom:du,dateTo:au,keepAbs:false,keepGardes:false,quoi:"desact"});
     removeTourPeriod(medId,du,au);
   },[clearPeriodActs,removeTourPeriod]);
 
@@ -15167,7 +15277,7 @@ header::-webkit-scrollbar { display: none; }
               <button onClick={()=>setHistModal(null)} style={S.xBtn}>×</button>
             </div>
             {histModal.loading&&<div style={{fontSize:12,color:"var(--txt3)"}}>Chargement…</div>}
-            {!histModal.loading&&histModal.list.length===0&&<div style={{fontSize:12,color:"var(--txt3)"}}>{hG?"Aucune modification enregistrée pour la garde de ce jour (la répartition automatique et « retirer toutes les gardes » ne sont pas inscrites).":"Aucune modification enregistrée pour cette case (seules les modifications manuelles de cases sont inscrites)."}</div>}
+            {!histModal.loading&&histModal.list.length===0&&<div style={{fontSize:12,color:"var(--txt3)"}}>{hG?"Aucune modification enregistrée pour la garde de ce jour (la répartition automatique et « retirer toutes les gardes » ne sont pas inscrites).":"Aucune modification enregistrée pour cette case."}</div>}
             {!histModal.loading&&histModal.list.map((e,i)=>{
               const a3=actes.find(x=>x.id===e.act);
               const dt=new Date(e.t);
@@ -15175,8 +15285,9 @@ header::-webkit-scrollbar { display: none; }
                 <span style={{color:"var(--txt3)",fontSize:10,minWidth:96}}>{String(dt.getDate()).padStart(2,"0")}/{String(dt.getMonth()+1).padStart(2,"0")}/{dt.getFullYear()} {String(dt.getHours()).padStart(2,"0")}:{String(dt.getMinutes()).padStart(2,"0")}</span>
                 <span style={{fontWeight:800,color:e.x==="add"?"#16a34a":"#dc2626"}}>{e.x==="add"?"+ Posé":"− Retiré"}</span>
                 {hG&&(()=>{const mg=medecins.find(x=>String(x.id)===String(e.md));return <span data-histmed="1" style={{padding:"0 6px",borderRadius:4,fontSize:10,fontWeight:800,background:mg?mg.color:"#888",color:"#fff"}}>{mg?mg.init:"#"+e.md}</span>;})()}
+                {histGrp(e)?<span data-histgrp="1" style={{fontSize:11,color:"var(--txt)",fontWeight:700}}>📅 {histGrpLib(e)}</span>:<>
                 {a3&&<span style={{padding:"0 6px",borderRadius:4,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a3.color,color:"#111"}}>{a3.short}</span>}
-                {!a3&&e.act&&<span style={{fontSize:10,color:"var(--txt2)"}}>{e.act}</span>}
+                {!a3&&e.act&&<span style={{fontSize:10,color:"var(--txt2)"}}>{e.act}</span>}</>}
                 <span style={{marginLeft:"auto",color:"var(--txt2)",fontSize:11}}>{e.a}</span>
               </div>;
             })}
@@ -15345,7 +15456,7 @@ header::-webkit-scrollbar { display: none; }
                             removeEntry(medId,y2,m2,d2,slot,e.acteId);
                             const dt=new Date(y2,m2,d2+1);const ny=dt.getFullYear(),nm=dt.getMonth(),nd3=dt.getDate();
                             setPlan(p=>{let next={...p};["JOUR","M","AM"].forEach(sl=>{const k=sk(ny,nm,nd3,sl);const dm={...(next[k]||{})};if(dm[medId]&&dm[medId].acteId==="REPOS_GARDE"){delete dm[medId];next={...next,[k]:dm};}});return next;});
-                          } else removeEntry(medId,y2,m2,d2,slot,e.acteId);
+                          } else{removeEntry(medId,y2,m2,d2,slot,e.acteId);if(ABS_IDS.indexOf(e.acteId)>=0)reposApresRetrait(medId,y2,m2,d2);}   /* v10.244 */
                         }} style={{background:"#fee2e2",border:"1px solid #fca5a5",cursor:"pointer",color:"#dc2626",fontSize:11,padding:"1px 5px",borderRadius:4,fontWeight:900}}>×</button>}
                       </div>
                     );
@@ -15383,7 +15494,9 @@ header::-webkit-scrollbar { display: none; }
               const lab=aid==="FORMATION"?"FMC":"absence";
               const finApres=dFin.getTime()>jClic.getTime()||(slotC==="M"&&sF==="AM");
               const go=mData._absGo;
-              const cible=go==="fin"?{df:iso(jClic),sd:slotC,dt:iso(dFin),sf:sF,txt:`du ${court(jClic)} au ${court(dFin)}`}
+              const auDebut=jClic.getTime()<=dDeb.getTime()&&(slotC==="M"||sD==="AM");   /* v10.244 : au 1er jour, « jusqu'à la fin » = « toute » */
+              const cible=go==="jour"?{df:iso(jClic),sd:"M",dt:iso(jClic),sf:"AM",txt:`le ${court(jClic)} seulement`}
+                        :go==="fin"?{df:iso(jClic),sd:slotC,dt:iso(dFin),sf:sF,txt:`du ${court(jClic)} au ${court(dFin)}`}
                         :go==="tout"?{df:iso(dDeb),sd:sD,dt:iso(dFin),sf:sF,txt:`du ${court(dDeb)} au ${court(dFin)}`}:null;
               const bt={background:"#fee2e2",border:"1px solid #fca5a5",color:"#dc2626",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:800,padding:"5px 9px",whiteSpace:"nowrap"};
               return(
@@ -15394,7 +15507,8 @@ header::-webkit-scrollbar { display: none; }
                   </div>
                   {!cible?
                     <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
-                      {finApres&&<button style={bt} onClick={()=>setMData(p=>({...p,_absGo:"fin"}))}>⏭ Jusqu'à la fin — {court(jClic)} au {court(dFin)}</button>}
+                      <button data-absjour="1" style={bt} onClick={()=>setMData(p=>({...p,_absGo:"jour"}))}>1️⃣ Seulement ce jour — {court(jClic)}</button>
+                      {finApres&&!auDebut&&<button style={bt} onClick={()=>setMData(p=>({...p,_absGo:"fin"}))}>⏭ Jusqu'à la fin — {court(jClic)} au {court(dFin)}</button>}
                       <button style={bt} onClick={()=>setMData(p=>({...p,_absGo:"tout"}))}>⏮⏭ Toute l'{lab==="FMC"?"a FMC":"absence"} — {court(dDeb)} au {court(dFin)}</button>
                     </div>
                   :
@@ -15725,6 +15839,7 @@ header::-webkit-scrollbar { display: none; }
           initDate={`${mData.y}-${String(mData.m+1).padStart(2,"0")}-${String(mData.d).padStart(2,"0")}`}
           onApply={({keepAbs,medId,dateFrom,dateTo,slots,absType="ABSENCE"})=>{
             const KEEP=keepAbs?["GARDE","REPOS_GARDE","TOUR_HC","TOUR_USIC","ABSENCE","FORM","FORMATION"]:SYS.filter(x=>x!=="ABSENCE");
+            logPlage("del",medId,dateFrom,dateTo,keepAbs?"eff":"effabs");   /* v10.244 */
             // Remove all non-system entries for medId over the period
             const df=new Date(dateFrom),dt=new Date(dateTo);
             const cur=new Date(df);
