@@ -129,7 +129,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.244 — 26/09/2026";
+const APP_VERSION="v10.245 — 26/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6271,6 +6271,7 @@ const HELP_SECTIONS=[
   HP({children:["🔐 ",HE("b",null,"Niveaux de droits")," : chaque médecin a un niveau dans sa fiche ✏️ (onglet Équipe), qui s'applique quand il se connecte avec son PIN personnel. ",HE("b",null,"Basique")," = sa propre ligne, plus ses activités dans CHL, CHB et les plateaux. ",HE("b",null,"Intermédiaire")," = le planning de tous les médecins, gardes et échanges, semaines de tour, planning type et attachés — sans Paramètres, Équipe ni Activités. ",HE("b",null,"Éditeur")," = accès complet. Récapitulatif dans Paramètres."]}),
   HP({children:["📴 ",HE("b",null,"Hors ligne")," : sans réseau, l'application s'ouvre quand même et affiche le dernier planning reçu sur cet appareil, en lecture seule (bandeau gris, pastille grise). Dès le retour du réseau, tout se remet à jour et l'édition se rouvre automatiquement — rien à faire. La première ouverture doit se faire avec du réseau ; sur iPhone, ajoutez l'icône à l'écran d'accueil pour que la mise en cache soit conservée."]}),
   HP({children:["🕘 ",HE("b",null,"Historique d'une case")," : en mode édition, appui long (téléphone) ou clic droit (ordinateur) sur une case — dans le Planning et les Attachés, sur le rond du médecin dans CHL, CHB, PT Cardio et PT Angio, sur la case dans Internes (v10.176) — affiche qui a posé ou retiré quoi, et quand (signé du prénom pour le rôle administratif). Depuis la v10.244, y figurent aussi, en une ligne 📅 « du … au … », les gestes sur plusieurs jours qui couvrent la case — absence ou FMC posée ou retirée, effacement par la fenêtre Période, désactivation, planning type posé ou retiré, restauration d'une sauvegarde, annulation ↶ — et, case par case, ce qui a été ÉCRASÉ : une consultation remplacée par une absence, ou par la garde ou le repos de garde d'un collègue (« − Retiré … · repos de garde du 15/11 »). La répartition automatique n'est pas inscrite."]}),
+  HP({children:["🛡 ",HE("b",null,"Enregistrement case par case")," (v10.245) : chaque modification n'envoie plus que la case du médecin concerné. Deux personnes qui travaillent en même temps sur la même demi-journée — même depuis un téléphone resté hors réseau — ne peuvent plus s'effacer l'une l'autre ; seule une modification de la MÊME case du MÊME médecin l'emporte sur la précédente. Si un envoi échoue, l'application réessaie seule (quelques secondes, puis jusqu'à une minute) : le point de connexion reste rouge tant que ce n'est pas passé, et rien d'autre n'est réécrit."]}),
   HP({children:["↩ ",HE("b",null,"Retirer une absence")," (v10.244) : cliquer sur un jour d'une absence qui dure plusieurs jours propose « 1️⃣ Seulement ce jour », « ⏭ Jusqu'à la fin » (sauf au premier jour, où cela reviendrait à tout retirer) et « ⏮⏭ Toute l'absence ». Pour retirer quelques jours au début, retirez-les jour par jour. ",HE("b",null,"Repos de garde")," : une garde posée la veille d'une absence ou d'une FMC est posée SANS repos (l'absence l'emporte). Quand cette absence est retirée ensuite — par la croix, « Seulement ce jour », « Jusqu'à la fin » ou « Toute l'absence » — le repos revient de lui-même sur les créneaux redevenus vides, sans rien écraser."]}),
   HP({children:["🕘 ",HE("b",null,"Historique d'une garde")," (v10.239) : clic droit ou appui long sur la case Garde d'un jour — dans le Planning, les Attachés et la tuile Gardes de Construire. Chaque changement de main y figure : « − retiré » pour l'ancien titulaire, « + posé » pour le nouveau, avec l'auteur et l'heure ; le retrait par 🗑 aussi. La répartition automatique et « retirer toutes les gardes » ne sont pas inscrites, ni les retraits antérieurs à la v10.239."]}),
   HP({children:["Depuis la v10.238, l'historique n'a ",HE("b",null,"plus de limite de 1000 lignes"),". Chaque période a son propre cahier d'historique, qui garde toutes les modifications de ses cases — y compris les deux mois de construction qui précèdent la période. Il suit la période jusqu'à son archivage : il part alors dans le fichier téléchargé, et reste lisible dans l'application. Un cahier contient plus de dix mille modifications ; s'il approchait de sa limite, l'éditeur serait prévenu à l'ouverture avant que les lignes les plus anciennes ne s'effacent."]}),
@@ -10760,26 +10761,57 @@ function CardioPlanning(){
     });
   },[]);
 
+  /* v10.245 : ENVOI DU PLAN, MÉDECIN PAR MÉDECIN, avec nouvel essai.
+     Avant : une case modifiée renvoyait la DEMI-JOURNÉE ENTIÈRE (tous les médecins) telle que l'appareil la
+     connaissait — un appareil en retard (hors réseau) effaçait en silence ce qu'un collègue venait de poser sur la
+     même demi-journée ; et un envoi en échec réécrivait TOUT le planning depuis la copie de l'appareil.
+     Désormais : un champ par médecin (planV2 › demi-journée › médecin), et en cas d'échec on RÉESSAIE (2 s, 4 s, 8 s…
+     jusqu'à 1 min) d'envoyer ce qui est encore en attente, à sa valeur la plus récente — jamais de réécriture globale.
+     planPending : clé « demi-journée \u0001 médecin » → valeur envoyée (null = retrait), jusqu'à confirmation du serveur. */
+  const PP_SEP="\u0001";
+  const envoyerPlan=useCallback((cles,essai)=>{
+    if(!PLANNING_DOC||!updatePaths||!cles.length)return;
+    (async()=>{
+      const lot=[];
+      cles.forEach(c=>{const id=c[0]+PP_SEP+c[1];if(!(id in planPending.current))return;const v=planPending.current[id];lot.push([["planV2",c[0],c[1]],v===null?"__DELETE__":v]);});
+      for(let i=0;i<lot.length;i+=400){
+        try{await updatePaths(PLANNING_DOC,lot.slice(i,i+400));}
+        catch(e){
+          console.error("sync plan (essai "+(essai+1)+", "+(lot.length-i)+" champs):",e);setFbStatus("error");
+          /* document absent (base neuve) : on le crée sans rien écraser, puis on réessaie */
+          if(/no document|not[-_ ]?found/i.test(String((e&&(e.code||e.message))||"")))try{if(setDoc)await setDoc(PLANNING_DOC,{planV2:{}},{merge:true});}catch(e2){}
+          const reste=lot.slice(i).map(p=>[p[0][1],p[0][2]]);
+          setTimeout(()=>envoyerPlan(reste,essai+1),Math.min(60000,2000*Math.pow(2,Math.min(essai,5))));
+          return;
+        }
+      }
+      if(essai>0)setFbStatus("ok");
+    })();
+  },[]);
   const flushPlan=useCallback((cur)=>{
     if(!PLANNING_DOC||!updatePaths)return;
     if(GEL.on)return;   /* v10.229 : planning gelé — planSynced intact, le serveur fait foi */
     const prev=planSynced.current||{};
-    const pairs=[],chg=[];
-    Object.keys(cur).forEach(k=>{const v=fbSafeCell(cur[k]);if(JSON.stringify(v)!==JSON.stringify(prev[k])){pairs.push([["planV2",k],v]);planPending.current[k]=v;chg.push(k);}});
-    Object.keys(prev).forEach(k=>{if(!(k in cur)){pairs.push([["planV2",k],"__DELETE__"]);planPending.current[k]=null;chg.push(k);}});
+    const cles=[],chg=[];
+    const ks={};Object.keys(cur).forEach(k=>{ks[k]=1;});Object.keys(prev).forEach(k=>{ks[k]=1;});
+    Object.keys(ks).forEach(k=>{
+      const a=cur[k],b=prev[k];if(a===b)return;
+      const sa=fbSafeCell(a||{})||{},sb=fbSafeCell(b||{})||{};
+      const mids={};Object.keys(sa).forEach(m=>{mids[m]=1;});Object.keys(sb).forEach(m=>{mids[m]=1;});
+      let touche=false;
+      Object.keys(mids).forEach(mid=>{
+        const va=sa[mid],vb=sb[mid];
+        if(JSON.stringify(va)===JSON.stringify(vb))return;
+        touche=true;planPending.current[k+PP_SEP+mid]=va===undefined?null:va;cles.push([k,mid]);
+      });
+      if(touche)chg.push(k);
+    });
     secrEmit(prev,cur,chg);   /* v10.115 : notifications secrétaires — avant l'écrasement de prev */
     planSynced.current=cur;
-    if(pairs.length===0)return;
-    expBump(pairs.length);   /* v10.35 : cases modifiees depuis la derniere sauvegarde */
+    if(cles.length===0)return;
+    expBump(chg.length);   /* v10.35 : cases modifiees depuis la derniere sauvegarde */
     localChange.current=true;
-    (async()=>{
-      try{for(let i=0;i<pairs.length;i+=200)await updatePaths(PLANNING_DOC,pairs.slice(i,i+200));}
-      /* v10.111 : le repli {merge:true} FUSIONNAIT — les SUPPRESSIONS (celles de
-         l'archivage !) étaient perdues en silence et les cases ressuscitaient au
-         rechargement suivant. mergeFields remplace le champ planV2 en entier :
-         les retraits comptent. Lots ramenés à 200 par prudence. */
-      catch(e){console.error("sync plan ("+pairs.length+" paires):",e);setFbStatus("error");if(setDoc)Promise.resolve(setDoc(PLANNING_DOC,{planV2:cur},{mergeFields:["planV2"]})).then(()=>setFbStatus("ok")).catch(e2=>{console.error("sync plan (repli):",e2);setFbStatus("error");});}
-    })();
+    envoyerPlan(cles,0);
   },[]);
 
   /* Écriture du planning type, médecin par médecin (v9.72). */
@@ -10870,11 +10902,14 @@ function CardioPlanning(){
           if(data.planV2){
             const incoming=data.planV2;
             const merged={...incoming};
-            Object.keys(planPending.current).forEach(k=>{
-              const pv=planPending.current[k];
-              const confirmed=pv===null?!(k in incoming):JSON.stringify(incoming[k])===JSON.stringify(pv);
-              if(confirmed)delete planPending.current[k];
-              else{if(pv===null)delete merged[k];else merged[k]=pv;}
+            /* v10.245 : attente médecin par médecin — seule MA case est ré-appliquée tant que le serveur ne l'a pas
+               confirmée ; ce que les collègues ont posé sur la même demi-journée reste visible. */
+            Object.keys(planPending.current).forEach(id=>{
+              const q=id.split("\u0001");if(q.length!==2){delete planPending.current[id];return;}
+              const k=q[0],mid=q[1],pv=planPending.current[id],inc=incoming[k]||{};
+              const confirmed=pv===null?!(mid in inc):JSON.stringify(inc[mid])===JSON.stringify(pv);
+              if(confirmed){delete planPending.current[id];return;}
+              const dm={...(merged[k]||{})};if(pv===null)delete dm[mid];else dm[mid]=pv;merged[k]=dm;
             });
             planSynced.current=merged;
             setPlan(merged);
@@ -11178,7 +11213,7 @@ function CardioPlanning(){
         const dm={...(plan[k]||{})};
         if(av===undefined||av===null||cellEs(av).length===0)delete dm[medId];
         else dm[medId]=av;
-        maj[k]=dm;pairs.push([["planV2",k],dm]);n++;
+        maj[k]=dm;pairs.push([["planV2",k,String(medId)],dm[medId]===undefined?"__DELETE__":dm[medId]]);n++;   /* v10.245 : la case de CE médecin seulement */
       });
       if(n===0){if(nLock)vToast(false);else toast("Rien à restaurer — déjà identique","info");return 0;}
       setPlan(p=>{const next={...p};Object.keys(maj).forEach(k=>{next[k]=maj[k];});return next;});
