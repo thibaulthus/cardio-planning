@@ -121,9 +121,69 @@ function estRefus(e){var c=String((e&&(e.code||e.message))||"");return /permissi
 var REFUS={n:0,t:0};
 function refusSignal(quoi){REFUS.n++;try{jlog("REFUS",["écriture refusée par le serveur (tampon trop ancien ?) : "+quoi]);}catch(e){}
   var n=Date.now();if(n-REFUS.t>10000){REFUS.t=n;toast("⛔ Une modification trop ancienne a été refusée par le serveur — l'écran reprend le planning à jour","warn");}}
-const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(estCahier(ref)){obj=avecTampon(obj);if(opts&&opts.mergeFields)opts={mergeFields:opts.mergeFields.concat(["_ecr"])};}return trafEcr(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
+/* v10.247 : FERMETURE DES PAGES OUBLIÉES (suite de la v10.246). Deux règles :
+   1. INACTIVITÉ — pour les profils qui peuvent modifier (tout sauf « Consulter »), au bout de INACT.min minutes sans
+      action (toucher, clic, clavier, défilement, souris), l'application se ferme et revient à l'écran du code ; un
+      bandeau prévient 30 s avant. Le délai est réglé dans Paramètres (inactMin, commun à l'équipe, 5 min par défaut).
+   2. UN CODE PERSONNEL, UN SEUL APPAREIL — voir l'effet « sessions » dans CardioPlanning.
+   LA FILE D'ATTENTE : une page endormie (téléphone verrouillé, onglet en arrière-plan) ne fait plus rien tourner ; au
+   réveil, Firestore pourrait renvoyer sa file AVANT notre vérification. D'où : quand la page passe en arrière-plan, on
+   laisse partir ce qui est en cours (1,5 s au plus), puis on COUPE le réseau de Firestore ; au retour, on vérifie le
+   délai AVANT de rebrancher. Délai dépassé = fermeture sans jamais rebrancher : file de Firestore effacée
+   (terminate + clearPersistence, seulement s'il reste quelque chose en attente — sinon le cache hors ligne est gardé),
+   écritures de l'application rendues muettes (FERME.on), puis rechargement sur l'écran du code. Le premier geste au
+   retour vérifie le délai AVANT de compter comme action. La règle du tampon (10 min) reste le dernier rempart.
+   Coût Firebase : nul (tout se passe dans l'appareil). */
+var INACT={min:5,dec:0,der:0,actif:false,coupe:false,gen:0,reste:null,surReste:null,
+  now:function(){return Date.now()+INACT.dec;},
+  recharger:function(){try{window.location.reload();}catch(e){}}};
+if(typeof window!=="undefined")window.__cpInact=INACT;   /* prise du banc fermeture.js (heure décalable, rechargement observé) */
+var FERME={on:false};
+var INACT_BORNES=[2,3,4,5,6,8,10,15,20,30];
+function inactMinOk(v){v=Number(v);return INACT_BORNES.indexOf(v)>=0?v:null;}
+function fermeMuet(){return Promise.resolve();}
+function attendreMs(ms){return new Promise(function(r){setTimeout(r,ms);});}
+/* une méthode de l'instance Firestore (disableNetwork, enableNetwork, waitForPendingWrites, terminate, clearPersistence) :
+   null si elle n'existe pas, sinon toujours une promesse — jamais d'exception */
+function fbEtape(nom){var db=typeof window!=="undefined"?window.firebaseDB:null;if(!db||typeof db[nom]!=="function")return null;
+  try{return Promise.resolve(db[nom]());}catch(e){return Promise.reject(e);}}
+function fermerApp(motif,info){
+  if(FERME.on)return;FERME.on=true;INACT.actif=false;INACT.gen++;
+  try{jlog("FERMETURE",[motif==="autre"?"code ouvert sur un autre appareil ("+((info&&info.lib)||"?")+")":"inactivité ("+INACT.min+" min)"]);}catch(e){}
+  try{localStorage.setItem("cp6_ferme",JSON.stringify({m:motif,lib:(info&&info.lib)||"",t:(info&&info.t)||0,min:INACT.min}));}catch(e){}
+  Promise.resolve(fbEtape("disableNetwork")).catch(function(){}).then(function(){
+    var w=fbEtape("waitForPendingWrites");if(!w)return true;   // réseau coupé : ne se résout que si RIEN n'attend
+    return Promise.race([w.then(function(){return false;},function(){return true;}),attendreMs(600).then(function(){return true;})]);
+  }).then(function(enAttente){
+    return Promise.resolve(fbEtape("terminate")).catch(function(){}).then(function(){
+      if(!enAttente)return;
+      var c=fbEtape("clearPersistence");if(!c)return;
+      return c.then(function(){jlog("FERMETURE",["file d'attente effacée"]);},
+        function(e){jlog("FERMETURE",["file d'attente non effacée (autre onglet ouvert ?) : "+String((e&&(e.code||e.message))||e)]);});
+    });
+  }).then(function(){INACT.recharger();},function(){INACT.recharger();});
+}
+function inactVerifier(){if(!INACT.actif||FERME.on)return false;
+  if(INACT.now()-INACT.der>=INACT.min*60000){fermerApp("inactivite");return true;}return false;}
+function inactCachee(){try{return !!document.hidden;}catch(e){return false;}}
+function inactRebrancher(){if(!INACT.coupe)return;INACT.coupe=false;var p=fbEtape("enableNetwork");if(p)p.catch(function(){});}
+/* la page passe en arrière-plan : immediat = gel du navigateur (événement freeze), plus le temps d'attendre */
+function inactCache(immediat){
+  if(!INACT.actif||FERME.on||INACT.coupe)return;var g=++INACT.gen;
+  var couper=function(){if(g!==INACT.gen||FERME.on||INACT.coupe||!inactCachee())return;var p=fbEtape("disableNetwork");if(p){INACT.coupe=true;p.catch(function(){});}};
+  if(immediat){couper();return;}
+  setTimeout(function(){if(g!==INACT.gen)return;var w=fbEtape("waitForPendingWrites");
+    (w?Promise.race([w.catch(function(){}),attendreMs(1500)]):Promise.resolve()).then(couper);},300);
+}
+function inactVisible(){if(inactCachee())return;INACT.gen++;if(FERME.on)return;if(inactVerifier())return;inactRebrancher();}
+function inactAction(){if(!INACT.actif||FERME.on)return;if(inactVerifier())return;INACT.der=INACT.now();
+  if(INACT.reste!==null){INACT.reste=null;if(INACT.surReste)INACT.surReste(null);}}
+function inactTick(){if(!INACT.actif||FERME.on)return;if(inactVerifier())return;
+  var r=INACT.min*60000-(INACT.now()-INACT.der);var sec=r<=30000&&!inactCachee()?Math.max(1,Math.ceil(r/1000)):null;
+  if(sec!==INACT.reste){INACT.reste=sec;if(INACT.surReste)INACT.surReste(sec);}}
+const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){if(FERME.on)return fermeMuet();if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(estCahier(ref)){obj=avecTampon(obj);if(opts&&opts.mergeFields)opts={mergeFields:opts.mergeFields.concat(["_ecr"])};}return trafEcr(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
 const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? function(ref,suite,err){return window.firebaseOnSnapshot(ref,function(){return trafRecu(suite,this,arguments);},err);} : null;   /* v10.233 : chaque message reçu est compté */
-const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(estCahier(ref))pairs=(pairs||[]).concat([[["_ecr"],tampon()]]);return trafEcr(window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])])));} : null;
+const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){if(FERME.on)return fermeMuet();if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(estCahier(ref))pairs=(pairs||[]).concat([[["_ecr"],tampon()]]);return trafEcr(window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])])));} : null;
 
 /* v10.246 : DÉCOUPAGE du tour, des notes et du registre des salles. Ces trois champs étaient enregistrés D'UN SEUL BLOC :
    la file d'attente d'une vieille page (état du 21-22/09) les a réécrits en entier entre le 25 et le 29/09 — semaines de
@@ -181,7 +241,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.246 — 29/09/2026";
+const APP_VERSION="v10.247 — 29/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6403,7 +6463,11 @@ const HELP_SECTIONS=[
   HT({children:"3. L'heure d'envoi de chaque modification"}),
   HP({children:["Chaque modification part avec son ",HE("b",null,"heure d'envoi"),", réglée sur l'heure du serveur (le fuseau horaire, un voyage ou un VPN n'y changent rien). Une règle de la base Firebase refuse une modification envoyée ",HE("b",null,"il y a plus de 10 minutes"),". Elle est ",HE("b",null,"abandonnée"),", jamais renvoyée ; l'écran reprend le planning à jour et un message l'annonce. Conséquence pour tous : une modification faite hors réseau puis envoyée plus de 10 minutes après est à refaire. La carte ",HE("b",null,"🛡️ Protection des écritures")," des Paramètres indique l'appareil, l'heure utilisée, et teste si la règle est publiée."]}),
   HT({children:"4. Les notes"}),
-  HP({children:["Le champ de note garde votre texte pendant la frappe et n'enregistre qu'après ",HE("b",null,"une courte pause"),", ou quand on quitte le champ ou la fenêtre. Les lettres ne s'effacent plus en tapant vite."]})
+  HP({children:["Le champ de note garde votre texte pendant la frappe et n'enregistre qu'après ",HE("b",null,"une courte pause"),", ou quand on quitte le champ ou la fenêtre. Les lettres ne s'effacent plus en tapant vite."]}),
+  HT({children:"5. Fermeture des pages oubliées (v10.247)"}),
+  HP({children:["Pour tous ceux qui peuvent modifier (médecins, éditeur, secrétaires, cadres, internes), l'application se ferme et revient à l'écran du code après ",HE("b",null,"5 minutes sans action"),", y compris si on est parti dans un autre onglet ou une autre application. Un bandeau orange prévient ",HE("b",null,"30 secondes avant"),", touchez l'écran pour continuer. Le délai se règle dans Paramètres, carte ",HE("b",null,"🔒 Fermeture après inactivité"),", pour toute l'équipe. « Consulter » n'est pas concerné."]}),
+  HP({children:["Une page endormie (téléphone verrouillé, onglet laissé en arrière-plan) se ferme ",HE("b",null,"à son réveil"),", sans rien envoyer de ce qu'elle gardait en attente. Une modification faite juste avant de changer d'application part normalement : l'application attend son envoi avant de s'endormir."]}),
+  HP({children:["Un ",HE("b",null,"code personnel de médecin")," ne reste ouvert que sur un seul appareil : l'entrer sur un autre appareil ferme le premier, qui l'annonce sur son écran du code. Deux onglets du même navigateur comptent comme un seul appareil. Les codes partagés (éditeur, secrétaires, cadres, internes) ne sont pas concernés : plusieurs postes peuvent travailler en même temps."]})
  )},
  {id:"fermees",icon:"🚫",title:"Plages fermées — fermer une salle sur une demi-journée",body:()=>HE("div",null,
   HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée et hachurée")," (hachures depuis la v10.235, pour ne pas la confondre avec la couleur d'une salle vide) dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
@@ -8437,6 +8501,17 @@ function ProtectionTuile({netOff=false,bloque=false}){
     {lg("Écritures refusées depuis l'ouverture",String(REFUS.n),REFUS.n?"#dc2626":undefined)}
     <button data-protest="1" disabled={netOff||bloque} onClick={tester} style={{marginTop:8,width:"100%",fontSize:12,padding:"7px 10px",borderRadius:8,cursor:netOff||bloque?"default":"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"var(--bg2)",color:"#16a34a",opacity:netOff||bloque?.5:1}}>🧪 La règle est-elle publiée ?</button>
     {res&&<div data-protres={res.k} style={{marginTop:6,fontSize:11.5,fontWeight:700,color:res.k==="oui"?"#16a34a":res.k==="non"?"#d97706":"var(--txt2)"}}>{res.k==="oui"?"✅ ":res.k==="non"?"⏳ ":""}{res.m}</div>}
+  </div>;
+}
+/* v10.247 : tuile 🔒 Fermeture après inactivité — le délai, commun à l'équipe (une écriture par changement : liste, pas curseur) */
+function InactTuile({min=5,setMin=null}){
+  return <div data-inacttuile="1" style={{...S.card,marginBottom:10}}>
+    <div style={{fontWeight:700,color:"#b45309",fontSize:13,marginBottom:6}}>🔒 Fermeture après inactivité</div>
+    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.45}}>Sans action pendant ce délai, l'application se ferme et revient à l'écran du code, pour tous les profils qui peuvent modifier (« Consulter » n'est pas concerné). Un bandeau prévient 30 secondes avant. Une page restée en arrière-plan ou endormie au-delà du délai se ferme à son retour, sans rien envoyer de ce qu'elle gardait en attente. Réglage commun à toute l'équipe. Un code personnel de médecin ne reste ouvert que sur un seul appareil : l'ouvrir ailleurs ferme l'autre.</div>
+    <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--txt)"}}><span>Délai :</span>
+      <select data-inactmin="1" value={min} disabled={!setMin} onChange={e=>{const v=inactMinOk(e.target.value);if(v&&setMin)setMin(v);}} style={{...S.fi,width:"auto",fontSize:12}}>
+        {INACT_BORNES.map(v=><option key={v} value={v}>{v} minutes</option>)}
+      </select></div>
   </div>;
 }
 /* v10.246 : tuile 📜 Journal du tour et des notes — les lignes « #T| » (semaine de tour) et « #N| » (note) du cahier
@@ -10556,6 +10631,11 @@ function CardioPlanning(){
   const [stale,setStale]=useState(false);   /* v10.135 : cette copie est dépassée par le serveur */
   const [salleFerm,setSalleFerm]=useState({type:{},jours:{}});   /* v10.229 : plages fermées */
   const [salleVideCol,setSalleVideCol]=useState(VIDE_COL_DEF);
+  /* v10.247 : délai de fermeture après inactivité (commun à l'équipe), bandeau des 30 dernières secondes, et message de
+     l'écran du code après une fermeture (lu une fois dans cp6_ferme, puis effacé) */
+  const [inactMin,setInactMin]=useState(5);
+  const [inactReste,setInactReste]=useState(null);
+  const [fermeMsg,setFermeMsg]=useState(()=>{try{const v=JSON.parse(localStorage.getItem("cp6_ferme")||"null");localStorage.removeItem("cp6_ferme");return v&&v.m?v:null;}catch(e){return null;}});
   const [bacDe,setBacDe]=useState(null);   /* v10.237 : {ts,at} — la sauvegarde chargée dans le bac, ou null */   /* v10.232 : LA couleur des salles vides (une seule) */
   FERM.d=salleFerm;
   const [gel,setGel]=useState(null);   /* v10.229 : {by,at} tant que le planning est gelé par un éditeur */
@@ -11207,6 +11287,7 @@ function CardioPlanning(){
             if(data.notesV2&&typeof data.notesV2==="object"){delete mapMigr.current.notesV2;setNotes(readMap("notesV2",data.notesV2).map);}
             else if(data.notes){const leg=lireJson(data.notes,{});mapSynced.current.notesV2=leg;setNotes(leg);migrerMap("notesV2",leg);}
             if(videColOk(data.salleVideCol))setSalleVideCol(data.salleVideCol);   /* v10.232 */
+            {const im=inactMinOk(data.inactMin);if(im)setInactMin(im);}   /* v10.247 */
             setBacDe(BAC&&data._bacDe&&data._bacDe.ts?data._bacDe:null);   /* v10.237 */
             BAC_DEP.t=BAC?((data._bacDe&&data._bacDe.ts)||data._bacDep||null):null;   /* v10.238 : jusqu'où le vrai historique vaut dans le bac */
             if(data.salleFerm){try{const f=JSON.parse(data.salleFerm)||{};const nf={type:f.type||{},jours:f.jours||{}};FERM.d=nf;setSalleFerm(nf);}catch(e){}}   /* v10.229 */
@@ -11812,6 +11893,37 @@ function CardioPlanning(){
     const mp={},ord=[];(salleReg||[]).forEach(x=>{if(x&&x.n&&!(x.n in mp)){mp[x.n]=x;ord.push(x.n);}});flushMap("salleRegV2",mp,ord);},[salleReg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleFerm:JSON.stringify(salleFerm)});},[salleFerm]);   /* v10.229 */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleVideCol});},[salleVideCol]);   /* v10.232 */
+  useEffect(()=>{INACT.min=inactMin;if(!isFirstLoad.current)saveToFirebase({inactMin});},[inactMin]);   /* v10.247 */
+  /* v10.247 : FERMETURE APRÈS INACTIVITÉ — armée pour tout profil qui peut modifier (pas « Consulter », pas l'écran du code) */
+  useEffect(()=>{if(accessMode!=="ask")setFermeMsg(null);
+    if(accessMode==="ask"||accessMode==="view"){INACT.actif=false;INACT.reste=null;setInactReste(null);inactRebrancher();return;}
+    INACT.actif=true;INACT.der=INACT.now();INACT.reste=null;INACT.surReste=setInactReste;setInactReste(null);
+    const act=()=>inactAction();
+    const vis=()=>{if(inactCachee())inactCache(false);else inactVisible();};
+    const fige=()=>inactCache(true);
+    const EV=["pointerdown","mousedown","touchstart","keydown","wheel","scroll","input","mousemove"];
+    EV.forEach(n=>window.addEventListener(n,act,true));
+    document.addEventListener("visibilitychange",vis);window.addEventListener("pageshow",vis);window.addEventListener("focus",vis);
+    document.addEventListener("freeze",fige);
+    const id=setInterval(inactTick,1000);
+    return ()=>{EV.forEach(n=>window.removeEventListener(n,act,true));
+      document.removeEventListener("visibilitychange",vis);window.removeEventListener("pageshow",vis);window.removeEventListener("focus",vis);
+      document.removeEventListener("freeze",fige);clearInterval(id);INACT.actif=false;};
+  },[accessMode]);
+  /* v10.247 : UN CODE PERSONNEL, UN SEUL APPAREIL. À l'entrée d'un code de médecin (ou d'attaché), l'appareil s'inscrit dans
+     sessions/<id du médecin> (identifiant d'appareil APPAREIL.id, propre au navigateur : deux onglets du même navigateur
+     sont un seul appareil) puis écoute cette fiche ; si un AUTRE appareil s'y inscrit, celui-ci se ferme. La fiche ne
+     porte jamais le code. Codes partagés (éditeur, secrétaires, cadres, internes) non concernés ; bac à sable exclu (on
+     y change de profil sans code : il fermerait le vrai téléphone du médecin). Coût : une écriture par entrée du code. */
+  useEffect(()=>{
+    if(BAC||accessMode!=="medecinEdit"||editMedId==null||typeof window==="undefined"||!window.firebaseDB)return;
+    let ref=null,off=null;
+    try{ref=window.firebaseDB.collection("sessions").doc(String(editMedId));
+      Promise.resolve(ref.set({app:APPAREIL.id,lib:APPAREIL.lib,t:Date.now(),v:verCourt()})).catch(e=>console.log("session:",e));
+      off=ref.onSnapshot(sn=>{const d=sn&&sn.exists&&typeof sn.data==="function"?sn.data():null;
+        if(d&&d.app&&d.app!==APPAREIL.id)fermerApp("autre",{lib:d.lib||"",t:d.t||0});},()=>{});}catch(e){}
+    return ()=>{try{if(typeof off==="function")off();}catch(e){}};
+  },[accessMode,editMedId]);
   const salleVide=useMemo(()=>{const noms={};(salleReg||[]).forEach(x=>{if(x&&x.vide)noms[x.n]=1;});return {col:salleVideCol,noms};},[salleReg,salleVideCol]);
   // Consultation des archives : charge le DOCUMENT DE PÉRIODE de la période affichée
   // (v10.110 : un doc par période — une seule lecture au lieu de cinq, débordement compris).
@@ -13570,6 +13682,11 @@ function CardioPlanning(){
         <div style={{fontSize:32,marginBottom:8}}>♥</div>
         <div style={{fontWeight:800,fontSize:20,color:"var(--txt)",marginBottom:4}}>CardioPlanning</div>
         <div style={{color:"var(--txt2)",fontSize:13,marginBottom:20}}>CHL & CHB</div>
+        {fermeMsg&&<div data-fermemsg={fermeMsg.m} style={{fontSize:12,fontWeight:700,color:"#b45309",background:"rgba(180,83,9,.08)",border:"1px solid #b45309",borderRadius:8,padding:"8px 10px",marginBottom:14,lineHeight:1.4}}>{/* v10.247 */}
+          {fermeMsg.m==="autre"
+            ?"🔒 Votre code a été ouvert sur un autre appareil"+(fermeMsg.lib?" ("+fermeMsg.lib+(fermeMsg.t?", "+new Date(fermeMsg.t).getHours()+" h "+String(new Date(fermeMsg.t).getMinutes()).padStart(2,"0"):"")+")":"")+" : cette session a été fermée."
+            :"🔒 Application fermée après "+(fermeMsg.min||5)+" minutes sans activité. Entrez votre code pour reprendre."}
+        </div>}
         {BAC&&<div style={{fontSize:11,fontWeight:700,color:"#c2410c",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>🧪 Bac à sable — espace de test<button onClick={bacSortir} style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6,border:"1px solid #c2410c",background:"none",color:"#c2410c",cursor:"pointer"}}>Sortir</button></div>}{/* v10.175 */}
         <button style={{width:"100%",padding:"11px",borderRadius:9,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontSize:14,marginBottom:14,fontWeight:600}} onClick={()=>setAccessMode("view")}>👁 Consulter</button>
         <div style={{color:"var(--txt3)",fontSize:12,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
@@ -13824,6 +13941,9 @@ header::-webkit-scrollbar { display: none; }
         </div>
       </div>}
       <FlecheHaut tab={tab}/>{/* v10.226 */}
+      {inactReste!==null&&<div data-inact="1" onClick={()=>inactAction()} style={{position:"fixed",top:10,left:"50%",transform:"translateX(-50%)",zIndex:4000,background:"#b45309",color:"#fff",padding:"10px 16px",borderRadius:10,fontSize:13,fontWeight:700,boxShadow:"0 4px 18px rgba(0,0,0,.35)",cursor:"pointer",textAlign:"center",maxWidth:"92vw"}}>{/* v10.247 */}
+        🔒 Fermeture dans {inactReste} s pour inactivité — touchez l'écran pour continuer
+      </div>}
       {gelOn&&!netOff&&<div data-botbar="1" data-gel="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e7490",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
         🧊 Planning gelé par {gel.by||"l'éditeur"} depuis {gelHeure(gel.at)} — lecture seule pour tout le monde{isEditVrai?" · dégel dans Paramètres":""}
       </div>}
@@ -14945,6 +15065,7 @@ header::-webkit-scrollbar { display: none; }
           </div>}
           <TraficTuile docSize={docSize} netOff={netOff} onPing={()=>{if(PLANNING_DOC&&setDoc)Promise.resolve(setDoc(PLANNING_DOC,{_ping:Date.now()},{merge:true})).catch(()=>{});}}/>
           <ProtectionTuile netOff={netOff} bloque={BAC||gelOn||stale}/>   {/* v10.246 */}
+          <InactTuile min={inactMin} setMin={isEdit?setInactMin:null}/>   {/* v10.247 */}
           <JournalTuile medecins={medecins} per0={perStart(year,month)}/>   {/* v10.246 */}
           <div style={{...S.card,marginBottom:10}}>{/* v10.137 : Sauvegarde & archivage, carte à part */}
             <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
