@@ -92,9 +92,61 @@ function sansIndef(v){
     if(pr===null||pr.constructor===undefined||pr.constructor.name==="Object"){const o={};Object.keys(v).forEach(k=>{if(v[k]!==undefined)o[k]=sansIndef(v[k]);});return o;}}
   return v;
 }
-const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){return VER_STALE.on?verMuet():GEL.on?gelMuet():trafEcr(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
+/* v10.246 : TAMPON HORAIRE. Chaque écriture du cahier (planning/main, planning/bac) emporte _ecr = {t : heure d'envoi,
+   corrigée par l'heure du serveur ; n : compteur ; a : appareil ; v : version ; s : heure du serveur}. Une règle Firestore
+   (publiée à part, voir l'Aide) refuse une écriture dont t a plus de 10 minutes : la file d'attente d'une vieille page qui se
+   réveille (incident du 25-29/09/2026, Firefox du téléphone) ne passe plus. Écrit ICI, au seul point de passage — et par
+   avecTampon pour les rares écritures directes (gel, version, restauration, bac, sauvegarde). */
+var APPAREIL=(function(){var id="",ua="";try{id=localStorage.getItem("cp6_app")||"";if(!/^[a-z0-9]{4}$/.test(id)){id=Math.random().toString(36).slice(2,6);if(id.length<4)id=(id+"0000").slice(0,4);localStorage.setItem("cp6_app",id);}}catch(e){id=id||"????";}
+  try{ua=navigator.userAgent||"";}catch(e){}
+  var nav=/Edg\//.test(ua)?"Edge":/Firefox\/|FxiOS/.test(ua)?"Firefox":/OPR\//.test(ua)?"Opera":/Chrome\/|CriOS/.test(ua)?"Chrome":/Safari\//.test(ua)?"Safari":"Navigateur";
+  var sys=/iPhone/.test(ua)?"iPhone":/iPad/.test(ua)?"iPad":/Android/.test(ua)?"Android":/Windows/.test(ua)?"Windows":/Mac OS X|Macintosh/.test(ua)?"Mac":/Linux/.test(ua)?"Linux":"";
+  return {id:id,lib:nav+(sys?" "+sys:"")+" #"+id};})();
+var HORL={dec:0,n:0,sure:false,tete:false,envoi:0,dernN:0,dernT:0};
+function horlNow(){return Math.round(Date.now()+HORL.dec);}
+function verCourt(){var m=String(APP_VERSION||"").match(/v?\d+\.\d+/);return m?m[0]:"?";}
+function tampon(){HORL.n++;HORL.dernN=HORL.n;HORL.envoi=Date.now();var o={t:horlNow(),n:HORL.n,a:APPAREIL.id,v:verCourt()};HORL.dernT=o.t;
+  try{var fb=typeof window!=="undefined"?window.firebase:null;if(fb&&fb.firestore&&fb.firestore.FieldValue)o.s=fb.firestore.FieldValue.serverTimestamp();}catch(e){}return o;}
+function estCahier(ref){if(!ref)return false;if(ref===PLANNING_DOC)return true;try{return (ref.id==="main"||ref.id==="bac")&&!!ref.parent&&ref.parent.id==="planning";}catch(e){return false;}}
+function avecTampon(obj){return Object.assign({},obj||{},{_ecr:tampon()});}
+/* l'heure du serveur : l'en-tête Date de la page (au chargement), puis l'écho de nos propres écritures (plus précis) */
+function horlCalibrer(){try{if(typeof fetch!=="function")return;var t0=Date.now();
+  fetch("./?h="+t0,{method:"HEAD",cache:"no-store"}).then(function(r){var t1=Date.now(),d=r&&r.headers&&r.headers.get("date");if(!d||HORL.sure)return;var srv=Date.parse(d);if(isNaN(srv))return;
+    var dec=srv+500-(t0+t1)/2;if(Math.abs(dec)>30000&&Math.abs(dec)<86400000){HORL.dec=dec;}HORL.tete=true;}).catch(function(){});}catch(e){}}
+function horlEcho(e,duServeur){try{if(!duServeur||!e||e.a!==APPAREIL.id||e.n!==HORL.dernN||!e.s||typeof e.s.toMillis!=="function")return;
+  var rtt=Date.now()-HORL.envoi;if(rtt<0||rtt>5000)return;HORL.dec=e.s.toMillis()-(HORL.envoi+rtt/2);HORL.sure=true;}catch(x){}}
+/* un refus de la règle : Firestore répond « permission-denied ». On ne RÉESSAIE jamais (un nouvel envoi porterait un
+   tampon neuf et passerait : c'est exactement ce qu'il faut empêcher) ; l'appareil reprend l'état du serveur. */
+function estRefus(e){var c=String((e&&(e.code||e.message))||"");return /permission[-_ ]?denied|insufficient permissions/i.test(c);}
+var REFUS={n:0,t:0};
+function refusSignal(quoi){REFUS.n++;try{jlog("REFUS",["écriture refusée par le serveur (tampon trop ancien ?) : "+quoi]);}catch(e){}
+  var n=Date.now();if(n-REFUS.t>10000){REFUS.t=n;toast("⛔ Une modification trop ancienne a été refusée par le serveur — l'écran reprend le planning à jour","warn");}}
+const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(estCahier(ref)){obj=avecTampon(obj);if(opts&&opts.mergeFields)opts={mergeFields:opts.mergeFields.concat(["_ecr"])};}return trafEcr(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
 const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? function(ref,suite,err){return window.firebaseOnSnapshot(ref,function(){return trafRecu(suite,this,arguments);},err);} : null;   /* v10.233 : chaque message reçu est compté */
-const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){return VER_STALE.on?verMuet():GEL.on?gelMuet():trafEcr(window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])])));} : null;
+const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(estCahier(ref))pairs=(pairs||[]).concat([[["_ecr"],tampon()]]);return trafEcr(window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])])));} : null;
+
+/* v10.246 : DÉCOUPAGE du tour, des notes et du registre des salles. Ces trois champs étaient enregistrés D'UN SEUL BLOC :
+   la file d'attente d'une vieille page (état du 21-22/09) les a réécrits en entier entre le 25 et le 29/09 — semaines de
+   tour de janvier 2027, 14 notes, coches « salle vide » et réglages des Reports ont reculé ; les cases, enregistrées une
+   par une, n'ont pas bougé. Même modèle que planningTypeV2 : tourMedV2 (une entrée par semaine), notesV2 (une par case),
+   salleRegV2 (une par salle) + salleRegV2Order. L'ancien champ reste en place comme filet, il n'est plus lu une fois migré. */
+function jsonTri(v){if(Array.isArray(v))return "["+v.map(x=>x===undefined?"null":jsonTri(x)).join(",")+"]";
+  if(v&&typeof v==="object"){return "{"+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+":"+jsonTri(v[k])).join(",")+"}";}
+  return v===undefined?"null":JSON.stringify(v);}
+function lireJson(x,def){try{return typeof x==="string"?(x?JSON.parse(x):def):(x||def);}catch(e){return def;}}
+/* clé Firestore acceptable : non vide, pas de la forme réservée __…__, pas démesurée */
+function cleOk(k){return typeof k==="string"&&k.length>0&&k.length<700&&!/^__.*__$/.test(k);}
+function docTourMed(d){d=d||{};return d.tourMedV2&&typeof d.tourMedV2==="object"?Object.assign({},d.tourMedV2):lireJson(d.tourMed,{});}
+function docNotes(d){d=d||{};return d.notesV2&&typeof d.notesV2==="object"?Object.assign({},d.notesV2):lireJson(d.notes,{});}
+function regListe(mp,ord){const out=[],vu={};(Array.isArray(ord)?ord:[]).forEach(k=>{if(mp&&mp[k]&&!vu[k]){vu[k]=1;out.push(mp[k]);}});
+  Object.keys(mp||{}).forEach(k=>{if(!vu[k]&&mp[k]){vu[k]=1;out.push(mp[k]);}});return out;}
+function docSalleReg(d){d=d||{};return d.salleRegV2&&typeof d.salleRegV2==="object"?regListe(d.salleRegV2,d.salleRegV2Order):lireJson(d.salleReg,[]);}
+/* v10.246 : JOURNAL DU TOUR ET DES NOTES — une ligne dans le cahier d'historique de la période (planning/hist-<période>) :
+   quoi, quand, qui, quel appareil, quelle version. Muet pendant l'archivage, le désarchivage et l'import d'un fichier
+   (ce sont des déplacements, pas des modifications). */
+var JRN_MUET={fin:0};
+function jrnMuet(ms){JRN_MUET.fin=Date.now()+(ms||4000);}
+var NOTE_PAUSE=800;   /* v10.246 : la note part après 0,8 s sans frappe, ou à la sortie du champ */
 
 /* v10.142 : JOURNAL DE BORD — l'équivalent de la console (F12) gardé en mémoire : erreurs, avertissements,
    erreurs non rattrapées, promesses rejetées, et les changements d'onglet. 40 entrées, 300 caractères
@@ -129,7 +181,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.245 — 26/09/2026";
+const APP_VERSION="v10.246 — 29/09/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -2989,7 +3041,7 @@ function PickMedActModal({ferm=null,mData,setMData,medecins,actes,getEntries,isM
                 const _nk=nk(med.id,y2,m2,d,sl);
                 const _cn=!!setNotes&&(isInt?canInt:((!selfOnly||med.id===selfOnly)&&(canNotes||okAct(acte))));
                 if(!_cn&&!notes[_nk])return null;
-                return <input value={notes[_nk]||""} readOnly={!_cn} onChange={_cn?(e=>{const v=e.target.value;setNotes(p=>({...p,[_nk]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
+                return <NoteChamp value={notes[_nk]||""} readOnly={!_cn} onCommit={v=>setNotes(p=>({...p,[_nk]:v}))} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
             </div>
             {canDif&&!isInt&&<div style={{margin:"-2px 0 7px 6px",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
               {(e&&e.dif)
@@ -3326,7 +3378,7 @@ function PickMedSiteModal({ferm=null,mData,medecins,actes,getEntries,isMedAvaila
                 const _nk=nk(med.id,y2,m2,d,sl);
                 const _cn=!!setNotes&&(isInt?canInt:((!selfOnly||med.id===selfOnly)&&(!adminOnly||canNotes||acte[okKey]===true)));
                 if(!_cn&&!notes[_nk])return null;
-                return <input value={notes[_nk]||""} readOnly={!_cn} onChange={_cn?(e=>{const v=e.target.value;setNotes(p=>({...p,[_nk]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
+                return <NoteChamp value={notes[_nk]||""} readOnly={!_cn} onCommit={v=>setNotes(p=>({...p,[_nk]:v}))} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:_cn?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>;})()}
             </div>
           ))}
         </div>
@@ -6342,6 +6394,17 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Côté éditeur")," : les Paramètres ne montrent plus qu'une carte 🧊, avec la liste des sauvegardes (👁 Aperçu, ↩ Restaurer) et le bouton ",HBtn({kind:"ghost",children:"✅ Dégeler le planning"}),". Le gel ",HE("b",null,"survit à la restauration")," : vérifiez le planning restauré, puis dégelez — chacun retrouve aussitôt ses droits. N'importe quel éditeur peut dégeler."]}),
   HP({children:["Le gel n'existe pas dans le 🧪 bac à sable. Un appareil resté sur une version plus ancienne ne connaît pas le gel, mais il est déjà en lecture seule : le garde-fou de version l'empêche d'écrire tant qu'il n'est pas à jour."]})
  )},
+ {id:"protection",icon:"🛡️",title:"Protection des données — tour, notes, vieilles pages",body:()=>HE("div",null,
+  HP({children:["Depuis la v10.246. Motif : fin septembre 2026, une ",HE("b",null,"vieille page restée ouverte"),", sur un navigateur rarement utilisé d'un téléphone, s'est réveillée et a renvoyé ce qu'elle avait gardé en attente. Le tour, les notes et le registre des salles, alors enregistrés ",HE("b",null,"d'un seul bloc"),", ont reculé de plusieurs jours ; les cases, enregistrées une par une, n'ont pas bougé."]}),
+  HT({children:"1. Tout est enregistré morceau par morceau"}),
+  HP({children:["Le tour est enregistré ",HE("b",null,"semaine par semaine"),", les notes ",HE("b",null,"case par case"),", les salles ",HE("b",null,"salle par salle"),". Une copie en retard n'envoie plus que ce qu'elle a elle-même modifié : elle ne peut plus effacer le travail des autres. L'ancien bloc est conservé comme filet dans la base, mais n'est plus lu."]}),
+  HT({children:"2. Le journal du tour et des notes"}),
+  HP({children:["Chaque médecin ajouté ou retiré d'une semaine de tour, chaque note posée, modifiée ou effacée est inscrit : ",HE("b",null,"quand, qui, depuis quel appareil et quelle version"),". À lire dans Paramètres, carte ",HE("b",null,"📜 Journal du tour et des notes"),", période par période ; l'historique d'une case (clic droit) montre aussi sa note. Le journal part avec l'archivage de la période. L'archivage, le désarchivage et l'import d'un fichier n'y écrivent rien."]}),
+  HT({children:"3. L'heure d'envoi de chaque modification"}),
+  HP({children:["Chaque modification part avec son ",HE("b",null,"heure d'envoi"),", réglée sur l'heure du serveur (le fuseau horaire, un voyage ou un VPN n'y changent rien). Une règle de la base Firebase refuse une modification envoyée ",HE("b",null,"il y a plus de 10 minutes"),". Elle est ",HE("b",null,"abandonnée"),", jamais renvoyée ; l'écran reprend le planning à jour et un message l'annonce. Conséquence pour tous : une modification faite hors réseau puis envoyée plus de 10 minutes après est à refaire. La carte ",HE("b",null,"🛡️ Protection des écritures")," des Paramètres indique l'appareil, l'heure utilisée, et teste si la règle est publiée."]}),
+  HT({children:"4. Les notes"}),
+  HP({children:["Le champ de note garde votre texte pendant la frappe et n'enregistre qu'après ",HE("b",null,"une courte pause"),", ou quand on quitte le champ ou la fenêtre. Les lettres ne s'effacent plus en tapant vite."]})
+ )},
  {id:"fermees",icon:"🚫",title:"Plages fermées — fermer une salle sur une demi-journée",body:()=>HE("div",null,
   HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée et hachurée")," (hachures depuis la v10.235, pour ne pas la confondre avec la couleur d'une salle vide) dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
   HT({children:"Colorer les salles vides (v10.232)"}),
@@ -8286,6 +8349,24 @@ function CouleurOK({value,onOk,onApercu=null,w=38,h=24,title}){
     {dirty&&<button data-colno="1" onClick={fin} title="Abandonner ce choix" style={{...bs,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)"}}>✕</button>}
   </span>;
 }
+/* v10.246 : CHAMP DE NOTE. Avant : chaque frappe renvoyait TOUT le bloc des notes ; sur ordinateur, en tapant vite, l'écho
+   d'un envoi précédent revenait par-dessus la frappe suivante — des lettres s'effaçaient puis revenaient. Désormais le champ
+   garde son texte pendant la frappe et n'enregistre (onCommit) qu'après NOTE_PAUSE sans frappe, à la sortie du champ, ou si
+   la fenêtre se ferme avant. Une note arrivée d'ailleurs s'affiche tant qu'on n'est pas en train d'écrire. */
+function NoteChamp({value,onCommit,multi,readOnly,...rest}){
+  const ext=value||"";
+  const [txt,setTxt]=useState(ext);
+  const foc=useRef(false),tim=useRef(null),txtR=useRef(ext),extR=useRef(ext),comR=useRef(onCommit);
+  extR.current=ext;comR.current=onCommit;
+  const envoyer=(v)=>{if(tim.current){clearTimeout(tim.current);tim.current=null;}if(v!==extR.current&&comR.current)comR.current(v);};
+  useEffect(()=>{if(!foc.current&&!tim.current){txtR.current=ext;setTxt(ext);}},[ext]);
+  useEffect(()=>()=>{if(tim.current){clearTimeout(tim.current);tim.current=null;if(txtR.current!==extR.current&&comR.current)comR.current(txtR.current);}},[]);
+  const P={...rest,value:txt,readOnly:!!readOnly,"data-note":"1",
+    onFocus:()=>{foc.current=true;},
+    onBlur:()=>{foc.current=false;envoyer(txtR.current);},
+    onChange:readOnly?undefined:(e=>{const v=e.target.value;txtR.current=v;setTxt(v);if(tim.current)clearTimeout(tim.current);tim.current=setTimeout(()=>{tim.current=null;envoyer(txtR.current);},NOTE_PAUSE);})};
+  return multi?<textarea {...P}/>:<input {...P}/>;
+}
 /* v10.233 : tuile 📡 Trafic des Paramètres. Rien ne tourne tant qu'on n'a pas appuyé sur ▶ Mesurer ; la mesure se rafraîchit
    une fois par seconde, s'arrête SEULE au bout de 2 minutes et au démontage (on quitte Paramètres). « Tester » envoie une
    écriture minuscule (champ _ping) : une seule, à la demande. */
@@ -8327,6 +8408,80 @@ function TraficTuile({onPing=null,netOff=false,docSize=null}){
       {lg("Depuis l'ouverture ("+b.depuis+" min)",b.ecr+" envoyées · "+b.recu+" reçus")}
       <div style={{fontSize:10,color:"var(--txt3)",marginTop:6,lineHeight:1.45}}>Repères : latence verte sous 0,6 s, orange jusqu'à 1,5 s, rouge au-delà ; traitement par l'appareil vert sous 0,15 s, orange jusqu'à 0,5 s. Latence = réseau et serveur ; « Appareil » = ce téléphone ou cet ordinateur — si c'est lui qui est lent, alléger le planning (archivage) est le remède. Sans écriture depuis l'ouverture, la latence est vide : « ⏱ Tester » en mesure une.</div>
     </div>}
+  </div>;
+}
+/* v10.246 : tuile 🛡️ Protection des écritures. Montre le tampon de CET appareil (heure corrigée par le serveur) et teste,
+   à la demande, si la règle Firestore est publiée : une écriture minuscule (_regleTest) part avec un tampon vieux de
+   20 minutes, hors des filets — refusée = règle active ; acceptée = pas encore publiée (sans conséquence). */
+function ProtectionTuile({netOff=false,bloque=false}){
+  const [res,setRes]=useState(null);
+  const [,force]=useState(0);
+  useEffect(()=>{const id=setInterval(()=>force(x=>x+1),5000);return ()=>clearInterval(id);},[]);
+  const ecart=Math.round(HORL.dec/1000);
+  const horl=HORL.sure?"réglée sur le serveur"+(ecart?" (cet appareil "+(ecart>0?"retarde":"avance")+" de "+Math.abs(ecart)+" s)":" (aucun écart)")
+    :HORL.tete?"réglée sur l'heure de la page"+(ecart?" (écart "+ecart+" s)":" (aucun écart)")+" — affinée à la prochaine modification":"heure de l'appareil — comparée au serveur dès la prochaine modification";
+  const tester=()=>{
+    if(!PLANNING_DOC||!window.firebaseSetDoc){setRes({k:"?",m:"Pas de connexion à la base."});return;}
+    setRes({k:"…",m:"Test en cours…"});
+    let fini=false;const t=setTimeout(()=>{if(!fini){fini=true;setRes({k:"?",m:"Pas de réponse du serveur en 10 s (hors ligne ?). Réessayez avec du réseau."});}},10000);
+    Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{_regleTest:Date.now(),_ecr:{t:horlNow()-20*60000,n:-1,a:APPAREIL.id,v:verCourt()}},{merge:true}))
+      .then(()=>{if(fini)return;fini=true;clearTimeout(t);setRes({k:"non",m:"La règle n'est PAS encore publiée : une écriture vieille de 20 minutes vient d'être acceptée (elle ne touche rien)."});})
+      .catch(e=>{if(fini)return;fini=true;clearTimeout(t);setRes(estRefus(e)?{k:"oui",m:"La règle est ACTIVE : une écriture vieille de 20 minutes vient d'être refusée par le serveur."}:{k:"?",m:"Réponse inattendue du serveur : "+String((e&&(e.code||e.message))||e).slice(0,120)});});
+  };
+  const lg=(l,v,c)=><div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:11.5,padding:"2px 0",borderBottom:"1px solid var(--border2)"}}><span style={{color:"var(--txt2)"}}>{l}</span><b style={{color:c||"var(--txt)",textAlign:"right"}}>{v}</b></div>;
+  return <div data-protection="1" style={{...S.card,marginBottom:10}}>
+    <div style={{fontWeight:700,color:"#16a34a",fontSize:13,marginBottom:6}}>🛡️ Protection des écritures</div>
+    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.45}}>Chaque modification part avec son heure d'envoi. Une fois la règle publiée dans Firebase, le serveur refuse toute modification envoyée il y a plus de 10 minutes — celle d'une vieille page restée ouverte qui se réveille, par exemple. Ce qu'elle voulait écrire est abandonné ; l'écran reprend le planning à jour.</div>
+    {lg("Cet appareil",APPAREIL.lib)}
+    {lg("Heure utilisée",horl)}
+    {lg("Écritures refusées depuis l'ouverture",String(REFUS.n),REFUS.n?"#dc2626":undefined)}
+    <button data-protest="1" disabled={netOff||bloque} onClick={tester} style={{marginTop:8,width:"100%",fontSize:12,padding:"7px 10px",borderRadius:8,cursor:netOff||bloque?"default":"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"var(--bg2)",color:"#16a34a",opacity:netOff||bloque?.5:1}}>🧪 La règle est-elle publiée ?</button>
+    {res&&<div data-protres={res.k} style={{marginTop:6,fontSize:11.5,fontWeight:700,color:res.k==="oui"?"#16a34a":res.k==="non"?"#d97706":"var(--txt2)"}}>{res.k==="oui"?"✅ ":res.k==="non"?"⏳ ":""}{res.m}</div>}
+  </div>;
+}
+/* v10.246 : tuile 📜 Journal du tour et des notes — les lignes « #T| » (semaine de tour) et « #N| » (note) du cahier
+   d'historique d'une période : quoi, quand, qui, quel appareil, quelle version. Lu à la demande (une lecture). */
+function JournalTuile({medecins=[],per0}){
+  const [per,setPer]=useState(per0);
+  const [etat,setEtat]=useState(null);   // null | "…" | {list}
+  const [filt,setFilt]=useState("tout");
+  const pid=perIdOf(per.sy,per.sm);
+  const lire=async()=>{setEtat("…");try{const es=await histLire([pid]);
+    const list=Object.values(es).filter(e=>e&&typeof e.k==="string"&&(e.k.indexOf("#T|")===0||e.k.indexOf("#N|")===0)).sort((a,b)=>(b.t||0)-(a.t||0));
+    setEtat({list});}catch(e){setEtat({list:[],err:1});}};
+  const mv=(dir)=>{const q=dir<0?perPrev(per.sy,per.sm):perNext(per.sy,per.sm);setPer(q);setEtat(null);};
+  const med=(id)=>medecins.find(m=>String(m.id)===String(id));
+  const d2=(n)=>String(n).padStart(2,"0");
+  const lib=(e)=>{const q=e.k.split("|");
+    if(q[0]==="#T"){const w=(q[1]||"").split("-").map(Number);return {typ:"tour",txt:"Tour · semaine du "+d2(w[2])+"/"+d2((w[1]||0)+1)+" · "+(q[2]||"")};}
+    const j=q[2]||"";return {typ:"note",txt:"Note · "+j.slice(8,10)+"/"+j.slice(5,7)+" "+(SLOTL[q[3]]||q[3]||"")};};
+  const list=etat&&etat.list?etat.list.filter(e=>filt==="tout"||(filt==="tour"?e.k.indexOf("#T|")===0:e.k.indexOf("#N|")===0)):[];
+  const bt=(v,l)=><button key={v} onClick={()=>setFilt(v)} style={{fontSize:11,padding:"3px 8px",borderRadius:7,cursor:"pointer",fontWeight:700,border:"1px solid var(--border)",background:filt===v?"var(--bg3)":"var(--bg2)",color:"var(--txt)"}}>{l}</button>;
+  return <div data-journaltn="1" style={{...S.card,marginBottom:10}}>
+    <div style={{fontWeight:700,color:"#7c3aed",fontSize:13,marginBottom:6}}>📜 Journal du tour et des notes</div>
+    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.45}}>Chaque médecin ajouté ou retiré d'une semaine de tour, chaque note posée, modifiée ou effacée : quand, par qui, depuis quel appareil et quelle version. L'historique d'une case (clic droit) montre aussi sa note.</div>
+    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+      <button onClick={()=>mv(-1)} style={{...S.icnBtn}}>‹</button>
+      <b style={{fontSize:12}}>Période de {MOIS[per.sm]} {per.sy}</b>
+      <button onClick={()=>mv(1)} style={{...S.icnBtn}}>›</button>
+      <button data-jrnlire="1" onClick={lire} style={{marginLeft:"auto",fontSize:12,padding:"5px 10px",borderRadius:8,cursor:"pointer",fontWeight:800,border:"1.5px solid #7c3aed",background:"var(--bg2)",color:"#7c3aed"}}>{etat&&etat!=="…"?"↻ Relire":"Afficher"}</button>
+    </div>
+    {etat==="…"&&<div style={{fontSize:12,color:"var(--txt3)"}}>Chargement…</div>}
+    {etat&&etat.list&&<>
+      <div style={{display:"flex",gap:5,marginBottom:6}}>{bt("tout","Tout")}{bt("tour","Tour")}{bt("notes","Notes")}<span style={{marginLeft:"auto",fontSize:11,color:"var(--txt3)"}}>{list.length} ligne{list.length>1?"s":""}</span></div>
+      {!list.length&&<div style={{fontSize:12,color:"var(--txt3)"}}>Rien d'inscrit pour cette période{filt!=="tout"?" dans ce filtre":""} (le journal commence avec la v10.246).</div>}
+      <div style={{maxHeight:360,overflowY:"auto"}}>
+      {list.slice(0,300).map((e,i)=>{const L=lib(e),m=med(e.md),dt=new Date(e.t||0);
+        return <div key={i} data-jrnligne={L.typ} style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",padding:"5px 0",borderBottom:"1px solid var(--border2)",fontSize:11.5}}>
+          <span style={{color:"var(--txt3)",fontSize:10,minWidth:88}}>{d2(dt.getDate())}/{d2(dt.getMonth()+1)} {d2(dt.getHours())}:{d2(dt.getMinutes())}:{d2(dt.getSeconds())}</span>
+          <b style={{color:e.x==="add"?"#16a34a":"#dc2626"}}>{L.typ==="tour"?(e.x==="add"?"+ ajouté":"− retiré"):(e.x==="add"?"📝 posée":"📝 effacée")}</b>
+          {m?<span style={{padding:"0 6px",borderRadius:4,fontSize:10,fontWeight:800,background:m.color,color:"#fff"}}>{m.init}</span>:(e.md&&e.md!=="-"?<span style={{fontSize:10}}>#{e.md}</span>:null)}
+          <span style={{color:"var(--txt2)"}}>{L.txt}</span>
+          {L.typ==="note"&&e.act&&<span style={{color:"var(--txt)"}}>« {e.act} »</span>}
+          <span style={{marginLeft:"auto",color:"var(--txt3)",fontSize:10}}>{e.a}</span>
+        </div>;})}
+      </div>
+    </>}
   </div>;
 }
 /* v10.236 : COMPARATEUR DE SAUVEGARDES, en lecture seule. Demande du 22/09/2026 : « voir les plannings enregistrés sans les
@@ -9356,7 +9511,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
               ?<span style={{fontSize:10,color:"var(--txt3)"}}>posé par la garde de la veille — retirez la garde pour l'enlever</span>
               :!posable(c.acteId)?<span style={{fontSize:10,color:"var(--txt3)"}}>posé par le service</span>
               :<button onClick={()=>retire(c)} style={{width:18,height:18,borderRadius:9,border:"1px solid #fecdd3",background:"#fff1f2",color:"#dc2626",fontSize:10,fontWeight:800,cursor:"pointer",lineHeight:1,padding:0}}>×</button>}
-            {nkC&&(c.salle||noteV)&&(canNote||noteV)&&<input value={noteV} readOnly={!canNote} onChange={canNote?(e=>{const v=e.target.value;setNotes(n=>({...n,[nkC]:v}));}):undefined} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:canNote?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>}
+            {nkC&&(c.salle||noteV)&&(canNote||noteV)&&<NoteChamp value={noteV} readOnly={!canNote} onCommit={v=>setNotes(n=>({...n,[nkC]:v}))} placeholder="📝 Note (visible au survol de la case)…" style={{flexBasis:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid var(--border)",background:canNote?"var(--inp)":"var(--bg)",color:"var(--txt)",fontSize:11,outline:"none",fontFamily:"'Sora',sans-serif"}}/>}
           </div>;
         })}
       </div>}
@@ -10406,6 +10561,7 @@ function CardioPlanning(){
   const [gel,setGel]=useState(null);   /* v10.229 : {by,at} tant que le planning est gelé par un éditeur */
   const gelOn=!!(gel&&gel.at)&&!BAC;
   useEffect(()=>{VER_STALE.toast=(m,t)=>toast(m,t);PER_LIM.toast=(m,t)=>toast(m,t);TOAST_HUB.f=(m,t,a)=>toast(m,t,a);});   /* sans dépendance : toast naît plus bas dans le composant */
+  useEffect(()=>{horlCalibrer();},[]);   /* v10.246 : l'heure du serveur, dès l'ouverture (en-tête Date de la page) */
   useEffect(()=>{
     const on=()=>setNetOff(false),off=()=>setNetOff(true);
     window.addEventListener("online",on);window.addEventListener("offline",off);
@@ -10616,6 +10772,8 @@ function CardioPlanning(){
   const expBump=useCallback((n)=>{if(!n)return;setExpN(v=>{const t=v+n;try{localStorage.setItem("cp6_expN",String(t));}catch(e){}return t;});},[]);
   useEffect(()=>{try{localStorage.setItem("cp6_expSeuil",String(expSeuil));}catch(e){}},[expSeuil]);
   const [salleReg,setSalleReg]=useState([]); // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
+  /* v10.246 : prise pour le banc protection.js — inerte hors banc (window.__cpBanc n'existe jamais dans l'application) */
+  useEffect(()=>{if(typeof window!=="undefined"&&window.__cpBanc)window.__cpBanc.etat={setTourMed,setNotes,setSalleReg,tourMed,notes,salleReg};});
   const [salleEdit,setSalleEdit]=useState(null); // salle en cours d'édition (activités associées)
   const [archPlan,setArchPlan]=useState({});   // cases archivées chargées pour consultation (lecture)
   /* v10.105 : annexes archivées relues pour la consultation (tour, dérogations, notes) */
@@ -10687,6 +10845,15 @@ function CardioPlanning(){
   const planSynced=useRef(null);
   const planPending=useRef({});
   const planMigrated=useRef(false);
+  /* v10.246 : tour, notes, salles découpés (tourMedV2, notesV2, salleRegV2) — dernière valeur connue par entrée, envois
+     non confirmés, migrations déjà envoyées. dernierSnap / recevoirRef : relire le dernier message du serveur quand une
+     écriture est REFUSÉE (tampon trop ancien) — l'écran reprend alors l'état du serveur. */
+  const mapSynced=useRef({});
+  const mapPending=useRef({});
+  const mapMigr=useRef({});
+  const dernierSnap=useRef(null);
+  const recevoirRef=useRef(null);
+  const reprendServeur=useCallback(()=>{setTimeout(()=>{try{if(dernierSnap.current&&recevoirRef.current)recevoirRef.current(dernierSnap.current);}catch(e){}},0);},[]);
   /* v9.72 : le planning type était enregistré d'un SEUL bloc — une écriture partant d'une
      base périmée réécrivait tout et effaçait ce qui avait été ajouté depuis. Il suit
      désormais le même découpage que le plan (v9.7) : un champ par médecin, écrit
@@ -10777,6 +10944,8 @@ function CardioPlanning(){
       for(let i=0;i<lot.length;i+=400){
         try{await updatePaths(PLANNING_DOC,lot.slice(i,i+400));}
         catch(e){
+          if(estRefus(e)){   /* v10.246 : refus de la règle (tampon trop ancien) — JAMAIS de nouvel essai, on reprend le serveur */
+            lot.slice(i).forEach(p=>{delete planPending.current[p[0][1]+PP_SEP+p[0][2]];});refusSignal("cases du planning");reprendServeur();return;}
           console.error("sync plan (essai "+(essai+1)+", "+(lot.length-i)+" champs):",e);setFbStatus("error");
           /* document absent (base neuve) : on le crée sans rien écraser, puis on réessaie */
           if(/no document|not[-_ ]?found/i.test(String((e&&(e.code||e.message))||"")))try{if(setDoc)await setDoc(PLANNING_DOC,{planV2:{}},{merge:true});}catch(e2){}
@@ -10840,7 +11009,7 @@ function CardioPlanning(){
     localChange.current=true;
     (async()=>{
       try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
-      catch(e){console.error("sync "+field+":",e);setFbStatus("error");}   /* v10.231 : console.error → visible dans le journal 🐞 */
+      catch(e){if(estRefus(e)){pairs.forEach(p=>{if(p[0].length===2)delete pend[p[0][1]];});refusSignal(field);reprendServeur();}else console.error("sync "+field+":",e);setFbStatus("error");}   /* v10.231 : console.error → visible dans le journal 🐞 ; v10.246 : refus */
     })();
   },[]);
   /* Réception d'une liste découpée : on ré-applique nos modifications non confirmées. */
@@ -10860,6 +11029,79 @@ function CardioPlanning(){
     return ord.map(k=>merged[k]).filter(Boolean);
   },[]);
 
+  /* v10.246 : ÉCRITURE ENTRÉE PAR ENTRÉE du tour (semaine), des notes (case) et des salles (salle + ordre). Seules les
+     entrées qui ont changé partent : une copie en retard ne peut plus réécrire ce qu'elle n'a pas touché. jrn(prev,cur,clés)
+     inscrit le journal (tour, notes) — seulement pour un changement LOCAL : la réception pose mapSynced AVANT l'état. */
+  const flushMap=useCallback((field,cur,order,jrn)=>{
+    if(!PLANNING_DOC||!updatePaths)return;
+    if(!serverSeen.current)return;   // jamais sur une base venant du seul cache
+    if(GEL.on)return;
+    cur=cur||{};
+    const prev=mapSynced.current[field]||{};
+    const pend=mapPending.current[field]||(mapPending.current[field]={});
+    const pairs=[],ch=[],oK=field+"Order";
+    Object.keys(cur).forEach(k=>{if(cur[k]===undefined||!cleOk(k))return;if(jsonTri(cur[k])!==jsonTri(prev[k])){pairs.push([[field,k],cur[k]]);pend[k]=cur[k];ch.push(k);}});
+    Object.keys(prev).forEach(k=>{if(cur[k]===undefined&&cleOk(k)){pairs.push([[field,k],"__DELETE__"]);pend[k]=null;ch.push(k);}});
+    if(order){const o=order.filter(cleOk);if(jsonTri(o)!==jsonTri(mapSynced.current[oK]||null)){pairs.push([[oK],o]);mapPending.current[oK]={v:o};}mapSynced.current[oK]=o;}
+    mapSynced.current[field]=cur;
+    if(!pairs.length)return;
+    if(jrn&&ch.length&&Date.now()>=JRN_MUET.fin){try{jrn(prev,cur,ch);}catch(e){}}
+    localChange.current=true;
+    (async()=>{
+      for(let i=0;i<pairs.length;i+=400){const lot=pairs.slice(i,i+400);
+        try{await updatePaths(PLANNING_DOC,lot);}
+        catch(e){
+          if(estRefus(e)){lot.forEach(q=>{if(q[0].length===2)delete pend[q[0][1]];else delete mapPending.current[oK];});refusSignal(field);reprendServeur();}
+          else console.error("sync "+field+":",e);
+          setFbStatus("error");
+        }
+      }
+    })();
+  },[]);
+  /* réception : nos entrées non confirmées sont ré-appliquées, le reste vient du serveur */
+  const readMap=useCallback((field,inc,incOrder)=>{
+    const merged=Object.assign({},inc||{});
+    const pend=mapPending.current[field]||{};
+    Object.keys(pend).forEach(k=>{const pv=pend[k];
+      const ok=pv===null?!(k in merged):jsonTri(merged[k])===jsonTri(pv);
+      if(ok)delete pend[k];else{if(pv===null)delete merged[k];else merged[k]=pv;}});
+    mapSynced.current[field]=merged;
+    const oK=field+"Order";let ord=Array.isArray(incOrder)?incOrder.slice():null;
+    const po=mapPending.current[oK];
+    if(po){if(jsonTri(ord)===jsonTri(po.v))delete mapPending.current[oK];else ord=po.v.slice();}
+    return {map:merged,ord};
+  },[]);
+  /* migration douce : l'ancien bloc est recopié UNE fois dans le champ découpé ; l'ancien champ reste en place (filet) */
+  const migrerMap=useCallback((field,obj,order)=>{
+    if(!serverSeen.current||!setDoc||!PLANNING_DOC||GEL.on||VER_STALE.on)return;
+    const m={};Object.keys(obj||{}).forEach(k=>{if(cleOk(k)&&obj[k]!==undefined)m[k]=obj[k];});
+    const sig=jsonTri(m)+"|"+jsonTri(order||null);if(mapMigr.current[field]===sig)return;mapMigr.current[field]=sig;
+    const o={[field]:m};if(order)o[field+"Order"]=order.filter(cleOk);
+    Promise.resolve(setDoc(PLANNING_DOC,o,{merge:true})).catch(e=>console.log("migration "+field+":",e));
+  },[]);
+  /* v10.246 : JOURNAL — une ligne par médecin ajouté ou retiré d'une semaine de tour, une ligne par note posée,
+     modifiée ou effacée. « pour » = appareil et version ; l'auteur est ajouté par logLots. */
+  const jrnTour=useCallback((prev,cur,ch)=>{
+    const L=[],pour=APPAREIL.lib+" · "+verCourt();
+    ch.forEach(wk=>{const p=wk.split("-").map(Number);if(p.length<3||p.some(isNaN))return;
+      const pid=BAC?"bac":histPid(dKey(p[0],p[1],p[2]));if(!pid)return;
+      const a=(prev||{})[wk]||{},b=(cur||{})[wk]||{},us={};Object.keys(a).forEach(u=>{us[u]=1;});Object.keys(b).forEach(u=>{us[u]=1;});
+      Object.keys(us).forEach(u=>{const va=a[u],vb=b[u],k="#T|"+wk+"|"+u;
+        if(Array.isArray(va)||Array.isArray(vb)){const la=(Array.isArray(va)?va:[]).map(String),lb=(Array.isArray(vb)?vb:[]).map(String);
+          lb.forEach(m=>{if(la.indexOf(m)<0)L.push({x:"add",md:m,k,act:u,pour,pids:[pid]});});
+          la.forEach(m=>{if(lb.indexOf(m)<0)L.push({x:"del",md:m,k,act:u,pour,pids:[pid]});});}
+        else if(jsonTri(va)!==jsonTri(vb))L.push({x:vb===undefined?"del":"add",md:"-",k,act:(u+" "+jsonTri(vb===undefined?va:vb)).slice(0,60),pour,pids:[pid]});
+      });});
+    if(L.length)logLots(L);
+  },[logLots]);
+  const jrnNotes=useCallback((prev,cur,ch)=>{
+    const L=[],pour=APPAREIL.lib+" · "+verCourt();
+    ch.forEach(k=>{const q=String(k).split("|");if(q.length<3)return;const pid=BAC?"bac":histPid(q[1]);if(!pid)return;
+      const ap=typeof (cur||{})[k]==="string"?cur[k]:"",av=typeof (prev||{})[k]==="string"?prev[k]:"";if(ap===av)return;
+      L.push({x:ap?"add":"del",md:q[0],k:"#N|"+k,act:(ap||av).replace(/[\t\r\n]+/g," ").slice(0,120),pour,pids:[pid]});});
+    if(L.length)logLots(L);
+  },[logLots]);
+
   const flushPT=useCallback((cur)=>{
     if(!PLANNING_DOC||!updatePaths)return;
     if(!serverSeen.current)return;                 // jamais sur une base venant du seul cache
@@ -10875,26 +11117,26 @@ function CardioPlanning(){
     localChange.current=true;
     (async()=>{
       try{for(let i=0;i<pairs.length;i+=400)await updatePaths(PLANNING_DOC,pairs.slice(i,i+400));}
-      catch(e){console.log("sync PT:",e);setFbStatus("error");}
+      catch(e){if(estRefus(e)){pairs.forEach(p=>{delete ptPending.current[p[0][1]];});refusSignal("planning type");reprendServeur();}else console.log("sync PT:",e);setFbStatus("error");}
     })();
   },[]);
 
   useEffect(()=>{
     if(!PLANNING_DOC||!onSnapshot){setFbStatus("offline");return;}
     setFbStatus("connecting");
-    const unsub=onSnapshot(PLANNING_DOC,
-      (snap)=>{
+    const recevoir=(snap)=>{   /* v10.246 : fonction nommée — relue telle quelle après un refus du serveur */
         fromServer.current=true;   /* v10.28 : tout ce qui suit vient du serveur */
         if(snap.metadata&&snap.metadata.fromCache===false)serverSeen.current=true;
         if(snap.exists){
           const data0=snap.data();
           const data=data0;
+          horlEcho(data0._ecr,!!(snap.metadata&&snap.metadata.fromCache===false));   /* v10.246 : l'heure du serveur, par l'écho de notre dernière écriture */
           /* v10.135 : garde-fou de version — lu sur chaque message. Un numéro plus grand que le
              mien : je suis périmé. Plus petit ou absent (et message venu du serveur, pas du cache) :
              j'inscris le mien — la copie la plus récente fait foi. */
           {const sv=verNum(data.appVer),mv=verNum(APP_VERSION),srv=snap.metadata&&snap.metadata.fromCache===false;
             if(sv>mv){if(!VER_STALE.on){VER_STALE.on=true;VER_STALE.serveur=String(data.appVer);setStale(true);}}
-            else if(sv<mv&&srv&&window.firebaseSetDoc)Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).catch(e=>console.log("appVer:",e));}
+            else if(sv<mv&&srv&&window.firebaseSetDoc)Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,avecTampon({appVer:APP_VERSION}),{merge:true})).catch(e=>console.log("appVer:",e));}
           /* v10.229 : gel du planning — lu sur chaque message, avant tout le reste */
           {let g=null;try{g=data.gel?JSON.parse(data.gel):null;}catch(e){g=null;}if(BAC||!(g&&g.at))g=null;
             GEL.on=!!g;GEL.raw=g?String(data.gel):"";setGel(pg=>JSON.stringify(pg)===JSON.stringify(g)?pg:g);}
@@ -10958,8 +11200,12 @@ function CardioPlanning(){
               fieldSync.current[k]=inc;                          // reçu = déjà au serveur, inutile de le renvoyer
             });return o;})();
             if(Object.keys(resend).length){Object.keys(resend).forEach(k=>{delete fieldSync.current[k];});setTimeout(()=>saveToFirebase(resend),400);}
-            if(data.tourMed){tourPrevRef.current=JSON.stringify(JSON.parse(data.tourMed));setTourMed(JSON.parse(data.tourMed));}else if(tourPrevRef.current===undefined)tourPrevRef.current="{}";   /* v10.209 : dernière valeur connue, pour le journal du tour */
-            if(data.notes)setNotes(JSON.parse(data.notes));
+            /* v10.246 : tour et notes découpés — le champ V2 fait foi dès qu'il existe ; sinon l'ancien bloc est lu et migré */
+            if(data.tourMedV2&&typeof data.tourMedV2==="object"){delete mapMigr.current.tourMedV2;const r=readMap("tourMedV2",data.tourMedV2);tourPrevRef.current=JSON.stringify(r.map);setTourMed(r.map);}
+            else if(data.tourMed){const leg=lireJson(data.tourMed,{});mapSynced.current.tourMedV2=leg;tourPrevRef.current=JSON.stringify(leg);setTourMed(leg);migrerMap("tourMedV2",leg);}
+            else if(tourPrevRef.current===undefined)tourPrevRef.current="{}";   /* v10.209 : dernière valeur connue, pour le journal du tour */
+            if(data.notesV2&&typeof data.notesV2==="object"){delete mapMigr.current.notesV2;setNotes(readMap("notesV2",data.notesV2).map);}
+            else if(data.notes){const leg=lireJson(data.notes,{});mapSynced.current.notesV2=leg;setNotes(leg);migrerMap("notesV2",leg);}
             if(videColOk(data.salleVideCol))setSalleVideCol(data.salleVideCol);   /* v10.232 */
             setBacDe(BAC&&data._bacDe&&data._bacDe.ts?data._bacDe:null);   /* v10.237 */
             BAC_DEP.t=BAC?((data._bacDe&&data._bacDe.ts)||data._bacDep||null):null;   /* v10.238 : jusqu'où le vrai historique vaut dans le bac */
@@ -11027,7 +11273,12 @@ function CardioPlanning(){
           if(data.astReport!==undefined&&data.astReport!=="")setAstReport(data.astReport);
           /* v9.89 : le champ ABSENT signifie « jamais configuré » (on déduit alors les
              salles des activités) ; un champ PRÉSENT, même vide, est un choix délibéré. */
-          if(data.salleReg!==undefined&&data.salleReg!==null&&data.salleReg!==""){setSalleReg(JSON.parse(data.salleReg)||[]);}
+          if(data.salleRegV2&&typeof data.salleRegV2==="object"){delete mapMigr.current.salleRegV2;   /* v10.246 : une entrée par salle + l'ordre */
+            const r=readMap("salleRegV2",data.salleRegV2,data.salleRegV2Order);const l=regListe(r.map,r.ord);
+            mapSynced.current.salleRegV2Order=l.map(x=>x.n);setSalleReg(l);}
+          else if(data.salleReg!==undefined&&data.salleReg!==null&&data.salleReg!==""){const l=lireJson(data.salleReg,[])||[];
+            const mp={};l.forEach(x=>{if(x&&x.n)mp[x.n]=x;});mapSynced.current.salleRegV2=mp;mapSynced.current.salleRegV2Order=l.filter(x=>x&&x.n).map(x=>x.n);
+            setSalleReg(l);migrerMap("salleRegV2",mp,l.filter(x=>x&&x.n).map(x=>x.n));}
           else{
             const acts=data.actes?JSON.parse(data.actes):[];
             const found=acts.flatMap(a=>a.salles||[]).filter((s,i2,arr)=>arr.indexOf(s)===i2);
@@ -11041,7 +11292,10 @@ function CardioPlanning(){
           localChange.current=false;
         }else{isFirstLoad.current=!serverSeen.current;}
         setFbStatus("ok");
-      },
+      };
+    recevoirRef.current=recevoir;
+    const unsub=onSnapshot(PLANNING_DOC,
+      (snap)=>{dernierSnap.current=snap;recevoir(snap);},
       (err)=>{console.error("Firebase:",err);setFbStatus("error");}
     );
     return()=>unsub();
@@ -11069,7 +11323,7 @@ function CardioPlanning(){
       const ts=Date.now();
       const payload={...cur,_ts:ts};
       await window.firebaseDB.collection("backups").doc("b"+ts).set(payload);
-      await window.firebaseDB.collection("planning").doc(PLAN_ID).set({_lastBackupAt:ts},{merge:true});
+      await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon({_lastBackupAt:ts}),{merge:true});
       // Purge au-delà de 10
       const items=await refreshBackupList();
       for(const it of items.slice(BK_KEEP)){
@@ -11119,7 +11373,7 @@ function CardioPlanning(){
          il annonçait donc une sauvegarde vide et toutes les cases actuelles « perdues ».
          Lecture du format actuel, avec repli sur l'ancien pour de très vieilles sauvegardes. */
       const bPlan=d.planV2?d.planV2:(d.plan?JSON.parse(d.plan):{});
-      const bTour=d.tourMed?JSON.parse(d.tourMed):{};
+      const bTour=docTourMed(d);   /* v10.246 : format découpé, repli sur l'ancien bloc */
       const bMeds=d.medecinsV2?Object.keys(d.medecinsV2).map(k2=>{const v2=d.medecinsV2[k2];return typeof v2==="string"?JSON.parse(v2):v2;}):(d.medecins?JSON.parse(d.medecins):[]);
       const sB=statsOf(bPlan,bTour,bMeds);
       const sC=statsOf(plan,tourMed,medecins);
@@ -11235,13 +11489,14 @@ function CardioPlanning(){
       const data=d.data();
       if(!data){toast("Sauvegarde introuvable","warn");return;}
       const{_ts,gel:_gelAncien,...rest}=data;   /* v10.229 : un gel enregistré DANS la sauvegarde ne revient jamais ; le gel EN COURS, lui, survit à la restauration */
+      delete rest._ecr;mapPending.current={};mapMigr.current={};   /* v10.246 : aucune de nos entrées en attente ne doit repasser par-dessus la sauvegarde */
       if(BAC){delete rest._bacDe;delete rest._bacDep;rest._bacDe={ts:_ts||0,at:Date.now()};planPending.current={};planSynced.current=null;
         try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : l'historique repart de l'heure de la sauvegarde */
-        await window.firebaseDB.collection("planning").doc(PLAN_ID).set(rest);
+        await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
         toast("📥 Sauvegarde du "+new Date(_ts||0).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+" chargée dans le bac — le vrai planning n'a pas bougé","info");return;}
       if(GEL.on&&GEL.raw)rest.gel=GEL.raw;
       planPending.current={};planSynced.current=null;
-      await window.firebaseDB.collection("planning").doc(PLAN_ID).set(rest); // remplacement complet : une restauration EST l'état intégral
+      await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest)); // remplacement complet : une restauration EST l'état intégral
       toast(GEL.on?"Sauvegarde restaurée — le planning reste gelé : vérifiez-le, puis dégelez":"Sauvegarde restaurée — rechargez la page si besoin","info");
     }catch(e){console.log("restore:",e);toast("Échec de la restauration","warn");}
   },[]);
@@ -11251,7 +11506,7 @@ function CardioPlanning(){
     if(BAC){toast("🧪 Bac à sable : pas de gel ici","warn");return;}
     if(!PLANNING_DOC||!window.firebaseSetDoc){toast("Pas de connexion à la base — gel impossible","warn");return;}
     const v=on?JSON.stringify({by:authorRef.current||"?",at:Date.now()}):"";
-    Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{gel:v},{merge:true}))
+    Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,avecTampon({gel:v}),{merge:true}))
       .then(()=>{toast(on?"🧊 Planning gelé — plus personne ne peut le modifier":"✅ Planning dégelé — chacun retrouve ses droits",on?"warn":"info");})
       .catch(e=>{console.log("gel:",e);toast("Échec — le gel n'a pas changé","warn");});
   },[]);
@@ -11500,7 +11755,9 @@ function CardioPlanning(){
        planPending pour le plan, qui lui n'a jamais perdu de données. */
     ks.forEach(k=>{const p=pendF.current[k];pendF.current[k]={v:data[k],s:fieldSync.current[k],n:p?p.n:0};});
     try{localChange.current=true;await setDoc(PLANNING_DOC,out,{merge:true});}
-    catch(err){console.error("Save:",err);setFbStatus("error");ks.forEach(k=>{delete fieldSync.current[k];});}
+    catch(err){
+      if(estRefus(err)){ks.forEach(k=>{delete pendF.current[k];});refusSignal(ks.join(", "));reprendServeur();setFbStatus("error");return;}   /* v10.246 : pas de renvoi — il passerait avec un tampon neuf */
+      console.error("Save:",err);setFbStatus("error");ks.forEach(k=>{delete fieldSync.current[k];});}
   },[]);
 
   useEffect(()=>{if(!isFirstLoad.current)flushPlan(plan);},[plan]);
@@ -11522,7 +11779,7 @@ function CardioPlanning(){
   useEffect(()=>{if(isFirstLoad.current)return;const s=JSON.stringify(tourMed),prevS=tourPrevRef.current;
     tourPrevRef.current=s;   /* la valeur reçue du serveur y est posée AVANT setTourMed : un écho ne diffère jamais */
     if(prevS&&prevS!==s){try{tourJournal(JSON.parse(prevS),tourMed);}catch(e){}}
-    saveToFirebase({tourMed:s});},[tourMed]);
+    flushMap("tourMedV2",tourMed,null,jrnTour);},[tourMed]);   /* v10.246 : semaine par semaine, et journal */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourMins:JSON.stringify(tourMins)});},[tourMins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourMinsHard:JSON.stringify(tourMinsHard)});},[tourMinsHard]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourCfg:JSON.stringify(tourCfg)});},[tourCfg]);
@@ -11551,7 +11808,8 @@ function CardioPlanning(){
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourHistDeb:tourHistDeb||TH_DEB_DEF});},[tourHistDeb]);   /* v10.165 */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({tourReport:tourReport||""});},[tourReport]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astReport:astReport||""});},[astReport]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleReg:JSON.stringify(salleReg)});},[salleReg]);
+  useEffect(()=>{if(isFirstLoad.current)return;   /* v10.246 : salle par salle, plus l'ordre */
+    const mp={},ord=[];(salleReg||[]).forEach(x=>{if(x&&x.n&&!(x.n in mp)){mp[x.n]=x;ord.push(x.n);}});flushMap("salleRegV2",mp,ord);},[salleReg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleFerm:JSON.stringify(salleFerm)});},[salleFerm]);   /* v10.229 */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleVideCol});},[salleVideCol]);   /* v10.232 */
   const salleVide=useMemo(()=>{const noms={};(salleReg||[]).forEach(x=>{if(x&&x.vide)noms[x.n]=1;});return {col:salleVideCol,noms};},[salleReg,salleVideCol]);
@@ -11577,7 +11835,7 @@ function CardioPlanning(){
   },[year,month]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({periodCfg:JSON.stringify(periodCfg)});},[periodCfg]);
   useEffect(()=>{if(!isFirstLoad.current)flushPT(planningType);},[planningType]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({notes:JSON.stringify(notes)});},[notes]);
+  useEffect(()=>{if(!isFirstLoad.current)flushMap("notesV2",notes,null,jrnNotes);},[notes]);   /* v10.246 : case par case, et journal */
   /* v10.174 : le 🐞 des onglets (SigBtn) demande l'ouverture de la modale de signalement */
   useEffect(()=>{const f=()=>setModal("signal");window.addEventListener("cp-signal",f);return()=>window.removeEventListener("cp-signal",f);},[]);
   useEffect(()=>{if(!isFirstLoad.current)flushList("medecinsV2",medecins);},[medecins]);
@@ -12075,7 +12333,8 @@ function CardioPlanning(){
       const es=await histLire([histPid(key3)]);   /* v10.238 : le cahier de la période de la case */
       if(sl2==="GARDE"){setHistModal(h=>h?{...h,loading:false,list:histGardeJour(es,y2,m2,d2).slice(0,60)}:h);return;}   /* v10.239 */
       const ds3=dKey(y2,m2,d2);   /* v10.244 : + les lignes groupées dont la plage couvre ce jour */
-      const list=Object.values(es).filter(e=>e&&((e.k===key3&&String(e.md)===String(medId2))||histCouvre(e,ds3,medId2))).sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,30);
+      const kN3="#N|"+nk(medId2,y2,m2,d2,sl2);   /* v10.246 : + le journal de la note de cette case */
+      const list=Object.values(es).filter(e=>e&&((e.k===key3&&String(e.md)===String(medId2))||e.k===kN3||histCouvre(e,ds3,medId2))).sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,30);
       setHistModal(h=>h?{...h,loading:false,list}:h);
     }catch(e){setHistModal(h=>h?{...h,loading:false,list:[]}:h);}})();
   },[]);
@@ -13262,8 +13521,8 @@ function CardioPlanning(){
           const rest=Object.keys(vals).filter(id=>ids.indexOf(id)<0);
           return ids.concat(rest).map(id=>vals[id]);
         };
-        src={plan:dd.planV2||{},notes:pj(dd.notes,{}),tourMed:pj(dd.tourMed,{}),tourDerog:pj(dd.tourDerog,{}),
-             medecins:rdV2(dd.medecinsV2,dd.medecinsV2Order,dd.medecins),actes:rdV2(dd.actesV2,dd.actesV2Order,dd.actes),salleReg:pj(dd.salleReg,[]),
+        src={plan:dd.planV2||{},notes:docNotes(dd),tourMed:docTourMed(dd),tourDerog:pj(dd.tourDerog,{}),
+             medecins:rdV2(dd.medecinsV2,dd.medecinsV2Order,dd.medecins),actes:rdV2(dd.actesV2,dd.actesV2Order,dd.actes),salleReg:docSalleReg(dd),
              planningType:(dd.planningTypeV2!==undefined?pj(dd.planningTypeV2,{}):pj(dd.planningType,{}))};
       }
       src.exportDate=new Date().toISOString();src.version="v7";   /* v10.102 : relisible par 📂 Importer */
@@ -13284,7 +13543,7 @@ function CardioPlanning(){
      (mêmes setAccessMode / setEditMedId / setIsCadre), la vérification du code en moins. */
   const bacCopie=async()=>{const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};
     try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : les essais précédents s'effacent */
-    await window.firebaseDB.collection("planning").doc("bac").set({...d,_bacDep:Date.now()});};   /* v10.238 : l'heure de la copie borne le vrai historique */
+    await window.firebaseDB.collection("planning").doc("bac").set(avecTampon({...d,_bacDep:Date.now()}));};   /* v10.246 : tampon neuf (celui de la copie est ancien) */   /* v10.238 : l'heure de la copie borne le vrai historique */
   const bacEntrer=async()=>{if(!window.confirm("Entrer dans le bac à sable ?\n\nLe planning réel est recopié dans un espace de test à part, puis l'application se recharge. Rien de ce que vous y ferez ne touchera au vrai planning."))return;
     try{await bacCopie();localStorage.setItem("cp6_bac","1");window.location.reload();}catch(e){toast("Échec de la copie vers le bac à sable","warn");}};
   const bacRaz=async()=>{if(!window.confirm("Remettre le bac à sable à zéro ?\n\nSon contenu est remplacé par une copie fraîche du planning réel, puis l'application se recharge."))return;
@@ -13461,7 +13720,7 @@ function CardioPlanning(){
     if(window.caches){const ks=await window.caches.keys();await Promise.all(ks.map(k=>window.caches.delete(k)));}}catch(e){}
     window.location.reload();};
   const verRetablir=()=>{if(!window.confirm("Déclarer CETTE version ("+APP_VERSION+") comme version en service ?\n\nÀ n'utiliser qu'après un retour volontaire à une version antérieure : toutes les copies plus récentes passeront à leur tour en lecture seule."))return;
-    if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{appVer:APP_VERSION},{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
+    if(!window.firebaseSetDoc)return;Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,avecTampon({appVer:APP_VERSION}),{merge:true})).then(()=>{VER_STALE.on=false;setStale(false);toast("Version rétablie : "+APP_VERSION,"info");}).catch(()=>toast("Échec du rétablissement","warn"));};
   const tourProps={isVac,medecins:medsAff,specColors,tourMins,tourMinsHard,tourAvoid,tourWish,applyTPForWeek,cleanTPForWeek,clearWeekActivities,reapplyPTWeek,purgeTourExtras,plan,tourDerog,tourPtOte,setTourPtOte,lastReport:tourReport,setLastReport:setTourReport,tourCfg,setTourCfg,year:tourYear,month:tourMonth,setYear:setTourYear,setMonth:setTourMonth,tourMed,setTourMed,tourHist,tourHistDeb,intCfg,getEntries,isEdit:isEdit||(isInterEdit&&!isAttEdit),edReel:isEdit,build,secrDif:secrCfg.dif||{},darkMode,setDarkMode,planningType,setPlan,allDays,toast,vRef,vToast,actes,setBuild,onPrevenir:annPrevenir,pushMeds,onDaySwap:(medId,y2,m2,d2)=>{setMData({medId,y:y2,m:m2,d:d2,fromTour:true});setModal("daySwap");}};   /* v10.193 : depuis la puce TP de la tuile Tour */
   const gardeProps={onCellHistory:isAnyEdit?openCellHistory:null,isVac,onRemoveGarde:removeGardeDay,printWk,onPrint:()=>setModal("print"),year,month,prevM,nextM,medecins:medsAff,getEntry,allDays,isEdit,applyGarde,isMedAvailable,plan,setPlan,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,tourMed,gardeAvoid,gardeWish,toast};
   return(
@@ -14685,6 +14944,8 @@ header::-webkit-scrollbar { display: none; }
               </div>}
           </div>}
           <TraficTuile docSize={docSize} netOff={netOff} onPing={()=>{if(PLANNING_DOC&&setDoc)Promise.resolve(setDoc(PLANNING_DOC,{_ping:Date.now()},{merge:true})).catch(()=>{});}}/>
+          <ProtectionTuile netOff={netOff} bloque={BAC||gelOn||stale}/>   {/* v10.246 */}
+          <JournalTuile medecins={medecins} per0={perStart(year,month)}/>   {/* v10.246 */}
           <div style={{...S.card,marginBottom:10}}>{/* v10.137 : Sauvegarde & archivage, carte à part */}
             <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>💾 Sauvegarde & archivage</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:12}}>
@@ -14708,7 +14969,7 @@ header::-webkit-scrollbar { display: none; }
                 </div>
                 {docDet&&(()=>{ /* v10.101 : le détail du poids, par famille de données */
                   const EQ="Équipe & internes",AC="Activités & salles",TO="Tour médical",SO="Souhaits ⭐🚫",AS="Astreinte",RE="Reports";
-                  const FAMN={planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2:EQ,medecinsV2Order:EQ,medecins:EQ,intCfg:EQ,medPins:EQ,actesV2:AC,actesV2Order:AC,actes:AC,salleReg:AC,salleFerm:AC,tourMed:TO,tourDerog:TO,tourPtOte:TO,tourHist:TO,tourHistDeb:TO,tourMins:TO,tourMinsHard:TO,tourCfg:TO,tourReport:TO,tourWish:SO,tourAvoid:SO,gardeWish:SO,gardeAvoid:SO,astreinte:AS,astReport:AS,notes:"Notes",build:"Construire",csRep:RE,csBlanches:RE,csActsSel:RE,csActsGlobal:RE,journal:"Journal"};
+                  const FAMN={planV2:"Cases du planning",plan:"Cases (ancien format)",planningTypeV2:"Planning type",planningType:"Planning type",medecinsV2:EQ,medecinsV2Order:EQ,medecins:EQ,intCfg:EQ,medPins:EQ,actesV2:AC,actesV2Order:AC,actes:AC,salleReg:AC,salleRegV2:AC,salleRegV2Order:AC,salleFerm:AC,tourMed:TO,tourMedV2:TO,notesV2:"Notes",_ecr:"Réglages divers",tourDerog:TO,tourPtOte:TO,tourHist:TO,tourHistDeb:TO,tourMins:TO,tourMinsHard:TO,tourCfg:TO,tourReport:TO,tourWish:SO,tourAvoid:SO,gardeWish:SO,gardeAvoid:SO,astreinte:AS,astReport:AS,notes:"Notes",build:"Construire",csRep:RE,csBlanches:RE,csActsSel:RE,csActsGlobal:RE,journal:"Journal"};
                   const g={};Object.keys(docDet).forEach(k=>{const f=FAMN[k]||"Réglages divers";g[f]=(g[f]||0)+docDet[k];});
                   const rows=Object.keys(g).map(f=>({f,b:g[f]})).sort((a,b)=>b.b-a.b);
                   return <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
@@ -14787,6 +15048,7 @@ header::-webkit-scrollbar { display: none; }
               <div style={{display:"flex",gap:8}}>
                 <button style={{...S.btnP,background:"#dc2626"}} onClick={()=>{
                   const data=impWait.data;
+                  jrnMuet();   /* v10.246 : un import de fichier remplace tout — pas une ligne de journal par note */
                   if(data.plan)setPlan(data.plan);
                   if(data.tourMed)setTourMed(data.tourMed);
                   if(data.planningType)setPlanningType(data.planningType);
@@ -14882,6 +15144,7 @@ header::-webkit-scrollbar { display: none; }
                   const lo3=thBorneBasse(tourHistDeb),g3={};
                   Object.keys(n3).forEach(k=>{if(thWkIso(k)>=lo3)g3[k]=n3[k];});
                   return g3;});
+                jrnMuet();   /* v10.246 : l'archivage déplace, il ne modifie pas — rien au journal du tour et des notes */
                 setTourMed(o=>arPurge(o,arPerTechSem,okP));
                 setTourDerog(o=>arPurge(o,arPerClair,okP));
                 setTourPtOte(o=>arPurge(o,arPerTechSem,okP));   /* v10.155 */
@@ -14955,6 +15218,7 @@ header::-webkit-scrollbar { display: none; }
                               setPlan(p=>({...frag,...p}));
                               /* le désarchivage est SYMÉTRIQUE — les annexes reviennent aussi */
                               if(d2.annex){try{const an=JSON.parse(d2.annex)||{};
+                                jrnMuet();   /* v10.246 */
                                 if(an.tourMed)setTourMed(c=>arFusion("tourMed",c,an.tourMed));
                                 if(an.tourDerog)setTourDerog(c=>arFusion("tourDerog",c,an.tourDerog));
                                 if(an.notes)setNotes(c=>arFusion("notes",c,an.notes));
@@ -15318,11 +15582,12 @@ header::-webkit-scrollbar { display: none; }
               const dt=new Date(e.t);
               return <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid var(--border2)",fontSize:12}}>
                 <span style={{color:"var(--txt3)",fontSize:10,minWidth:96}}>{String(dt.getDate()).padStart(2,"0")}/{String(dt.getMonth()+1).padStart(2,"0")}/{dt.getFullYear()} {String(dt.getHours()).padStart(2,"0")}:{String(dt.getMinutes()).padStart(2,"0")}</span>
+                {String(e.k).indexOf("#N|")===0?<span data-histnote="1" style={{fontSize:11,color:"var(--txt)"}}><b style={{color:e.x==="add"?"#16a34a":"#dc2626"}}>📝 {e.x==="add"?"Note":"Note effacée"}</b> « {e.act} »</span>:<>
                 <span style={{fontWeight:800,color:e.x==="add"?"#16a34a":"#dc2626"}}>{e.x==="add"?"+ Posé":"− Retiré"}</span>
                 {hG&&(()=>{const mg=medecins.find(x=>String(x.id)===String(e.md));return <span data-histmed="1" style={{padding:"0 6px",borderRadius:4,fontSize:10,fontWeight:800,background:mg?mg.color:"#888",color:"#fff"}}>{mg?mg.init:"#"+e.md}</span>;})()}
                 {histGrp(e)?<span data-histgrp="1" style={{fontSize:11,color:"var(--txt)",fontWeight:700}}>📅 {histGrpLib(e)}</span>:<>
                 {a3&&<span style={{padding:"0 6px",borderRadius:4,fontSize:9,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",background:a3.color,color:"#111"}}>{a3.short}</span>}
-                {!a3&&e.act&&<span style={{fontSize:10,color:"var(--txt2)"}}>{e.act}</span>}</>}
+                {!a3&&e.act&&<span style={{fontSize:10,color:"var(--txt2)"}}>{e.act}</span>}</>}</>}
                 <span style={{marginLeft:"auto",color:"var(--txt2)",fontSize:11}}>{e.a}</span>
               </div>;
             })}
@@ -15821,7 +16086,7 @@ header::-webkit-scrollbar { display: none; }
 
             {!(mData&&mData._pend)&&<div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
               <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>📝 Note</div>
-              <textarea value={notesAff[nk(medId,y2,m2,d2,slot)]||""} onChange={e=>setNotes(p=>({...p,[nk(medId,y2,m2,d2,slot)]:e.target.value}))}
+              <NoteChamp multi value={notesAff[nk(medId,y2,m2,d2,slot)]||""} onCommit={v=>setNotes(p=>({...p,[nk(medId,y2,m2,d2,slot)]:v}))}
                 placeholder="Note visible au survol..." readOnly={(estClos(y2,m2,d2)&&!isEdit)||!canEditThisMed||(isAdminEdit&&!adminCanNotes&&!entries.some(e2=>{const a2=acteById(e2.acteId);return a2&&a2[roleOkKey]===true;}))}
                 style={{width:"100%",padding:"6px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--inp)",color:"var(--txt)",fontSize:12,fontFamily:"'Sora',sans-serif",resize:"vertical",minHeight:48,outline:"none"}}/>
             </div>}

@@ -221,9 +221,163 @@ function sansIndef(v) {
     }
     return v;
 }
-const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function (ref, obj, opts) { return VER_STALE.on ? verMuet() : GEL.on ? gelMuet() : trafEcr(arguments.length > 2 ? window.firebaseSetDoc(ref, sansIndef(obj), opts) : window.firebaseSetDoc(ref, sansIndef(obj))); } : null;
+/* v10.246 : TAMPON HORAIRE. Chaque écriture du cahier (planning/main, planning/bac) emporte _ecr = {t : heure d'envoi,
+   corrigée par l'heure du serveur ; n : compteur ; a : appareil ; v : version ; s : heure du serveur}. Une règle Firestore
+   (publiée à part, voir l'Aide) refuse une écriture dont t a plus de 10 minutes : la file d'attente d'une vieille page qui se
+   réveille (incident du 25-29/09/2026, Firefox du téléphone) ne passe plus. Écrit ICI, au seul point de passage — et par
+   avecTampon pour les rares écritures directes (gel, version, restauration, bac, sauvegarde). */
+var APPAREIL = (function () {
+    var id = "", ua = "";
+    try {
+        id = localStorage.getItem("cp6_app") || "";
+        if (!/^[a-z0-9]{4}$/.test(id)) {
+            id = Math.random().toString(36).slice(2, 6);
+            if (id.length < 4)
+                id = (id + "0000").slice(0, 4);
+            localStorage.setItem("cp6_app", id);
+        }
+    }
+    catch (e) {
+        id = id || "????";
+    }
+    try {
+        ua = navigator.userAgent || "";
+    }
+    catch (e) { }
+    var nav = /Edg\//.test(ua) ? "Edge" : /Firefox\/|FxiOS/.test(ua) ? "Firefox" : /OPR\//.test(ua) ? "Opera" : /Chrome\/|CriOS/.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Navigateur";
+    var sys = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Mac OS X|Macintosh/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux" : "";
+    return { id: id, lib: nav + (sys ? " " + sys : "") + " #" + id };
+})();
+var HORL = { dec: 0, n: 0, sure: false, tete: false, envoi: 0, dernN: 0, dernT: 0 };
+function horlNow() { return Math.round(Date.now() + HORL.dec); }
+function verCourt() { var m = String(APP_VERSION || "").match(/v?\d+\.\d+/); return m ? m[0] : "?"; }
+function tampon() {
+    HORL.n++;
+    HORL.dernN = HORL.n;
+    HORL.envoi = Date.now();
+    var o = { t: horlNow(), n: HORL.n, a: APPAREIL.id, v: verCourt() };
+    HORL.dernT = o.t;
+    try {
+        var fb = typeof window !== "undefined" ? window.firebase : null;
+        if (fb && fb.firestore && fb.firestore.FieldValue)
+            o.s = fb.firestore.FieldValue.serverTimestamp();
+    }
+    catch (e) { }
+    return o;
+}
+function estCahier(ref) { if (!ref)
+    return false; if (ref === PLANNING_DOC)
+    return true; try {
+    return (ref.id === "main" || ref.id === "bac") && !!ref.parent && ref.parent.id === "planning";
+}
+catch (e) {
+    return false;
+} }
+function avecTampon(obj) { return Object.assign({}, obj || {}, { _ecr: tampon() }); }
+/* l'heure du serveur : l'en-tête Date de la page (au chargement), puis l'écho de nos propres écritures (plus précis) */
+function horlCalibrer() {
+    try {
+        if (typeof fetch !== "function")
+            return;
+        var t0 = Date.now();
+        fetch("./?h=" + t0, { method: "HEAD", cache: "no-store" }).then(function (r) {
+            var t1 = Date.now(), d = r && r.headers && r.headers.get("date");
+            if (!d || HORL.sure)
+                return;
+            var srv = Date.parse(d);
+            if (isNaN(srv))
+                return;
+            var dec = srv + 500 - (t0 + t1) / 2;
+            if (Math.abs(dec) > 30000 && Math.abs(dec) < 86400000) {
+                HORL.dec = dec;
+            }
+            HORL.tete = true;
+        }).catch(function () { });
+    }
+    catch (e) { }
+}
+function horlEcho(e, duServeur) {
+    try {
+        if (!duServeur || !e || e.a !== APPAREIL.id || e.n !== HORL.dernN || !e.s || typeof e.s.toMillis !== "function")
+            return;
+        var rtt = Date.now() - HORL.envoi;
+        if (rtt < 0 || rtt > 5000)
+            return;
+        HORL.dec = e.s.toMillis() - (HORL.envoi + rtt / 2);
+        HORL.sure = true;
+    }
+    catch (x) { }
+}
+/* un refus de la règle : Firestore répond « permission-denied ». On ne RÉESSAIE jamais (un nouvel envoi porterait un
+   tampon neuf et passerait : c'est exactement ce qu'il faut empêcher) ; l'appareil reprend l'état du serveur. */
+function estRefus(e) { var c = String((e && (e.code || e.message)) || ""); return /permission[-_ ]?denied|insufficient permissions/i.test(c); }
+var REFUS = { n: 0, t: 0 };
+function refusSignal(quoi) {
+    REFUS.n++;
+    try {
+        jlog("REFUS", ["écriture refusée par le serveur (tampon trop ancien ?) : " + quoi]);
+    }
+    catch (e) { }
+    var n = Date.now();
+    if (n - REFUS.t > 10000) {
+        REFUS.t = n;
+        toast("⛔ Une modification trop ancienne a été refusée par le serveur — l'écran reprend le planning à jour", "warn");
+    }
+}
+const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function (ref, obj, opts) { if (VER_STALE.on)
+    return verMuet(); if (GEL.on)
+    return gelMuet(); if (estCahier(ref)) {
+    obj = avecTampon(obj);
+    if (opts && opts.mergeFields)
+        opts = { mergeFields: opts.mergeFields.concat(["_ecr"]) };
+} return trafEcr(arguments.length > 2 ? window.firebaseSetDoc(ref, sansIndef(obj), opts) : window.firebaseSetDoc(ref, sansIndef(obj))); } : null;
 const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? function (ref, suite, err) { return window.firebaseOnSnapshot(ref, function () { return trafRecu(suite, this, arguments); }, err); } : null; /* v10.233 : chaque message reçu est compté */
-const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function (ref, pairs) { return VER_STALE.on ? verMuet() : GEL.on ? gelMuet() : trafEcr(window.firebaseUpdatePaths(ref, (pairs || []).map(p => [p[0], p[1] === "__DELETE__" ? p[1] : sansIndef(p[1])]))); } : null;
+const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function (ref, pairs) { if (VER_STALE.on)
+    return verMuet(); if (GEL.on)
+    return gelMuet(); if (estCahier(ref))
+    pairs = (pairs || []).concat([[["_ecr"], tampon()]]); return trafEcr(window.firebaseUpdatePaths(ref, (pairs || []).map(p => [p[0], p[1] === "__DELETE__" ? p[1] : sansIndef(p[1])]))); } : null;
+/* v10.246 : DÉCOUPAGE du tour, des notes et du registre des salles. Ces trois champs étaient enregistrés D'UN SEUL BLOC :
+   la file d'attente d'une vieille page (état du 21-22/09) les a réécrits en entier entre le 25 et le 29/09 — semaines de
+   tour de janvier 2027, 14 notes, coches « salle vide » et réglages des Reports ont reculé ; les cases, enregistrées une
+   par une, n'ont pas bougé. Même modèle que planningTypeV2 : tourMedV2 (une entrée par semaine), notesV2 (une par case),
+   salleRegV2 (une par salle) + salleRegV2Order. L'ancien champ reste en place comme filet, il n'est plus lu une fois migré. */
+function jsonTri(v) {
+    if (Array.isArray(v))
+        return "[" + v.map(x => x === undefined ? "null" : jsonTri(x)).join(",") + "]";
+    if (v && typeof v === "object") {
+        return "{" + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ":" + jsonTri(v[k])).join(",") + "}";
+    }
+    return v === undefined ? "null" : JSON.stringify(v);
+}
+function lireJson(x, def) { try {
+    return typeof x === "string" ? (x ? JSON.parse(x) : def) : (x || def);
+}
+catch (e) {
+    return def;
+} }
+/* clé Firestore acceptable : non vide, pas de la forme réservée __…__, pas démesurée */
+function cleOk(k) { return typeof k === "string" && k.length > 0 && k.length < 700 && !/^__.*__$/.test(k); }
+function docTourMed(d) { d = d || {}; return d.tourMedV2 && typeof d.tourMedV2 === "object" ? Object.assign({}, d.tourMedV2) : lireJson(d.tourMed, {}); }
+function docNotes(d) { d = d || {}; return d.notesV2 && typeof d.notesV2 === "object" ? Object.assign({}, d.notesV2) : lireJson(d.notes, {}); }
+function regListe(mp, ord) {
+    const out = [], vu = {};
+    (Array.isArray(ord) ? ord : []).forEach(k => { if (mp && mp[k] && !vu[k]) {
+        vu[k] = 1;
+        out.push(mp[k]);
+    } });
+    Object.keys(mp || {}).forEach(k => { if (!vu[k] && mp[k]) {
+        vu[k] = 1;
+        out.push(mp[k]);
+    } });
+    return out;
+}
+function docSalleReg(d) { d = d || {}; return d.salleRegV2 && typeof d.salleRegV2 === "object" ? regListe(d.salleRegV2, d.salleRegV2Order) : lireJson(d.salleReg, []); }
+/* v10.246 : JOURNAL DU TOUR ET DES NOTES — une ligne dans le cahier d'historique de la période (planning/hist-<période>) :
+   quoi, quand, qui, quel appareil, quelle version. Muet pendant l'archivage, le désarchivage et l'import d'un fichier
+   (ce sont des déplacements, pas des modifications). */
+var JRN_MUET = { fin: 0 };
+function jrnMuet(ms) { JRN_MUET.fin = Date.now() + (ms || 4000); }
+var NOTE_PAUSE = 800; /* v10.246 : la note part après 0,8 s sans frappe, ou à la sortie du champ */
 /* v10.142 : JOURNAL DE BORD — l'équivalent de la console (F12) gardé en mémoire : erreurs, avertissements,
    erreurs non rattrapées, promesses rejetées, et les changements d'onglet. 40 entrées, 300 caractères
    chacune, rien n'est envoyé nulle part : elles ne partent qu'avec un signalement 🐞. */
@@ -293,7 +447,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.245 — 26/09/2026";
+const APP_VERSION = "v10.246 — 29/09/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -3500,7 +3654,7 @@ function PickMedActModal({ ferm = null, mData, setMData, medecins, actes, getEnt
                         const _cn = !!setNotes && (isInt ? canInt : ((!selfOnly || med.id === selfOnly) && (canNotes || okAct(acte))));
                         if (!_cn && !notes[_nk])
                             return null;
-                        return React.createElement("input", { value: notes[_nk] || "", readOnly: !_cn, onChange: _cn ? (e => { const v = e.target.value; setNotes(p => (Object.assign(Object.assign({}, p), { [_nk]: v }))); }) : undefined, placeholder: "\uD83D\uDCDD Note (visible au survol de la case)\u2026", style: { flexBasis: "100%", padding: "4px 7px", borderRadius: 6, border: "1px solid var(--border)", background: _cn ? "var(--inp)" : "var(--bg)", color: "var(--txt)", fontSize: 11, outline: "none", fontFamily: "'Sora',sans-serif" } });
+                        return React.createElement(NoteChamp, { value: notes[_nk] || "", readOnly: !_cn, onCommit: v => setNotes(p => (Object.assign(Object.assign({}, p), { [_nk]: v }))), placeholder: "\uD83D\uDCDD Note (visible au survol de la case)\u2026", style: { flexBasis: "100%", padding: "4px 7px", borderRadius: 6, border: "1px solid var(--border)", background: _cn ? "var(--inp)" : "var(--bg)", color: "var(--txt)", fontSize: 11, outline: "none", fontFamily: "'Sora',sans-serif" } });
                     })()),
                 canDif && !isInt && React.createElement("div", { style: { margin: "-2px 0 7px 6px", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" } }, (e && e.dif)
                     ? React.createElement(React.Fragment, null,
@@ -3789,7 +3943,7 @@ function PickMedSiteModal({ ferm = null, mData, medecins, actes, getEntries, isM
                     const _cn = !!setNotes && (isInt ? canInt : ((!selfOnly || med.id === selfOnly) && (!adminOnly || canNotes || acte[okKey] === true)));
                     if (!_cn && !notes[_nk])
                         return null;
-                    return React.createElement("input", { value: notes[_nk] || "", readOnly: !_cn, onChange: _cn ? (e => { const v = e.target.value; setNotes(p => (Object.assign(Object.assign({}, p), { [_nk]: v }))); }) : undefined, placeholder: "\uD83D\uDCDD Note (visible au survol de la case)\u2026", style: { flexBasis: "100%", padding: "4px 7px", borderRadius: 6, border: "1px solid var(--border)", background: _cn ? "var(--inp)" : "var(--bg)", color: "var(--txt)", fontSize: 11, outline: "none", fontFamily: "'Sora',sans-serif" } });
+                    return React.createElement(NoteChamp, { value: notes[_nk] || "", readOnly: !_cn, onCommit: v => setNotes(p => (Object.assign(Object.assign({}, p), { [_nk]: v }))), placeholder: "\uD83D\uDCDD Note (visible au survol de la case)\u2026", style: { flexBasis: "100%", padding: "4px 7px", borderRadius: 6, border: "1px solid var(--border)", background: _cn ? "var(--inp)" : "var(--bg)", color: "var(--txt)", fontSize: 11, outline: "none", fontFamily: "'Sora',sans-serif" } });
                 })()))))),
         step === "med" && !(ferm && ferm.on) && (React.createElement(React.Fragment, null,
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 } }, "Choisir un m\u00E9decin"),
@@ -7021,6 +7175,7 @@ const HELP_SECTIONS = [
     { id: "periodes", icon: "📆", title: "Les périodes de l'application", body: () => HE("div", null, HP({ children: ["L'application manipule plusieurs découpages du temps. Les voici, pour s'y retrouver."] }), HP({ children: [HE("b", null, "La période (4 mois)"), " : l'unité centrale — la navigation ‹ ›, le verrou, l'archivage, Construire, le planning type, les stats et l'export travaillent par période. Ses bornes sont RÉELLES : elle commence le lendemain de la fin de la précédente et se termine au dimanche qui clôt la dernière semaine de son dernier mois ; le lundi suivant lui est rattaché s'il est férié (1er novembre) ; et sa fin s'étend jusqu'au dernier jour des vacances scolaires quand elle tombe dedans (21 jours au plus — l'été n'est jamais absorbé). Une période ne va donc jamais « du 1er au 31 ». Longueur et mois de départ se règlent dans Paramètres."] }), HP({ children: [HE("b", null, "Les semaines"), " (tour et planning type) : toujours entières, du lundi au dimanche. Les semaines d'une période vont du lundi qui précède ou égale son premier jour au dimanche qui précède ou égale son dernier jour — autrement dit, une semaine appartient à la période de son dimanche. Quand un lundi férié est rattaché à la période précédente, la semaine de ce lundi ouvre la période suivante : le tour s'y répartit à partir du mardi."] }), HP({ children: [HE("b", null, "Les semestres"), " (internes et Dr Juniors) : six mois, bascules début mai et début novembre, reportées au lundi. Ils sont indépendants des périodes — seule la période de mars à juin contient une bascule en son milieu (début mai) ; celle de novembre tombe sur une frontière de période."] }), HP({ children: [HE("b", null, "L'année scolaire des vacances"), " (Toussaint → Été), saisie dans Paramètres : elle sert au calcul de la fin de période et au fond coloré des jours — ou des semaines — de vacances, dans tous les onglets (v10.230)."] }), HP({ last: true, children: [HE("b", null, "En cours, close, archivée"), " : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."] })) },
     { id: "archives", icon: "🗄️", title: "Archiver, sauvegarder, exporter", body: () => HE("div", null, HP({ children: [HE("b", null, "Zoom de l'application"), " (v10.179) : tout l'affichage est à 110 % par défaut. Le bouton 🔍, à côté de 🐞, passe à 120, 130, puis 100 % — réglage mémorisé sur l'appareil, chacun le sien ; le zoom du navigateur (Ctrl + molette, pincement) reste possible par-dessus. L'impression reste à 100 %. Le bouton est proposé à tous."] }), HP({ children: [HE("b", null, "Le vrai nom du junior dans les modales"), " (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."] }), HP({ children: [HE("b", null, "Une seule barre de défilement sur ordinateur"), " (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."] }), HP({ children: [HE("b", null, "Deux filets de sécurité"), " (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."] }), HP({ children: [HE("b", null, "Verrou de l'avenir"), " (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil (secrétaires et cadres ont chacun leur case depuis la v10.242) — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre. Depuis la v10.158 : la fin de l'étape 1 de Construire referme d'elle-même les demandes (la période se verrouille), les semaines de tour d'une période à venir restent invisibles des non-éditeurs tant que le tour n'est pas validé (tuile 2), et valider l'étape 5 ouvre automatiquement la dérogation des intermédiaires — la dévalider la referme."] }), HP({ children: [HE("b", null, "Garde int., aller-retour"), " (v10.145) : éteindre 🎓 Garde int. ramène le cadre là où il était avant de l'allumer — à condition qu'on n'ait rien fait entre-temps. Un défilement, un changement d'onglet ou de période, et le cadre reste où il est."] }), HP({ children: [HE("b", null, "Pointillé « moi » fermé"), " (v10.144) : le pointillé violet de sa propre colonne ferme désormais son cadre, en haut sur l'initiale et en bas sur la dernière ligne, comme le cadre plein de la colonne suivie."] }), HP({ children: [HE("b", null, "Plus de zoom intempestif sur iPhone"), " (v10.143) : toucher un champ de saisie (PIN, note, filtre, fenêtre 🐞…) faisait grossir la page, qui restait ainsi ensuite — Safari agrandit tout champ dont le texte fait moins de 16 px. Sur téléphone, les champs font désormais 16 px : plus de zoom. Le pincement pour agrandir la grille reste possible ; si votre page est déjà zoomée, un pincement la remet à sa taille."] }), HP({ children: [HE("b", null, "Signaler un problème"), " (v10.142) : le bouton 🐞 — dans l'onglet Aide, et dans Planning et Attachés (à côté de 🌓, ou sous ⋯ sur téléphone) — ouvre une petite fenêtre : on décrit ce qui s'est passé, on appuie sur Envoyer, c'est tout. Version, onglet, période, jour regardé, mode d'accès, appareil, navigateur, état du réseau, trafic (v10.242 : les compteurs de la tuile 📡 relevés à l'envoi — latence, temps de l'appareil, messages et écritures de la dernière minute, écritures en attente et refusées, poids du planning) et journal de la page (les erreurs et avertissements de la console, avec les derniers changements d'onglet) partent avec, automatiquement — jamais le PIN, jamais d'image. L'envoi demande du réseau. L'éditeur retrouve les tickets dans Paramètres, carte 🐞 Signalements (un badge rouge sur l'onglet compte ceux à traiter) : ▸ déroule le détail, Copier donne un texte prêt à coller, ✓ Traité le classe."] }), HP({ children: [HE("b", null, "Colonne suivie"), " (v10.140) : dans Planning et Attachés, l'éditeur et les médecins de niveau intermédiaire peuvent appuyer sur l'initiale en tête d'une colonne pour la suivre : cadre plein de la couleur du médecin, anneau autour de son initiale, teinte légère sur ses cases vides, et les autres colonnes s'estompent à 40 %. Un second appui relâche, une autre initiale déplace le suivi ; une seule colonne à la fois, conservée le temps de la session, d'un onglet et d'une période à l'autre — elle cohabite avec le pointillé violet de sa propre colonne. Sur téléphone, la colonne suivie vient se centrer à l'écran. Le bouton 🎓 Garde int. ramène le cadre tout à gauche pour montrer la colonne 🎓 Int., sans changer ni le jour regardé ni la hauteur (v10.141). À l'extinction, retour à la position d'avant si rien n'a bougé (v10.145). La carte 🌓 Thème de Paramètres est retirée : c'est un réglage par appareil, que le bouton 🌓 des onglets couvre (voir 📱 Installer sur votre téléphone)."] }), HP({ children: [HE("b", null, "Bornes de navigation"), " (v10.138) : les flèches ‹ › ne remontent pas avant la plus ancienne archive (à défaut deux ans en arrière) et ne vont pas au-delà de six périodes — deux ans — devant la période en cours ; un message le dit à la borne. Cela vaut pour tous les onglets qui naviguent par période : Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Planning type, Tour, Reports, Construire, Astreinte, Stats et l'export. Les Internes naviguent par semestre, entre les semestres déclarés. Naviguer ne crée aucune donnée ; la borne évite qu'une case posée par erreur très loin dans le futur ne pèse sans que personne ne la voie. La carte Poids affiche aussi le poids des archives, rangées dans leur propre collection et donc hors de la jauge du document actif."] }), HP({ children: [HE("b", null, "Paramètres réorganisés"), " (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles et Sauvegarde & archivage sont trois cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto avec un message à chaque appui (v10.139), donc chacun choisit son mode sans Paramètres ; à la reprise de l'application en veille, le réglage du téléphone est relu. La carte Thème de Paramètres, devenue redondante, est retirée en v10.140. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."] }), HP({ children: [HE("b", null, "Version périmée"), " (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."] }), HP({ children: [HE("b", null, "Bandeaux allégés sur téléphone"), " (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."] }), HP({ children: [HE("b", null, "La colonne du médecin connecté"), " (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."] }), HP({ children: [HE("b", null, "Les journées passées"), " : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."] }), HP({ children: [HE("b", null, "Le planning type ne touche plus aux cases posées à la main"), " : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."] }), HP({ children: [HE("b", null, "Le balai des fiches (« Retirer ces activités »)"), " suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."] }), HP({ children: [HE("b", null, "Les périodes à venir"), " (v10.146) : fermées à tous sauf l'éditeur, badge « 🚧 En préparation ». Dès qu'il ouvre la demande de congés dans Construire, badge « 🏖️ Congés ouverts » : chacun pose congés, FMC et préférences, et rien d'autre, jusqu'à ce qu'il referme la demande. À la diffusion du planning, la période s'ouvre comme la période en cours. L'éditeur peut déroger pour un profil dans Paramètres. Les semaines de tour, elles, restent invisibles tant que l'éditeur n'a pas validé le tour dans Construire (v10.158)."] }), HP({ children: [HE("b", null, "Les périodes closes"), " : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."] }), HP({ children: [HE("b", null, "Archiver une période"), " (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase — il contient aussi l'historique des cases de la période), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période. Une exception voulue : le décompte des binômes de tour. Au moment de l'archivage, les semaines de tour de la période sont recopiées dans une petite ardoise permanente qui, elle, ne part jamais avec une période — sans quoi le tableau 🤝 repartirait de zéro à chaque archivage. Elle se purge d'elle-même au-delà de deux ans."] }), HP({ children: [HE("b", null, "Sauvegardes automatiques"), " : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."] }), HT({ children: "Feuilleter une sauvegarde comme un planning (v10.237)" }), HP({ children: ["Depuis le ", HE("b", null, "🧪 bac à sable"), ", le bouton ", HBtn({ kind: "ghost", children: "📥 Charger dans le bac" }), " (carte 💾, ou depuis l'aperçu) recopie une sauvegarde ", HE("b", null, "dans le bac uniquement"), ". Vous la parcourez alors dans tous les onglets, l'imprimez, y faites des essais : le vrai planning n'est jamais touché. Le bandeau du bas rappelle quelle sauvegarde est chargée ; la remise à zéro du bac y remet une copie du vrai planning."] }), HT({ children: "Vérifier qu'une modification n'a pas été faite « toute seule » (v10.236)" }), HP({ children: ["Dans ", HBtn({ kind: "ghost", children: "👁 Aperçu" }), " d'une sauvegarde, choisissez avec quoi la comparer — le planning actuel, ou une ", HE("b", null, "autre sauvegarde"), ", pour dater un changement — puis ", HBtn({ kind: "ghost", children: "Voir les différences case par case" }), ". Chaque case qui diffère est listée (jour, demi-journée, médecin, avant → après) avec ", HE("b", null, "qui l'a modifiée et quand"), ", d'après le journal des cases. Les différences ", HE("b", null, "sans trace"), " sont mises en tête, en rouge : ce sont soit des opérations de masse (construction, planning type, import, restauration, archivage), soit des changements sans auteur — ceux qu'on cherche. Rien n'est appliqué : c'est une lecture."] }), HP({ children: [HE("b", null, "Restaurer un seul médecin, sur quelques jours"), " : depuis la modale d'une case, ", HBtn({ kind: "ghost", children: "↩ Restaurer depuis une sauvegarde…" }), " (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ", HE("b", null, "bilan"), " — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait. Depuis la v10.128, les journées verrouillées de la plage choisie sont sautées, comme pour toute opération de période — le bilan les compte à part (🔒), et le message final les rappelle."] }), HP({ children: [HE("b", null, "Exports"), " : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."] }), HP({ children: ["La jauge dans Paramètres indique la taille des données Firebase — archivez les périodes passées si elle monte."] }), HT({ children: "💻 Copie sur mon ordinateur" }), HP({ children: ["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ", HE("b", null, "Copie sur mon ordinateur"), " produit deux fichiers indépendants de l'application : le ", HE("b", null, "tableau (.xls)"), ", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ", HE("b", null, "données brutes (.json)"), ", qui contiennent l'intégralité des données (toutes périodes) et permettent de tout remettre en place via l'encart 📂 Importer, juste en dessous. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."] }), HP({ last: true, children: ["Un ", HE("b", null, "rappel"), " s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). Depuis la v10.169, la date de la dernière sauvegarde est PARTAGÉE entre vos appareils : un ordinateur qui n'a jamais servi à sauvegarder ne réclame plus une sauvegarde dès sa première ouverture. Le compteur de cases modifiées, lui, reste propre à ", HE("b", null, "chaque ordinateur"), " et repart de zéro dès qu'une sauvegarde est faite, d'où qu'elle vienne."] })) },
     { id: "gel", icon: "🧊", title: "Geler le planning avant une restauration", body: () => HE("div", null, HP({ children: ["Réservé à l'éditeur (v10.229). Dans Paramètres, encart 💾 Sauvegarde & archivage, le bouton ", HBtn({ kind: "ghost", children: "🧊 Geler le planning" }), " met le planning en ", HE("b", null, "lecture seule pour tout le monde, éditeurs compris"), ", sur tous les appareils, en quelques secondes et sans recharger. C'est fait pour restaurer une sauvegarde en étant sûr que personne ne modifie rien entre-temps."] }), HP({ children: [HE("b", null, "Pendant le gel"), " : un bandeau bleu-vert en bas de l'écran dit qui a gelé et depuis quand ; aucune case, aucune salle, aucune garde ne s'ouvre ; une fenêtre restée ouverte au moment du gel se referme ; rien n'est envoyé à la base. Chacun garde ses onglets et peut tout consulter."] }), HP({ children: [HE("b", null, "Côté éditeur"), " : les Paramètres ne montrent plus qu'une carte 🧊, avec la liste des sauvegardes (👁 Aperçu, ↩ Restaurer) et le bouton ", HBtn({ kind: "ghost", children: "✅ Dégeler le planning" }), ". Le gel ", HE("b", null, "survit à la restauration"), " : vérifiez le planning restauré, puis dégelez — chacun retrouve aussitôt ses droits. N'importe quel éditeur peut dégeler."] }), HP({ children: ["Le gel n'existe pas dans le 🧪 bac à sable. Un appareil resté sur une version plus ancienne ne connaît pas le gel, mais il est déjà en lecture seule : le garde-fou de version l'empêche d'écrire tant qu'il n'est pas à jour."] })) },
+    { id: "protection", icon: "🛡️", title: "Protection des données — tour, notes, vieilles pages", body: () => HE("div", null, HP({ children: ["Depuis la v10.246. Motif : fin septembre 2026, une ", HE("b", null, "vieille page restée ouverte"), ", sur un navigateur rarement utilisé d'un téléphone, s'est réveillée et a renvoyé ce qu'elle avait gardé en attente. Le tour, les notes et le registre des salles, alors enregistrés ", HE("b", null, "d'un seul bloc"), ", ont reculé de plusieurs jours ; les cases, enregistrées une par une, n'ont pas bougé."] }), HT({ children: "1. Tout est enregistré morceau par morceau" }), HP({ children: ["Le tour est enregistré ", HE("b", null, "semaine par semaine"), ", les notes ", HE("b", null, "case par case"), ", les salles ", HE("b", null, "salle par salle"), ". Une copie en retard n'envoie plus que ce qu'elle a elle-même modifié : elle ne peut plus effacer le travail des autres. L'ancien bloc est conservé comme filet dans la base, mais n'est plus lu."] }), HT({ children: "2. Le journal du tour et des notes" }), HP({ children: ["Chaque médecin ajouté ou retiré d'une semaine de tour, chaque note posée, modifiée ou effacée est inscrit : ", HE("b", null, "quand, qui, depuis quel appareil et quelle version"), ". À lire dans Paramètres, carte ", HE("b", null, "📜 Journal du tour et des notes"), ", période par période ; l'historique d'une case (clic droit) montre aussi sa note. Le journal part avec l'archivage de la période. L'archivage, le désarchivage et l'import d'un fichier n'y écrivent rien."] }), HT({ children: "3. L'heure d'envoi de chaque modification" }), HP({ children: ["Chaque modification part avec son ", HE("b", null, "heure d'envoi"), ", réglée sur l'heure du serveur (le fuseau horaire, un voyage ou un VPN n'y changent rien). Une règle de la base Firebase refuse une modification envoyée ", HE("b", null, "il y a plus de 10 minutes"), ". Elle est ", HE("b", null, "abandonnée"), ", jamais renvoyée ; l'écran reprend le planning à jour et un message l'annonce. Conséquence pour tous : une modification faite hors réseau puis envoyée plus de 10 minutes après est à refaire. La carte ", HE("b", null, "🛡️ Protection des écritures"), " des Paramètres indique l'appareil, l'heure utilisée, et teste si la règle est publiée."] }), HT({ children: "4. Les notes" }), HP({ children: ["Le champ de note garde votre texte pendant la frappe et n'enregistre qu'après ", HE("b", null, "une courte pause"), ", ou quand on quitte le champ ou la fenêtre. Les lettres ne s'effacent plus en tapant vite."] })) },
     { id: "fermees", icon: "🚫", title: "Plages fermées — fermer une salle sur une demi-journée", body: () => HE("div", null, HP({ children: ["Depuis la v10.229, une salle peut être ", HE("b", null, "fermée sur une demi-journée"), " : sa case est ", HE("b", null, "grisée et hachurée"), " (hachures depuis la v10.235, pour ne pas la confondre avec la couleur d'une salle vide) dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ", HE("b", null, "proposée à personne"), " sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."] }), HT({ children: "Colorer les salles vides (v10.232)" }), HP({ children: ["Depuis la v10.233, tous les choix de couleur des Paramètres (salles vides, surspécialités, pointillé de votre colonne et sa transparence) se valident par ", HBtn({ kind: "ghost", children: "✓ OK" }), " : tant que vous cherchez la teinte, rien n'est enregistré ni envoyé aux autres appareils ; ✕ abandonne."] }), HP({ children: ["À ne pas confondre avec une plage fermée : dans Paramètres → 🏥 Salles, cliquez le nom d'une salle et cochez ", HE("b", null, "🎨 Colorer la case quand la salle est vide"), ". Dans CHL, CHB, PT Angio et PT Cardio, sa case prend alors la ", HE("b", null, "couleur des salles vides"), " tant que personne n'y est posé — pratique pour voir d'un coup d'œil ce qui reste à pourvoir. La couleur est ", HE("b", null, "unique"), ", réglée en tête de la carte 🏥 Salles ; les salles cochées y portent une petite pastille. Si la plage est fermée, ", HE("b", null, "le gris gagne"), "."] }), HT({ children: "Fermer ou rouvrir un jour précis" }), HP({ children: ["Cliquez la case de la salle : en tête de la fenêtre, la ligne ", HE("b", null, "🚫 Plage fermée"), " se coche pour fermer, se décoche pour rouvrir — ce jour-là seulement. Réservé aux ", HE("b", null, "éditeurs, cadres et médecins intermédiaires"), " ; pour les autres, une plage fermée ne s'ouvre pas, un message le dit."] }), HT({ children: "Fermer chaque semaine — la grille de la salle" }), HP({ children: ["Dans Paramètres → 🏥 Salles, cliquez le ", HE("b", null, "nom de la salle"), ", puis ", HBtn({ kind: "ghost", children: "🚫 Plages fermées" }), " : une grille ", HE("b", null, "sans date"), ", du lundi au vendredi, matin et après-midi. Cliquez à la suite toutes les demi-journées fermées : c'est enregistré aussitôt, et la pastille de la salle porte 🚫 avec leur nombre. Ces plages sont fermées toutes les semaines ; pour en rouvrir une un jour donné, passez par la case de ce jour (ligne 🚫 à décocher) — l'exception d'un jour gagne toujours sur la grille."] }), HT({ children: "Ce qui se passe autour" }), HP({ children: [HE("b", null, "Un médecin déjà posé"), " dans une plage qu'on ferme n'est pas retiré : il reste affiché sur la case grisée et entre dans le bandeau ⚠ des problèmes de planning (« en plage fermée »), à déplacer à la main. ", HE("b", null, "Le planning type"), " ne pose rien dans une plage fermée : la case est sautée et le message de fin le compte. Renommer une salle emporte ses fermetures ; la supprimer les efface."] })) },
     { id: "colplanning", icon: "👁", title: "Colonnes de salles et d'activités dans le Planning", body: () => HE("div", null, HP({ children: ["Accès : éditeur et intermédiaires. Pour construire le planning en voyant tout le monde, le bouton ", HBtn({ kind: "ghost", children: "👁" }), " de la barre du Planning ouvre la liste de ", HE("b", null, "toutes les colonnes des onglets salles"), " — CHL, CHB (avec le BIP), PT Cardio (avec la Stimulation) et PT Angio — et un champ de recherche (« bip », « stim », « CHB-2 »…). Chaque colonne cochée s'ajoute ", HE("b", null, "tout à droite, après les médecins"), ", derrière un trait vertical (v10.240)."] }), HP({ children: ["La colonne est ", HE("b", null, "exactement celle de son onglet"), ", dessinée par le même code : mêmes ronds, mêmes couleurs, salle vide colorée, plage fermée grisée, alertes et notes. Un clic ouvre la même fenêtre que dans l'onglet d'origine, avec les mêmes droits et les mêmes verrous. Poser un médecin depuis cette colonne revient à le poser dans sa propre colonne : tout se met à jour en même temps, rien n'est écrit deux fois."] }), HP({ last: true, children: ["Réglage ", HE("b", null, "propre à cet appareil"), ", vide par défaut : personne d'autre ne voit vos colonnes, et elles disparaissent dès qu'on les décoche (", HBtn({ kind: "ghost", children: "✕ Tout décocher" }), "). Le bouton 👁 prend un liseré tant qu'une colonne est cochée. Ces colonnes ne sont pas imprimées. Seul ce qui est déjà une colonne dans un onglet salle peut être affiché : pour une activité qui n'en a pas, cochez-lui une colonne de reprise ↩ dans Paramètres → Activités."] })) },
     { id: "bac", icon: "🧪", title: "Bac à sable — tester sans risque", body: () => HE("div", null, HP({ children: ["Un espace de test à part, réservé à l'éditeur (Paramètres → 🧪 Bac à sable). En y entrant, l'application recopie le planning réel dans un cahier Firebase distinct, puis se recharge dessus : tout ce que vous y faites reste dans cette copie. Le bac est propre au navigateur qui l'a activé — vos collègues continuent de voir le vrai planning, et d'y travailler."] }), HP({ children: [HE("b", null, "Ce qui s'y comporte comme dans le vrai"), " : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."] }), HP({ children: [HE("b", null, "Ce qui est désactivé"), " : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."] }), HP({ children: [HE("b", null, "L'historique des cases dans le bac"), ", depuis la v10.238 : il montre le vrai historique jusqu'au moment où le bac a été copié — ou, si vous avez chargé une sauvegarde, jusqu'à l'heure de cette sauvegarde — puis vos essais du bac, à la suite. Vos essais ne se mêlent jamais au vrai historique, et la remise à zéro (ou le chargement d'une autre sauvegarde) les efface."] }), HP({ children: [HE("b", null, "Le bandeau orange"), ", en bas de l'écran, rappelle où vous êtes et porte trois commandes. ", HE("b", null, "Connecté comme"), ", pour passer d'un profil à l'autre sans PIN — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation. ", HBtn({ kind: "ghost", children: "↺ Remettre à zéro" }), ", qui remplace le bac par une copie fraîche du planning réel. ", HBtn({ kind: "ghost", children: "🚪 Sortir du bac" }), ", qui ramène au vrai planning. L'écran d'accueil (PIN) affiche le même rappel, avec son bouton Sortir."] })) },
@@ -8949,6 +9104,36 @@ function CouleurOK({ value, onOk, onApercu = null, w = 38, h = 24, title }) {
         dirty && React.createElement("button", { "data-colok": "1", onClick: () => { const v = tmp; fin(); onOk(v); }, style: Object.assign(Object.assign({}, bs), { border: "1.5px solid #16a34a", background: "rgba(22,163,74,.12)", color: "#16a34a" }) }, "\u2713 OK"),
         dirty && React.createElement("button", { "data-colno": "1", onClick: fin, title: "Abandonner ce choix", style: Object.assign(Object.assign({}, bs), { border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)" }) }, "\u2715"));
 }
+/* v10.246 : CHAMP DE NOTE. Avant : chaque frappe renvoyait TOUT le bloc des notes ; sur ordinateur, en tapant vite, l'écho
+   d'un envoi précédent revenait par-dessus la frappe suivante — des lettres s'effaçaient puis revenaient. Désormais le champ
+   garde son texte pendant la frappe et n'enregistre (onCommit) qu'après NOTE_PAUSE sans frappe, à la sortie du champ, ou si
+   la fenêtre se ferme avant. Une note arrivée d'ailleurs s'affiche tant qu'on n'est pas en train d'écrire. */
+function NoteChamp(_a) {
+    var { value, onCommit, multi, readOnly } = _a, rest = __rest(_a, ["value", "onCommit", "multi", "readOnly"]);
+    const ext = value || "";
+    const [txt, setTxt] = useState(ext);
+    const foc = useRef(false), tim = useRef(null), txtR = useRef(ext), extR = useRef(ext), comR = useRef(onCommit);
+    extR.current = ext;
+    comR.current = onCommit;
+    const envoyer = (v) => { if (tim.current) {
+        clearTimeout(tim.current);
+        tim.current = null;
+    } if (v !== extR.current && comR.current)
+        comR.current(v); };
+    useEffect(() => { if (!foc.current && !tim.current) {
+        txtR.current = ext;
+        setTxt(ext);
+    } }, [ext]);
+    useEffect(() => () => { if (tim.current) {
+        clearTimeout(tim.current);
+        tim.current = null;
+        if (txtR.current !== extR.current && comR.current)
+            comR.current(txtR.current);
+    } }, []);
+    const P = Object.assign(Object.assign({}, rest), { value: txt, readOnly: !!readOnly, "data-note": "1", onFocus: () => { foc.current = true; }, onBlur: () => { foc.current = false; envoyer(txtR.current); }, onChange: readOnly ? undefined : (e => { const v = e.target.value; txtR.current = v; setTxt(v); if (tim.current)
+            clearTimeout(tim.current); tim.current = setTimeout(() => { tim.current = null; envoyer(txtR.current); }, NOTE_PAUSE); }) });
+    return multi ? React.createElement("textarea", Object.assign({}, P)) : React.createElement("input", Object.assign({}, P));
+}
 /* v10.233 : tuile 📡 Trafic des Paramètres. Rien ne tourne tant qu'on n'a pas appuyé sur ▶ Mesurer ; la mesure se rafraîchit
    une fois par seconde, s'arrête SEULE au bout de 2 minutes et au démontage (on quitte Paramètres). « Tester » envoie une
    écriture minuscule (champ _ping) : une seule, à la demande. */
@@ -8994,6 +9179,130 @@ function TraficTuile({ onPing = null, netOff = false, docSize = null }) {
             lg("Écritures refusées", String(b.ko), b.ko ? "#dc2626" : undefined),
             lg("Depuis l'ouverture (" + b.depuis + " min)", b.ecr + " envoyées · " + b.recu + " reçus"),
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 6, lineHeight: 1.45 } }, "Rep\u00E8res : latence verte sous 0,6 s, orange jusqu'\u00E0 1,5 s, rouge au-del\u00E0 ; traitement par l'appareil vert sous 0,15 s, orange jusqu'\u00E0 0,5 s. Latence = r\u00E9seau et serveur ; \u00AB Appareil \u00BB = ce t\u00E9l\u00E9phone ou cet ordinateur \u2014 si c'est lui qui est lent, all\u00E9ger le planning (archivage) est le rem\u00E8de. Sans \u00E9criture depuis l'ouverture, la latence est vide : \u00AB \u23F1 Tester \u00BB en mesure une.")));
+}
+/* v10.246 : tuile 🛡️ Protection des écritures. Montre le tampon de CET appareil (heure corrigée par le serveur) et teste,
+   à la demande, si la règle Firestore est publiée : une écriture minuscule (_regleTest) part avec un tampon vieux de
+   20 minutes, hors des filets — refusée = règle active ; acceptée = pas encore publiée (sans conséquence). */
+function ProtectionTuile({ netOff = false, bloque = false }) {
+    const [res, setRes] = useState(null);
+    const [, force] = useState(0);
+    useEffect(() => { const id = setInterval(() => force(x => x + 1), 5000); return () => clearInterval(id); }, []);
+    const ecart = Math.round(HORL.dec / 1000);
+    const horl = HORL.sure ? "réglée sur le serveur" + (ecart ? " (cet appareil " + (ecart > 0 ? "retarde" : "avance") + " de " + Math.abs(ecart) + " s)" : " (aucun écart)")
+        : HORL.tete ? "réglée sur l'heure de la page" + (ecart ? " (écart " + ecart + " s)" : " (aucun écart)") + " — affinée à la prochaine modification" : "heure de l'appareil — comparée au serveur dès la prochaine modification";
+    const tester = () => {
+        if (!PLANNING_DOC || !window.firebaseSetDoc) {
+            setRes({ k: "?", m: "Pas de connexion à la base." });
+            return;
+        }
+        setRes({ k: "…", m: "Test en cours…" });
+        let fini = false;
+        const t = setTimeout(() => { if (!fini) {
+            fini = true;
+            setRes({ k: "?", m: "Pas de réponse du serveur en 10 s (hors ligne ?). Réessayez avec du réseau." });
+        } }, 10000);
+        Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, { _regleTest: Date.now(), _ecr: { t: horlNow() - 20 * 60000, n: -1, a: APPAREIL.id, v: verCourt() } }, { merge: true }))
+            .then(() => { if (fini)
+            return; fini = true; clearTimeout(t); setRes({ k: "non", m: "La règle n'est PAS encore publiée : une écriture vieille de 20 minutes vient d'être acceptée (elle ne touche rien)." }); })
+            .catch(e => { if (fini)
+            return; fini = true; clearTimeout(t); setRes(estRefus(e) ? { k: "oui", m: "La règle est ACTIVE : une écriture vieille de 20 minutes vient d'être refusée par le serveur." } : { k: "?", m: "Réponse inattendue du serveur : " + String((e && (e.code || e.message)) || e).slice(0, 120) }); });
+    };
+    const lg = (l, v, c) => React.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5, padding: "2px 0", borderBottom: "1px solid var(--border2)" } },
+        React.createElement("span", { style: { color: "var(--txt2)" } }, l),
+        React.createElement("b", { style: { color: c || "var(--txt)", textAlign: "right" } }, v));
+    return React.createElement("div", { "data-protection": "1", style: Object.assign(Object.assign({}, S.card), { marginBottom: 10 }) },
+        React.createElement("div", { style: { fontWeight: 700, color: "#16a34a", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDEE1\uFE0F Protection des \u00E9critures"),
+        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8, lineHeight: 1.45 } }, "Chaque modification part avec son heure d'envoi. Une fois la r\u00E8gle publi\u00E9e dans Firebase, le serveur refuse toute modification envoy\u00E9e il y a plus de 10 minutes \u2014 celle d'une vieille page rest\u00E9e ouverte qui se r\u00E9veille, par exemple. Ce qu'elle voulait \u00E9crire est abandonn\u00E9 ; l'\u00E9cran reprend le planning \u00E0 jour."),
+        lg("Cet appareil", APPAREIL.lib),
+        lg("Heure utilisée", horl),
+        lg("Écritures refusées depuis l'ouverture", String(REFUS.n), REFUS.n ? "#dc2626" : undefined),
+        React.createElement("button", { "data-protest": "1", disabled: netOff || bloque, onClick: tester, style: { marginTop: 8, width: "100%", fontSize: 12, padding: "7px 10px", borderRadius: 8, cursor: netOff || bloque ? "default" : "pointer", fontWeight: 800, border: "1.5px solid #16a34a", background: "var(--bg2)", color: "#16a34a", opacity: netOff || bloque ? .5 : 1 } }, "\uD83E\uDDEA La r\u00E8gle est-elle publi\u00E9e ?"),
+        res && React.createElement("div", { "data-protres": res.k, style: { marginTop: 6, fontSize: 11.5, fontWeight: 700, color: res.k === "oui" ? "#16a34a" : res.k === "non" ? "#d97706" : "var(--txt2)" } },
+            res.k === "oui" ? "✅ " : res.k === "non" ? "⏳ " : "",
+            res.m));
+}
+/* v10.246 : tuile 📜 Journal du tour et des notes — les lignes « #T| » (semaine de tour) et « #N| » (note) du cahier
+   d'historique d'une période : quoi, quand, qui, quel appareil, quelle version. Lu à la demande (une lecture). */
+function JournalTuile({ medecins = [], per0 }) {
+    const [per, setPer] = useState(per0);
+    const [etat, setEtat] = useState(null); // null | "…" | {list}
+    const [filt, setFilt] = useState("tout");
+    const pid = perIdOf(per.sy, per.sm);
+    const lire = async () => {
+        setEtat("…");
+        try {
+            const es = await histLire([pid]);
+            const list = Object.values(es).filter(e => e && typeof e.k === "string" && (e.k.indexOf("#T|") === 0 || e.k.indexOf("#N|") === 0)).sort((a, b) => (b.t || 0) - (a.t || 0));
+            setEtat({ list });
+        }
+        catch (e) {
+            setEtat({ list: [], err: 1 });
+        }
+    };
+    const mv = (dir) => { const q = dir < 0 ? perPrev(per.sy, per.sm) : perNext(per.sy, per.sm); setPer(q); setEtat(null); };
+    const med = (id) => medecins.find(m => String(m.id) === String(id));
+    const d2 = (n) => String(n).padStart(2, "0");
+    const lib = (e) => {
+        const q = e.k.split("|");
+        if (q[0] === "#T") {
+            const w = (q[1] || "").split("-").map(Number);
+            return { typ: "tour", txt: "Tour · semaine du " + d2(w[2]) + "/" + d2((w[1] || 0) + 1) + " · " + (q[2] || "") };
+        }
+        const j = q[2] || "";
+        return { typ: "note", txt: "Note · " + j.slice(8, 10) + "/" + j.slice(5, 7) + " " + (SLOTL[q[3]] || q[3] || "") };
+    };
+    const list = etat && etat.list ? etat.list.filter(e => filt === "tout" || (filt === "tour" ? e.k.indexOf("#T|") === 0 : e.k.indexOf("#N|") === 0)) : [];
+    const bt = (v, l) => React.createElement("button", { key: v, onClick: () => setFilt(v), style: { fontSize: 11, padding: "3px 8px", borderRadius: 7, cursor: "pointer", fontWeight: 700, border: "1px solid var(--border)", background: filt === v ? "var(--bg3)" : "var(--bg2)", color: "var(--txt)" } }, l);
+    return React.createElement("div", { "data-journaltn": "1", style: Object.assign(Object.assign({}, S.card), { marginBottom: 10 }) },
+        React.createElement("div", { style: { fontWeight: 700, color: "#7c3aed", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCDC Journal du tour et des notes"),
+        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8, lineHeight: 1.45 } }, "Chaque m\u00E9decin ajout\u00E9 ou retir\u00E9 d'une semaine de tour, chaque note pos\u00E9e, modifi\u00E9e ou effac\u00E9e : quand, par qui, depuis quel appareil et quelle version. L'historique d'une case (clic droit) montre aussi sa note."),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" } },
+            React.createElement("button", { onClick: () => mv(-1), style: Object.assign({}, S.icnBtn) }, "\u2039"),
+            React.createElement("b", { style: { fontSize: 12 } },
+                "P\u00E9riode de ",
+                MOIS[per.sm],
+                " ",
+                per.sy),
+            React.createElement("button", { onClick: () => mv(1), style: Object.assign({}, S.icnBtn) }, "\u203A"),
+            React.createElement("button", { "data-jrnlire": "1", onClick: lire, style: { marginLeft: "auto", fontSize: 12, padding: "5px 10px", borderRadius: 8, cursor: "pointer", fontWeight: 800, border: "1.5px solid #7c3aed", background: "var(--bg2)", color: "#7c3aed" } }, etat && etat !== "…" ? "↻ Relire" : "Afficher")),
+        etat === "…" && React.createElement("div", { style: { fontSize: 12, color: "var(--txt3)" } }, "Chargement\u2026"),
+        etat && etat.list && React.createElement(React.Fragment, null,
+            React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 6 } },
+                bt("tout", "Tout"),
+                bt("tour", "Tour"),
+                bt("notes", "Notes"),
+                React.createElement("span", { style: { marginLeft: "auto", fontSize: 11, color: "var(--txt3)" } },
+                    list.length,
+                    " ligne",
+                    list.length > 1 ? "s" : "")),
+            !list.length && React.createElement("div", { style: { fontSize: 12, color: "var(--txt3)" } },
+                "Rien d'inscrit pour cette p\u00E9riode",
+                filt !== "tout" ? " dans ce filtre" : "",
+                " (le journal commence avec la v10.246)."),
+            React.createElement("div", { style: { maxHeight: 360, overflowY: "auto" } }, list.slice(0, 300).map((e, i) => {
+                const L = lib(e), m = med(e.md), dt = new Date(e.t || 0);
+                return React.createElement("div", { key: i, "data-jrnligne": L.typ, style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "5px 0", borderBottom: "1px solid var(--border2)", fontSize: 11.5 } },
+                    React.createElement("span", { style: { color: "var(--txt3)", fontSize: 10, minWidth: 88 } },
+                        d2(dt.getDate()),
+                        "/",
+                        d2(dt.getMonth() + 1),
+                        " ",
+                        d2(dt.getHours()),
+                        ":",
+                        d2(dt.getMinutes()),
+                        ":",
+                        d2(dt.getSeconds())),
+                    React.createElement("b", { style: { color: e.x === "add" ? "#16a34a" : "#dc2626" } }, L.typ === "tour" ? (e.x === "add" ? "+ ajouté" : "− retiré") : (e.x === "add" ? "📝 posée" : "📝 effacée")),
+                    m ? React.createElement("span", { style: { padding: "0 6px", borderRadius: 4, fontSize: 10, fontWeight: 800, background: m.color, color: "#fff" } }, m.init) : (e.md && e.md !== "-" ? React.createElement("span", { style: { fontSize: 10 } },
+                        "#",
+                        e.md) : null),
+                    React.createElement("span", { style: { color: "var(--txt2)" } }, L.txt),
+                    L.typ === "note" && e.act && React.createElement("span", { style: { color: "var(--txt)" } },
+                        "\u00AB ",
+                        e.act,
+                        " \u00BB"),
+                    React.createElement("span", { style: { marginLeft: "auto", color: "var(--txt3)", fontSize: 10 } }, e.a));
+            }))));
 }
 /* v10.236 : COMPARATEUR DE SAUVEGARDES, en lecture seule. Demande du 22/09/2026 : « voir les plannings enregistrés sans les
    appliquer, pour vérifier que des modifications ne se font pas toutes seules ». L'aperçu ne donnait que des TOTAUX.
@@ -10248,7 +10557,7 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                             ? React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "pos\u00E9 par la garde de la veille \u2014 retirez la garde pour l'enlever")
                             : !posable(c.acteId) ? React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "pos\u00E9 par le service")
                                 : React.createElement("button", { onClick: () => retire(c), style: { width: 18, height: 18, borderRadius: 9, border: "1px solid #fecdd3", background: "#fff1f2", color: "#dc2626", fontSize: 10, fontWeight: 800, cursor: "pointer", lineHeight: 1, padding: 0 } }, "\u00D7"),
-                        nkC && (c.salle || noteV) && (canNote || noteV) && React.createElement("input", { value: noteV, readOnly: !canNote, onChange: canNote ? (e => { const v = e.target.value; setNotes(n => (Object.assign(Object.assign({}, n), { [nkC]: v }))); }) : undefined, placeholder: "\uD83D\uDCDD Note (visible au survol de la case)\u2026", style: { flexBasis: "100%", padding: "4px 7px", borderRadius: 6, border: "1px solid var(--border)", background: canNote ? "var(--inp)" : "var(--bg)", color: "var(--txt)", fontSize: 11, outline: "none", fontFamily: "'Sora',sans-serif" } }));
+                        nkC && (c.salle || noteV) && (canNote || noteV) && React.createElement(NoteChamp, { value: noteV, readOnly: !canNote, onCommit: v => setNotes(n => (Object.assign(Object.assign({}, n), { [nkC]: v }))), placeholder: "\uD83D\uDCDD Note (visible au survol de la case)\u2026", style: { flexBasis: "100%", padding: "4px 7px", borderRadius: 6, border: "1px solid var(--border)", background: canNote ? "var(--inp)" : "var(--bg)", color: "var(--txt)", fontSize: 11, outline: "none", fontFamily: "'Sora',sans-serif" } }));
                 })),
             pend && React.createElement(ValidPose, { med: med, acte: acteById(pend.id) || null, salle: pend.salle, note: pend.note, canNote: canNote, setNote: v => setPend(p => (Object.assign(Object.assign({}, p), { note: v }))), onRetour: retourPend, onValider: validePend, onClose: onClose }),
             semQ && React.createElement("div", { style: { border: "1.5px solid #388bfd", background: "rgba(56,139,253,.07)", borderRadius: 9, padding: "10px 12px", marginBottom: 10 } },
@@ -11690,6 +11999,7 @@ function CardioPlanning() {
     const [gel, setGel] = useState(null); /* v10.229 : {by,at} tant que le planning est gelé par un éditeur */
     const gelOn = !!(gel && gel.at) && !BAC;
     useEffect(() => { VER_STALE.toast = (m, t) => toast(m, t); PER_LIM.toast = (m, t) => toast(m, t); TOAST_HUB.f = (m, t, a) => toast(m, t, a); }); /* sans dépendance : toast naît plus bas dans le composant */
+    useEffect(() => { horlCalibrer(); }, []); /* v10.246 : l'heure du serveur, dès l'ouverture (en-tête Date de la page) */
     useEffect(() => {
         const on = () => setNetOff(false), off = () => setNetOff(true);
         window.addEventListener("online", on);
@@ -12043,6 +12353,9 @@ function CardioPlanning() {
     }
     catch (e) { } }, [expSeuil]);
     const [salleReg, setSalleReg] = useState([]); // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
+    /* v10.246 : prise pour le banc protection.js — inerte hors banc (window.__cpBanc n'existe jamais dans l'application) */
+    useEffect(() => { if (typeof window !== "undefined" && window.__cpBanc)
+        window.__cpBanc.etat = { setTourMed, setNotes, setSalleReg, tourMed, notes, salleReg }; });
     const [salleEdit, setSalleEdit] = useState(null); // salle en cours d'édition (activités associées)
     const [archPlan, setArchPlan] = useState({}); // cases archivées chargées pour consultation (lecture)
     /* v10.105 : annexes archivées relues pour la consultation (tour, dérogations, notes) */
@@ -12119,6 +12432,19 @@ function CardioPlanning() {
     const planSynced = useRef(null);
     const planPending = useRef({});
     const planMigrated = useRef(false);
+    /* v10.246 : tour, notes, salles découpés (tourMedV2, notesV2, salleRegV2) — dernière valeur connue par entrée, envois
+       non confirmés, migrations déjà envoyées. dernierSnap / recevoirRef : relire le dernier message du serveur quand une
+       écriture est REFUSÉE (tampon trop ancien) — l'écran reprend alors l'état du serveur. */
+    const mapSynced = useRef({});
+    const mapPending = useRef({});
+    const mapMigr = useRef({});
+    const dernierSnap = useRef(null);
+    const recevoirRef = useRef(null);
+    const reprendServeur = useCallback(() => { setTimeout(() => { try {
+        if (dernierSnap.current && recevoirRef.current)
+            recevoirRef.current(dernierSnap.current);
+    }
+    catch (e) { } }, 0); }, []);
     /* v9.72 : le planning type était enregistré d'un SEUL bloc — une écriture partant d'une
        base périmée réécrivait tout et effaçait ce qui avait été ajouté depuis. Il suit
        désormais le même découpage que le plan (v9.7) : un champ par médecin, écrit
@@ -12252,6 +12578,12 @@ function CardioPlanning() {
                     await updatePaths(PLANNING_DOC, lot.slice(i, i + 400));
                 }
                 catch (e) {
+                    if (estRefus(e)) { /* v10.246 : refus de la règle (tampon trop ancien) — JAMAIS de nouvel essai, on reprend le serveur */
+                        lot.slice(i).forEach(p => { delete planPending.current[p[0][1] + PP_SEP + p[0][2]]; });
+                        refusSignal("cases du planning");
+                        reprendServeur();
+                        return;
+                    }
                     console.error("sync plan (essai " + (essai + 1) + ", " + (lot.length - i) + " champs):", e);
                     setFbStatus("error");
                     /* document absent (base neuve) : on le crée sans rien écraser, puis on réessaie */
@@ -12351,9 +12683,16 @@ function CardioPlanning() {
                     await updatePaths(PLANNING_DOC, pairs.slice(i, i + 400));
             }
             catch (e) {
-                console.error("sync " + field + ":", e);
+                if (estRefus(e)) {
+                    pairs.forEach(p => { if (p[0].length === 2)
+                        delete pend[p[0][1]]; });
+                    refusSignal(field);
+                    reprendServeur();
+                }
+                else
+                    console.error("sync " + field + ":", e);
                 setFbStatus("error");
-            } /* v10.231 : console.error → visible dans le journal 🐞 */
+            } /* v10.231 : console.error → visible dans le journal 🐞 ; v10.246 : refus */
         })();
     }, []);
     /* Réception d'une liste découpée : on ré-applique nos modifications non confirmées. */
@@ -12379,6 +12718,162 @@ function CardioPlanning() {
         listSynced.current[field + "Order"] = ord;
         return ord.map(k => merged[k]).filter(Boolean);
     }, []);
+    /* v10.246 : ÉCRITURE ENTRÉE PAR ENTRÉE du tour (semaine), des notes (case) et des salles (salle + ordre). Seules les
+       entrées qui ont changé partent : une copie en retard ne peut plus réécrire ce qu'elle n'a pas touché. jrn(prev,cur,clés)
+       inscrit le journal (tour, notes) — seulement pour un changement LOCAL : la réception pose mapSynced AVANT l'état. */
+    const flushMap = useCallback((field, cur, order, jrn) => {
+        if (!PLANNING_DOC || !updatePaths)
+            return;
+        if (!serverSeen.current)
+            return; // jamais sur une base venant du seul cache
+        if (GEL.on)
+            return;
+        cur = cur || {};
+        const prev = mapSynced.current[field] || {};
+        const pend = mapPending.current[field] || (mapPending.current[field] = {});
+        const pairs = [], ch = [], oK = field + "Order";
+        Object.keys(cur).forEach(k => { if (cur[k] === undefined || !cleOk(k))
+            return; if (jsonTri(cur[k]) !== jsonTri(prev[k])) {
+            pairs.push([[field, k], cur[k]]);
+            pend[k] = cur[k];
+            ch.push(k);
+        } });
+        Object.keys(prev).forEach(k => { if (cur[k] === undefined && cleOk(k)) {
+            pairs.push([[field, k], "__DELETE__"]);
+            pend[k] = null;
+            ch.push(k);
+        } });
+        if (order) {
+            const o = order.filter(cleOk);
+            if (jsonTri(o) !== jsonTri(mapSynced.current[oK] || null)) {
+                pairs.push([[oK], o]);
+                mapPending.current[oK] = { v: o };
+            }
+            mapSynced.current[oK] = o;
+        }
+        mapSynced.current[field] = cur;
+        if (!pairs.length)
+            return;
+        if (jrn && ch.length && Date.now() >= JRN_MUET.fin) {
+            try {
+                jrn(prev, cur, ch);
+            }
+            catch (e) { }
+        }
+        localChange.current = true;
+        (async () => {
+            for (let i = 0; i < pairs.length; i += 400) {
+                const lot = pairs.slice(i, i + 400);
+                try {
+                    await updatePaths(PLANNING_DOC, lot);
+                }
+                catch (e) {
+                    if (estRefus(e)) {
+                        lot.forEach(q => { if (q[0].length === 2)
+                            delete pend[q[0][1]];
+                        else
+                            delete mapPending.current[oK]; });
+                        refusSignal(field);
+                        reprendServeur();
+                    }
+                    else
+                        console.error("sync " + field + ":", e);
+                    setFbStatus("error");
+                }
+            }
+        })();
+    }, []);
+    /* réception : nos entrées non confirmées sont ré-appliquées, le reste vient du serveur */
+    const readMap = useCallback((field, inc, incOrder) => {
+        const merged = Object.assign({}, inc || {});
+        const pend = mapPending.current[field] || {};
+        Object.keys(pend).forEach(k => {
+            const pv = pend[k];
+            const ok = pv === null ? !(k in merged) : jsonTri(merged[k]) === jsonTri(pv);
+            if (ok)
+                delete pend[k];
+            else {
+                if (pv === null)
+                    delete merged[k];
+                else
+                    merged[k] = pv;
+            }
+        });
+        mapSynced.current[field] = merged;
+        const oK = field + "Order";
+        let ord = Array.isArray(incOrder) ? incOrder.slice() : null;
+        const po = mapPending.current[oK];
+        if (po) {
+            if (jsonTri(ord) === jsonTri(po.v))
+                delete mapPending.current[oK];
+            else
+                ord = po.v.slice();
+        }
+        return { map: merged, ord };
+    }, []);
+    /* migration douce : l'ancien bloc est recopié UNE fois dans le champ découpé ; l'ancien champ reste en place (filet) */
+    const migrerMap = useCallback((field, obj, order) => {
+        if (!serverSeen.current || !setDoc || !PLANNING_DOC || GEL.on || VER_STALE.on)
+            return;
+        const m = {};
+        Object.keys(obj || {}).forEach(k => { if (cleOk(k) && obj[k] !== undefined)
+            m[k] = obj[k]; });
+        const sig = jsonTri(m) + "|" + jsonTri(order || null);
+        if (mapMigr.current[field] === sig)
+            return;
+        mapMigr.current[field] = sig;
+        const o = { [field]: m };
+        if (order)
+            o[field + "Order"] = order.filter(cleOk);
+        Promise.resolve(setDoc(PLANNING_DOC, o, { merge: true })).catch(e => console.log("migration " + field + ":", e));
+    }, []);
+    /* v10.246 : JOURNAL — une ligne par médecin ajouté ou retiré d'une semaine de tour, une ligne par note posée,
+       modifiée ou effacée. « pour » = appareil et version ; l'auteur est ajouté par logLots. */
+    const jrnTour = useCallback((prev, cur, ch) => {
+        const L = [], pour = APPAREIL.lib + " · " + verCourt();
+        ch.forEach(wk => {
+            const p = wk.split("-").map(Number);
+            if (p.length < 3 || p.some(isNaN))
+                return;
+            const pid = BAC ? "bac" : histPid(dKey(p[0], p[1], p[2]));
+            if (!pid)
+                return;
+            const a = (prev || {})[wk] || {}, b = (cur || {})[wk] || {}, us = {};
+            Object.keys(a).forEach(u => { us[u] = 1; });
+            Object.keys(b).forEach(u => { us[u] = 1; });
+            Object.keys(us).forEach(u => {
+                const va = a[u], vb = b[u], k = "#T|" + wk + "|" + u;
+                if (Array.isArray(va) || Array.isArray(vb)) {
+                    const la = (Array.isArray(va) ? va : []).map(String), lb = (Array.isArray(vb) ? vb : []).map(String);
+                    lb.forEach(m => { if (la.indexOf(m) < 0)
+                        L.push({ x: "add", md: m, k, act: u, pour, pids: [pid] }); });
+                    la.forEach(m => { if (lb.indexOf(m) < 0)
+                        L.push({ x: "del", md: m, k, act: u, pour, pids: [pid] }); });
+                }
+                else if (jsonTri(va) !== jsonTri(vb))
+                    L.push({ x: vb === undefined ? "del" : "add", md: "-", k, act: (u + " " + jsonTri(vb === undefined ? va : vb)).slice(0, 60), pour, pids: [pid] });
+            });
+        });
+        if (L.length)
+            logLots(L);
+    }, [logLots]);
+    const jrnNotes = useCallback((prev, cur, ch) => {
+        const L = [], pour = APPAREIL.lib + " · " + verCourt();
+        ch.forEach(k => {
+            const q = String(k).split("|");
+            if (q.length < 3)
+                return;
+            const pid = BAC ? "bac" : histPid(q[1]);
+            if (!pid)
+                return;
+            const ap = typeof (cur || {})[k] === "string" ? cur[k] : "", av = typeof (prev || {})[k] === "string" ? prev[k] : "";
+            if (ap === av)
+                return;
+            L.push({ x: ap ? "add" : "del", md: q[0], k: "#N|" + k, act: (ap || av).replace(/[\t\r\n]+/g, " ").slice(0, 120), pour, pids: [pid] });
+        });
+        if (L.length)
+            logLots(L);
+    }, [logLots]);
     const flushPT = useCallback((cur) => {
         if (!PLANNING_DOC || !updatePaths)
             return;
@@ -12407,7 +12902,13 @@ function CardioPlanning() {
                     await updatePaths(PLANNING_DOC, pairs.slice(i, i + 400));
             }
             catch (e) {
-                console.log("sync PT:", e);
+                if (estRefus(e)) {
+                    pairs.forEach(p => { delete ptPending.current[p[0][1]]; });
+                    refusSignal("planning type");
+                    reprendServeur();
+                }
+                else
+                    console.log("sync PT:", e);
                 setFbStatus("error");
             }
         })();
@@ -12418,13 +12919,14 @@ function CardioPlanning() {
             return;
         }
         setFbStatus("connecting");
-        const unsub = onSnapshot(PLANNING_DOC, (snap) => {
+        const recevoir = (snap) => {
             fromServer.current = true; /* v10.28 : tout ce qui suit vient du serveur */
             if (snap.metadata && snap.metadata.fromCache === false)
                 serverSeen.current = true;
             if (snap.exists) {
                 const data0 = snap.data();
                 const data = data0;
+                horlEcho(data0._ecr, !!(snap.metadata && snap.metadata.fromCache === false)); /* v10.246 : l'heure du serveur, par l'écho de notre dernière écriture */
                 /* v10.135 : garde-fou de version — lu sur chaque message. Un numéro plus grand que le
                    mien : je suis périmé. Plus petit ou absent (et message venu du serveur, pas du cache) :
                    j'inscris le mien — la copie la plus récente fait foi. */
@@ -12438,7 +12940,7 @@ function CardioPlanning() {
                         }
                     }
                     else if (sv < mv && srv && window.firebaseSetDoc)
-                        Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, { appVer: APP_VERSION }, { merge: true })).catch(e => console.log("appVer:", e));
+                        Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, avecTampon({ appVer: APP_VERSION }), { merge: true })).catch(e => console.log("appVer:", e));
                 }
                 /* v10.229 : gel du planning — lu sur chaque message, avant tout le reste */
                 {
@@ -12553,14 +13055,32 @@ function CardioPlanning() {
                         Object.keys(resend).forEach(k => { delete fieldSync.current[k]; });
                         setTimeout(() => saveToFirebase(resend), 400);
                     }
-                    if (data.tourMed) {
-                        tourPrevRef.current = JSON.stringify(JSON.parse(data.tourMed));
-                        setTourMed(JSON.parse(data.tourMed));
+                    /* v10.246 : tour et notes découpés — le champ V2 fait foi dès qu'il existe ; sinon l'ancien bloc est lu et migré */
+                    if (data.tourMedV2 && typeof data.tourMedV2 === "object") {
+                        delete mapMigr.current.tourMedV2;
+                        const r = readMap("tourMedV2", data.tourMedV2);
+                        tourPrevRef.current = JSON.stringify(r.map);
+                        setTourMed(r.map);
+                    }
+                    else if (data.tourMed) {
+                        const leg = lireJson(data.tourMed, {});
+                        mapSynced.current.tourMedV2 = leg;
+                        tourPrevRef.current = JSON.stringify(leg);
+                        setTourMed(leg);
+                        migrerMap("tourMedV2", leg);
                     }
                     else if (tourPrevRef.current === undefined)
                         tourPrevRef.current = "{}"; /* v10.209 : dernière valeur connue, pour le journal du tour */
-                    if (data.notes)
-                        setNotes(JSON.parse(data.notes));
+                    if (data.notesV2 && typeof data.notesV2 === "object") {
+                        delete mapMigr.current.notesV2;
+                        setNotes(readMap("notesV2", data.notesV2).map);
+                    }
+                    else if (data.notes) {
+                        const leg = lireJson(data.notes, {});
+                        mapSynced.current.notesV2 = leg;
+                        setNotes(leg);
+                        migrerMap("notesV2", leg);
+                    }
                     if (videColOk(data.salleVideCol))
                         setSalleVideCol(data.salleVideCol); /* v10.232 */
                     setBacDe(BAC && data._bacDe && data._bacDe.ts ? data._bacDe : null); /* v10.237 */
@@ -12734,8 +13254,22 @@ function CardioPlanning() {
                         setAstReport(data.astReport);
                     /* v9.89 : le champ ABSENT signifie « jamais configuré » (on déduit alors les
                        salles des activités) ; un champ PRÉSENT, même vide, est un choix délibéré. */
-                    if (data.salleReg !== undefined && data.salleReg !== null && data.salleReg !== "") {
-                        setSalleReg(JSON.parse(data.salleReg) || []);
+                    if (data.salleRegV2 && typeof data.salleRegV2 === "object") {
+                        delete mapMigr.current.salleRegV2; /* v10.246 : une entrée par salle + l'ordre */
+                        const r = readMap("salleRegV2", data.salleRegV2, data.salleRegV2Order);
+                        const l = regListe(r.map, r.ord);
+                        mapSynced.current.salleRegV2Order = l.map(x => x.n);
+                        setSalleReg(l);
+                    }
+                    else if (data.salleReg !== undefined && data.salleReg !== null && data.salleReg !== "") {
+                        const l = lireJson(data.salleReg, []) || [];
+                        const mp = {};
+                        l.forEach(x => { if (x && x.n)
+                            mp[x.n] = x; });
+                        mapSynced.current.salleRegV2 = mp;
+                        mapSynced.current.salleRegV2Order = l.filter(x => x && x.n).map(x => x.n);
+                        setSalleReg(l);
+                        migrerMap("salleRegV2", mp, l.filter(x => x && x.n).map(x => x.n));
                     }
                     else {
                         const acts = data.actes ? JSON.parse(data.actes) : [];
@@ -12756,7 +13290,9 @@ function CardioPlanning() {
                 isFirstLoad.current = !serverSeen.current;
             }
             setFbStatus("ok");
-        }, (err) => { console.error("Firebase:", err); setFbStatus("error"); });
+        };
+        recevoirRef.current = recevoir;
+        const unsub = onSnapshot(PLANNING_DOC, (snap) => { dernierSnap.current = snap; recevoir(snap); }, (err) => { console.error("Firebase:", err); setFbStatus("error"); });
         return () => unsub();
     }, []);
     /* ── Sauvegardes automatiques : une par jour, 45 conservées (v10.0) ──
@@ -12790,7 +13326,7 @@ function CardioPlanning() {
             const ts = Date.now();
             const payload = Object.assign(Object.assign({}, cur), { _ts: ts });
             await window.firebaseDB.collection("backups").doc("b" + ts).set(payload);
-            await window.firebaseDB.collection("planning").doc(PLAN_ID).set({ _lastBackupAt: ts }, { merge: true });
+            await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon({ _lastBackupAt: ts }), { merge: true });
             // Purge au-delà de 10
             const items = await refreshBackupList();
             for (const it of items.slice(BK_KEEP)) {
@@ -12859,7 +13395,7 @@ function CardioPlanning() {
                il annonçait donc une sauvegarde vide et toutes les cases actuelles « perdues ».
                Lecture du format actuel, avec repli sur l'ancien pour de très vieilles sauvegardes. */
             const bPlan = d.planV2 ? d.planV2 : (d.plan ? JSON.parse(d.plan) : {});
-            const bTour = d.tourMed ? JSON.parse(d.tourMed) : {};
+            const bTour = docTourMed(d); /* v10.246 : format découpé, repli sur l'ancien bloc */
             const bMeds = d.medecinsV2 ? Object.keys(d.medecinsV2).map(k2 => { const v2 = d.medecinsV2[k2]; return typeof v2 === "string" ? JSON.parse(v2) : v2; }) : (d.medecins ? JSON.parse(d.medecins) : []);
             const sB = statsOf(bPlan, bTour, bMeds);
             const sC = statsOf(plan, tourMed, medecins);
@@ -13066,6 +13602,9 @@ function CardioPlanning() {
                 return;
             }
             const { _ts, gel: _gelAncien } = data, rest = __rest(data, ["_ts", "gel"]); /* v10.229 : un gel enregistré DANS la sauvegarde ne revient jamais ; le gel EN COURS, lui, survit à la restauration */
+            delete rest._ecr;
+            mapPending.current = {};
+            mapMigr.current = {}; /* v10.246 : aucune de nos entrées en attente ne doit repasser par-dessus la sauvegarde */
             if (BAC) {
                 delete rest._bacDe;
                 delete rest._bacDep;
@@ -13076,7 +13615,7 @@ function CardioPlanning() {
                     await window.firebaseDB.collection("planning").doc(HIST_PFX + "bac").set({ e: {} });
                 }
                 catch (e) { } /* v10.238 : l'historique repart de l'heure de la sauvegarde */
-                await window.firebaseDB.collection("planning").doc(PLAN_ID).set(rest);
+                await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
                 toast("📥 Sauvegarde du " + new Date(_ts || 0).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) + " chargée dans le bac — le vrai planning n'a pas bougé", "info");
                 return;
             }
@@ -13084,7 +13623,7 @@ function CardioPlanning() {
                 rest.gel = GEL.raw;
             planPending.current = {};
             planSynced.current = null;
-            await window.firebaseDB.collection("planning").doc(PLAN_ID).set(rest); // remplacement complet : une restauration EST l'état intégral
+            await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest)); // remplacement complet : une restauration EST l'état intégral
             toast(GEL.on ? "Sauvegarde restaurée — le planning reste gelé : vérifiez-le, puis dégelez" : "Sauvegarde restaurée — rechargez la page si besoin", "info");
         }
         catch (e) {
@@ -13104,7 +13643,7 @@ function CardioPlanning() {
             return;
         }
         const v = on ? JSON.stringify({ by: authorRef.current || "?", at: Date.now() }) : "";
-        Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, { gel: v }, { merge: true }))
+        Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, avecTampon({ gel: v }), { merge: true }))
             .then(() => { toast(on ? "🧊 Planning gelé — plus personne ne peut le modifier" : "✅ Planning dégelé — chacun retrouve ses droits", on ? "warn" : "info"); })
             .catch(e => { console.log("gel:", e); toast("Échec — le gel n'a pas changé", "warn"); });
     }, []);
@@ -13454,6 +13993,13 @@ function CardioPlanning() {
             await setDoc(PLANNING_DOC, out, { merge: true });
         }
         catch (err) {
+            if (estRefus(err)) {
+                ks.forEach(k => { delete pendF.current[k]; });
+                refusSignal(ks.join(", "));
+                reprendServeur();
+                setFbStatus("error");
+                return;
+            } /* v10.246 : pas de renvoi — il passerait avec un tampon neuf */
             console.error("Save:", err);
             setFbStatus("error");
             ks.forEach(k => { delete fieldSync.current[k]; });
@@ -13505,8 +14051,8 @@ function CardioPlanning() {
             }
             catch (e) { }
         }
-        saveToFirebase({ tourMed: s });
-    }, [tourMed]);
+        flushMap("tourMedV2", tourMed, null, jrnTour);
+    }, [tourMed]); /* v10.246 : semaine par semaine, et journal */
     useEffect(() => { if (!isFirstLoad.current)
         saveToFirebase({ tourMins: JSON.stringify(tourMins) }); }, [tourMins]);
     useEffect(() => { if (!isFirstLoad.current)
@@ -13557,8 +14103,16 @@ function CardioPlanning() {
         saveToFirebase({ tourReport: tourReport || "" }); }, [tourReport]);
     useEffect(() => { if (!isFirstLoad.current)
         saveToFirebase({ astReport: astReport || "" }); }, [astReport]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ salleReg: JSON.stringify(salleReg) }); }, [salleReg]);
+    useEffect(() => {
+        if (isFirstLoad.current)
+            return; /* v10.246 : salle par salle, plus l'ordre */
+        const mp = {}, ord = [];
+        (salleReg || []).forEach(x => { if (x && x.n && !(x.n in mp)) {
+            mp[x.n] = x;
+            ord.push(x.n);
+        } });
+        flushMap("salleRegV2", mp, ord);
+    }, [salleReg]);
     useEffect(() => { if (!isFirstLoad.current)
         saveToFirebase({ salleFerm: JSON.stringify(salleFerm) }); }, [salleFerm]); /* v10.229 */
     useEffect(() => { if (!isFirstLoad.current)
@@ -13602,7 +14156,7 @@ function CardioPlanning() {
     useEffect(() => { if (!isFirstLoad.current)
         flushPT(planningType); }, [planningType]);
     useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ notes: JSON.stringify(notes) }); }, [notes]);
+        flushMap("notesV2", notes, null, jrnNotes); }, [notes]); /* v10.246 : case par case, et journal */
     /* v10.174 : le 🐞 des onglets (SigBtn) demande l'ouverture de la modale de signalement */
     useEffect(() => { const f = () => setModal("signal"); window.addEventListener("cp-signal", f); return () => window.removeEventListener("cp-signal", f); }, []);
     useEffect(() => { if (!isFirstLoad.current)
@@ -14320,7 +14874,8 @@ function CardioPlanning() {
                     return;
                 } /* v10.239 */
                 const ds3 = dKey(y2, m2, d2); /* v10.244 : + les lignes groupées dont la plage couvre ce jour */
-                const list = Object.values(es).filter(e => e && ((e.k === key3 && String(e.md) === String(medId2)) || histCouvre(e, ds3, medId2))).sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 30);
+                const kN3 = "#N|" + nk(medId2, y2, m2, d2, sl2); /* v10.246 : + le journal de la note de cette case */
+                const list = Object.values(es).filter(e => e && ((e.k === key3 && String(e.md) === String(medId2)) || e.k === kN3 || histCouvre(e, ds3, medId2))).sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 30);
                 setHistModal(h => h ? Object.assign(Object.assign({}, h), { loading: false, list }) : h);
             }
             catch (e) {
@@ -16015,8 +16570,8 @@ function CardioPlanning() {
                     const rest = Object.keys(vals).filter(id => ids.indexOf(id) < 0);
                     return ids.concat(rest).map(id => vals[id]);
                 };
-                src = { plan: dd.planV2 || {}, notes: pj(dd.notes, {}), tourMed: pj(dd.tourMed, {}), tourDerog: pj(dd.tourDerog, {}),
-                    medecins: rdV2(dd.medecinsV2, dd.medecinsV2Order, dd.medecins), actes: rdV2(dd.actesV2, dd.actesV2Order, dd.actes), salleReg: pj(dd.salleReg, []),
+                src = { plan: dd.planV2 || {}, notes: docNotes(dd), tourMed: docTourMed(dd), tourDerog: pj(dd.tourDerog, {}),
+                    medecins: rdV2(dd.medecinsV2, dd.medecinsV2Order, dd.medecins), actes: rdV2(dd.actesV2, dd.actesV2Order, dd.actes), salleReg: docSalleReg(dd),
                     planningType: (dd.planningTypeV2 !== undefined ? pj(dd.planningTypeV2, {}) : pj(dd.planningType, {})) };
             }
             src.exportDate = new Date().toISOString();
@@ -16055,8 +16610,8 @@ function CardioPlanning() {
             await window.firebaseDB.collection("planning").doc(HIST_PFX + "bac").set({ e: {} });
         }
         catch (e) { } /* v10.238 : les essais précédents s'effacent */
-        await window.firebaseDB.collection("planning").doc("bac").set(Object.assign(Object.assign({}, d), { _bacDep: Date.now() }));
-    }; /* v10.238 : l'heure de la copie borne le vrai historique */
+        await window.firebaseDB.collection("planning").doc("bac").set(avecTampon(Object.assign(Object.assign({}, d), { _bacDep: Date.now() })));
+    }; /* v10.246 : tampon neuf (celui de la copie est ancien) */ /* v10.238 : l'heure de la copie borne le vrai historique */
     const bacEntrer = async () => {
         if (!window.confirm("Entrer dans le bac à sable ?\n\nLe planning réel est recopié dans un espace de test à part, puis l'application se recharge. Rien de ce que vous y ferez ne touchera au vrai planning."))
             return;
@@ -16365,7 +16920,7 @@ function CardioPlanning() {
             return;
         if (!window.firebaseSetDoc)
             return;
-        Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, { appVer: APP_VERSION }, { merge: true })).then(() => { VER_STALE.on = false; setStale(false); toast("Version rétablie : " + APP_VERSION, "info"); }).catch(() => toast("Échec du rétablissement", "warn"));
+        Promise.resolve(window.firebaseSetDoc(PLANNING_DOC, avecTampon({ appVer: APP_VERSION }), { merge: true })).then(() => { VER_STALE.on = false; setStale(false); toast("Version rétablie : " + APP_VERSION, "info"); }).catch(() => toast("Échec du rétablissement", "warn"));
     };
     const tourProps = { isVac, medecins: medsAff, specColors, tourMins, tourMinsHard, tourAvoid, tourWish, applyTPForWeek, cleanTPForWeek, clearWeekActivities, reapplyPTWeek, purgeTourExtras, plan, tourDerog, tourPtOte, setTourPtOte, lastReport: tourReport, setLastReport: setTourReport, tourCfg, setTourCfg, year: tourYear, month: tourMonth, setYear: setTourYear, setMonth: setTourMonth, tourMed, setTourMed, tourHist, tourHistDeb, intCfg, getEntries, isEdit: isEdit || (isInterEdit && !isAttEdit), edReel: isEdit, build, secrDif: secrCfg.dif || {}, darkMode, setDarkMode, planningType, setPlan, allDays, toast, vRef, vToast, actes, setBuild, onPrevenir: annPrevenir, pushMeds, onDaySwap: (medId, y2, m2, d2) => { setMData({ medId, y: y2, m: m2, d: d2, fromTour: true }); setModal("daySwap"); } }; /* v10.193 : depuis la puce TP de la tuile Tour */
     const gardeProps = { onCellHistory: isAnyEdit ? openCellHistory : null, isVac, onRemoveGarde: removeGardeDay, printWk, onPrint: () => setModal("print"), year, month, prevM, nextM, medecins: medsAff, getEntry, allDays, isEdit, applyGarde, isMedAvailable, plan, setPlan, darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, tourMed, gardeAvoid, gardeWish, toast };
@@ -17615,6 +18170,10 @@ header::-webkit-scrollbar { display: none; }
                             React.createElement("button", { onClick: bacEntrer, style: { width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #c2410c", background: "rgba(194,65,12,.10)", color: "#c2410c", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\uD83E\uDDEA Entrer dans le bac \u00E0 sable"))),
                 React.createElement(TraficTuile, { docSize: docSize, netOff: netOff, onPing: () => { if (PLANNING_DOC && setDoc)
                         Promise.resolve(setDoc(PLANNING_DOC, { _ping: Date.now() }, { merge: true })).catch(() => { }); } }),
+                React.createElement(ProtectionTuile, { netOff: netOff, bloque: BAC || gelOn || stale }),
+                "   ",
+                React.createElement(JournalTuile, { medecins: medecins, per0: perStart(year, month) }),
+                "   ",
                 React.createElement("div", { style: Object.assign(Object.assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDCBE Sauvegarde & archivage"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 12 } }, "Tout ce qui prot\u00E8ge vos donn\u00E9es, regroup\u00E9 ici : leur poids, la sauvegarde quotidienne, la copie sur votre ordinateur et l'archivage des anciens mois."),
@@ -17646,7 +18205,7 @@ header::-webkit-scrollbar { display: none; }
                                 React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 4 } })),
                             docDet && (() => {
                                 const EQ = "Équipe & internes", AC = "Activités & salles", TO = "Tour médical", SO = "Souhaits ⭐🚫", AS = "Astreinte", RE = "Reports";
-                                const FAMN = { planV2: "Cases du planning", plan: "Cases (ancien format)", planningTypeV2: "Planning type", planningType: "Planning type", medecinsV2: EQ, medecinsV2Order: EQ, medecins: EQ, intCfg: EQ, medPins: EQ, actesV2: AC, actesV2Order: AC, actes: AC, salleReg: AC, salleFerm: AC, tourMed: TO, tourDerog: TO, tourPtOte: TO, tourHist: TO, tourHistDeb: TO, tourMins: TO, tourMinsHard: TO, tourCfg: TO, tourReport: TO, tourWish: SO, tourAvoid: SO, gardeWish: SO, gardeAvoid: SO, astreinte: AS, astReport: AS, notes: "Notes", build: "Construire", csRep: RE, csBlanches: RE, csActsSel: RE, csActsGlobal: RE, journal: "Journal" };
+                                const FAMN = { planV2: "Cases du planning", plan: "Cases (ancien format)", planningTypeV2: "Planning type", planningType: "Planning type", medecinsV2: EQ, medecinsV2Order: EQ, medecins: EQ, intCfg: EQ, medPins: EQ, actesV2: AC, actesV2Order: AC, actes: AC, salleReg: AC, salleRegV2: AC, salleRegV2Order: AC, salleFerm: AC, tourMed: TO, tourMedV2: TO, notesV2: "Notes", _ecr: "Réglages divers", tourDerog: TO, tourPtOte: TO, tourHist: TO, tourHistDeb: TO, tourMins: TO, tourMinsHard: TO, tourCfg: TO, tourReport: TO, tourWish: SO, tourAvoid: SO, gardeWish: SO, gardeAvoid: SO, astreinte: AS, astReport: AS, notes: "Notes", build: "Construire", csRep: RE, csBlanches: RE, csActsSel: RE, csActsGlobal: RE, journal: "Journal" };
                                 const g = {};
                                 Object.keys(docDet).forEach(k => { const f = FAMN[k] || "Réglages divers"; g[f] = (g[f] || 0) + docDet[k]; });
                                 const rows = Object.keys(g).map(f => ({ f, b: g[f] })).sort((a, b) => b.b - a.b);
@@ -17736,6 +18295,7 @@ header::-webkit-scrollbar { display: none; }
                             React.createElement("div", { style: { display: "flex", gap: 8 } },
                                 React.createElement("button", { style: Object.assign(Object.assign({}, S.btnP), { background: "#dc2626" }), onClick: () => {
                                         const data = impWait.data;
+                                        jrnMuet(); /* v10.246 : un import de fichier remplace tout — pas une ligne de journal par note */
                                         if (data.plan)
                                             setPlan(data.plan);
                                         if (data.tourMed)
@@ -17863,6 +18423,7 @@ header::-webkit-scrollbar { display: none; }
                                     g3[k] = n3[k]; });
                                 return g3;
                             });
+                            jrnMuet(); /* v10.246 : l'archivage déplace, il ne modifie pas — rien au journal du tour et des notes */
                             setTourMed(o => arPurge(o, arPerTechSem, okP));
                             setTourDerog(o => arPurge(o, arPerClair, okP));
                             setTourPtOte(o => arPurge(o, arPerTechSem, okP)); /* v10.155 */
@@ -17966,6 +18527,7 @@ header::-webkit-scrollbar { display: none; }
                                                 if (d2.annex) {
                                                     try {
                                                         const an = JSON.parse(d2.annex) || {};
+                                                        jrnMuet(); /* v10.246 */
                                                         if (an.tourMed)
                                                             setTourMed(c => arFusion("tourMed", c, an.tourMed));
                                                         if (an.tourDerog)
@@ -18362,13 +18924,20 @@ header::-webkit-scrollbar { display: none; }
                             String(dt.getHours()).padStart(2, "0"),
                             ":",
                             String(dt.getMinutes()).padStart(2, "0")),
-                        React.createElement("span", { style: { fontWeight: 800, color: e.x === "add" ? "#16a34a" : "#dc2626" } }, e.x === "add" ? "+ Posé" : "− Retiré"),
-                        hG && (() => { const mg = medecins.find(x => String(x.id) === String(e.md)); return React.createElement("span", { "data-histmed": "1", style: { padding: "0 6px", borderRadius: 4, fontSize: 10, fontWeight: 800, background: mg ? mg.color : "#888", color: "#fff" } }, mg ? mg.init : "#" + e.md); })(),
-                        histGrp(e) ? React.createElement("span", { "data-histgrp": "1", style: { fontSize: 11, color: "var(--txt)", fontWeight: 700 } },
-                            "\uD83D\uDCC5 ",
-                            histGrpLib(e)) : React.createElement(React.Fragment, null,
-                            a3 && React.createElement("span", { style: { padding: "0 6px", borderRadius: 4, fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: a3.color, color: "#111" } }, a3.short),
-                            !a3 && e.act && React.createElement("span", { style: { fontSize: 10, color: "var(--txt2)" } }, e.act)),
+                        String(e.k).indexOf("#N|") === 0 ? React.createElement("span", { "data-histnote": "1", style: { fontSize: 11, color: "var(--txt)" } },
+                            React.createElement("b", { style: { color: e.x === "add" ? "#16a34a" : "#dc2626" } },
+                                "\uD83D\uDCDD ",
+                                e.x === "add" ? "Note" : "Note effacée"),
+                            " \u00AB ",
+                            e.act,
+                            " \u00BB") : React.createElement(React.Fragment, null,
+                            React.createElement("span", { style: { fontWeight: 800, color: e.x === "add" ? "#16a34a" : "#dc2626" } }, e.x === "add" ? "+ Posé" : "− Retiré"),
+                            hG && (() => { const mg = medecins.find(x => String(x.id) === String(e.md)); return React.createElement("span", { "data-histmed": "1", style: { padding: "0 6px", borderRadius: 4, fontSize: 10, fontWeight: 800, background: mg ? mg.color : "#888", color: "#fff" } }, mg ? mg.init : "#" + e.md); })(),
+                            histGrp(e) ? React.createElement("span", { "data-histgrp": "1", style: { fontSize: 11, color: "var(--txt)", fontWeight: 700 } },
+                                "\uD83D\uDCC5 ",
+                                histGrpLib(e)) : React.createElement(React.Fragment, null,
+                                a3 && React.createElement("span", { style: { padding: "0 6px", borderRadius: 4, fontSize: 9, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", background: a3.color, color: "#111" } }, a3.short),
+                                !a3 && e.act && React.createElement("span", { style: { fontSize: 10, color: "var(--txt2)" } }, e.act))),
                         React.createElement("span", { style: { marginLeft: "auto", color: "var(--txt2)", fontSize: 11 } }, e.a));
                 })));
         })(),
@@ -18944,7 +19513,7 @@ header::-webkit-scrollbar { display: none; }
                 })(),
                 !(mData && mData._pend) && React.createElement("div", { style: { marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 10 } },
                     React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 5 } }, "\uD83D\uDCDD Note"),
-                    React.createElement("textarea", { value: notesAff[nk(medId, y2, m2, d2, slot)] || "", onChange: e => setNotes(p => (Object.assign(Object.assign({}, p), { [nk(medId, y2, m2, d2, slot)]: e.target.value }))), placeholder: "Note visible au survol...", readOnly: (estClos(y2, m2, d2) && !isEdit) || !canEditThisMed || (isAdminEdit && !adminCanNotes && !entries.some(e2 => { const a2 = acteById(e2.acteId); return a2 && a2[roleOkKey] === true; })), style: { width: "100%", padding: "6px 8px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, fontFamily: "'Sora',sans-serif", resize: "vertical", minHeight: 48, outline: "none" } }))));
+                    React.createElement(NoteChamp, { multi: true, value: notesAff[nk(medId, y2, m2, d2, slot)] || "", onCommit: v => setNotes(p => (Object.assign(Object.assign({}, p), { [nk(medId, y2, m2, d2, slot)]: v }))), placeholder: "Note visible au survol...", readOnly: (estClos(y2, m2, d2) && !isEdit) || !canEditThisMed || (isAdminEdit && !adminCanNotes && !entries.some(e2 => { const a2 = acteById(e2.acteId); return a2 && a2[roleOkKey] === true; })), style: { width: "100%", padding: "6px 8px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, fontFamily: "'Sora',sans-serif", resize: "vertical", minHeight: 48, outline: "none" } }))));
         })(),
         modal === "editMedPin" && mData && (React.createElement(Ov, { onClose: () => setModal(null) },
             React.createElement("div", { style: S.mHd },
