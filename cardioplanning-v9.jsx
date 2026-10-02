@@ -37,6 +37,32 @@ var ZOOM=(function(){var z=ZOOM_DEF;try{var v=parseInt(localStorage.getItem("cp6
 function zoomApply(z){ZOOM.z=z;ZOOM.f=z/100;try{document.documentElement.style.zoom=String(ZOOM.f);}catch(e){}}
 zoomApply(ZOOM.z);
 function verNum(v){var m=String(v||"").match(/(\d+)\.(\d+)/);return m?parseInt(m[1],10)*1000+parseInt(m[2],10):0;}
+/* v10.248 : PHOTO DE PASSAGE DE VERSION. Demande du 01/10/2026 : « à chaque changement de version, regarder les données
+   avant et après et comparer, pour être sûr que rien ne soit perdu ». Au PREMIER message du serveur qui porte une version
+   plus ancienne que la mienne (le moment où cette version s'inscrit comme « en service », v10.135), le document reçu est
+   exactement l'état laissé par l'ancienne version : on le recopie tel quel dans « backups », marqué _verArr (cette version)
+   et _verPrec (l'ancienne), AVANT toute écriture de notre part. Une fois par page ; jamais dans le bac. Les 3 dernières
+   photos sont gardées, hors du compte des 45 sauvegardes quotidiennes (purge dans makeBackup). Paramètres → 🔎 Vérifier le
+   passage de version compare ensuite cette photo au planning actuel, case par case, avec le journal. */
+var VER_PHOTO={fait:false,err:""};
+var BK_VER=3;   /* photos de passage de version conservées */
+function photoVersion(data0,prec){
+  if(VER_PHOTO.fait||BAC||!data0||!data0.planV2||typeof window==="undefined"||!window.firebaseDB)return Promise.resolve(false);
+  VER_PHOTO.fait=true;
+  var ts=Date.now(),ver=String(APP_VERSION).split(" ")[0];
+  var pl=Object.assign({},data0,{_ts:ts,_verArr:ver,_verPrec:String(prec||"")});
+  return Promise.resolve(window.firebaseDB.collection("backups").doc("b"+ts).set(pl)).then(function(){return true;})
+    .catch(function(e){VER_PHOTO.err=String((e&&(e.message||e.code))||e).slice(0,200);console.log("photo de version:",e);return false;});
+}
+/* v10.248 : message clair quand une sauvegarde échoue — le 01/10/2026, 45 sauvegardes, aucune nouvelle depuis le 29/09 :
+   Firebase refusait la copie (« too many index entries », limite d'index d'un document) et l'écran disait seulement
+   « Échec de la sauvegarde ». Réparé côté Firebase (exception d'index sur backups › planV2) ; ce texte nomme la cause. */
+function bkRaison(e){var m=String((e&&(e.message||e.code))||e||"");
+  if(/index entries/i.test(m))return "Firebase refuse la copie : trop de cases indexées (console Firebase → Firestore → Index → Exceptions : backups › planV2, les trois index désactivés)";
+  if(/permission/i.test(m))return "droits insuffisants dans Firebase";
+  if(/too large|exceeds the maximum|maximum size/i.test(m))return "document trop lourd pour Firebase (1 Mo au plus)";
+  if(/unavailable|offline|network|deadline/i.test(m))return "pas de réseau";
+  return m?m.slice(0,140):"erreur inconnue";}
 function verMuet(){if(VER_STALE.toast)VER_STALE.toast("⛔ Version périmée — modification NON enregistrée. Mettez l'application à jour.","warn");return Promise.resolve();}
 /* v10.229 : GEL DU PLANNING. Un éditeur gèle (Paramètres) : le champ « gel » du document passe à {by,at}. Chaque
    copie qui le lit devient LECTURE SEULE — les profils perdent leurs droits comme hors ligne, vBloque refuse toute
@@ -73,6 +99,7 @@ function trafEcr(p){
   TRAFIC.ecr++;trafFil("e");
   if(p&&typeof p.then==="function"){const t=Date.now();TRAFIC.vol++;
     p.then(()=>{TRAFIC.vol--;TRAFIC.lat.push(Date.now()-t);if(TRAFIC.lat.length>20)TRAFIC.lat.shift();},()=>{TRAFIC.vol--;TRAFIC.ko++;});}
+  liaisonEcriture(p);   /* v10.251 : APRÈS le décompte de TRAFIC.vol, pour que l'accusé le voie à zéro */
   return p;
 }
 /* v10.242 : la ligne « Trafic » d'un signalement 🐞 (et du rapport de plantage) — les compteurs de la tuile 📡,
@@ -181,9 +208,86 @@ function inactAction(){if(!INACT.actif||FERME.on)return;if(inactVerifier())retur
 function inactTick(){if(!INACT.actif||FERME.on)return;if(inactVerifier())return;
   var r=INACT.min*60000-(INACT.now()-INACT.der);var sec=r<=30000&&!inactCachee()?Math.max(1,Math.ceil(r/1000)):null;
   if(sec!==INACT.reste){INACT.reste=sec;if(INACT.surReste)INACT.surReste(sec);}}
-const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){if(FERME.on)return fermeMuet();if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(estCahier(ref)){obj=avecTampon(obj);if(opts&&opts.mergeFields)opts={mergeFields:opts.mergeFields.concat(["_ecr"])};}return trafEcr(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
+const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function(ref,obj,opts){if(FERME.on)return fermeMuet();if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(LIAISON.on)return liaisonMuet();if(estCahier(ref)){obj=avecTampon(obj);if(opts&&opts.mergeFields)opts={mergeFields:opts.mergeFields.concat(["_ecr"])};}return trafEcr(arguments.length>2?window.firebaseSetDoc(ref,sansIndef(obj),opts):window.firebaseSetDoc(ref,sansIndef(obj)));} : null;
+/* v10.251 : COMPTES (Firebase Authentication), étape 1 — préparer sans rien verrouiller. Chaque code de l'équipe a, en
+   coulisse, un compte Google « e-mail + mot de passe » : l'adresse est une empreinte du code (toujours la même pour un
+   code donné, jamais une vraie boîte), le mot de passe est le code, complété d'un suffixe fixe quand il a moins des
+   6 caractères exigés par Google. Le compte porte une ÉTIQUETTE (nom d'affichage) qui dit qui il est : « med:12:editeur »,
+   « att:9 », « role:editeur », « role:secretaires », « role:cadres », « role:internes ». Tout passe par window.cpAuth
+   (index.html, en-tête) ; sans lui (bancs, environnement sans la bibliothèque), rien de tout ceci n'existe et l'application
+   se comporte comme avant. Les créations, sondages et suppressions d'un AUTRE compte que le sien passent par une seconde
+   liaison Firebase discrète (cp-comptes), pour ne jamais déloger la session en cours. Aucune règle Firestore ne s'appuie
+   dessus dans cette version : la vérification des codes reste celle d'avant, et un compte qui ne se crée pas ne bloque rien. */
+var CPTE={delai:6000,inactif:false,dernier:""};
+function cpteDispo(){try{return !!(typeof window!=="undefined"&&window.cpAuth&&window.cpAuth.dispo&&window.cpAuth.dispo());}catch(e){return false;}}
+function cpteHash(s){var h1=0x811c9dc5,h2=0x9747b28c;s=String(s);for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);h1^=c;h1=Math.imul(h1,0x01000193)>>>0;h2=Math.imul(h2^c,0x5bd1e995)>>>0;h2^=h2>>>13;}
+  for(var j=0;j<4;j++){h1=Math.imul(h1^(h2>>>7),0x01000193)>>>0;h2=Math.imul(h2^(h1>>>11),0x5bd1e995)>>>0;}
+  return ("00000000"+h1.toString(16)).slice(-8)+("00000000"+h2.toString(16)).slice(-8);}
+function cpteEmail(code){return "c-"+cpteHash("cardioplanning|"+String(code))+"@comptes.cardioplanning.app";}
+function cpteMdp(code){code=String(code);return code.length>=6?code:code+"-cp";}
+function cpteErr(e){return String((e&&(e.code||e.message))||e||"");}
+function cpteReseau(e){return /network-request-failed|auth\/timeout|unavailable|deadline/i.test(cpteErr(e));}
+function cpteInconnu(e){return /user-not-found|invalid-credential|invalid-login-credentials|wrong-password/i.test(cpteErr(e));}
+function cpteDelai(p,ms){return new Promise(function(res,rej){var t=setTimeout(function(){rej({code:"auth/timeout"});},ms||CPTE.delai);Promise.resolve(p).then(function(v){clearTimeout(t);res(v);},function(e){clearTimeout(t);rej(e);});});}
+function cpteLog(){try{jlog("COMPTES",Array.prototype.slice.call(arguments));}catch(e){}}
+function cpteNote(e){if(/operation-not-allowed/i.test(cpteErr(e)))CPTE.inactif=true;}
+/* étiquette d'un code : médecin (avec son niveau), attaché, ou rôle partagé */
+function cpteEtiquette(m){if(!m)return "";if((m.role||"medecin")==="attache")return "att:"+m.id;return "med:"+m.id+":"+((m.niveau)||"basic");}
+/* ENTRÉE : connecter le compte du code tapé ; le créer s'il manque ; corriger son étiquette si elle a changé (niveau, code redonné).
+   Rend {ok:true} (compte ouvert, créé, ou erreur non bloquante) ou {ok:false,reseau:false} (Google injoignable). */
+function cpteEntrer(code,etiq){
+  if(!cpteDispo())return Promise.resolve({ok:true,sans:true});
+  var A=window.cpAuth,em=cpteEmail(code),mdp=cpteMdp(code);
+  return cpteDelai(A.connecter(em,mdp)).then(function(u){CPTE.dernier=etiq;
+    if(u&&etiq&&u.nom!==etiq)return cpteDelai(A.renommer(etiq)).then(function(){cpteLog("étiquette corrigée",u.nom,"→",etiq);return {ok:true,uid:u.uid,cree:false};},function(){return {ok:true,uid:u.uid,cree:false};});
+    return {ok:true,uid:u.uid,cree:false};
+  }).catch(function(e){
+    if(cpteReseau(e)){cpteLog("Google injoignable",cpteErr(e));return {ok:false,reseau:false};}
+    if(cpteInconnu(e))return cpteDelai(A.creer(em,mdp,etiq,true)).then(function(u){CPTE.dernier=etiq;cpteLog("compte créé à la première connexion",etiq);return {ok:true,uid:u.uid,cree:true};})
+      .catch(function(e2){if(cpteReseau(e2))return {ok:false,reseau:false};cpteNote(e2);cpteLog("création impossible",etiq,cpteErr(e2));return {ok:true,erreur:cpteErr(e2)};});
+    cpteNote(e);cpteLog("connexion impossible",etiq,cpteErr(e));return {ok:true,erreur:cpteErr(e)};
+  });
+}
+/* SONDER (liaison discrète) : {existe:true,nom} / {existe:false} / {erreur} */
+function cpteSonder(code){if(!cpteDispo())return Promise.resolve({erreur:"sans"});
+  return cpteDelai(window.cpAuth.sonder(cpteEmail(code),cpteMdp(code))).then(function(u){return {existe:true,nom:(u&&u.nom)||"",uid:u&&u.uid};},function(e){if(cpteInconnu(e))return {existe:false};cpteNote(e);return {erreur:cpteErr(e),reseau:cpteReseau(e)};});}
+/* CRÉER pour un autre (liaison discrète) : {ok} / {existe:true} / {erreur} */
+function cpteCreer(code,etiq){if(!cpteDispo())return Promise.resolve({erreur:"sans"});
+  return cpteDelai(window.cpAuth.creer(cpteEmail(code),cpteMdp(code),etiq,false)).then(function(u){cpteLog("compte créé",etiq);return {ok:true,uid:u&&u.uid};},function(e){if(/email-already-in-use/i.test(cpteErr(e)))return {existe:true};cpteNote(e);cpteLog("création impossible",etiq,cpteErr(e));return {erreur:cpteErr(e),reseau:cpteReseau(e)};});}
+/* SUPPRIMER (liaison discrète, en se connectant avec le code — c'est pour cela que l'éditeur garde les codes) : {ok} / {absent:true} / {erreur} */
+function cpteSupprimer(code,etiq){if(!cpteDispo()||!code)return Promise.resolve({erreur:"sans"});
+  return cpteDelai(window.cpAuth.supprimer(cpteEmail(code),cpteMdp(code))).then(function(){cpteLog("compte supprimé",etiq||"");return {ok:true};},function(e){if(cpteInconnu(e))return {absent:true};cpteNote(e);cpteLog("suppression impossible",etiq||"",cpteErr(e));return {erreur:cpteErr(e),reseau:cpteReseau(e)};});}
+/* CHANGER un code = supprimer l'ancien compte, créer le nouveau ; si c'était MA session, la rouvrir sur le nouveau */
+function cpteChanger(ancien,nouveau,etiq){if(!cpteDispo())return Promise.resolve({erreur:"sans"});
+  var A=window.cpAuth,moi=null;try{moi=A.utilisateur();}catch(e){}
+  var mien=!!(moi&&ancien&&moi.email===cpteEmail(ancien));
+  return (ancien?cpteSupprimer(ancien,etiq):Promise.resolve({absent:true})).then(function(){return nouveau?cpteCreer(nouveau,etiq):{ok:true};}).then(function(r){
+    if(mien&&nouveau)return cpteDelai(A.connecter(cpteEmail(nouveau),cpteMdp(nouveau))).then(function(){return r;},function(){return r;});
+    return r;});}
+function cpteLib(e){e=String(e||"");if(/operation-not-allowed/i.test(e))return "Authentication n'est pas activé dans la console Firebase";if(/network|timeout|unavailable|deadline/i.test(e))return "pas de réseau";if(/too-many-requests/i.test(e))return "trop d'essais, réessayez plus tard";return e.replace(/^auth\//,"").slice(0,80);}
+function cpteSuite(r){if(r&&r.erreur&&r.erreur!=="sans"&&TOAST_HUB.f)TOAST_HUB.f("⚠ Compte Google non mis à jour ("+cpteLib(r.erreur)+") — le code fonctionne quand même","warn");return r;}
+function cpteDeconnecter(){if(!cpteDispo())return;try{window.cpAuth.deconnecter();}catch(e){}}
+/* le « parti » qui tenait ce code — pour l'avertissement « ce code a appartenu au Dr X, parti » */
+function cpteAncien(code,medPins,medecins){var ks=Object.keys(medPins||{});for(var i=0;i<ks.length;i++){if(medPins[ks[i]]!==code)continue;var m=(medecins||[]).find(function(x){return String(x.id)===ks[i];});if(m&&medParti(m))return m;}return null;}
+
+/* v10.251 : LIAISON. Le feu gris suivait le navigateur, qui ne sait pas toujours que le réseau est tombé. Le vrai signal est
+   celui de Firebase : (1) chaque écriture doit être ACCUSÉE par le serveur — sans accusé pendant plus de LIAISON.delai,
+   la liaison est grise ; (2) un message « servi depuis le cache » qui dure plus de LIAISON.delai (Firebase a perdu le
+   serveur) la rend grise aussi. Retour au vert au premier accusé ou au premier message venu du serveur. Grise = les profils
+   perdent leurs droits comme hors ligne (netOff), bandeau « Connexion perdue — modifications suspendues », et dernier filet,
+   setDoc / updatePaths muets. */
+var LIAISON={on:false,delai:8000,tEcr:null,tCache:null,sur:null,depuis:0};
+if(typeof window!=="undefined")window.__cpLiaison=LIAISON;   /* prise du banc comptes.js (délai raccourci) */
+function liaisonMuet(){var n=Date.now();if(n-(LIAISON.t||0)>10000){LIAISON.t=n;try{jlog("LIAISON",["écriture refusée — connexion perdue"]);}catch(e){}}return Promise.resolve();}
+function liaisonPoser(on){if(LIAISON.on===on)return;LIAISON.on=on;LIAISON.depuis=on?Date.now():0;try{jlog("LIAISON",[on?"grise — modifications suspendues":"verte — modifications reprises"]);}catch(e){}if(LIAISON.sur)LIAISON.sur(on);}
+function liaisonEcriture(p){if(!p||typeof p.then!=="function")return;
+  if(!LIAISON.tEcr)LIAISON.tEcr=setTimeout(function(){LIAISON.tEcr=null;if(TRAFIC.vol>0)liaisonPoser(true);},LIAISON.delai);
+  p.then(function(){liaisonAccuse();},function(e){if(!/permission|invalid|not-found/i.test(String((e&&(e.code||e.message))||"")))return;liaisonAccuse();});}
+function liaisonAccuse(){if(LIAISON.tEcr&&TRAFIC.vol<=0){clearTimeout(LIAISON.tEcr);LIAISON.tEcr=null;}if(LIAISON.on&&TRAFIC.vol<=0)liaisonPoser(false);}
+function liaisonMessage(duCache){if(duCache){if(!LIAISON.tCache)LIAISON.tCache=setTimeout(function(){LIAISON.tCache=null;liaisonPoser(true);},LIAISON.delai);return;}
+  if(LIAISON.tCache){clearTimeout(LIAISON.tCache);LIAISON.tCache=null;}if(LIAISON.on&&TRAFIC.vol<=0)liaisonPoser(false);}
 const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? function(ref,suite,err){return window.firebaseOnSnapshot(ref,function(){return trafRecu(suite,this,arguments);},err);} : null;   /* v10.233 : chaque message reçu est compté */
-const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){if(FERME.on)return fermeMuet();if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(estCahier(ref))pairs=(pairs||[]).concat([[["_ecr"],tampon()]]);return trafEcr(window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])])));} : null;
+const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function(ref,pairs){if(FERME.on)return fermeMuet();if(VER_STALE.on)return verMuet();if(GEL.on)return gelMuet();if(LIAISON.on)return liaisonMuet();if(estCahier(ref))pairs=(pairs||[]).concat([[["_ecr"],tampon()]]);return trafEcr(window.firebaseUpdatePaths(ref,(pairs||[]).map(p=>[p[0],p[1]==="__DELETE__"?p[1]:sansIndef(p[1])])));} : null;
 
 /* v10.246 : DÉCOUPAGE du tour, des notes et du registre des salles. Ces trois champs étaient enregistrés D'UN SEUL BLOC :
    la file d'attente d'une vieille page (état du 21-22/09) les a réécrits en entier entre le 25 et le 29/09 — semaines de
@@ -201,6 +305,52 @@ function docNotes(d){d=d||{};return d.notesV2&&typeof d.notesV2==="object"?Objec
 function regListe(mp,ord){const out=[],vu={};(Array.isArray(ord)?ord:[]).forEach(k=>{if(mp&&mp[k]&&!vu[k]){vu[k]=1;out.push(mp[k]);}});
   Object.keys(mp||{}).forEach(k=>{if(!vu[k]&&mp[k]){vu[k]=1;out.push(mp[k]);}});return out;}
 function docSalleReg(d){d=d||{};return d.salleRegV2&&typeof d.salleRegV2==="object"?regListe(d.salleRegV2,d.salleRegV2Order):lireJson(d.salleReg,[]);}
+/* v10.250 : EXPORT « DONNÉES BRUTES » COMPLET. Demande du 01/10/2026 : le fichier promettait « l'intégralité des données »
+   et n'en emportait que 8 rubriques (cases, notes, tour, dérogations, équipe, activités, salles, planning type) — ni
+   l'astreinte, ni les souhaits, ni les reports, ni les internes, ni Construire, ni les périodes archivées ; et 📂 Importer
+   relisait trois rubriques du tour que l'export n'écrivait jamais. Désormais le fichier emporte le cahier ENTIER (comme une
+   sauvegarde automatique) dans « doc », plus les archives ; seuls restent dehors les CODES D'ACCÈS (choix de Thibault, 01/10 :
+   un fichier qui traîne ne doit pas les livrer) et les marques techniques. Règle par LISTE NOIRE : un réglage créé demain part
+   dans le fichier sans qu'on y pense (contrôle 42). Les 8 rubriques lisibles restent en tête (anciens lecteurs, contrôle 41) ;
+   le planning n'est écrit qu'une fois (« plan », remis en planV2 à la restauration). */
+var EXP_CODES=["medPins","editPin","adminPin","cadrePin"];   /* + le code des internes, rangé dans intCfg.pin */
+var EXP_HORS=["_ts","_verArr","_verPrec","_ecr","gel","_bacDe","_bacDep","_lastBackupAt","planV2","plan"];
+var EXP_RUB=[[["astreinte","astReport"],"l'astreinte"],[["tourWish","tourAvoid","gardeWish","gardeAvoid"],"les souhaits de tour et de garde"],
+  [["csRep","csBlanches"],"les reports"],[["intCfg"],"les internes"],[["build"],"Construire"],[["ideCfg"],"les IDE"],
+  [["vacs","vacRule"],"les vacances"],[["salleFerm"],"les plages fermées"],[["annonces"],"les messages"]];
+/* équipe et activités d'un cahier : en V2 (map + ordre) depuis la v9.7 ; l'ancien champ en secours (v10.102) */
+function docListeV2(mp,ordRaw,leg){
+  if(!mp||typeof mp!=="object")return lireJson(leg,[]);
+  var vals={};Object.keys(mp).forEach(function(k){var v=mp[k];vals[k]=typeof v==="string"?lireJson(v,null):v;});
+  var ord=lireJson(ordRaw,null);
+  var ids=Array.isArray(ord)?ord.map(String).filter(function(id){return vals[id]!==undefined&&vals[id]!==null;}):[];
+  var rest=Object.keys(vals).filter(function(id){return ids.indexOf(id)<0&&vals[id]!==null;});
+  return ids.concat(rest).map(function(id){return vals[id];});
+}
+function expSansPin(x){var c=lireJson(x,null);if(!c||typeof c!=="object"||!("pin" in c))return x;c=Object.assign({},c);delete c.pin;return typeof x==="string"?JSON.stringify(c):c;}
+/* raw = le cahier tel que Firebase le rend (planning/main ou une sauvegarde) ; arch = {"per-AAAA-M": document} ou null */
+function expComplet(raw,arch){
+  raw=raw||{};
+  var doc={};Object.keys(raw).forEach(function(k){if(EXP_HORS.indexOf(k)<0&&EXP_CODES.indexOf(k)<0)doc[k]=raw[k];});
+  if(doc.intCfg!==undefined)doc.intCfg=expSansPin(doc.intCfg);
+  var src={plan:raw.planV2&&typeof raw.planV2==="object"?raw.planV2:lireJson(raw.plan,{}),notes:docNotes(raw),tourMed:docTourMed(raw),
+    tourDerog:lireJson(raw.tourDerog,{}),medecins:docListeV2(raw.medecinsV2,raw.medecinsV2Order,raw.medecins),
+    actes:docListeV2(raw.actesV2,raw.actesV2Order,raw.actes),salleReg:docSalleReg(raw),
+    planningType:raw.planningTypeV2!==undefined?lireJson(raw.planningTypeV2,{}):lireJson(raw.planningType,{}),doc:doc};
+  if(arch)src.archives=arch;else src.archivesAbsentes=true;
+  return src;
+}
+/* ce que contient un fichier, en clair, pour l'écran de confirmation de 📂 Importer */
+function expResume(data){
+  data=data||{};var plan=data.plan&&typeof data.plan==="object"?data.plan:{},n=0;
+  Object.keys(plan).forEach(function(k){var dm=plan[k];if(dm&&typeof dm==="object")n+=Object.keys(dm).length;});
+  var l=[n.toLocaleString("fr-FR")+" case"+(n>1?"s":"")];
+  if(Array.isArray(data.medecins))l.push("l'équipe ("+data.medecins.length+")");
+  l.push("le tour","les notes","le planning type");
+  var doc=data.doc&&typeof data.doc==="object"?data.doc:null;
+  if(doc){EXP_RUB.forEach(function(r){if(r[0].some(function(k){return doc[k]!==undefined;}))l.push(r[1]);});l.push("les réglages");}
+  return {complet:!!doc,liste:l.join(", "),nArch:data.archives&&typeof data.archives==="object"?Object.keys(data.archives).length:0,sansArch:!!data.archivesAbsentes};
+}
 /* v10.246 : JOURNAL DU TOUR ET DES NOTES — une ligne dans le cahier d'historique de la période (planning/hist-<période>) :
    quoi, quand, qui, quel appareil, quelle version. Muet pendant l'archivage, le désarchivage et l'import d'un fichier
    (ce sont des déplacements, pas des modifications). */
@@ -241,7 +391,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.247 — 29/09/2026";
+const APP_VERSION="v10.251 — 02/10/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6436,7 +6586,9 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Les périodes à venir")," (v10.146) : fermées à tous sauf l'éditeur, badge « 🚧 En préparation ». Dès qu'il ouvre la demande de congés dans Construire, badge « 🏖️ Congés ouverts » : chacun pose congés, FMC et préférences, et rien d'autre, jusqu'à ce qu'il referme la demande. À la diffusion du planning, la période s'ouvre comme la période en cours. L'éditeur peut déroger pour un profil dans Paramètres. Les semaines de tour, elles, restent invisibles tant que l'éditeur n'a pas validé le tour dans Construire (v10.158)."]}),
   HP({children:[HE("b",null,"Les périodes closes")," : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."]}),
   HP({children:[HE("b",null,"Archiver une période")," (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase — il contient aussi l'historique des cases de la période), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période. Une exception voulue : le décompte des binômes de tour. Au moment de l'archivage, les semaines de tour de la période sont recopiées dans une petite ardoise permanente qui, elle, ne part jamais avec une période — sans quoi le tableau 🤝 repartirait de zéro à chaque archivage. Elle se purge d'elle-même au-delà de deux ans."]}),
-  HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration."]}),
+  HP({children:[HE("b",null,"Sauvegardes automatiques")," : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration. Depuis la v10.248, si la sauvegarde du jour échoue alors que la dernière réussie a plus de 48 h, un bandeau rouge prévient l'éditeur, et la carte Sauvegardes de Paramètres dit pourquoi (par exemple la limite d'index de Firebase, cause de la panne du 29/09 au 01/10/2026)."]}),
+  HP({children:[HE("b",null,"Comparaison fiable")," (v10.249) : le comparateur et la vérification de passage de version ne tiennent plus compte de l'ordre interne des informations d'une case — la première vérification, le 01/10/2026, annonçait 3 282 cases « ABS → ABS » sur un planning identique. Si deux contenus portent le même libellé mais diffèrent vraiment, la ligne nomme l'information en cause."]}),
+  HP({children:[HE("b",null,"Vérifier un passage de version")," (v10.248) : à la première ouverture d'une nouvelle version, sur n'importe quel appareil, l'application photographie le planning tel que l'ancienne version l'a laissé, avant d'y écrire quoi que ce soit — une sauvegarde marquée 🏷 « arrivée v10.xxx », gardée à part (les 3 dernières, en plus des 45 quotidiennes). Dans Paramètres, carte Sauvegardes, 🔎 Vérifier le passage de version compare cette photo au planning actuel, case par case : une case modifiée AVEC une ligne dans le journal, c'est un collègue qui a travaillé ; une case modifiée SANS trace est listée en rouge. Les cases d'une période archivée entre-temps sont comptées à part — elles sont dans les archives, pas perdues. Le verdict tient en une ligne : vert si rien n'a bougé sans auteur. Lecture seule."]}),
   HT({children:"Feuilleter une sauvegarde comme un planning (v10.237)"}),
   HP({children:["Depuis le ",HE("b",null,"🧪 bac à sable"),", le bouton ",HBtn({kind:"ghost",children:"📥 Charger dans le bac"})," (carte 💾, ou depuis l'aperçu) recopie une sauvegarde ",HE("b",null,"dans le bac uniquement"),". Vous la parcourez alors dans tous les onglets, l'imprimez, y faites des essais : le vrai planning n'est jamais touché. Le bandeau du bas rappelle quelle sauvegarde est chargée ; la remise à zéro du bac y remet une copie du vrai planning."]}),
   HT({children:"Vérifier qu'une modification n'a pas été faite « toute seule » (v10.236)"}),
@@ -6445,7 +6597,7 @@ const HELP_SECTIONS=[
   HP({children:[HE("b",null,"Exports")," : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."]}),
   HP({children:["La jauge dans Paramètres indique la taille des données Firebase — archivez les périodes passées si elle monte."]}),
   HT({children:"💻 Copie sur mon ordinateur"}),
-  HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui contiennent l'intégralité des données (toutes périodes) et permettent de tout remettre en place via l'encart 📂 Importer, juste en dessous. Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
+  HP({children:["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ",HE("b",null,"Copie sur mon ordinateur")," produit deux fichiers indépendants de l'application : le ",HE("b",null,"tableau (.xls)"),", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ",HE("b",null,"données brutes (.json)"),", qui contiennent tout le planning — toutes périodes, périodes archivées comprises, astreinte, souhaits, reports, internes, Construire et réglages (v10.250) — ",HE("b",null,"sauf les codes d'accès"),", volontairement laissés dehors : un fichier qui traîne ne doit pas les livrer. Elles permettent de tout remettre en place via l'encart 📂 Importer, juste en dessous, qui affiche d'abord ce que le fichier contient, prend une sauvegarde de l'état actuel, puis remplace tout en gardant les codes en service (un fichier d'avant la v10.250 ne remet en place que les cases, l'équipe, les activités, les salles, le planning type, le tour et les notes). Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."]}),
   HP({last:true,children:["Un ",HE("b",null,"rappel")," s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). Depuis la v10.169, la date de la dernière sauvegarde est PARTAGÉE entre vos appareils : un ordinateur qui n'a jamais servi à sauvegarder ne réclame plus une sauvegarde dès sa première ouverture. Le compteur de cases modifiées, lui, reste propre à ",HE("b",null,"chaque ordinateur")," et repart de zéro dès qu'une sauvegarde est faite, d'où qu'elle vienne."]}))},
 
  {id:"gel",icon:"🧊",title:"Geler le planning avant une restauration",body:()=>HE("div",null,
@@ -6467,7 +6619,10 @@ const HELP_SECTIONS=[
   HT({children:"5. Fermeture des pages oubliées (v10.247)"}),
   HP({children:["Pour tous ceux qui peuvent modifier (médecins, éditeur, secrétaires, cadres, internes), l'application se ferme et revient à l'écran du code après ",HE("b",null,"5 minutes sans action"),", y compris si on est parti dans un autre onglet ou une autre application. Un bandeau orange prévient ",HE("b",null,"30 secondes avant"),", touchez l'écran pour continuer. Le délai se règle dans Paramètres, carte ",HE("b",null,"🔒 Fermeture après inactivité"),", pour toute l'équipe. « Consulter » n'est pas concerné."]}),
   HP({children:["Une page endormie (téléphone verrouillé, onglet laissé en arrière-plan) se ferme ",HE("b",null,"à son réveil"),", sans rien envoyer de ce qu'elle gardait en attente. Une modification faite juste avant de changer d'application part normalement : l'application attend son envoi avant de s'endormir."]}),
-  HP({children:["Un ",HE("b",null,"code personnel de médecin")," ne reste ouvert que sur un seul appareil : l'entrer sur un autre appareil ferme le premier, qui l'annonce sur son écran du code. Deux onglets du même navigateur comptent comme un seul appareil. Les codes partagés (éditeur, secrétaires, cadres, internes) ne sont pas concernés : plusieurs postes peuvent travailler en même temps."]})
+  HP({children:["Un ",HE("b",null,"code personnel de médecin")," ne reste ouvert que sur un seul appareil : l'entrer sur un autre appareil ferme le premier, qui l'annonce sur son écran du code. Deux onglets du même navigateur comptent comme un seul appareil. Les codes partagés (éditeur, secrétaires, cadres, internes) ne sont pas concernés : plusieurs postes peuvent travailler en même temps."]}),
+  HT({children:"6. Les comptes et la connexion perdue (v10.251)"}),
+  HP({children:["Chaque code a désormais, en coulisse, un ",HE("b",null,"compte Google")," (Firebase Authentication), créé tout seul à la première connexion ou d'un coup depuis Paramètres → 🔐 Comptes. Pour l'équipe rien ne change : on tape son code, puis son prénom pour un code partagé. Dans cette version rien n'est verrouillé par ces comptes ; c'est la préparation du verrou de la base (version suivante)."]}),
+  HP({children:["Sans réseau, on ne peut plus entrer en modification : l'écran du code dit « ",HE("b",null,"Pas de connexion internet : consultation seule")," » et propose 👁 Consulter. En cours de travail, si Firebase ne répond plus pendant plus de quelques secondes, le bandeau « ",HE("b",null,"Connexion perdue — modifications suspendues")," » apparaît et les modifications sont bloquées ; tout reprend tout seul dès que Firebase répond. Le feu de liaison suit désormais ce vrai signal, et non plus seulement celui du navigateur."]}),
  )},
  {id:"fermees",icon:"🚫",title:"Plages fermées — fermer une salle sur une demi-journée",body:()=>HE("div",null,
   HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée et hachurée")," (hachures depuis la v10.235, pour ne pas la confondre avec la couleur d'une salle vide) dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
@@ -8353,7 +8508,7 @@ function ExportCard({per,setPer,source,setSource,backups,seuil,setSeuil,dernier,
   return(
     <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}} id="set-export">
       <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:6}}>💻 Copie sur mon ordinateur</div>
-      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un fichier gardé chez vous, indépendant de l'application et de sa synchronisation. Le tableau ne couvre que la période choisie ci-dessous : il sert à rediffuser le planning. Les données brutes contiennent l'intégralité des données, toutes périodes confondues : elles servent à tout remettre en place via 📂 Importer.</div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un fichier gardé chez vous, indépendant de l'application et de sa synchronisation. Le tableau ne couvre que la période choisie ci-dessous : il sert à rediffuser le planning. Les données brutes contiennent tout le planning (toutes périodes, périodes archivées comprises, astreinte, souhaits, reports, internes, réglages), sauf les codes d'accès : elles servent à tout remettre en place via 📂 Importer.</div>
 
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
         <button onClick={()=>setPer(perPrevB(per.sy,per.sm)||per)} style={S.arr}>‹</button>
@@ -8504,6 +8659,57 @@ function ProtectionTuile({netOff=false,bloque=false}){
   </div>;
 }
 /* v10.247 : tuile 🔒 Fermeture après inactivité — le délai, commun à l'équipe (une écriture par changement : liste, pas curseur) */
+/* v10.251 : tuile 🔐 Comptes — pour chaque code, le compte Google existe ✅ ou non ❌ (sondé à la demande, liaison discrète :
+   aucune lecture Firestore), les comptes des partis à supprimer, le bouton « Créer les comptes manquants » (qui supprime
+   aussi ceux des partis), et l'état d'Authentication. Les codes en clair ne s'affichent qu'une fois « Afficher tous les
+   codes » déverrouillé (carte des codes PIN, juste au-dessus). Indisponible dans le bac à sable. */
+function ComptesTuile({codes=[],netOff=false,bac=false,showPins=false}){
+  const [etat,setEtat]=useState({});   // code → {existe,nom} | {erreur}
+  const [enCours,setEnCours]=useState(null);   // null | "sonde" | "creation"
+  const [fait,setFait]=useState(null);
+  const dispo=cpteDispo();
+  const sonder=async()=>{if(enCours)return;setEnCours("sonde");setFait(null);const e={};
+    for(const c of codes){e[c.code]=await cpteSonder(c.code);setEtat(Object.assign({},e));}
+    setEnCours(null);};
+  const creer=async()=>{if(enCours)return;setEnCours("creation");let n=0,s=0,ko=0;const e=Object.assign({},etat);
+    for(const c of codes){const r0=e[c.code];
+      if(c.parti&&!c.repris){if(!r0||r0.existe){const r=await cpteSupprimer(c.code,c.etiq);if(r.ok||r.absent){e[c.code]={existe:false};if(r.ok)s++;}else{e[c.code]={erreur:r.erreur};ko++;}}continue;}
+      if(r0&&r0.existe)continue;
+      const r=await cpteCreer(c.code,c.etiq);
+      if(r.ok||r.existe){e[c.code]={existe:true,nom:c.etiq};if(r.ok)n++;}else{e[c.code]={erreur:r.erreur};ko++;}
+      setEtat(Object.assign({},e));}
+    setEtat(e);setEnCours(null);setFait({n,s,ko});};
+  const lib=(c)=>{const r=etat[c.code];if(!r)return {t:"—",col:"var(--txt3)"};
+    if(r.erreur)return {t:"⚠ "+cpteLib(r.erreur),col:"#b45309"};
+    if(c.parti&&!c.repris)return r.existe?{t:"⚠ compte à supprimer (parti)",col:"#b45309"}:{t:"✅ aucun compte (parti)",col:"var(--txt3)"};
+    if(!r.existe)return {t:"❌ compte manquant",col:"#dc2626"};
+    return r.nom&&r.nom!==c.etiq?{t:"✅ compte existant · étiquette à corriger (à sa prochaine connexion)",col:"#b45309"}:{t:"✅ compte existant",col:"#16a34a"};};
+  const manquants=codes.filter(c=>{const r=etat[c.code];return r&&!r.erreur&&((!c.parti||c.repris)?!r.existe:r.existe);}).length;
+  return <div data-comptestuile="1" style={{...S.card,marginBottom:10}}>
+    <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>🔐 Comptes</div>
+    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.45}}>Chaque code a, en coulisse, un compte Google (Firebase Authentication). Il se crée tout seul à la première connexion de chacun, ou ici d'un coup. Dans cette version rien n'est verrouillé : un compte absent ne bloque personne.</div>
+    {bac&&<div style={{fontSize:11,color:"#c2410c",fontWeight:700}}>🧪 Bac à sable : les comptes ne se gèrent pas d'ici.</div>}
+    {!bac&&!dispo&&<div style={{fontSize:11,color:"#dc2626",fontWeight:700}}>Bibliothèque Authentication absente de cette page : rien à faire ici.</div>}
+    {!bac&&dispo&&<div>
+      {CPTE.inactif&&<div data-cpteinactif="1" style={{fontSize:11,color:"#dc2626",fontWeight:700,marginBottom:6}}>⛔ Authentication n'est pas activé dans la console Firebase (Authentication → Sign-in method → E-mail/Mot de passe). Tant que ce n'est pas fait, aucun compte ne peut se créer — l'application fonctionne comme avant.</div>}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+        <button data-cptesonder="1" disabled={!!enCours||netOff} onClick={sonder} style={{...S.btnP,opacity:(enCours||netOff)?.6:1}}>{enCours==="sonde"?"⏳ Vérification…":"🔎 Vérifier les comptes"}</button>
+        <button data-cptecreer="1" disabled={!!enCours||netOff||!Object.keys(etat).length} onClick={creer} style={{...S.btnP,background:"#16a34a",opacity:(enCours||netOff||!Object.keys(etat).length)?.6:1}}>{enCours==="creation"?"⏳ Création…":"Créer les comptes manquants"+(manquants?" ("+manquants+")":"")}</button>
+      </div>
+      {netOff&&<div style={{fontSize:11,color:"#dc2626",fontWeight:700,marginBottom:6}}>📴 Hors ligne — Google est injoignable.</div>}
+      {fait&&<div data-cptefait="1" style={{fontSize:11,color:"var(--txt2)",marginBottom:6}}>{fait.n+" compte"+(fait.n>1?"s":"")+" créé"+(fait.n>1?"s":"")+(fait.s?", "+fait.s+" supprimé"+(fait.s>1?"s":"")+" (partis)":"")+(fait.ko?", "+fait.ko+" en échec":"")+"."}</div>}
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><tbody>
+        {codes.map(c=>{const l=lib(c);return <tr key={[c.etiq,c.code].join("|")} data-cpteligne={c.etiq} style={{borderTop:"1px solid var(--border)"}}>
+          <td style={{padding:"3px 4px",fontWeight:700,color:c.parti?"var(--txt3)":"var(--txt)"}}>{c.qui}{c.parti?" · parti":""}</td>
+          <td style={{padding:"3px 4px",fontFamily:"'JetBrains Mono',monospace",color:"var(--txt2)"}}>{showPins?c.code:"••••"}</td>
+          <td data-cpteetat="1" style={{padding:"3px 4px",color:l.col,fontWeight:700}}>{l.t}</td>
+        </tr>;})}
+        {codes.length===0&&<tr><td style={{padding:4,color:"var(--txt3)"}}>Aucun code défini.</td></tr>}
+      </tbody></table>
+      <div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>Les codes en clair : « Afficher tous les codes » dans la carte 🔐 Codes PIN et droits. Supprimer un code, changer un code ou retirer un membre met son compte à jour tout seul — jamais besoin de la console Firebase.</div>
+    </div>}
+  </div>;
+}
 function InactTuile({min=5,setMin=null}){
   return <div data-inacttuile="1" style={{...S.card,marginBottom:10}}>
     <div style={{fontWeight:700,color:"#b45309",fontSize:13,marginBottom:6}}>🔒 Fermeture après inactivité</div>
@@ -8565,12 +8771,30 @@ function JournalTuile({medecins=[],per0}){
    expliqueDiffs rapproche chaque différence du JOURNAL des cases (auteur, heure) sur la fenêtre de temps entre les deux
    états. Une différence SANS ligne de journal est soit une opération de masse non journalisée (construction d'une période,
    planning type, import, restauration, archivage), soit — c'est ce qu'on cherche — une modification sans auteur. */
+/* v10.249 : COMPARAISON INDIFFÉRENTE À L'ORDRE DES CHAMPS. Le 01/10/2026, la première vérification de passage de version
+   annonçait 3 282 cases « modifiées » — « ABS → ABS » — sur un planning identique en totaux, mois par mois. Une case est un
+   petit objet ({acteId, salle, …}) ; JSON.stringify suit l'ordre des champs, qui dépend du chemin par lequel l'objet est
+   arrivé (écrit par l'application, relu du serveur, recopié dans une sauvegarde). Même contenu, autre ordre = faux écart.
+   cleStable trie les champs (pas les listes : l'ordre de deux activités d'une case a un sens) et ignore les champs vides. */
+function cleStable(v){
+  if(Array.isArray(v))return "["+v.map(cleStable).join(",")+"]";
+  if(v&&typeof v==="object")return "{"+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+":"+cleStable(v[k])).join(",")+"}";
+  return JSON.stringify(v===undefined?null:v);
+}
+/* v10.249 : les champs qui diffèrent vraiment entre deux contenus de case — affichés quand le libellé est le même des deux côtés */
+function champsDiff(a,b){
+  const ea=cellEs(a),eb=cellEs(b),out=[];
+  for(let i=0;i<Math.max(ea.length,eb.length);i++){const x=ea[i]||{},y=eb[i]||{};
+    Object.keys(x).concat(Object.keys(y)).filter((v,j,arr)=>arr.indexOf(v)===j).forEach(k=>{if(cleStable(x[k])!==cleStable(y[k])&&out.indexOf(k)<0)out.push(k);});}
+  if(!out.length&&ea.length!==eb.length)out.push("nombre d'entrées");
+  return out;
+}
 function diffPlans(aPlan,bPlan){
   const out=[];const A=aPlan||{},B=bPlan||{};
   const allK=Object.keys(A).concat(Object.keys(B)).filter((v,i,arr)=>arr.indexOf(v)===i);
   allK.forEach(k=>{const a=A[k]||{},b=B[k]||{};
     const mids=Object.keys(a).concat(Object.keys(b)).filter((v,i,arr)=>arr.indexOf(v)===i);
-    mids.forEach(mid=>{const ja=JSON.stringify(a[mid]||null),jb=JSON.stringify(b[mid]||null);if(ja===jb)return;
+    mids.forEach(mid=>{const ja=cleStable(a[mid]||null),jb=cleStable(b[mid]||null);if(ja===jb)return;
       out.push({k,mid:String(mid),avant:a[mid]||null,apres:b[mid]||null,type:!a[mid]?"ajout":!b[mid]?"retrait":"changement"});});});
   out.sort((x,y)=>x.k<y.k?-1:x.k>y.k?1:(x.mid<y.mid?-1:x.mid>y.mid?1:0));
   return out;
@@ -8641,7 +8865,7 @@ function libEntree(e,actes){
   const a=(actes||[]).find(x=>x.id===e.acteId);const nom=a?(a.short||a.label):(e.acteId||"?");
   return nom+(e.salle?" · "+e.salle:"");
 }
-function DiffPanel({res,meds,actes,tA,tB,libA,libB}){
+function DiffPanel({res,meds,actes,tA,tB,libA,libB,nArch=0}){
   const [filtre,setFiltre]=useState("");const [voirTout,setVoirTout]=useState(false);
   const mn=id=>{const m=(meds||[]).find(x=>String(x.id)===String(id));return m?m.init:"#"+id;};
   const f=filtre.trim().toLowerCase();
@@ -8655,6 +8879,7 @@ function DiffPanel({res,meds,actes,tA,tB,libA,libB}){
       <b style={{minWidth:36}}>{mn(d.mid)}</b>
       <span style={{color:d.type==="ajout"?"#16a34a":d.type==="retrait"?"#dc2626":"#d97706",fontWeight:800}}>{d.type==="ajout"?"+ ajouté":d.type==="retrait"?"− retiré":"≠ modifié"}</span>
       <span style={{color:"var(--txt2)"}}>{libEntree(d.avant,actes)} <span style={{color:"var(--txt3)"}}>→</span> {libEntree(d.apres,actes)}</span>
+      {d.avant&&d.apres&&libEntree(d.avant,actes)===libEntree(d.apres,actes)&&<span data-invisible="1" style={{fontSize:10.5,color:"var(--txt3)"}}>(même libellé — diffère par : {champsDiff(d.avant,d.apres).map(c=>c==="pt"?"marque du planning type":c==="salle"?"salle":c).join(", ")||"?"})</span>}{/* v10.249 */}
     </div>
     <div style={{fontSize:10.5,color:d.sansTrace?"#dc2626":"var(--txt3)",paddingLeft:8}}>
       {d.sansTrace?"aucune trace dans le journal sur cette fenêtre":d.traces.map((e,i)=><span key={i} style={{marginRight:10}}>{fd(e.t)} · {histGrp(e)?histGrpLib(e):(e.x==="add"?"posé":"retiré")} par <b>{e.a||"?"}</b></span>)}
@@ -8663,6 +8888,7 @@ function DiffPanel({res,meds,actes,tA,tB,libA,libB}){
   const CAP=300;
   return <div data-diffpanel="1" style={{marginTop:10,borderTop:"1px solid var(--border)",paddingTop:10}}>
     <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6,lineHeight:1.45}}>Différences case par case entre <b style={{color:"#388bfd"}}>{libA}</b> et <b style={{color:"var(--txt)"}}>{libB}</b> : {res.length} au total, dont <b style={{color:res.some(d=>d.sansTrace)?"#dc2626":"#16a34a"}}>{res.filter(d=>d.sansTrace).length} sans trace</b> dans le journal.</div>
+    {nArch>0&&<div data-diffarch="1" style={{fontSize:11,color:"var(--txt2)",marginBottom:6}}>🗄 {nArch} case(s) de périodes archivées depuis — rangées dans les archives, pas perdues : non listées ici.</div>}{/* v10.248 */}
     <input value={filtre} onChange={e=>setFiltre(e.target.value)} placeholder="Filtrer : initiales, date (2026-10-16), activité…" style={{...S.inp,fontSize:11.5,marginBottom:8}}/>
     {res.length===0&&<div data-diffvide="1" style={{fontSize:12,fontWeight:700,color:"#16a34a"}}>✓ Aucune différence : les deux états sont identiques, case par case.</div>}
     {sans.length>0&&<div style={{marginBottom:10}}>
@@ -9335,8 +9561,9 @@ function InternesTile({intCfg,setIntCfg,actes=[],pins=[]}){
         <button style={S.btnP} onClick={()=>{const v=(document.getElementById("nintp").value||"").trim();
           if(v.length<4){toast("Min 4 car.","warn");return;}
           if((pins||[]).filter(Boolean).indexOf(v)>=0){toast("Ce code est déjà utilisé par un autre rôle","warn");return;}
+          if(!BAC)cpteChanger(intCfg.pin||"",v,"role:internes").then(cpteSuite);   /* v10.251 */
           setIntCfg(p=>({...p,pin:v}));document.getElementById("nintp").value="";toast("Code des internes mis à jour");}}>OK</button>
-        {intCfg.pin&&<button style={{...S.icnBtn,fontSize:11}} onClick={()=>{setIntCfg(p=>({...p,pin:""}));toast("Code des internes supprimé — l'accès est fermé");}}>Supprimer</button>}
+        {intCfg.pin&&<button style={{...S.icnBtn,fontSize:11}} onClick={()=>{if(!BAC)cpteSupprimer(intCfg.pin,"role:internes").then(cpteSuite);setIntCfg(p=>({...p,pin:""}));toast("Code des internes supprimé — l'accès est fermé");}}>Supprimer</button>}
       </div>
       <div style={{fontSize:11,color:"var(--txt3)",marginTop:5}}>{intCfg.pin?("Code actuel : "+intCfg.pin):"Aucun code : les internes ne peuvent pas se connecter."}</div>
     </div>
@@ -10583,6 +10810,7 @@ function CardioPlanning(){
   const [accessMode,setAccessMode]=useState("ask");
   const [pinInput,setPinInput]=useState("");
   const [pinError,setPinError]=useState(false);
+  const [codeAttente,setCodeAttente]=useState(false);   /* v10.251 : Google interrogé */
   const [editPin,setEditPin]=useState(EDIT_PIN_DEFAULT);
   /* ── v9.8 : rôle Administratif (secrétaires + cadres) ── */
   const [adminPin,setAdminPin]=useState("");
@@ -10627,7 +10855,11 @@ function CardioPlanning(){
   const [pinsTry,setPinsTry]=useState("");
   const validatePins=()=>{const v=pinsTry;const okEd=medecins.some(m=>((m.niveau)||"basic")==="editeur"&&(medPins[String(m.id)]||"").length>=3&&medPins[String(m.id)]===v);if(v===editPin||okEd){setShowPins(true);setPinsAsk(false);setPinsTry("");}else toast("PIN incorrect","warn");};
   /* ── v9.10 : mode hors ligne (lecture seule) ── */
-  const [netOff,setNetOff]=useState(()=>typeof navigator!=="undefined"&&navigator.onLine===false);
+  const [navOff,setNetOff]=useState(()=>typeof navigator!=="undefined"&&navigator.onLine===false);
+  const [liaisonOff,setLiaisonOff]=useState(false);   /* v10.251 : la liaison Firebase est grise (vrai signal, voir LIAISON) */
+  const netOff=navOff||liaisonOff;
+  const [horsReseau,setHorsReseau]=useState(false);   /* v10.251 : écran du code — Google injoignable au moment du code */
+  useEffect(()=>{LIAISON.sur=(on)=>setLiaisonOff(on);setLiaisonOff(LIAISON.on);return()=>{LIAISON.sur=null;};},[]);
   const [stale,setStale]=useState(false);   /* v10.135 : cette copie est dépassée par le serveur */
   const [salleFerm,setSalleFerm]=useState({type:{},jours:{}});   /* v10.229 : plages fermées */
   const [salleVideCol,setSalleVideCol]=useState(VIDE_COL_DEF);
@@ -10718,6 +10950,7 @@ function CardioPlanning(){
   },[]);
   /* v10.228 : retour à l'accueil (♥) = mémoire des onglets vidée — poste partagé */
   useEffect(()=>{if(accessMode==="ask"){ongletMemVider();pageMem.current={};}},[accessMode]);
+  useEffect(()=>{if(accessMode==="ask"||accessMode==="view")cpteDeconnecter();},[accessMode]);   /* v10.251 : retour au code ou consultation = compte Google refermé */
   const [ym,setYM]=useState(()=>({year:new Date().getFullYear(),month:new Date().getMonth()}));
   const year=ym.year, month=ym.month;
   const setYear=y=>setYM(p=>({...p,year:typeof y==="function"?y(p.year):y}));
@@ -11207,6 +11440,7 @@ function CardioPlanning(){
     const recevoir=(snap)=>{   /* v10.246 : fonction nommée — relue telle quelle après un refus du serveur */
         fromServer.current=true;   /* v10.28 : tout ce qui suit vient du serveur */
         if(snap.metadata&&snap.metadata.fromCache===false)serverSeen.current=true;
+        if(serverSeen.current&&snap.metadata)liaisonMessage(snap.metadata.fromCache===true);   /* v10.251 : le vrai signal de Firebase */
         if(snap.exists){
           const data0=snap.data();
           const data=data0;
@@ -11216,7 +11450,9 @@ function CardioPlanning(){
              j'inscris le mien — la copie la plus récente fait foi. */
           {const sv=verNum(data.appVer),mv=verNum(APP_VERSION),srv=snap.metadata&&snap.metadata.fromCache===false;
             if(sv>mv){if(!VER_STALE.on){VER_STALE.on=true;VER_STALE.serveur=String(data.appVer);setStale(true);}}
-            else if(sv<mv&&srv&&window.firebaseSetDoc)Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,avecTampon({appVer:APP_VERSION}),{merge:true})).catch(e=>console.log("appVer:",e));}
+            else if(sv<mv&&srv&&window.firebaseSetDoc){
+              photoVersion(data0,data.appVer).then(ok=>{if(ok&&bkListRef.current)bkListRef.current();});   /* v10.248 : la photo de l'état laissé par l'ancienne version, prise sur CE message (déjà en mémoire) */
+              Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,avecTampon({appVer:APP_VERSION}),{merge:true})).catch(e=>console.log("appVer:",e));}}
           /* v10.229 : gel du planning — lu sur chaque message, avant tout le reste */
           {let g=null;try{g=data.gel?JSON.parse(data.gel):null;}catch(e){g=null;}if(BAC||!(g&&g.at))g=null;
             GEL.on=!!g;GEL.raw=g?String(data.gel):"";setGel(pg=>JSON.stringify(pg)===JSON.stringify(g)?pg:g);}
@@ -11386,17 +11622,20 @@ function CardioPlanning(){
      Coût vérifié avant de changer : le document pèse ~227 Ko, donc 45 copies ≈ 10 Mo,
      soit 1 % du gigaoctet gratuit. La contrainte n'est pas le stockage. Règle unique
      et facile à expliquer : « les 45 derniers jours ». */
-  const [backupList,setBackupList]=useState([]); // [{id,ts}]
+  const [backupList,setBackupList]=useState([]); // [{id,ts,ver,prec}]
+  const [bkErr,setBkErr]=useState(null);         /* v10.248 : {t,raison} — le dernier essai de sauvegarde a échoué */
+  const [bkAlarme,setBkAlarme]=useState(null);   /* v10.248 : {last} — sauvegarde du jour en échec et dernière réussie > 48 h */
   const [bkOpen,setBkOpen]=useState("");        // sauvegarde ancienne dépliée
   const refreshBackupList=useCallback(async()=>{
     try{
       const snap=await window.firebaseDB.collection("backups").get();
-      const items=[];snap.forEach(d=>items.push({id:d.id,ts:(d.data()||{})._ts||0}));
+      const items=[];snap.forEach(d=>{const x=d.data()||{};items.push({id:d.id,ts:x._ts||0,ver:x._verArr||"",prec:x._verPrec||""});});   /* v10.248 : photos de passage de version */
       items.sort((a,b)=>b.ts-a.ts);
       setBackupList(items);
       return items;
     }catch(e){console.log("backup list:",e);return [];}
   },[]);
+  const bkListRef=useRef(null);bkListRef.current=refreshBackupList;   /* v10.248 : rafraîchie après la photo de version */
   const makeBackup=useCallback(async(manual)=>{
     if(BAC){if(manual)toast("🧪 Bac à sable : pas de sauvegarde ici","warn");return false;}   /* v10.175 */
     try{
@@ -11405,28 +11644,33 @@ function CardioPlanning(){
       const payload={...cur,_ts:ts};
       await window.firebaseDB.collection("backups").doc("b"+ts).set(payload);
       await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon({_lastBackupAt:ts}),{merge:true});
-      // Purge au-delà de 10
+      /* v10.248 : purge en deux comptes — 45 sauvegardes quotidiennes, et à part les 3 dernières photos de version */
       const items=await refreshBackupList();
-      for(const it of items.slice(BK_KEEP)){
+      for(const it of items.filter(x=>!x.ver).slice(BK_KEEP).concat(items.filter(x=>x.ver).slice(BK_VER))){
         await window.firebaseDB.collection("backups").doc(it.id).delete();
       }
       await refreshBackupList();
+      setBkErr(null);setBkAlarme(null);
       if(manual)toast("Sauvegarde créée","info");
       return true;
-    }catch(e){console.log("backup:",e);if(manual)toast("Échec de la sauvegarde","warn");return false;}
+    }catch(e){console.log("backup:",e);const raison=bkRaison(e);setBkErr({t:Date.now(),raison});if(manual)toast("Échec de la sauvegarde — "+raison,"warn");return false;}
   },[refreshBackupList]);
   const [bkPreview,setBkPreview]=useState(null); // {ts, stats}
+  const archRef=useRef([]);   /* v10.248 : périodes archivées, pour le comparateur */
   /* v10.236 : le comparateur — contre = "actuel" ou l'id d'une autre sauvegarde ; UNE lecture du journal, UNE de l'autre sauvegarde */
   const comparerSauvegarde=useCallback(async(pv,contre)=>{
     setBkPreview(q=>q?{...q,contre,diff:"chargement"}:q);
     try{
       let autrePlan=planRef.current||{},tB=Date.now(),libB="le planning actuel";
       if(contre!=="actuel"){const d=(await window.firebaseDB.collection("backups").doc(contre).get()).data()||{};autrePlan=d.planV2?d.planV2:(d.plan?JSON.parse(d.plan):{});tB=d._ts||0;libB="la sauvegarde du "+new Date(tB).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});}
-      const dfs=diffPlans(pv.bPlan,autrePlan);
+      /* v10.248 : une case présente dans la sauvegarde et absente aujourd'hui parce que sa période a été ARCHIVÉE depuis
+         n'est pas une perte : elle est comptée à part (nArch), pas listée parmi les « sans trace » */
+      const arch=archRef.current||[];let nArch=0;
+      const dfs=diffPlans(pv.bPlan,autrePlan).filter(d=>{if(d.type==="retrait"&&arch.indexOf(histPid(d.k))>=0){nArch++;return false;}return true;});
       const journal=await histLire(dfs.map(d=>histPid(d.k)));   /* v10.238 : les cahiers des périodes concernées */
       const [tA,tZ]=pv.ts<=tB?[pv.ts,tB]:[tB,pv.ts];
       const res=expliqueDiffs(dfs,journal,tA,tZ);
-      setBkPreview(q=>q?{...q,contre,diff:{res,tA,tB:tZ,libB}}:q);
+      setBkPreview(q=>q?{...q,contre,diff:{res,tA,tB:tZ,libB,nArch}}:q);
     }catch(e){toast("Impossible de comparer","warn");setBkPreview(q=>q?{...q,diff:null}:q);}
   },[]);
   const statsOf=(planObj,tourObj,medsArr)=>{
@@ -11446,7 +11690,7 @@ function CardioPlanning(){
     }).length;
     return {nEntries,nGardes,nTourW,nMeds:(medsArr||[]).length,byMonth};
   };
-  const previewBackup=useCallback(async(id,ts)=>{
+  const previewBackup=useCallback(async(id,ts,opt)=>{
     try{
       const snap=await window.firebaseDB.collection("backups").doc(id).get();
       const d=snap.data()||{};
@@ -11465,20 +11709,23 @@ function CardioPlanning(){
         const a=bPlan[k]||{},c2=plan[k]||{};
         const mids=new Set([...Object.keys(a),...Object.keys(c2)]);
         mids.forEach(mid=>{
-          const ja=JSON.stringify(a[mid]||null),jc=JSON.stringify(c2[mid]||null);
+          const ja=cleStable(a[mid]||null),jc=cleStable(c2[mid]||null);   /* v10.249 : indifférent à l'ordre des champs */
           if(ja===jc)return;
           if(a[mid]&&!c2[mid])removed++;      // présent dans la sauvegarde, absent aujourd'hui (serait ré-ajouté)
           else if(!a[mid]&&c2[mid])added++;   // ajouté depuis (serait perdu)
           else changed++;
         });
       });
-      setBkPreview({id,ts,b:sB,c:sC,added,removed,changed,bPlan,diff:null,contre:"actuel"});   /* v10.236 : bPlan pour le comparateur */
+      const pv={id,ts,b:sB,c:sC,added,removed,changed,bPlan,diff:null,contre:"actuel",ver:(opt&&opt.ver)||null};   /* v10.236 : bPlan pour le comparateur ; v10.248 : ver = photo de passage de version */
+      setBkPreview(pv);
+      if(opt&&opt.auto)comparerSauvegarde(pv,"actuel");   /* v10.248 : la vérification lance d'emblée la comparaison case par case */
     }catch(e){toast("Impossible de charger l'aperçu","warn");}
-  },[plan,tourMed,medecins]);
+  },[plan,tourMed,medecins,comparerSauvegarde]);
   const [docSize,setDocSize]=useState(null);
   const [docDet,setDocDet]=useState(null);   /* v10.101 : poids par champ, pour le détail de la jauge */
   const [impWait,setImpWait]=useState(null);  /* v10.103 : fichier d'import lu, en attente de confirmation dans la page */
   const [archivedList,setArchivedList]=useState([]);
+  archRef.current=archivedList;   /* v10.248 : lu par le comparateur */
   const [archBytes,setArchBytes]=useState(0);   /* v10.138 : poids des archives (collection à part) */
   /* v10.142 : signalements — lus à l'ouverture (badge sur l'onglet Paramètres) et à chaque visite de Paramètres */
   const [sigList,setSigList]=useState([]);
@@ -11569,18 +11816,53 @@ function CardioPlanning(){
       const d=await window.firebaseDB.collection("backups").doc(id).get();
       const data=d.data();
       if(!data){toast("Sauvegarde introuvable","warn");return;}
-      const{_ts,gel:_gelAncien,...rest}=data;   /* v10.229 : un gel enregistré DANS la sauvegarde ne revient jamais ; le gel EN COURS, lui, survit à la restauration */
+      const{_ts,gel:_gelAncien,_verArr:_va,_verPrec:_vp,...rest}=data;   /* v10.248 : les marques de photo de version restent dans la sauvegarde */   /* v10.229 : un gel enregistré DANS la sauvegarde ne revient jamais ; le gel EN COURS, lui, survit à la restauration */
       delete rest._ecr;mapPending.current={};mapMigr.current={};   /* v10.246 : aucune de nos entrées en attente ne doit repasser par-dessus la sauvegarde */
       if(BAC){delete rest._bacDe;delete rest._bacDep;rest._bacDe={ts:_ts||0,at:Date.now()};planPending.current={};planSynced.current=null;
         try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : l'historique repart de l'heure de la sauvegarde */
         await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
         toast("📥 Sauvegarde du "+new Date(_ts||0).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+" chargée dans le bac — le vrai planning n'a pas bougé","info");return;}
       if(GEL.on&&GEL.raw)rest.gel=GEL.raw;
+      if(verNum(rest.appVer)<verNum(APP_VERSION))rest.appVer=APP_VERSION;   /* v10.248 : restaurer une vieille sauvegarde ne fait pas croire aux autres appareils à un changement de version */
       planPending.current={};planSynced.current=null;
       await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest)); // remplacement complet : une restauration EST l'état intégral
       toast(GEL.on?"Sauvegarde restaurée — le planning reste gelé : vérifiez-le, puis dégelez":"Sauvegarde restaurée — rechargez la page si besoin","info");
     }catch(e){console.log("restore:",e);toast("Échec de la restauration","warn");}
   },[]);
+  /* v10.250 : RESTAURATION D'UN FICHIER COMPLET (export « données brutes » ≥ v10.250, rubrique « doc ») — même chemin que
+     restoreBackup : le cahier est remplacé d'un bloc. Codes d'accès : ceux EN SERVICE (le fichier n'en contient pas) ; si la
+     base ne répond pas, on ne restaure pas (on écrirait un cahier sans codes). Une sauvegarde de l'état actuel est prise juste
+     avant : retour arrière possible. Périodes archivées du fichier : réécrites telles quelles (jamais depuis le bac). */
+  const restaurerFichier=useCallback(async(data)=>{
+    try{
+      let cur;
+      try{cur=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data();}catch(e){cur=null;}
+      if(!cur){toast("Restauration impossible : la base ne répond pas — rien n'a changé","warn");return false;}
+      if(!BAC){const okB=await makeBackup(true);if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Restaurer quand même ?"))return false;}
+      const rest=Object.assign({},data.doc||{});
+      EXP_HORS.forEach(k=>{delete rest[k];});EXP_CODES.forEach(k=>{delete rest[k];});
+      rest.planV2=data.plan&&typeof data.plan==="object"?data.plan:{};
+      EXP_CODES.forEach(k=>{if(cur[k]!==undefined)rest[k]=cur[k];});
+      ["_lastBackupAt","_bacDe","_bacDep"].forEach(k=>{if(cur[k]!==undefined)rest[k]=cur[k];});
+      const pinInt=(lireJson(cur.intCfg,{})||{}).pin;
+      if(rest.intCfg!==undefined){const c=lireJson(rest.intCfg,null);
+        if(c&&typeof c==="object"){const c2=Object.assign({},c);delete c2.pin;if(pinInt!==undefined)c2.pin=pinInt;rest.intCfg=typeof rest.intCfg==="string"?JSON.stringify(c2):c2;}}
+      else if(cur.intCfg!==undefined)rest.intCfg=cur.intCfg;
+      if(GEL.on&&GEL.raw)rest.gel=GEL.raw;
+      if(verNum(rest.appVer)<verNum(APP_VERSION))rest.appVer=APP_VERSION;
+      jrnMuet();
+      mapPending.current={};mapMigr.current={};planPending.current={};planSynced.current=null;
+      await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
+      let nA=0;
+      if(!BAC&&data.archives&&typeof data.archives==="object"){
+        for(const id of Object.keys(data.archives)){if(id.indexOf("per-")!==0||!data.archives[id])continue;
+          await window.firebaseDB.collection("archives").doc(id).set(data.archives[id]);nA++;}
+        refreshArchList();
+      }
+      toast("Fichier restauré"+(nA?" — "+nA+" période"+(nA>1?"s":"")+" archivée"+(nA>1?"s":"")+" remise"+(nA>1?"s":"")+" en place":"")+(GEL.on?" — le planning reste gelé":""),"info");
+      return true;
+    }catch(e){console.log("restauration fichier:",e);toast("Échec de la restauration","warn");return false;}
+  },[makeBackup,refreshArchList]);
   /* v10.229 : GELER / DÉGELER. Écrit hors du filet (window.firebaseSetDoc) : c'est la seule écriture, avec la
      restauration, qui passe pendant le gel. Dégeler = chaîne vide ({merge:true} ne sait pas supprimer un champ). */
   const gelEcrire=useCallback((on)=>{
@@ -11599,7 +11881,8 @@ function CardioPlanning(){
       try{
         const d=await window.firebaseDB.collection("planning").doc(PLAN_ID).get();
         const last=(d.data()||{})._lastBackupAt||0;
-        if(Date.now()-last>24*3600*1000)await makeBackup(false);   /* v10.0 : une par jour au lieu d'une tous les 3 jours */
+        if(Date.now()-last>24*3600*1000){const ok=await makeBackup(false);   /* v10.0 : une par jour au lieu d'une tous les 3 jours */
+          if(!ok&&Date.now()-last>48*3600*1000)setBkAlarme({last});}   /* v10.248 : panne silencieuse du 29/09 au 01/10/2026 — désormais un bandeau */
         else refreshBackupList();
       }catch(e){console.log("backup check:",e);}
     },6000);
@@ -12049,6 +12332,16 @@ function CardioPlanning(){
      éditeurs compris ; le premier garde la main sur Paramètres (restaurer, dégeler). */
   const isEditVrai=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"&&(((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")!=="attache"))&&!netOff;
   const isEdit=isEditVrai&&!gelOn;  /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
+  /* v10.251 : COPIE DES CODES dans prive/codes — le document que la v10.252 réservera à l'éditeur (règle Firestore), quand les
+     codes quitteront le document principal. Tenue à jour par les appareils d'un éditeur, à chaque changement reçu (le sien
+     ou celui d'un médecin qui change son propre code) ; une écriture au plus par changement. Jamais depuis le bac à sable. */
+  const priveRef=useRef("");
+  useEffect(()=>{if(BAC||!isEditVrai||!serverSeen.current||!window.firebaseDB||isFirstLoad.current)return;
+    const meds={};Object.keys(medPins||{}).forEach(k=>{const m=medecins.find(x=>String(x.id)===k);const c=medPins[k];if(!c)return;meds[k]={code:c,init:m?m.init:"",nom:m?((m.prenom||"")+" "+(m.nom||"")).trim():"",etiq:m?cpteEtiquette(m):"",parti:!!(m&&medParti(m)),depart:(m&&m.depart)||null};});
+    const o={medecins:meds,editeur:editPin||"",secretaires:adminPin||"",cadres:cadrePin||"",internes:(intCfg&&intCfg.pin)||""};
+    const sig=JSON.stringify(o);if(priveRef.current===sig)return;priveRef.current=sig;
+    try{trafEcr(window.firebaseDB.collection("prive").doc("codes").set(Object.assign({},o,{at:Date.now(),v:verCourt(),a:APPAREIL.id}))).catch(e=>{priveRef.current="";cpteLog("copie des codes non écrite",cpteErr(e));});}catch(e){priveRef.current="";}
+  },[medPins,editPin,adminPin,cadrePin,intCfg,medecins,isEditVrai]);
   /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
      une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
   const verrouDeb=useMemo(()=>verrouDebut(),[PCFG.len,PCFG.startM,vacs]);
@@ -13553,6 +13846,7 @@ function CardioPlanning(){
     const n=medNbCases(m.id,plan,archPlan);
     if(n>0){toast("🚪 "+(m.prenom||"")+" "+(m.nom||"")+" a "+n+" case"+(n>1?"s":"")+" dans le planning — indiquez sa date de départ dans sa fiche (✏️) : son historique reste, sa fiche passe dans « Anciens membres ».","warn");return;}
     if(!window.confirm("Supprimer "+(m.nom||"")+" ? Cette fiche n'a aucune case dans le planning."))return;
+    if(!BAC&&medPins[m.id])cpteSupprimer(medPins[m.id],cpteEtiquette(m)).then(cpteSuite);   /* v10.251 */
     setMedecins(p=>p.filter(x=>x.id!==m.id));
     setMedPins(p=>{if(!p[m.id])return p;const q={...p};delete q[m.id];return q;});
   };
@@ -13618,33 +13912,28 @@ function CardioPlanning(){
   const doExport=useCallback(async(kind)=>{
     setExpBusy(true);
     try{
-      let src;
-      if(expSrc==="now")src={plan:plan,notes:notes,tourMed:tourMed,tourDerog:tourDerog,medecins:medecins,actes:actes,salleReg:salleReg,planningType:planningType};
-      else{
-        const dd=(await window.firebaseDB.collection("backups").doc(expSrc).get()).data()||{};
-        const pj=(x,def)=>{try{return typeof x==="string"?JSON.parse(x):(x||def);}catch(e){return def;}};
-        /* v10.102 : l'équipe et les activités d'une sauvegarde sont en V2 (map + ordre)
-           depuis la v9.7 — l'ancien champ, purgé, sortait une liste vide ou périmée. */
-        const rdV2=(mp,ordRaw,leg)=>{
-          if(!mp)return pj(leg,[]);
-          const vals={};Object.keys(mp).forEach(k=>{const v=mp[k];vals[k]=typeof v==="string"?JSON.parse(v):v;});
-          const ord=pj(ordRaw,null);
-          const ids=Array.isArray(ord)?ord.map(String).filter(id=>vals[id]!==undefined):[];
-          const rest=Object.keys(vals).filter(id=>ids.indexOf(id)<0);
-          return ids.concat(rest).map(id=>vals[id]);
-        };
-        src={plan:dd.planV2||{},notes:docNotes(dd),tourMed:docTourMed(dd),tourDerog:pj(dd.tourDerog,{}),
-             medecins:rdV2(dd.medecinsV2,dd.medecinsV2Order,dd.medecins),actes:rdV2(dd.actesV2,dd.actesV2Order,dd.actes),salleReg:docSalleReg(dd),
-             planningType:(dd.planningTypeV2!==undefined?pj(dd.planningTypeV2,{}):pj(dd.planningType,{}))};
-      }
-      src.exportDate=new Date().toISOString();src.version="v7";   /* v10.102 : relisible par 📂 Importer */
+      /* v10.250 : les données brutes partent du CAHIER lui-même (planning actuel ou sauvegarde), plus les archives — voir
+         expComplet. Le tableau garde l'état affiché. Base muette : export partiel, annoncé comme tel. */
+      let src=null,raw=null;
+      if(expSrc!=="now")raw=(await window.firebaseDB.collection("backups").doc(expSrc).get()).data()||{};
+      else if(kind==="donnees"){try{raw=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data()||null;}catch(e){raw=null;}}
+      if(raw){
+        let arch=null;
+        if(kind==="donnees"&&!BAC){try{const sn=await window.firebaseDB.collection("archives").get();const a2={};
+          sn.forEach(d2=>{if(d2.id&&d2.id.indexOf("per-")===0)a2[d2.id]=d2.data()||{};});arch=a2;}catch(e){arch=null;}}
+        src=expComplet(raw,arch);
+      }else src={plan:plan,notes:notes,tourMed:tourMed,tourDerog:tourDerog,medecins:medecins,actes:actes,salleReg:salleReg,planningType:planningType};
+      src.exportDate=new Date().toISOString();src.version=src.doc?"v8":"v7";   /* v10.102 : relisible par 📂 Importer ; v8 = complet (v10.250) */
       const nom="planning-"+expPer.sy+"-"+String(expPer.sm+1).padStart(2,"0");
       if(kind==="tableau")expTelecharge(nom+".xls",expTable(expPer,src));
       else expTelecharge(nom+"-donnees.json",JSON.stringify(src),"application/json;charset=utf-8");
       const t=Date.now();setExpLast(t);setExpN(0);setExpSnooze(false);setExpLastFB(t);
       try{localStorage.setItem("cp6_expLast",String(t));localStorage.setItem("cp6_expN","0");}catch(e){}
       saveToFirebase({expLast:String(t)});   /* v10.169 : les autres appareils la reprennent */
-      toast("Sauvegarde téléchargée","info");
+      if(kind==="tableau")toast("Sauvegarde téléchargée","info");
+      else if(!src.doc)toast("⚠ Export PARTIEL : la base n'a pas répondu — le fichier ne contient que les cases, l'équipe, les activités, les salles, le planning type, le tour et les notes","warn");
+      else if(src.archivesAbsentes)toast("Données brutes téléchargées — sans les périodes archivées"+(BAC?" (bac à sable)":" (la base n'a pas répondu)"),"warn");
+      else{const nA=Object.keys(src.archives||{}).length;toast("Données brutes téléchargées — complètes"+(nA?", "+nA+" période"+(nA>1?"s":"")+" archivée"+(nA>1?"s":"")+" comprise"+(nA>1?"s":""):""),"info");}
     }catch(e){console.log("export:",e);toast("Échec de la sauvegarde","warn");}
     setExpBusy(false);
   },[expSrc,expPer,plan,notes,tourMed,tourDerog,medecins,actes,salleReg,planningType]);
@@ -13661,6 +13950,16 @@ function CardioPlanning(){
   const bacRaz=async()=>{if(!window.confirm("Remettre le bac à sable à zéro ?\n\nSon contenu est remplacé par une copie fraîche du planning réel, puis l'application se recharge."))return;
     try{await bacCopie();window.location.reload();}catch(e){toast("Échec de la remise à zéro","warn");}};
   const bacSortir=()=>{try{localStorage.removeItem("cp6_bac");}catch(e){}window.location.reload();};
+  /* v10.251 : les codes en service et ceux des partis (compte à supprimer), pour la carte 🔐 Comptes */
+  const cpteListe=()=>{const L=[];
+    if(editPin)L.push({code:editPin,etiq:"role:editeur",qui:"Éditeur",partage:true});
+    if(adminPin&&adminPin.length>=3)L.push({code:adminPin,etiq:"role:secretaires",qui:"Secrétaires",partage:true});
+    if(cadrePin&&cadrePin.length>=3)L.push({code:cadrePin,etiq:"role:cadres",qui:"Cadres",partage:true});
+    if(intCfg&&intCfg.pin&&intCfg.pin.length>=3)L.push({code:intCfg.pin,etiq:"role:internes",qui:"Internes",partage:true});
+    (medecins||[]).forEach(m=>{const c=medPins[String(m.id)];if(!c||c.length<3)return;const parti=medParti(m);
+      if(!parti&&L.some(x=>x.code===c))return;
+      L.push({code:c,etiq:cpteEtiquette(m),qui:(m.init||"")+(m.role==="attache"?" (attaché)":""),parti,repris:parti&&L.some(x=>x.code===c&&!x.parti)});});
+    return L;};
   const bacProfil=accessMode==="edit"?"edit":accessMode==="view"?"view":accessMode==="medecinEdit"?"med:"+editMedId:accessMode==="adminEdit"?(isCadre?"cadre":"admin"):accessMode==="interneEdit"?"interne":"edit";
   const bacConnecter=(v)=>{setPinInput("");setPinError(false);
     if(v==="edit"||v==="view"){setIsCadre(false);setAccessMode(v);setTab("planning");return;}
@@ -13669,6 +13968,30 @@ function CardioPlanning(){
     if(v==="interne"){if(!interneName)setInterneName("Bac");setAccessMode("interneEdit");setTab("planning");}};
 
   /* ── Login ── */
+  /* v10.251 : UNE SEULE fonction d'entrée (la touche Entrée et le bouton faisaient deux fois le même code). Étapes :
+     (1) à quel profil correspond le code tapé — vérification INCHANGÉE (codes du document) ; (2) pas de réseau = pas de
+     modification : navigateur hors ligne, ou Google injoignable dans les 6 s → message « consultation seule » ; (3) le compte
+     Google du code est ouvert, créé s'il manque, ré-étiqueté s'il le faut — une erreur de Google ne bloque pas ; (4) le profil
+     s'applique comme avant. Dans le bac à sable, pas de compte (ce sont les mêmes codes : rien à préparer). */
+  const codeProfil=(v)=>{
+    if(v===editPin)return {type:"edit",etiq:"role:editeur"};
+    const medEntry=Object.entries(medPins).find(([id,pin])=>pin===v&&pin.length>=3&&!medParti(medecins.find(m=>m.id===parseInt(id))));
+    if(medEntry){const m=medecins.find(x=>x.id===parseInt(medEntry[0]));return {type:"med",id:parseInt(medEntry[0]),attache:!!(m&&m.role==="attache"),etiq:cpteEtiquette(m)};}
+    if(adminEnabled){const okA=adminPin&&adminPin.length>=3&&v===adminPin;const okC=cadrePin&&cadrePin.length>=3&&v===cadrePin;if(okA)return {type:"admin",etiq:"role:secretaires"};if(okC)return {type:"cadre",etiq:"role:cadres"};}
+    if(intCfg.show===true&&intCfg.pin&&intCfg.pin.length>=3&&v===intCfg.pin)return {type:"interne",etiq:"role:internes"};
+    return null;};
+  const codeAppliquer=(q)=>{setPinError(false);
+    if(q.type==="edit"){setAccessMode("edit");return;}
+    if(q.type==="med"){setEditMedId(q.id);setAccessMode("medecinEdit");if(q.attache)setTab("attache");return;}   /* v10.72 : un ATTACHE ouvre sur l'onglet Attaches */
+    if(q.type==="admin"||q.type==="cadre"){setIsCadre(q.type==="cadre");setAdminAsk(true);return;}
+    if(q.type==="interne")setInterneAsk(true);};
+  const entrerCode=async()=>{if(codeAttente)return;
+    const v=pinInput,q=codeProfil(v);
+    if(!q){setPinError(true);return;}
+    if(navOff||(typeof navigator!=="undefined"&&navigator.onLine===false)){setHorsReseau(true);setPinError(false);return;}
+    if(cpteDispo()&&!BAC){setCodeAttente(true);let r;try{r=await cpteEntrer(v,q.etiq);}catch(e){r={ok:true,erreur:String(e)};}setCodeAttente(false);
+      if(r&&r.ok===false){setHorsReseau(true);setPinError(false);return;}}
+    setHorsReseau(false);codeAppliquer(q);};
   // Show loading while Firebase connects (so medPins are available for login)
   if(accessMode==="ask"&&fbStatus==="connecting"&&!PLANNING_DOC) return(
     <div style={{minHeight:"100vh",background:"#1a1f2e",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",color:"#4ade80",fontSize:20}}>
@@ -13694,38 +14017,13 @@ function CardioPlanning(){
           {fbStatus==="connecting"&&<span style={{fontSize:10,color:"#f59e0b"}}>⏳ Chargement...</span>}
           {fbStatus==="ok"&&Object.keys(medPins).length>0&&<span style={{fontSize:10,color:"#4ade80"}}>✓ {Object.keys(medPins).length} PIN(s) médecin</span>}
         </div>
-        <input value={pinInput} onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){
-    if(pinInput===editPin){setAccessMode("edit");setPinError(false);return;}
-    const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3&&!medParti(medecins.find(m=>m.id===parseInt(id))));
-    if(medEntry){setEditMedId(parseInt(medEntry[0]));setAccessMode("medecinEdit");setPinError(false);
-      /* v10.72 : un ATTACHE ouvre directement sur l'onglet Attaches — son planning
-         n'est pas dans l'onglet Planning, qui ne montre que les medecins. */
-      const _mA=medecins.find(m=>m.id===parseInt(medEntry[0]));if(_mA&&_mA.role==="attache")setTab("attache");}
-    else if(adminEnabled&&(()=>{const okA=adminPin&&adminPin.length>=3&&pinInput===adminPin;const okC=cadrePin&&cadrePin.length>=3&&pinInput===cadrePin;if(okA||okC)setIsCadre(!!okC&&!okA);return okA||okC;})()){setAdminAsk(true);setPinError(false);}
-    else if(intCfg.show===true&&intCfg.pin&&intCfg.pin.length>=3&&pinInput===intCfg.pin){setInterneAsk(true);setPinError(false);}
-    else setPinError(true);
-  }}}
+        <input value={pinInput} onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")entrerCode();}}
           type="password" placeholder="PIN" style={{...S.fi,width:"100%",textAlign:"center",letterSpacing:6,fontSize:16,marginBottom:8}}/>
         {pinError&&<div style={{color:"#ef4444",fontSize:12,marginBottom:8}}>Code incorrect</div>}
+        {horsReseau&&<div data-horsreseau="1" style={{color:"#b45309",background:"rgba(180,83,9,.08)",border:"1px solid #b45309",borderRadius:8,padding:"8px 10px",fontSize:12,fontWeight:700,marginBottom:8,lineHeight:1.4}}>📴 Pas de connexion internet : consultation seule. Reconnectez-vous pour modifier le planning.<button style={{display:"block",width:"100%",marginTop:8,padding:"8px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontSize:13,fontWeight:700}} onClick={()=>setAccessMode("view")}>👁 Consulter</button></div>}{/* v10.251 */}
+        {codeAttente&&<div data-codeattente="1" style={{color:"var(--txt3)",fontSize:12,marginBottom:8}}>⏳ Vérification…</div>}
         <button style={{width:"100%",padding:"10px",borderRadius:9,border:"none",background:"#1d4ed8",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700}}
-          onClick={()=>{
-            if(pinInput===editPin){setAccessMode("edit");setPinError(false);return;}
-            // Check medecin PINs
-            const medEntry=Object.entries(medPins).find(([id,pin])=>pin===pinInput&&pin.length>=3&&!medParti(medecins.find(m=>m.id===parseInt(id))));
-            if(medEntry){
-              setEditMedId(parseInt(medEntry[0]));
-              setAccessMode("medecinEdit");
-              setPinError(false);
-              const _mA=medecins.find(m=>m.id===parseInt(medEntry[0]));   /* v10.72 : attache -> onglet Attaches */
-              if(_mA&&_mA.role==="attache")setTab("attache");
-            } else if(adminEnabled&&(()=>{const okA=adminPin&&adminPin.length>=3&&pinInput===adminPin;const okC=cadrePin&&cadrePin.length>=3&&pinInput===cadrePin;if(okA||okC)setIsCadre(!!okC&&!okA);return okA||okC;})()){
-              setAdminAsk(true);setPinError(false);
-            } else if(intCfg.show===true&&intCfg.pin&&intCfg.pin.length>=3&&pinInput===intCfg.pin){
-              setInterneAsk(true);setPinError(false);
-            } else {
-              setPinError(true);
-            }
-          }}>✏️ Édition</button>
+          disabled={codeAttente} onClick={()=>entrerCode()}>✏️ Édition</button>
         {adminAsk&&<div style={{marginTop:10,padding:10,borderRadius:9,border:"1.5px solid #7c3aed",background:"rgba(124,58,237,.08)"}}>
           <div style={{fontSize:11,color:"#7c3aed",fontWeight:800,marginBottom:6}}>{"🗝 Accès "+(isCadre?"cadre":"secrétaire")+" — votre prénom :"}</div>
           <input value={adminNameInput} onChange={e=>setAdminNameInput(e.target.value)} placeholder="Prénom" style={{...S.fi,width:"100%",textAlign:"center",marginBottom:8}}/>
@@ -13941,14 +14239,17 @@ header::-webkit-scrollbar { display: none; }
         </div>
       </div>}
       <FlecheHaut tab={tab}/>{/* v10.226 */}
+      {bkAlarme&&isEditVrai&&!BAC&&inactReste===null&&<div data-bkalarme="1" onClick={()=>{setBkAlarme(null);setTab("partage");}} title="Ouvrir Paramètres" style={{position:"fixed",top:10,left:"50%",transform:"translateX(-50%)",zIndex:2900,background:"#b91c1c",color:"#fff",padding:"9px 16px",borderRadius:10,fontSize:12.5,fontWeight:700,boxShadow:"0 4px 18px rgba(0,0,0,.35)",cursor:"pointer",textAlign:"center",maxWidth:"92vw",lineHeight:1.45}}>{/* v10.248 */}
+        💾 Sauvegarde automatique en échec — la dernière réussie date {bkAlarme.last?"du "+new Date(bkAlarme.last).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"d'avant le suivi"}{bkErr?" · "+bkErr.raison:""}. Toucher pour ouvrir Paramètres.
+      </div>}
       {inactReste!==null&&<div data-inact="1" onClick={()=>inactAction()} style={{position:"fixed",top:10,left:"50%",transform:"translateX(-50%)",zIndex:4000,background:"#b45309",color:"#fff",padding:"10px 16px",borderRadius:10,fontSize:13,fontWeight:700,boxShadow:"0 4px 18px rgba(0,0,0,.35)",cursor:"pointer",textAlign:"center",maxWidth:"92vw"}}>{/* v10.247 */}
         🔒 Fermeture dans {inactReste} s pour inactivité — touchez l'écran pour continuer
       </div>}
       {gelOn&&!netOff&&<div data-botbar="1" data-gel="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e7490",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
         🧊 Planning gelé par {gel.by||"l'éditeur"} depuis {gelHeure(gel.at)} — lecture seule pour tout le monde{isEditVrai?" · dégel dans Paramètres":""}
       </div>}
-      {netOff&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
-        📴 Hors ligne — dernier planning reçu · lecture seule
+      {netOff&&<div data-botbar="1" data-liaison={!navOff&&liaisonOff?"1":undefined} style={{position:"fixed",bottom:0,left:0,right:0,background:"#64748b",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:502,fontWeight:600}}>
+        {!navOff&&liaisonOff?"📡 Connexion perdue — modifications suspendues (reprise automatique dès que Firebase répond)":"📴 Hors ligne — dernier planning reçu · lecture seule"}{/* v10.251 */}
       </div>}
       {isMedEdit&&botOn&&!BAC&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#1d4ed8",color:"#fff",textAlign:"center",fontSize:12,padding:"6px",zIndex:500,fontWeight:600}}>
         ✏️ {isInterEdit?"Édition étendue":"Mode édition restreinte"} — Dr. {(djAff(medecins.find(m=>m.id===editMedId),djTodayIso)||{nom:""}).nom}{/* v10.150 : le junior en poste, pas le rôle */}
@@ -14718,18 +15019,18 @@ header::-webkit-scrollbar { display: none; }
               <input type="password" id="pinOld" placeholder="Ancien PIN" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
               <input type="password" id="pinN1" placeholder="Nouveau PIN (min 4 car.)" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
               <input type="password" id="pinN2" placeholder="Confirmer le nouveau PIN" style={{...S.fi,textAlign:"center",letterSpacing:4}}/>
-              <button style={S.btnP} onClick={()=>{const o=document.getElementById("pinOld").value;const a=document.getElementById("pinN1").value;const b=document.getElementById("pinN2").value;if(o!==editPin){toast("Ancien PIN incorrect","warn");}else if(a.length<4){toast("Min 4 car.","warn");}else if(a!==b){toast("Les deux nouveaux PIN ne correspondent pas","warn");}else{setEditPin(a);["pinOld","pinN1","pinN2"].forEach(x=>{document.getElementById(x).value="";});toast("PIN mis à jour");}}}>Changer le PIN</button>
+              <button style={S.btnP} onClick={()=>{const o=document.getElementById("pinOld").value;const a=document.getElementById("pinN1").value;const b=document.getElementById("pinN2").value;if(o!==editPin){toast("Ancien PIN incorrect","warn");}else if(a.length<4){toast("Min 4 car.","warn");}else if(a!==b){toast("Les deux nouveaux PIN ne correspondent pas","warn");}else{if(!BAC)cpteChanger(editPin,a,"role:editeur").then(cpteSuite);setEditPin(a);["pinOld","pinN1","pinN2"].forEach(x=>{document.getElementById(x).value="";});toast("PIN mis à jour");}   /* v10.251 : le compte suit le code */}}>Changer le PIN</button>
             </div>
             <div style={{fontWeight:700,fontSize:12,color:"var(--txt)",margin:"12px 0 6px",paddingTop:10,borderTop:"1px solid var(--border)"}}>🗝 Rôles secrétaires et cadres</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>PIN secrétaires (partagé) : à la connexion, chaque personne saisit son prénom (mémorisé sur son appareil). Le rôle peut poser, modifier et retirer les activités cochées « ✏️ secrétaires » sur la ligne de n'importe quel médecin.</div>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <input type="password" id="nap" placeholder={adminPin?"PIN défini — nouveau PIN":"Définir le PIN"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
-              <button style={S.btnP} onClick={()=>{const v=document.getElementById("nap").value;if(v.length>=4){setAdminPin(v);toast("PIN administratif mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
+              <button style={S.btnP} onClick={()=>{const v=document.getElementById("nap").value;if(v.length>=4){if(!BAC)cpteChanger(adminPin,v,"role:secretaires").then(cpteSuite);setAdminPin(v);toast("PIN administratif mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
             </div>
             <div style={{fontSize:10,color:"var(--txt3)",margin:"2px 0 4px"}}>PIN cadre : suit sa propre coche « ✏️ cadres » sur chaque activité, plus la gestion du planning IDE (PT cardio) et les départs différés.</div>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <input type="password" id="ncp" placeholder={cadrePin?"PIN cadre défini — nouveau PIN":"Définir le PIN cadre"} style={{...S.fi,flex:1,textAlign:"center",letterSpacing:4}}/>
-              <button style={S.btnP} onClick={()=>{const v=document.getElementById("ncp").value;if(v.length>=4){if(v===adminPin||v===editPin){toast("Ce PIN est déjà utilisé par un autre rôle","warn");return;}setCadrePin(v);toast("PIN cadre mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
+              <button style={S.btnP} onClick={()=>{const v=document.getElementById("ncp").value;if(v.length>=4){if(v===adminPin||v===editPin){toast("Ce PIN est déjà utilisé par un autre rôle","warn");return;}if(!BAC)cpteChanger(cadrePin,v,"role:cadres").then(cpteSuite);setCadrePin(v);toast("PIN cadre mis à jour");}else toast("Min 4 car.","warn");}}>OK</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:8}}>
               <label style={{display:"flex",gap:8,alignItems:"center",fontSize:12,color:"var(--txt2)",cursor:"pointer"}}><input type="checkbox" checked={adminEnabled} onChange={e=>setAdminEnabled(e.target.checked)} style={{width:14,height:14}}/>Rôle activé (décocher suspend l'accès sans changer le PIN)</label>
@@ -14774,6 +15075,8 @@ header::-webkit-scrollbar { display: none; }
                 <div style={{fontSize:12,color:"var(--txt)",lineHeight:1.9}}>
                   <div><b>Éditeur :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{editPin}</span></div>
                   <div><b>Administratif :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{adminPin||"— non défini —"}</span></div>
+                  <div><b>Cadres :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{cadrePin||"— non défini —"}</span></div>{/* v10.251 */}
+                  <div><b>Internes :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{(intCfg&&intCfg.pin)||"— non défini —"}</span></div>
                   {Object.entries(medPins).filter(([,p2])=>p2&&p2.length>=3).map(([mid2,p2])=>{const m2=medecins.find(x=>String(x.id)===String(mid2));return <div key={mid2}><b>{m2?m2.init:mid2} :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{p2}</span></div>;})}
                   {Object.entries(medPins).filter(([,p2])=>p2&&p2.length>=3).length===0&&<div style={{color:"var(--txt3)"}}>Aucun PIN médecin défini.</div>}
                 </div>
@@ -14781,6 +15084,7 @@ header::-webkit-scrollbar { display: none; }
               </div>}
           </div>}
 
+          {isEdit&&<ComptesTuile codes={cpteListe()} netOff={netOff} bac={BAC} showPins={showPins}/>}{/* v10.251 */}
           {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.131 : sa propre carte */}
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🎯 Colonne du médecin connecté</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas.</div>
@@ -15104,6 +15408,13 @@ header::-webkit-scrollbar { display: none; }
             <div style={{marginBottom:14,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
               <div style={{fontSize:11,fontWeight:700,color:"var(--txt2)",marginBottom:4}}>🕐 Sauvegardes automatiques (une par jour, 45 conservées)</div>
               <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Restaurer écrase les données actuelles par celles de la sauvegarde choisie.</div>
+              {bkErr&&<div data-bkerr="1" style={{fontSize:11,fontWeight:700,color:"#dc2626",marginBottom:8,lineHeight:1.45}}>⚠️ Dernier essai de sauvegarde échoué ({new Date(bkErr.t).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}) : {bkErr.raison}.</div>}{/* v10.248 */}
+              {(()=>{/* v10.248 : la dernière photo de passage de version et sa vérification */
+                const pv=backupList.find(b=>b.ver);if(!pv)return null;
+                return <div data-verbloc="1" style={{marginBottom:8,padding:"7px 9px",borderRadius:7,border:"1px solid #388bfd",background:"rgba(56,139,253,.06)",fontSize:11,lineHeight:1.5}}>
+                  <div>🏷 Photo prise à l'arrivée de la <b>{pv.ver}</b>{pv.prec?<> (données laissées par la <b>{String(pv.prec).split(" ")[0]}</b>)</>:null} — {new Date(pv.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}.</div>
+                  <button data-verbtn="1" onClick={()=>previewBackup(pv.id,pv.ts,{auto:true,ver:pv})} style={{marginTop:5,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid #388bfd",background:"var(--bg2)",color:"#388bfd",fontWeight:700,cursor:"pointer"}}>🔎 Vérifier le passage de version</button>
+                </div>;})()}
               <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
                 {backupList.length===0&&<span style={{fontSize:11,color:"var(--txt3)"}}>Aucune sauvegarde pour l'instant.</span>}
                 {/* v10.0 : avec 45 sauvegardes, une liste à plat devient illisible. On la
@@ -15112,11 +15423,11 @@ header::-webkit-scrollbar { display: none; }
                   style={{...S.fi,width:"100%",marginBottom:6,fontSize:11}}>
                   <option value="">📜 {backupList.length-5} sauvegardes plus anciennes…</option>
                   {backupList.slice(5).map(b=>(
-                    <option key={b.id} value={b.id}>{new Date(b.ts).toLocaleString("fr-FR",{weekday:"short",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</option>))}
+                    <option key={b.id} value={b.id}>{new Date(b.ts).toLocaleString("fr-FR",{weekday:"short",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+(b.ver?" — 🏷 arrivée "+b.ver:"")}</option>))}
                 </select>}
                 {backupList.filter(b=>backupList.indexOf(b)<5||b.id===bkOpen).map(b=>(
                   <div key={b.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"var(--txt)"}}>
-                    <span style={{flex:1}}>{new Date(b.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
+                    <span style={{flex:1}}>{new Date(b.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}{b.ver&&<span style={{marginLeft:6,fontSize:10,color:"#388bfd",fontWeight:700}}>🏷 arrivée {b.ver}</span>}</span>
                     <button style={{padding:"3px 10px",borderRadius:6,border:"1px solid #388bfd",background:"var(--bg2)",color:"#388bfd",fontSize:10,fontWeight:700,cursor:"pointer"}}
                       onClick={()=>previewBackup(b.id,b.ts)}>
                       👁 Aperçu
@@ -15165,10 +15476,18 @@ header::-webkit-scrollbar { display: none; }
             </div>
             {impWait&&<div style={{marginTop:8,padding:10,borderRadius:8,border:"1px solid #f87171",background:"var(--bg2)"}}>
               <div style={{fontSize:11,fontWeight:700,marginBottom:6}}>Restaurer la sauvegarde du {impWait.ds} ?</div>
-              <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>Toutes les données actuelles seront remplacées par celles du fichier.</div>
+              {(()=>{const r=expResume(impWait.data);   /* v10.250 : ce que le fichier remet en place, en clair */
+                return r.complet?<div data-impresume="complet" style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>
+                  Le fichier contient : {r.liste}{r.nArch?" · "+r.nArch+" période"+(r.nArch>1?"s":"")+" archivée"+(r.nArch>1?"s":""):""}.
+                  {" "}Tout le planning actuel sera remplacé par son contenu{r.nArch?", et ces périodes archivées réécrites":""}.
+                  {r.sansArch?" Ce fichier a été fait sans les périodes archivées : celles de la base ne bougent pas.":""}
+                  {" "}Les codes d'accès actuels sont conservés. Une sauvegarde de l'état actuel est prise juste avant.</div>
+                :<div data-impresume="ancien" style={{fontSize:10,color:"var(--txt3)",marginBottom:8}}>
+                  Fichier d'un ancien format (avant la v10.250) : seuls {r.liste} seront remplacés. Le reste (astreinte, souhaits, reports, internes, réglages…) ne change pas.</div>;})()}
               <div style={{display:"flex",gap:8}}>
                 <button style={{...S.btnP,background:"#dc2626"}} onClick={()=>{
                   const data=impWait.data;
+                  if(data.doc&&typeof data.doc==="object"){setImpWait(null);restaurerFichier(data);return;}   /* v10.250 : fichier complet */
                   jrnMuet();   /* v10.246 : un import de fichier remplace tout — pas une ligne de journal par note */
                   if(data.plan)setPlan(data.plan);
                   if(data.tourMed)setTourMed(data.tourMed);
@@ -15413,10 +15732,19 @@ header::-webkit-scrollbar { display: none; }
         <Ov onClose={()=>setBkPreview(null)}>
           <div style={{...S.modal,maxWidth:bkPreview.diff&&bkPreview.diff!=="chargement"?760:520,maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-              <div style={S.mTit2}>👁 Aperçu — sauvegarde du {new Date(ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
+              <div style={S.mTit2}>{bkPreview.ver?"🔎 Passage à la "+bkPreview.ver.ver+" — photo du ":"👁 Aperçu — sauvegarde du "}{new Date(ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
               <button onClick={()=>setBkPreview(null)} style={S.xBtn}>×</button>
             </div>
-            {identical
+            {bkPreview.ver&&(()=>{/* v10.248 : le verdict de la vérification de passage de version */
+              const v=bkPreview.ver,dd=bkPreview.diff;
+              const intro=<div style={{fontSize:11,color:"var(--txt2)",marginBottom:6,lineHeight:1.5}}>Photo prise à l'arrivée de la <b>{v.ver}</b>{v.prec?<> — l'état laissé par la <b>{String(v.prec).split(" ")[0]}</b></>:null}, avant toute écriture de la nouvelle version. On la compare au planning actuel, case par case, cases archivées mises à part.</div>;
+              if(!dd||dd==="chargement")return <div>{intro}<div style={{fontSize:12,color:"var(--txt3)",marginBottom:10}}>Vérification en cours…</div></div>;
+              const nS=dd.res.filter(x=>x.sansTrace).length,nA=dd.res.length-nS;
+              return <div>{intro}{nS===0
+                ?<div data-verdict="ok" style={{padding:"8px 12px",borderRadius:8,border:"1px solid #16a34a",background:"rgba(22,163,74,.08)",fontSize:12.5,fontWeight:700,color:"#16a34a",marginBottom:10,lineHeight:1.5}}>✓ Passage de version vérifié : aucune case perdue ni modifiée sans auteur. {nA===0?"Le planning est identique, case par case.":nA+" modification(s) depuis la photo, toutes avec leur auteur dans le journal."}</div>
+                :<div data-verdict="ko" style={{padding:"8px 12px",borderRadius:8,border:"1px solid #dc2626",background:"rgba(220,38,38,.08)",fontSize:12.5,fontWeight:700,color:"#dc2626",marginBottom:10,lineHeight:1.5}}>⚠️ {nS} case(s) ont changé depuis la photo SANS trace dans le journal — détail ci-dessous. Une opération de masse (planning type, construction, import, restauration) en est l'explication habituelle ; sinon, envoyez un 🐞 avec cette liste.</div>}</div>;
+            })()}
+            {bkPreview.ver?null:identical
               ?<div style={{padding:"8px 12px",borderRadius:8,border:"1px solid #16a34a",background:"rgba(22,163,74,.08)",fontSize:12,fontWeight:700,color:"#16a34a",marginBottom:10}}>✓ Cette sauvegarde est identique au planning actuel.</div>
               :<div style={{padding:"8px 12px",borderRadius:8,border:"1px solid #f59e0b",background:"rgba(245,158,11,.08)",fontSize:12,color:"var(--txt)",marginBottom:10,lineHeight:1.5}}>
                 Restaurer cette sauvegarde : <b style={{color:"#16a34a"}}>{removed} case(s) ré-apparaîtraient</b> (présentes alors, effacées depuis), <b style={{color:"#f85149"}}>{added} case(s) seraient perdues</b> (ajoutées depuis), <b style={{color:"#e3b341"}}>{changed} case(s) reviendraient à leur ancien contenu</b>.
@@ -15448,7 +15776,7 @@ header::-webkit-scrollbar { display: none; }
               {!bkPreview.diff&&<button data-cmpbtn="1" onClick={()=>comparerSauvegarde(bkPreview,bkPreview.contre||"actuel")} style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid #388bfd",background:"var(--bg2)",color:"#388bfd",fontWeight:700,cursor:"pointer"}}>Voir les différences case par case</button>}
               {bkPreview.diff==="chargement"&&<span style={{color:"var(--txt3)"}}>Comparaison…</span>}
             </div>
-            {bkPreview.diff&&bkPreview.diff!=="chargement"&&<DiffPanel res={bkPreview.diff.res} meds={medecins} actes={actes} tA={bkPreview.diff.tA} tB={bkPreview.diff.tB} libA={"la sauvegarde du "+new Date(ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})} libB={bkPreview.diff.libB}/>}
+            {bkPreview.diff&&bkPreview.diff!=="chargement"&&<DiffPanel res={bkPreview.diff.res} meds={medecins} actes={actes} tA={bkPreview.diff.tA} tB={bkPreview.diff.tB} libA={"la sauvegarde du "+new Date(ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})} libB={bkPreview.diff.libB} nArch={bkPreview.diff.nArch||0}/>}
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}>
               <button onClick={()=>setBkPreview(null)} style={{padding:"9px 16px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",fontWeight:700,fontSize:13,cursor:"pointer"}}>Fermer</button>
               <button style={{...S.btnP,padding:"9px 18px",background:"#dc2626"}}
@@ -16237,12 +16565,18 @@ header::-webkit-scrollbar { display: none; }
                 // Check not used by another med
                 const conflict=Object.entries(medPins).find(([id,p])=>p===v&&parseInt(id)!==mData.id&&!medParti(medecins.find(m=>m.id===parseInt(id))));   /* v10.151 : le PIN d'un parti est libre */
                 if(conflict){const m2=medecins.find(m=>m.id===parseInt(conflict[0]));return toast(`Ce PIN est déjà utilisé par ${m2?.init||"un autre médecin"}`,"warn");}
+                /* v10.251 : un code d'un PARTI se redonne, avec avertissement — jamais interdit */
+                const ancienParti=cpteAncien(v,medPins,medecins);
+                if(ancienParti&&parseInt(ancienParti.id)!==mData.id&&!window.confirm("⚠ Ce code a appartenu à "+(ancienParti.prenom||"")+" "+(ancienParti.nom||ancienParti.init)+", parti"+(ancienParti.depart?" le "+offFr(ancienParti.depart):"")+".\n\nLe redonner à "+(mData.init||"")+" ?"))return;
+                const ancienCode=medPins[mData.id]||"";
                 setMedPins(p=>{const n={...p,[mData.id]:v};Object.keys(n).forEach(k=>{if(k!==String(mData.id)&&n[k]===v)delete n[k];});return n;});   /* v10.151 : retiré au parti qui l'avait */
+                if(!BAC)(ancienParti?cpteSupprimer(v,"parti"):Promise.resolve()).then(()=>cpteChanger(ancienCode,v,cpteEtiquette(mData))).then(cpteSuite);   /* v10.251 : le compte suit le code */
                 toast(`PIN de ${mData.init} enregistré`);
                 setModal(null);
               }}>OK</button>
             </div>
             {medPins[mData.id]&&<button style={{...S.qBtn,marginTop:8,width:"100%"}} onClick={()=>{
+              if(!BAC)cpteSupprimer(medPins[mData.id],cpteEtiquette(mData)).then(cpteSuite);   /* v10.251 */
               setMedPins(p=>{const n={...p};delete n[mData.id];return n;});
               toast(`PIN de ${mData.init} supprimé`);setModal(null);
             }}>Supprimer le PIN</button>}

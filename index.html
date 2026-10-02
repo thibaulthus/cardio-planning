@@ -24,6 +24,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script><!-- v10.251 : comptes -->
 <script>
 /* v10.211 : clé PUBLIQUE d'envoi des notifications (Firebase → Paramètres du projet → Cloud Messaging → Web Push certificates).
    Vide = notifications non configurées : le bouton 🔔 le dit et ne fait rien. */
@@ -51,6 +52,27 @@ window.pushGetToken=function(vapid){
   return navigator.serviceWorker.ready.then(function(reg){return firebase.messaging().getToken({vapidKey:vapid,serviceWorkerRegistration:reg});});
 };
 window.pushDelToken=function(){try{return firebase.messaging().deleteToken();}catch(e){return Promise.resolve(false);}};
+/* v10.251 : COMPTES (Firebase Authentication). Deux liaisons : la principale (ma session) et « cp-comptes », discrète, pour
+   créer, sonder ou supprimer le compte d'un autre sans déloger la mienne. Session gardée en mémoire seulement (NONE) :
+   fermer l'onglet ou revenir à l'écran du code referme le compte. Le JSX n'appelle que ces fonctions. */
+window.cpAuth=(function(){
+  var app2=null;
+  function A(){return firebase.auth();}
+  function A2(){if(!app2)app2=firebase.initializeApp(firebase.app().options,"cp-comptes");return app2.auth();}
+  function fiche(u){return u?{uid:u.uid,nom:u.displayName||"",email:u.email||""}:null;}
+  try{A().setPersistence(firebase.auth.Auth.Persistence.NONE).catch(function(){});}catch(e){}
+  return {
+    dispo:function(){try{return !!(firebase.auth&&A());}catch(e){return false;}},
+    utilisateur:function(){try{return fiche(A().currentUser);}catch(e){return null;}},
+    connecter:function(email,mdp){return A().signInWithEmailAndPassword(email,mdp).then(function(c){return fiche(c.user);});},
+    renommer:function(nom){var u=A().currentUser;if(!u)return Promise.reject({code:"auth/no-user"});return u.updateProfile({displayName:nom});},
+    creer:function(email,mdp,nom,soi){var a=soi?A():A2();
+      return a.createUserWithEmailAndPassword(email,mdp).then(function(c){return c.user.updateProfile({displayName:nom}).catch(function(){}).then(function(){var f=fiche(c.user);f.nom=nom;if(soi)return f;return a.signOut().then(function(){return f;},function(){return f;});});});},
+    sonder:function(email,mdp){var a=A2();return a.signInWithEmailAndPassword(email,mdp).then(function(c){var f=fiche(c.user);return a.signOut().then(function(){return f;},function(){return f;});});},
+    supprimer:function(email,mdp){var a=A2();return a.signInWithEmailAndPassword(email,mdp).then(function(c){return c.user.delete();}).then(function(){return a.signOut().catch(function(){});});},
+    deconnecter:function(){return A().signOut().catch(function(){});}
+  };
+})();
 </script>
 <script>var __rest = (this && this.__rest) || function (s, e) {
     var t = {};
@@ -206,6 +228,7 @@ function trafEcr(p) {
         p.then(() => { TRAFIC.vol--; TRAFIC.lat.push(Date.now() - t); if (TRAFIC.lat.length > 20)
             TRAFIC.lat.shift(); }, () => { TRAFIC.vol--; TRAFIC.ko++; });
     }
+    liaisonEcriture(p); /* v10.251 : APRÈS le décompte de TRAFIC.vol, pour que l'accusé le voie à zéro */
     return p;
 }
 /* v10.242 : la ligne « Trafic » d'un signalement 🐞 (et du rapport de plantage) — les compteurs de la tuile 📡,
@@ -497,16 +520,196 @@ function inactTick() {
 const setDoc = typeof window !== "undefined" && window.firebaseSetDoc ? function (ref, obj, opts) { if (FERME.on)
     return fermeMuet(); if (VER_STALE.on)
     return verMuet(); if (GEL.on)
-    return gelMuet(); if (estCahier(ref)) {
+    return gelMuet(); if (LIAISON.on)
+    return liaisonMuet(); if (estCahier(ref)) {
     obj = avecTampon(obj);
     if (opts && opts.mergeFields)
         opts = { mergeFields: opts.mergeFields.concat(["_ecr"]) };
 } return trafEcr(arguments.length > 2 ? window.firebaseSetDoc(ref, sansIndef(obj), opts) : window.firebaseSetDoc(ref, sansIndef(obj))); } : null;
+/* v10.251 : COMPTES (Firebase Authentication), étape 1 — préparer sans rien verrouiller. Chaque code de l'équipe a, en
+   coulisse, un compte Google « e-mail + mot de passe » : l'adresse est une empreinte du code (toujours la même pour un
+   code donné, jamais une vraie boîte), le mot de passe est le code, complété d'un suffixe fixe quand il a moins des
+   6 caractères exigés par Google. Le compte porte une ÉTIQUETTE (nom d'affichage) qui dit qui il est : « med:12:editeur »,
+   « att:9 », « role:editeur », « role:secretaires », « role:cadres », « role:internes ». Tout passe par window.cpAuth
+   (index.html, en-tête) ; sans lui (bancs, environnement sans la bibliothèque), rien de tout ceci n'existe et l'application
+   se comporte comme avant. Les créations, sondages et suppressions d'un AUTRE compte que le sien passent par une seconde
+   liaison Firebase discrète (cp-comptes), pour ne jamais déloger la session en cours. Aucune règle Firestore ne s'appuie
+   dessus dans cette version : la vérification des codes reste celle d'avant, et un compte qui ne se crée pas ne bloque rien. */
+var CPTE = { delai: 6000, inactif: false, dernier: "" };
+function cpteDispo() { try {
+    return !!(typeof window !== "undefined" && window.cpAuth && window.cpAuth.dispo && window.cpAuth.dispo());
+}
+catch (e) {
+    return false;
+} }
+function cpteHash(s) {
+    var h1 = 0x811c9dc5, h2 = 0x9747b28c;
+    s = String(s);
+    for (var i = 0; i < s.length; i++) {
+        var c = s.charCodeAt(i);
+        h1 ^= c;
+        h1 = Math.imul(h1, 0x01000193) >>> 0;
+        h2 = Math.imul(h2 ^ c, 0x5bd1e995) >>> 0;
+        h2 ^= h2 >>> 13;
+    }
+    for (var j = 0; j < 4; j++) {
+        h1 = Math.imul(h1 ^ (h2 >>> 7), 0x01000193) >>> 0;
+        h2 = Math.imul(h2 ^ (h1 >>> 11), 0x5bd1e995) >>> 0;
+    }
+    return ("00000000" + h1.toString(16)).slice(-8) + ("00000000" + h2.toString(16)).slice(-8);
+}
+function cpteEmail(code) { return "c-" + cpteHash("cardioplanning|" + String(code)) + "@comptes.cardioplanning.app"; }
+function cpteMdp(code) { code = String(code); return code.length >= 6 ? code : code + "-cp"; }
+function cpteErr(e) { return String((e && (e.code || e.message)) || e || ""); }
+function cpteReseau(e) { return /network-request-failed|auth\/timeout|unavailable|deadline/i.test(cpteErr(e)); }
+function cpteInconnu(e) { return /user-not-found|invalid-credential|invalid-login-credentials|wrong-password/i.test(cpteErr(e)); }
+function cpteDelai(p, ms) { return new Promise(function (res, rej) { var t = setTimeout(function () { rej({ code: "auth/timeout" }); }, ms || CPTE.delai); Promise.resolve(p).then(function (v) { clearTimeout(t); res(v); }, function (e) { clearTimeout(t); rej(e); }); }); }
+function cpteLog() { try {
+    jlog("COMPTES", Array.prototype.slice.call(arguments));
+}
+catch (e) { } }
+function cpteNote(e) { if (/operation-not-allowed/i.test(cpteErr(e)))
+    CPTE.inactif = true; }
+/* étiquette d'un code : médecin (avec son niveau), attaché, ou rôle partagé */
+function cpteEtiquette(m) { if (!m)
+    return ""; if ((m.role || "medecin") === "attache")
+    return "att:" + m.id; return "med:" + m.id + ":" + ((m.niveau) || "basic"); }
+/* ENTRÉE : connecter le compte du code tapé ; le créer s'il manque ; corriger son étiquette si elle a changé (niveau, code redonné).
+   Rend {ok:true} (compte ouvert, créé, ou erreur non bloquante) ou {ok:false,reseau:false} (Google injoignable). */
+function cpteEntrer(code, etiq) {
+    if (!cpteDispo())
+        return Promise.resolve({ ok: true, sans: true });
+    var A = window.cpAuth, em = cpteEmail(code), mdp = cpteMdp(code);
+    return cpteDelai(A.connecter(em, mdp)).then(function (u) {
+        CPTE.dernier = etiq;
+        if (u && etiq && u.nom !== etiq)
+            return cpteDelai(A.renommer(etiq)).then(function () { cpteLog("étiquette corrigée", u.nom, "→", etiq); return { ok: true, uid: u.uid, cree: false }; }, function () { return { ok: true, uid: u.uid, cree: false }; });
+        return { ok: true, uid: u.uid, cree: false };
+    }).catch(function (e) {
+        if (cpteReseau(e)) {
+            cpteLog("Google injoignable", cpteErr(e));
+            return { ok: false, reseau: false };
+        }
+        if (cpteInconnu(e))
+            return cpteDelai(A.creer(em, mdp, etiq, true)).then(function (u) { CPTE.dernier = etiq; cpteLog("compte créé à la première connexion", etiq); return { ok: true, uid: u.uid, cree: true }; })
+                .catch(function (e2) { if (cpteReseau(e2))
+                return { ok: false, reseau: false }; cpteNote(e2); cpteLog("création impossible", etiq, cpteErr(e2)); return { ok: true, erreur: cpteErr(e2) }; });
+        cpteNote(e);
+        cpteLog("connexion impossible", etiq, cpteErr(e));
+        return { ok: true, erreur: cpteErr(e) };
+    });
+}
+/* SONDER (liaison discrète) : {existe:true,nom} / {existe:false} / {erreur} */
+function cpteSonder(code) {
+    if (!cpteDispo())
+        return Promise.resolve({ erreur: "sans" });
+    return cpteDelai(window.cpAuth.sonder(cpteEmail(code), cpteMdp(code))).then(function (u) { return { existe: true, nom: (u && u.nom) || "", uid: u && u.uid }; }, function (e) { if (cpteInconnu(e))
+        return { existe: false }; cpteNote(e); return { erreur: cpteErr(e), reseau: cpteReseau(e) }; });
+}
+/* CRÉER pour un autre (liaison discrète) : {ok} / {existe:true} / {erreur} */
+function cpteCreer(code, etiq) {
+    if (!cpteDispo())
+        return Promise.resolve({ erreur: "sans" });
+    return cpteDelai(window.cpAuth.creer(cpteEmail(code), cpteMdp(code), etiq, false)).then(function (u) { cpteLog("compte créé", etiq); return { ok: true, uid: u && u.uid }; }, function (e) { if (/email-already-in-use/i.test(cpteErr(e)))
+        return { existe: true }; cpteNote(e); cpteLog("création impossible", etiq, cpteErr(e)); return { erreur: cpteErr(e), reseau: cpteReseau(e) }; });
+}
+/* SUPPRIMER (liaison discrète, en se connectant avec le code — c'est pour cela que l'éditeur garde les codes) : {ok} / {absent:true} / {erreur} */
+function cpteSupprimer(code, etiq) {
+    if (!cpteDispo() || !code)
+        return Promise.resolve({ erreur: "sans" });
+    return cpteDelai(window.cpAuth.supprimer(cpteEmail(code), cpteMdp(code))).then(function () { cpteLog("compte supprimé", etiq || ""); return { ok: true }; }, function (e) { if (cpteInconnu(e))
+        return { absent: true }; cpteNote(e); cpteLog("suppression impossible", etiq || "", cpteErr(e)); return { erreur: cpteErr(e), reseau: cpteReseau(e) }; });
+}
+/* CHANGER un code = supprimer l'ancien compte, créer le nouveau ; si c'était MA session, la rouvrir sur le nouveau */
+function cpteChanger(ancien, nouveau, etiq) {
+    if (!cpteDispo())
+        return Promise.resolve({ erreur: "sans" });
+    var A = window.cpAuth, moi = null;
+    try {
+        moi = A.utilisateur();
+    }
+    catch (e) { }
+    var mien = !!(moi && ancien && moi.email === cpteEmail(ancien));
+    return (ancien ? cpteSupprimer(ancien, etiq) : Promise.resolve({ absent: true })).then(function () { return nouveau ? cpteCreer(nouveau, etiq) : { ok: true }; }).then(function (r) {
+        if (mien && nouveau)
+            return cpteDelai(A.connecter(cpteEmail(nouveau), cpteMdp(nouveau))).then(function () { return r; }, function () { return r; });
+        return r;
+    });
+}
+function cpteLib(e) { e = String(e || ""); if (/operation-not-allowed/i.test(e))
+    return "Authentication n'est pas activé dans la console Firebase"; if (/network|timeout|unavailable|deadline/i.test(e))
+    return "pas de réseau"; if (/too-many-requests/i.test(e))
+    return "trop d'essais, réessayez plus tard"; return e.replace(/^auth\//, "").slice(0, 80); }
+function cpteSuite(r) { if (r && r.erreur && r.erreur !== "sans" && TOAST_HUB.f)
+    TOAST_HUB.f("⚠ Compte Google non mis à jour (" + cpteLib(r.erreur) + ") — le code fonctionne quand même", "warn"); return r; }
+function cpteDeconnecter() { if (!cpteDispo())
+    return; try {
+    window.cpAuth.deconnecter();
+}
+catch (e) { } }
+/* le « parti » qui tenait ce code — pour l'avertissement « ce code a appartenu au Dr X, parti » */
+function cpteAncien(code, medPins, medecins) { var ks = Object.keys(medPins || {}); for (var i = 0; i < ks.length; i++) {
+    if (medPins[ks[i]] !== code)
+        continue;
+    var m = (medecins || []).find(function (x) { return String(x.id) === ks[i]; });
+    if (m && medParti(m))
+        return m;
+} return null; }
+/* v10.251 : LIAISON. Le feu gris suivait le navigateur, qui ne sait pas toujours que le réseau est tombé. Le vrai signal est
+   celui de Firebase : (1) chaque écriture doit être ACCUSÉE par le serveur — sans accusé pendant plus de LIAISON.delai,
+   la liaison est grise ; (2) un message « servi depuis le cache » qui dure plus de LIAISON.delai (Firebase a perdu le
+   serveur) la rend grise aussi. Retour au vert au premier accusé ou au premier message venu du serveur. Grise = les profils
+   perdent leurs droits comme hors ligne (netOff), bandeau « Connexion perdue — modifications suspendues », et dernier filet,
+   setDoc / updatePaths muets. */
+var LIAISON = { on: false, delai: 8000, tEcr: null, tCache: null, sur: null, depuis: 0 };
+if (typeof window !== "undefined")
+    window.__cpLiaison = LIAISON; /* prise du banc comptes.js (délai raccourci) */
+function liaisonMuet() { var n = Date.now(); if (n - (LIAISON.t || 0) > 10000) {
+    LIAISON.t = n;
+    try {
+        jlog("LIAISON", ["écriture refusée — connexion perdue"]);
+    }
+    catch (e) { }
+} return Promise.resolve(); }
+function liaisonPoser(on) { if (LIAISON.on === on)
+    return; LIAISON.on = on; LIAISON.depuis = on ? Date.now() : 0; try {
+    jlog("LIAISON", [on ? "grise — modifications suspendues" : "verte — modifications reprises"]);
+}
+catch (e) { } if (LIAISON.sur)
+    LIAISON.sur(on); }
+function liaisonEcriture(p) {
+    if (!p || typeof p.then !== "function")
+        return;
+    if (!LIAISON.tEcr)
+        LIAISON.tEcr = setTimeout(function () { LIAISON.tEcr = null; if (TRAFIC.vol > 0)
+            liaisonPoser(true); }, LIAISON.delai);
+    p.then(function () { liaisonAccuse(); }, function (e) { if (!/permission|invalid|not-found/i.test(String((e && (e.code || e.message)) || "")))
+        return; liaisonAccuse(); });
+}
+function liaisonAccuse() { if (LIAISON.tEcr && TRAFIC.vol <= 0) {
+    clearTimeout(LIAISON.tEcr);
+    LIAISON.tEcr = null;
+} if (LIAISON.on && TRAFIC.vol <= 0)
+    liaisonPoser(false); }
+function liaisonMessage(duCache) {
+    if (duCache) {
+        if (!LIAISON.tCache)
+            LIAISON.tCache = setTimeout(function () { LIAISON.tCache = null; liaisonPoser(true); }, LIAISON.delai);
+        return;
+    }
+    if (LIAISON.tCache) {
+        clearTimeout(LIAISON.tCache);
+        LIAISON.tCache = null;
+    }
+    if (LIAISON.on && TRAFIC.vol <= 0)
+        liaisonPoser(false);
+}
 const onSnapshot = typeof window !== "undefined" && window.firebaseOnSnapshot ? function (ref, suite, err) { return window.firebaseOnSnapshot(ref, function () { return trafRecu(suite, this, arguments); }, err); } : null; /* v10.233 : chaque message reçu est compté */
 const updatePaths = typeof window !== "undefined" && window.firebaseUpdatePaths ? function (ref, pairs) { if (FERME.on)
     return fermeMuet(); if (VER_STALE.on)
     return verMuet(); if (GEL.on)
-    return gelMuet(); if (estCahier(ref))
+    return gelMuet(); if (LIAISON.on)
+    return liaisonMuet(); if (estCahier(ref))
     pairs = (pairs || []).concat([[["_ecr"], tampon()]]); return trafEcr(window.firebaseUpdatePaths(ref, (pairs || []).map(p => [p[0], p[1] === "__DELETE__" ? p[1] : sansIndef(p[1])]))); } : null;
 /* v10.246 : DÉCOUPAGE du tour, des notes et du registre des salles. Ces trois champs étaient enregistrés D'UN SEUL BLOC :
    la file d'attente d'une vieille page (état du 21-22/09) les a réécrits en entier entre le 25 et le 29/09 — semaines de
@@ -681,7 +884,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.250 — 01/10/2026";
+const APP_VERSION = "v10.251 — 02/10/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -7409,7 +7612,7 @@ const HELP_SECTIONS = [
     { id: "periodes", icon: "📆", title: "Les périodes de l'application", body: () => HE("div", null, HP({ children: ["L'application manipule plusieurs découpages du temps. Les voici, pour s'y retrouver."] }), HP({ children: [HE("b", null, "La période (4 mois)"), " : l'unité centrale — la navigation ‹ ›, le verrou, l'archivage, Construire, le planning type, les stats et l'export travaillent par période. Ses bornes sont RÉELLES : elle commence le lendemain de la fin de la précédente et se termine au dimanche qui clôt la dernière semaine de son dernier mois ; le lundi suivant lui est rattaché s'il est férié (1er novembre) ; et sa fin s'étend jusqu'au dernier jour des vacances scolaires quand elle tombe dedans (21 jours au plus — l'été n'est jamais absorbé). Une période ne va donc jamais « du 1er au 31 ». Longueur et mois de départ se règlent dans Paramètres."] }), HP({ children: [HE("b", null, "Les semaines"), " (tour et planning type) : toujours entières, du lundi au dimanche. Les semaines d'une période vont du lundi qui précède ou égale son premier jour au dimanche qui précède ou égale son dernier jour — autrement dit, une semaine appartient à la période de son dimanche. Quand un lundi férié est rattaché à la période précédente, la semaine de ce lundi ouvre la période suivante : le tour s'y répartit à partir du mardi."] }), HP({ children: [HE("b", null, "Les semestres"), " (internes et Dr Juniors) : six mois, bascules début mai et début novembre, reportées au lundi. Ils sont indépendants des périodes — seule la période de mars à juin contient une bascule en son milieu (début mai) ; celle de novembre tombe sur une frontière de période."] }), HP({ children: [HE("b", null, "L'année scolaire des vacances"), " (Toussaint → Été), saisie dans Paramètres : elle sert au calcul de la fin de période et au fond coloré des jours — ou des semaines — de vacances, dans tous les onglets (v10.230)."] }), HP({ last: true, children: [HE("b", null, "En cours, close, archivée"), " : la période en cours est celle qui contient aujourd'hui ; tout ce qui la précède est clos (lecture seule, badge 🔒) ; une période close peut être archivée (badge 🗄) — voir la section « Archiver, sauvegarder, exporter »."] })) },
     { id: "archives", icon: "🗄️", title: "Archiver, sauvegarder, exporter", body: () => HE("div", null, HP({ children: [HE("b", null, "Zoom de l'application"), " (v10.179) : tout l'affichage est à 110 % par défaut. Le bouton 🔍, à côté de 🐞, passe à 120, 130, puis 100 % — réglage mémorisé sur l'appareil, chacun le sien ; le zoom du navigateur (Ctrl + molette, pincement) reste possible par-dessus. L'impression reste à 100 %. Le bouton est proposé à tous."] }), HP({ children: [HE("b", null, "Le vrai nom du junior dans les modales"), " (v10.163) : partout où une modale montre un médecin pour un jour précis — échange d'un jour de tour, garde d'un jour (titulaire, échanges et liste de choix, dans le Planning comme dans l'onglet Gardes), préférences, restauration —, un rôle Dr Junior s'affiche sous le nom de son titulaire en poste ce jour-là, comme dans les cases du planning, et plus jamais sous le nom du rôle (« DJ imagerie 1 », J1…)."] }), HP({ children: [HE("b", null, "Une seule barre de défilement sur ordinateur"), " (v10.161) : dans les onglets à grille (Planning, CHL, CHB, PT Cardio, PT Angio, Internes, Attachés), la page elle-même ne défile plus — les onglets, le message d'alerte, la période et les icônes restent en place, et seul le tableau des jours défile, avec sa propre barre. Fini le grand vide en bas quand la molette allait trop vite. Sur téléphone et dans les onglets en cartes (Paramètres, Aide…), rien ne change."] }), HP({ children: [HE("b", null, "Deux filets de sécurité"), " (v10.148) : le journal de bord survit au redémarrage — les lignes de la session précédente partent avec le prochain 🐞, marquées comme telles — et une erreur pendant l'affichage ne laisse plus une page blanche : un écran la montre, avec Recharger et Copier le rapport, et elle est journalisée."] }), HP({ children: [HE("b", null, "Verrou de l'avenir"), " (v10.146) : tout ce qui suit la période en cours est fermé à tous sauf l'éditeur. Quand il ouvre la demande de congés (Construire, tuile 1), chacun peut poser ses congés, ses FMC et ses préférences de tour et de gardes — rien d'autre — jusqu'à la date indicative affichée dans le rappel ; quand il referme la demande, tout se referme pendant qu'il construit ; la diffusion (tuile 8) ouvre tout. Un badge sous le titre du Planning dit où en est la période (🏖️ congés ouverts, 🚧 en préparation) ; une case fermée le dit aussi au toucher. Astreinte, internes et période en cours ne changent pas. Paramètres, carte 🚧 Verrous (v10.147) : le verrou du passé et, pour chaque période à venir, son état et au besoin une dérogation par profil (secrétaires et cadres ont chacun leur case depuis la v10.242) — qui joue avec les droits habituels du profil, donc sur les lignes des autres pour un intermédiaire, une secrétaire ou un cadre. Depuis la v10.158 : la fin de l'étape 1 de Construire referme d'elle-même les demandes (la période se verrouille), les semaines de tour d'une période à venir restent invisibles des non-éditeurs tant que le tour n'est pas validé (tuile 2), et valider l'étape 5 ouvre automatiquement la dérogation des intermédiaires — la dévalider la referme."] }), HP({ children: [HE("b", null, "Garde int., aller-retour"), " (v10.145) : éteindre 🎓 Garde int. ramène le cadre là où il était avant de l'allumer — à condition qu'on n'ait rien fait entre-temps. Un défilement, un changement d'onglet ou de période, et le cadre reste où il est."] }), HP({ children: [HE("b", null, "Pointillé « moi » fermé"), " (v10.144) : le pointillé violet de sa propre colonne ferme désormais son cadre, en haut sur l'initiale et en bas sur la dernière ligne, comme le cadre plein de la colonne suivie."] }), HP({ children: [HE("b", null, "Plus de zoom intempestif sur iPhone"), " (v10.143) : toucher un champ de saisie (PIN, note, filtre, fenêtre 🐞…) faisait grossir la page, qui restait ainsi ensuite — Safari agrandit tout champ dont le texte fait moins de 16 px. Sur téléphone, les champs font désormais 16 px : plus de zoom. Le pincement pour agrandir la grille reste possible ; si votre page est déjà zoomée, un pincement la remet à sa taille."] }), HP({ children: [HE("b", null, "Signaler un problème"), " (v10.142) : le bouton 🐞 — dans l'onglet Aide, et dans Planning et Attachés (à côté de 🌓, ou sous ⋯ sur téléphone) — ouvre une petite fenêtre : on décrit ce qui s'est passé, on appuie sur Envoyer, c'est tout. Version, onglet, période, jour regardé, mode d'accès, appareil, navigateur, état du réseau, trafic (v10.242 : les compteurs de la tuile 📡 relevés à l'envoi — latence, temps de l'appareil, messages et écritures de la dernière minute, écritures en attente et refusées, poids du planning) et journal de la page (les erreurs et avertissements de la console, avec les derniers changements d'onglet) partent avec, automatiquement — jamais le PIN, jamais d'image. L'envoi demande du réseau. L'éditeur retrouve les tickets dans Paramètres, carte 🐞 Signalements (un badge rouge sur l'onglet compte ceux à traiter) : ▸ déroule le détail, Copier donne un texte prêt à coller, ✓ Traité le classe."] }), HP({ children: [HE("b", null, "Colonne suivie"), " (v10.140) : dans Planning et Attachés, l'éditeur et les médecins de niveau intermédiaire peuvent appuyer sur l'initiale en tête d'une colonne pour la suivre : cadre plein de la couleur du médecin, anneau autour de son initiale, teinte légère sur ses cases vides, et les autres colonnes s'estompent à 40 %. Un second appui relâche, une autre initiale déplace le suivi ; une seule colonne à la fois, conservée le temps de la session, d'un onglet et d'une période à l'autre — elle cohabite avec le pointillé violet de sa propre colonne. Sur téléphone, la colonne suivie vient se centrer à l'écran. Le bouton 🎓 Garde int. ramène le cadre tout à gauche pour montrer la colonne 🎓 Int., sans changer ni le jour regardé ni la hauteur (v10.141). À l'extinction, retour à la position d'avant si rien n'a bougé (v10.145). La carte 🌓 Thème de Paramètres est retirée : c'est un réglage par appareil, que le bouton 🌓 des onglets couvre (voir 📱 Installer sur votre téléphone)."] }), HP({ children: [HE("b", null, "Bornes de navigation"), " (v10.138) : les flèches ‹ › ne remontent pas avant la plus ancienne archive (à défaut deux ans en arrière) et ne vont pas au-delà de six périodes — deux ans — devant la période en cours ; un message le dit à la borne. Cela vaut pour tous les onglets qui naviguent par période : Planning, CHL, CHB, PT Cardio, PT Angio, Attachés, Planning type, Tour, Reports, Construire, Astreinte, Stats et l'export. Les Internes naviguent par semestre, entre les semestres déclarés. Naviguer ne crée aucune donnée ; la borne évite qu'une case posée par erreur très loin dans le futur ne pèse sans que personne ne la voie. La carte Poids affiche aussi le poids des archives, rangées dans leur propre collection et donc hors de la jauge du document actif."] }), HP({ children: [HE("b", null, "Paramètres réorganisés"), " (v10.136) : les quatre cartes des codes PIN ne font plus qu'une, 🔐 Codes PIN et droits, en sections (PIN éditeur, rôles secrétaires et cadres, niveaux des médecins, récupération). Les titres alternent deux couleurs, bleu et ambre, dans l'ordre des cartes ; Salles et Internes ont la même taille de texte que le reste. Vacances scolaires, Salles et Sauvegarde & archivage sont trois cartes distinctes (v10.137), chacune repliable depuis son titre comme les autres. Le bouton 🌓 des onglets tourne Auto → Jour → Nuit → Auto avec un message à chaque appui (v10.139), donc chacun choisit son mode sans Paramètres ; à la reprise de l'application en veille, le réglage du téléphone est relu. La carte Thème de Paramètres, devenue redondante, est retirée en v10.140. L'ordre des cartes est le même dans la source et dans l'application — un contrôle le vérifie à chaque version."] }), HP({ children: [HE("b", null, "Version périmée"), " (v10.135) : la version la plus récente qui se connecte inscrit son numéro dans Firebase. Une copie plus ancienne — par exemple resservie par le cache hors-ligne du téléphone après un plantage — le lit, passe aussitôt en lecture seule et affiche un bandeau rouge : rien de ce qu'elle modifierait ne serait enregistré. Appuyer sur Mettre à jour maintenant vide le cache et recharge la vraie version. Si l'éditeur revient volontairement à une version antérieure, le bouton Rétablir cette version, dans le bandeau, la déclare comme version en service."] }), HP({ children: [HE("b", null, "Bandeaux allégés sur téléphone"), " (v10.132) : dans Planning et Attachés, le bouton Planning type a quitté le haut de l'onglet (l'application par praticien reste disponible dans l'onglet Planning type). Le filtre des médecins est devenu un menu : le bouton 🔍 Filtre montre la sélection en clair, le panneau reprend les pastilles colorées, Garde int. reste à côté. Sous 760 px de large, les icônes impression, clair/sombre et préférences se replient sous ⋯ et ressortent dans un plateau qui se referme au geste suivant ; le bouton ce jour / toute la période reste toujours visible. Résultat sur téléphone : le sélecteur de période reste à l'écran, la page ne défile plus, seule la grille défile, et le bandeau fixé en bas ne masque plus la dernière ligne."] }), HP({ children: [HE("b", null, "La colonne du médecin connecté"), " (v10.130) : en ouvrant l'application avec son PIN, un médecin arrive dans le Planning centré sur sa colonne, un attaché dans Attachés — une seule fois, au chargement. Sa colonne porte un pointillé violet (en-tête compris) pour la retrouver après avoir fait défiler ; l'éditeur peut l'éteindre médecin par médecin dans Paramètres, carte 🎯 Colonne du médecin connecté (au-dessus de Période d'affichage), et y régler sa couleur et sa transparence (v10.133). En changeant d'onglet et en revenant, on retrouve désormais la date ET la colonne où l'on était, dans chaque onglet à jours (Planning, CHL, CHB, PT Cardio, PT Angio, Attachés) — le temps de la session, comme la date."] }), HP({ children: [HE("b", null, "Les journées passées"), " : depuis la v10.117, tout jour ANTÉRIEUR À AUJOURD'HUI est en LECTURE SEULE, pour tout le monde, éditeur compris — modifier une journée déjà écoulée n'a pas de sens, et personne n'en serait informé (une notification à une date passée s'efface d'elle-même). Le jour même reste modifiable en entier. Les opérations sur une période (planning type, effacement) sautent d'elles-mêmes les jours verrouillés. Les gardes (pose, retrait, échange) et l'astreinte suivent le même verrou — une semaine d'astreinte est jugée close par son dimanche. Depuis la v10.128, l'onglet Tour aussi : une semaine de tour est close dès que son VENDREDI est passé (le tour se pense du lundi au vendredi, la semaine en cours reste ouverte jusqu'au vendredi soir) — ses tourneurs sont grisés 🔒, l'échange, la répartition automatique et l'effacement de la période sont refusés dès que la première semaine est passée. L'onglet Reports suit le même verrou jour par jour : un jour passé est grisé, une semaine passée porte 🔒, aucun report ne se pose ni ne s'annule dessus, et une semaine blanche passée n'est plus proposée comme destination."] }), HP({ children: [HE("b", null, "Le planning type ne touche plus aux cases posées à la main"), " : depuis la v10.118, chaque case écrite par le planning type porte une marque invisible. À l'application, au retrait ou lors d'une bascule de tour, seules les cases marquées (et le TP) sont réécrites ou retirées — une case saisie ou corrigée à la main survit, et un message « conservée(s) » avec un bouton Voir l'entoure d'un liseré doré dans le Planning pendant quelques secondes. Une case au contenu identique à ce que poserait le planning type est traitée comme la sienne, même ancienne."] }), HP({ children: [HE("b", null, "Le balai des fiches (« Retirer ces activités »)"), " suit le verrou des journées passées : il n'emporte ni les cases des jours verrouillés, ni les semaines de tour entamées ou passées, ni les périodes archivées — et son compteur annonce ce qui est réellement retirable. Déverrouiller les journées passées étend son geste au passé."] }), HP({ children: [HE("b", null, "Les périodes à venir"), " (v10.146) : fermées à tous sauf l'éditeur, badge « 🚧 En préparation ». Dès qu'il ouvre la demande de congés dans Construire, badge « 🏖️ Congés ouverts » : chacun pose congés, FMC et préférences, et rien d'autre, jusqu'à ce qu'il referme la demande. À la diffusion du planning, la période s'ouvre comme la période en cours. L'éditeur peut déroger pour un profil dans Paramètres. Les semaines de tour, elles, restent invisibles tant que l'éditeur n'a pas validé le tour dans Construire (v10.158)."] }), HP({ children: [HE("b", null, "Les périodes closes"), " : une période ENTIÈREMENT passée porte en plus le badge « 🔒 Période close » sous le titre, en haut à gauche. Pour une correction exceptionnelle, l'éditeur peut lever le verrou dans Paramètres, encart 🔓 Journées passées et périodes closes : il ne vaut que pour cette session et se remet en place au rechargement suivant. C'est aussi cette borne de période, et non le jour, qui décide qu'une période devient archivable."] }), HP({ children: [HE("b", null, "Archiver une période"), " (Paramètres → Archives) : chaque période close a son bouton 🗄 Archiver — et « Tout archiver » quand il y en a plusieurs. L'archivage copie dans Firebase les cases de la période et ses données datées (tour, astreinte, notes, souhaits, reports, Construire, semestres d'internes), télécharge un fichier .json sur l'appareil (à conserver : c'est la copie hors Firebase — il contient aussi l'historique des cases de la période), puis les retire des données actives — la base reste légère. En naviguant vers une période archivée, ses cases, son tour, ses notes, son astreinte et ses internes se rechargent automatiquement en consultation, et « 🗄 Période archivée » remplace le badge de verrou. Chaque période archivée a sa pastille dans Paramètres : ↩ la désarchive et rend tout. Une période corrigée après déverrouillage peut être archivée une seconde fois — l'archive fusionne. L'astreinte de la période et les semestres d'internes clos (avec les noms de Docteurs Juniors) partent aussi : une période archivée est une photo complète du planning, consultable en reculant de période en période. Une exception voulue : le décompte des binômes de tour. Au moment de l'archivage, les semaines de tour de la période sont recopiées dans une petite ardoise permanente qui, elle, ne part jamais avec une période — sans quoi le tableau 🤝 repartirait de zéro à chaque archivage. Elle se purge d'elle-même au-delà de deux ans."] }), HP({ children: [HE("b", null, "Sauvegardes automatiques"), " : une photographie complète une fois par jour, les 45 dernières conservées, avec aperçu avant restauration. Depuis la v10.248, si la sauvegarde du jour échoue alors que la dernière réussie a plus de 48 h, un bandeau rouge prévient l'éditeur, et la carte Sauvegardes de Paramètres dit pourquoi (par exemple la limite d'index de Firebase, cause de la panne du 29/09 au 01/10/2026)."] }), HP({ children: [HE("b", null, "Comparaison fiable"), " (v10.249) : le comparateur et la vérification de passage de version ne tiennent plus compte de l'ordre interne des informations d'une case — la première vérification, le 01/10/2026, annonçait 3 282 cases « ABS → ABS » sur un planning identique. Si deux contenus portent le même libellé mais diffèrent vraiment, la ligne nomme l'information en cause."] }), HP({ children: [HE("b", null, "Vérifier un passage de version"), " (v10.248) : à la première ouverture d'une nouvelle version, sur n'importe quel appareil, l'application photographie le planning tel que l'ancienne version l'a laissé, avant d'y écrire quoi que ce soit — une sauvegarde marquée 🏷 « arrivée v10.xxx », gardée à part (les 3 dernières, en plus des 45 quotidiennes). Dans Paramètres, carte Sauvegardes, 🔎 Vérifier le passage de version compare cette photo au planning actuel, case par case : une case modifiée AVEC une ligne dans le journal, c'est un collègue qui a travaillé ; une case modifiée SANS trace est listée en rouge. Les cases d'une période archivée entre-temps sont comptées à part — elles sont dans les archives, pas perdues. Le verdict tient en une ligne : vert si rien n'a bougé sans auteur. Lecture seule."] }), HT({ children: "Feuilleter une sauvegarde comme un planning (v10.237)" }), HP({ children: ["Depuis le ", HE("b", null, "🧪 bac à sable"), ", le bouton ", HBtn({ kind: "ghost", children: "📥 Charger dans le bac" }), " (carte 💾, ou depuis l'aperçu) recopie une sauvegarde ", HE("b", null, "dans le bac uniquement"), ". Vous la parcourez alors dans tous les onglets, l'imprimez, y faites des essais : le vrai planning n'est jamais touché. Le bandeau du bas rappelle quelle sauvegarde est chargée ; la remise à zéro du bac y remet une copie du vrai planning."] }), HT({ children: "Vérifier qu'une modification n'a pas été faite « toute seule » (v10.236)" }), HP({ children: ["Dans ", HBtn({ kind: "ghost", children: "👁 Aperçu" }), " d'une sauvegarde, choisissez avec quoi la comparer — le planning actuel, ou une ", HE("b", null, "autre sauvegarde"), ", pour dater un changement — puis ", HBtn({ kind: "ghost", children: "Voir les différences case par case" }), ". Chaque case qui diffère est listée (jour, demi-journée, médecin, avant → après) avec ", HE("b", null, "qui l'a modifiée et quand"), ", d'après le journal des cases. Les différences ", HE("b", null, "sans trace"), " sont mises en tête, en rouge : ce sont soit des opérations de masse (construction, planning type, import, restauration, archivage), soit des changements sans auteur — ceux qu'on cherche. Rien n'est appliqué : c'est une lecture."] }), HP({ children: [HE("b", null, "Restaurer un seul médecin, sur quelques jours"), " : depuis la modale d'une case, ", HBtn({ kind: "ghost", children: "↩ Restaurer depuis une sauvegarde…" }), " (éditeur seulement). On choisit la sauvegarde, puis les dates, et l'application affiche d'abord un ", HE("b", null, "bilan"), " — remises, supprimées, inchangées, avec le détail par activité — avant toute écriture. Seules les cases de ce médecin sur ces dates sont touchées : le travail des autres depuis la sauvegarde est préservé, ce qu'une restauration complète écraserait. Depuis la v10.128, les journées verrouillées de la plage choisie sont sautées, comme pour toute opération de période — le bilan les compte à part (🔒), et le message final les rappelle."] }), HP({ children: [HE("b", null, "Exports"), " : JSON complet (Paramètres), CSV des gardes, des astreintes et des stats depuis leurs onglets."] }), HP({ children: ["La jauge dans Paramètres indique la taille des données Firebase — archivez les périodes passées si elle monte."] }), HT({ children: "💻 Copie sur mon ordinateur" }), HP({ children: ["Dans Paramètres, encart 💾 Sauvegarde & archivage, le bloc ", HE("b", null, "Copie sur mon ordinateur"), " produit deux fichiers indépendants de l'application : le ", HE("b", null, "tableau (.xls)"), ", limité à la période choisie, à ouvrir dans Excel ou Google Sheets pour rediffuser le planning (week-ends et fériés en jaune, notes ✎ dans les cases), et les ", HE("b", null, "données brutes (.json)"), ", qui contiennent tout le planning — toutes périodes, périodes archivées comprises, astreinte, souhaits, reports, internes, Construire et réglages (v10.250) — ", HE("b", null, "sauf les codes d'accès"), ", volontairement laissés dehors : un fichier qui traîne ne doit pas les livrer. Elles permettent de tout remettre en place via l'encart 📂 Importer, juste en dessous, qui affiche d'abord ce que le fichier contient, prend une sauvegarde de l'état actuel, puis remplace tout en gardant les codes en service (un fichier d'avant la v10.250 ne remet en place que les cases, l'équipe, les activités, les salles, le planning type, le tour et les notes). Source au choix : le planning actuel ou l'une des sauvegardes automatiques. Aucune connexion nécessaire — cela fonctionne même quand la synchronisation est en panne, c'est fait pour ça."] }), HP({ last: true, children: ["Un ", HE("b", null, "rappel"), " s'affiche dans le Planning de l'éditeur au bout de 7 jours ou de 200 cases modifiées depuis la dernière sauvegarde (seuil réglable dans l'encart). Depuis la v10.169, la date de la dernière sauvegarde est PARTAGÉE entre vos appareils : un ordinateur qui n'a jamais servi à sauvegarder ne réclame plus une sauvegarde dès sa première ouverture. Le compteur de cases modifiées, lui, reste propre à ", HE("b", null, "chaque ordinateur"), " et repart de zéro dès qu'une sauvegarde est faite, d'où qu'elle vienne."] })) },
     { id: "gel", icon: "🧊", title: "Geler le planning avant une restauration", body: () => HE("div", null, HP({ children: ["Réservé à l'éditeur (v10.229). Dans Paramètres, encart 💾 Sauvegarde & archivage, le bouton ", HBtn({ kind: "ghost", children: "🧊 Geler le planning" }), " met le planning en ", HE("b", null, "lecture seule pour tout le monde, éditeurs compris"), ", sur tous les appareils, en quelques secondes et sans recharger. C'est fait pour restaurer une sauvegarde en étant sûr que personne ne modifie rien entre-temps."] }), HP({ children: [HE("b", null, "Pendant le gel"), " : un bandeau bleu-vert en bas de l'écran dit qui a gelé et depuis quand ; aucune case, aucune salle, aucune garde ne s'ouvre ; une fenêtre restée ouverte au moment du gel se referme ; rien n'est envoyé à la base. Chacun garde ses onglets et peut tout consulter."] }), HP({ children: [HE("b", null, "Côté éditeur"), " : les Paramètres ne montrent plus qu'une carte 🧊, avec la liste des sauvegardes (👁 Aperçu, ↩ Restaurer) et le bouton ", HBtn({ kind: "ghost", children: "✅ Dégeler le planning" }), ". Le gel ", HE("b", null, "survit à la restauration"), " : vérifiez le planning restauré, puis dégelez — chacun retrouve aussitôt ses droits. N'importe quel éditeur peut dégeler."] }), HP({ children: ["Le gel n'existe pas dans le 🧪 bac à sable. Un appareil resté sur une version plus ancienne ne connaît pas le gel, mais il est déjà en lecture seule : le garde-fou de version l'empêche d'écrire tant qu'il n'est pas à jour."] })) },
-    { id: "protection", icon: "🛡️", title: "Protection des données — tour, notes, vieilles pages", body: () => HE("div", null, HP({ children: ["Depuis la v10.246. Motif : fin septembre 2026, une ", HE("b", null, "vieille page restée ouverte"), ", sur un navigateur rarement utilisé d'un téléphone, s'est réveillée et a renvoyé ce qu'elle avait gardé en attente. Le tour, les notes et le registre des salles, alors enregistrés ", HE("b", null, "d'un seul bloc"), ", ont reculé de plusieurs jours ; les cases, enregistrées une par une, n'ont pas bougé."] }), HT({ children: "1. Tout est enregistré morceau par morceau" }), HP({ children: ["Le tour est enregistré ", HE("b", null, "semaine par semaine"), ", les notes ", HE("b", null, "case par case"), ", les salles ", HE("b", null, "salle par salle"), ". Une copie en retard n'envoie plus que ce qu'elle a elle-même modifié : elle ne peut plus effacer le travail des autres. L'ancien bloc est conservé comme filet dans la base, mais n'est plus lu."] }), HT({ children: "2. Le journal du tour et des notes" }), HP({ children: ["Chaque médecin ajouté ou retiré d'une semaine de tour, chaque note posée, modifiée ou effacée est inscrit : ", HE("b", null, "quand, qui, depuis quel appareil et quelle version"), ". À lire dans Paramètres, carte ", HE("b", null, "📜 Journal du tour et des notes"), ", période par période ; l'historique d'une case (clic droit) montre aussi sa note. Le journal part avec l'archivage de la période. L'archivage, le désarchivage et l'import d'un fichier n'y écrivent rien."] }), HT({ children: "3. L'heure d'envoi de chaque modification" }), HP({ children: ["Chaque modification part avec son ", HE("b", null, "heure d'envoi"), ", réglée sur l'heure du serveur (le fuseau horaire, un voyage ou un VPN n'y changent rien). Une règle de la base Firebase refuse une modification envoyée ", HE("b", null, "il y a plus de 10 minutes"), ". Elle est ", HE("b", null, "abandonnée"), ", jamais renvoyée ; l'écran reprend le planning à jour et un message l'annonce. Conséquence pour tous : une modification faite hors réseau puis envoyée plus de 10 minutes après est à refaire. La carte ", HE("b", null, "🛡️ Protection des écritures"), " des Paramètres indique l'appareil, l'heure utilisée, et teste si la règle est publiée."] }), HT({ children: "4. Les notes" }), HP({ children: ["Le champ de note garde votre texte pendant la frappe et n'enregistre qu'après ", HE("b", null, "une courte pause"), ", ou quand on quitte le champ ou la fenêtre. Les lettres ne s'effacent plus en tapant vite."] }), HT({ children: "5. Fermeture des pages oubliées (v10.247)" }), HP({ children: ["Pour tous ceux qui peuvent modifier (médecins, éditeur, secrétaires, cadres, internes), l'application se ferme et revient à l'écran du code après ", HE("b", null, "5 minutes sans action"), ", y compris si on est parti dans un autre onglet ou une autre application. Un bandeau orange prévient ", HE("b", null, "30 secondes avant"), ", touchez l'écran pour continuer. Le délai se règle dans Paramètres, carte ", HE("b", null, "🔒 Fermeture après inactivité"), ", pour toute l'équipe. « Consulter » n'est pas concerné."] }), HP({ children: ["Une page endormie (téléphone verrouillé, onglet laissé en arrière-plan) se ferme ", HE("b", null, "à son réveil"), ", sans rien envoyer de ce qu'elle gardait en attente. Une modification faite juste avant de changer d'application part normalement : l'application attend son envoi avant de s'endormir."] }), HP({ children: ["Un ", HE("b", null, "code personnel de médecin"), " ne reste ouvert que sur un seul appareil : l'entrer sur un autre appareil ferme le premier, qui l'annonce sur son écran du code. Deux onglets du même navigateur comptent comme un seul appareil. Les codes partagés (éditeur, secrétaires, cadres, internes) ne sont pas concernés : plusieurs postes peuvent travailler en même temps."] })) },
+    { id: "protection", icon: "🛡️", title: "Protection des données — tour, notes, vieilles pages", body: () => HE("div", null, HP({ children: ["Depuis la v10.246. Motif : fin septembre 2026, une ", HE("b", null, "vieille page restée ouverte"), ", sur un navigateur rarement utilisé d'un téléphone, s'est réveillée et a renvoyé ce qu'elle avait gardé en attente. Le tour, les notes et le registre des salles, alors enregistrés ", HE("b", null, "d'un seul bloc"), ", ont reculé de plusieurs jours ; les cases, enregistrées une par une, n'ont pas bougé."] }), HT({ children: "1. Tout est enregistré morceau par morceau" }), HP({ children: ["Le tour est enregistré ", HE("b", null, "semaine par semaine"), ", les notes ", HE("b", null, "case par case"), ", les salles ", HE("b", null, "salle par salle"), ". Une copie en retard n'envoie plus que ce qu'elle a elle-même modifié : elle ne peut plus effacer le travail des autres. L'ancien bloc est conservé comme filet dans la base, mais n'est plus lu."] }), HT({ children: "2. Le journal du tour et des notes" }), HP({ children: ["Chaque médecin ajouté ou retiré d'une semaine de tour, chaque note posée, modifiée ou effacée est inscrit : ", HE("b", null, "quand, qui, depuis quel appareil et quelle version"), ". À lire dans Paramètres, carte ", HE("b", null, "📜 Journal du tour et des notes"), ", période par période ; l'historique d'une case (clic droit) montre aussi sa note. Le journal part avec l'archivage de la période. L'archivage, le désarchivage et l'import d'un fichier n'y écrivent rien."] }), HT({ children: "3. L'heure d'envoi de chaque modification" }), HP({ children: ["Chaque modification part avec son ", HE("b", null, "heure d'envoi"), ", réglée sur l'heure du serveur (le fuseau horaire, un voyage ou un VPN n'y changent rien). Une règle de la base Firebase refuse une modification envoyée ", HE("b", null, "il y a plus de 10 minutes"), ". Elle est ", HE("b", null, "abandonnée"), ", jamais renvoyée ; l'écran reprend le planning à jour et un message l'annonce. Conséquence pour tous : une modification faite hors réseau puis envoyée plus de 10 minutes après est à refaire. La carte ", HE("b", null, "🛡️ Protection des écritures"), " des Paramètres indique l'appareil, l'heure utilisée, et teste si la règle est publiée."] }), HT({ children: "4. Les notes" }), HP({ children: ["Le champ de note garde votre texte pendant la frappe et n'enregistre qu'après ", HE("b", null, "une courte pause"), ", ou quand on quitte le champ ou la fenêtre. Les lettres ne s'effacent plus en tapant vite."] }), HT({ children: "5. Fermeture des pages oubliées (v10.247)" }), HP({ children: ["Pour tous ceux qui peuvent modifier (médecins, éditeur, secrétaires, cadres, internes), l'application se ferme et revient à l'écran du code après ", HE("b", null, "5 minutes sans action"), ", y compris si on est parti dans un autre onglet ou une autre application. Un bandeau orange prévient ", HE("b", null, "30 secondes avant"), ", touchez l'écran pour continuer. Le délai se règle dans Paramètres, carte ", HE("b", null, "🔒 Fermeture après inactivité"), ", pour toute l'équipe. « Consulter » n'est pas concerné."] }), HP({ children: ["Une page endormie (téléphone verrouillé, onglet laissé en arrière-plan) se ferme ", HE("b", null, "à son réveil"), ", sans rien envoyer de ce qu'elle gardait en attente. Une modification faite juste avant de changer d'application part normalement : l'application attend son envoi avant de s'endormir."] }), HP({ children: ["Un ", HE("b", null, "code personnel de médecin"), " ne reste ouvert que sur un seul appareil : l'entrer sur un autre appareil ferme le premier, qui l'annonce sur son écran du code. Deux onglets du même navigateur comptent comme un seul appareil. Les codes partagés (éditeur, secrétaires, cadres, internes) ne sont pas concernés : plusieurs postes peuvent travailler en même temps."] }), HT({ children: "6. Les comptes et la connexion perdue (v10.251)" }), HP({ children: ["Chaque code a désormais, en coulisse, un ", HE("b", null, "compte Google"), " (Firebase Authentication), créé tout seul à la première connexion ou d'un coup depuis Paramètres → 🔐 Comptes. Pour l'équipe rien ne change : on tape son code, puis son prénom pour un code partagé. Dans cette version rien n'est verrouillé par ces comptes ; c'est la préparation du verrou de la base (version suivante)."] }), HP({ children: ["Sans réseau, on ne peut plus entrer en modification : l'écran du code dit « ", HE("b", null, "Pas de connexion internet : consultation seule"), " » et propose 👁 Consulter. En cours de travail, si Firebase ne répond plus pendant plus de quelques secondes, le bandeau « ", HE("b", null, "Connexion perdue — modifications suspendues"), " » apparaît et les modifications sont bloquées ; tout reprend tout seul dès que Firebase répond. Le feu de liaison suit désormais ce vrai signal, et non plus seulement celui du navigateur."] })) },
     { id: "fermees", icon: "🚫", title: "Plages fermées — fermer une salle sur une demi-journée", body: () => HE("div", null, HP({ children: ["Depuis la v10.229, une salle peut être ", HE("b", null, "fermée sur une demi-journée"), " : sa case est ", HE("b", null, "grisée et hachurée"), " (hachures depuis la v10.235, pour ne pas la confondre avec la couleur d'une salle vide) dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ", HE("b", null, "proposée à personne"), " sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."] }), HT({ children: "Colorer les salles vides (v10.232)" }), HP({ children: ["Depuis la v10.233, tous les choix de couleur des Paramètres (salles vides, surspécialités, pointillé de votre colonne et sa transparence) se valident par ", HBtn({ kind: "ghost", children: "✓ OK" }), " : tant que vous cherchez la teinte, rien n'est enregistré ni envoyé aux autres appareils ; ✕ abandonne."] }), HP({ children: ["À ne pas confondre avec une plage fermée : dans Paramètres → 🏥 Salles, cliquez le nom d'une salle et cochez ", HE("b", null, "🎨 Colorer la case quand la salle est vide"), ". Dans CHL, CHB, PT Angio et PT Cardio, sa case prend alors la ", HE("b", null, "couleur des salles vides"), " tant que personne n'y est posé — pratique pour voir d'un coup d'œil ce qui reste à pourvoir. La couleur est ", HE("b", null, "unique"), ", réglée en tête de la carte 🏥 Salles ; les salles cochées y portent une petite pastille. Si la plage est fermée, ", HE("b", null, "le gris gagne"), "."] }), HT({ children: "Fermer ou rouvrir un jour précis" }), HP({ children: ["Cliquez la case de la salle : en tête de la fenêtre, la ligne ", HE("b", null, "🚫 Plage fermée"), " se coche pour fermer, se décoche pour rouvrir — ce jour-là seulement. Réservé aux ", HE("b", null, "éditeurs, cadres et médecins intermédiaires"), " ; pour les autres, une plage fermée ne s'ouvre pas, un message le dit."] }), HT({ children: "Fermer chaque semaine — la grille de la salle" }), HP({ children: ["Dans Paramètres → 🏥 Salles, cliquez le ", HE("b", null, "nom de la salle"), ", puis ", HBtn({ kind: "ghost", children: "🚫 Plages fermées" }), " : une grille ", HE("b", null, "sans date"), ", du lundi au vendredi, matin et après-midi. Cliquez à la suite toutes les demi-journées fermées : c'est enregistré aussitôt, et la pastille de la salle porte 🚫 avec leur nombre. Ces plages sont fermées toutes les semaines ; pour en rouvrir une un jour donné, passez par la case de ce jour (ligne 🚫 à décocher) — l'exception d'un jour gagne toujours sur la grille."] }), HT({ children: "Ce qui se passe autour" }), HP({ children: [HE("b", null, "Un médecin déjà posé"), " dans une plage qu'on ferme n'est pas retiré : il reste affiché sur la case grisée et entre dans le bandeau ⚠ des problèmes de planning (« en plage fermée »), à déplacer à la main. ", HE("b", null, "Le planning type"), " ne pose rien dans une plage fermée : la case est sautée et le message de fin le compte. Renommer une salle emporte ses fermetures ; la supprimer les efface."] })) },
     { id: "colplanning", icon: "👁", title: "Colonnes de salles et d'activités dans le Planning", body: () => HE("div", null, HP({ children: ["Accès : éditeur et intermédiaires. Pour construire le planning en voyant tout le monde, le bouton ", HBtn({ kind: "ghost", children: "👁" }), " de la barre du Planning ouvre la liste de ", HE("b", null, "toutes les colonnes des onglets salles"), " — CHL, CHB (avec le BIP), PT Cardio (avec la Stimulation) et PT Angio — et un champ de recherche (« bip », « stim », « CHB-2 »…). Chaque colonne cochée s'ajoute ", HE("b", null, "tout à droite, après les médecins"), ", derrière un trait vertical (v10.240)."] }), HP({ children: ["La colonne est ", HE("b", null, "exactement celle de son onglet"), ", dessinée par le même code : mêmes ronds, mêmes couleurs, salle vide colorée, plage fermée grisée, alertes et notes. Un clic ouvre la même fenêtre que dans l'onglet d'origine, avec les mêmes droits et les mêmes verrous. Poser un médecin depuis cette colonne revient à le poser dans sa propre colonne : tout se met à jour en même temps, rien n'est écrit deux fois."] }), HP({ last: true, children: ["Réglage ", HE("b", null, "propre à cet appareil"), ", vide par défaut : personne d'autre ne voit vos colonnes, et elles disparaissent dès qu'on les décoche (", HBtn({ kind: "ghost", children: "✕ Tout décocher" }), "). Le bouton 👁 prend un liseré tant qu'une colonne est cochée. Ces colonnes ne sont pas imprimées. Seul ce qui est déjà une colonne dans un onglet salle peut être affiché : pour une activité qui n'en a pas, cochez-lui une colonne de reprise ↩ dans Paramètres → Activités."] })) },
     { id: "bac", icon: "🧪", title: "Bac à sable — tester sans risque", body: () => HE("div", null, HP({ children: ["Un espace de test à part, réservé à l'éditeur (Paramètres → 🧪 Bac à sable). En y entrant, l'application recopie le planning réel dans un cahier Firebase distinct, puis se recharge dessus : tout ce que vous y faites reste dans cette copie. Le bac est propre au navigateur qui l'a activé — vos collègues continuent de voir le vrai planning, et d'y travailler."] }), HP({ children: [HE("b", null, "Ce qui s'y comporte comme dans le vrai"), " : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."] }), HP({ children: [HE("b", null, "Ce qui est désactivé"), " : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."] }), HP({ children: [HE("b", null, "L'historique des cases dans le bac"), ", depuis la v10.238 : il montre le vrai historique jusqu'au moment où le bac a été copié — ou, si vous avez chargé une sauvegarde, jusqu'à l'heure de cette sauvegarde — puis vos essais du bac, à la suite. Vos essais ne se mêlent jamais au vrai historique, et la remise à zéro (ou le chargement d'une autre sauvegarde) les efface."] }), HP({ children: [HE("b", null, "Le bandeau orange"), ", en bas de l'écran, rappelle où vous êtes et porte trois commandes. ", HE("b", null, "Connecté comme"), ", pour passer d'un profil à l'autre sans PIN — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation. ", HBtn({ kind: "ghost", children: "↺ Remettre à zéro" }), ", qui remplace le bac par une copie fraîche du planning réel. ", HBtn({ kind: "ghost", children: "🚪 Sortir du bac" }), ", qui ramène au vrai planning. L'écran d'accueil (PIN) affiche le même rappel, avec son bouton Sortir."] })) },
@@ -9456,6 +9659,108 @@ function ProtectionTuile({ netOff = false, bloque = false }) {
             res.m));
 }
 /* v10.247 : tuile 🔒 Fermeture après inactivité — le délai, commun à l'équipe (une écriture par changement : liste, pas curseur) */
+/* v10.251 : tuile 🔐 Comptes — pour chaque code, le compte Google existe ✅ ou non ❌ (sondé à la demande, liaison discrète :
+   aucune lecture Firestore), les comptes des partis à supprimer, le bouton « Créer les comptes manquants » (qui supprime
+   aussi ceux des partis), et l'état d'Authentication. Les codes en clair ne s'affichent qu'une fois « Afficher tous les
+   codes » déverrouillé (carte des codes PIN, juste au-dessus). Indisponible dans le bac à sable. */
+function ComptesTuile({ codes = [], netOff = false, bac = false, showPins = false }) {
+    const [etat, setEtat] = useState({}); // code → {existe,nom} | {erreur}
+    const [enCours, setEnCours] = useState(null); // null | "sonde" | "creation"
+    const [fait, setFait] = useState(null);
+    const dispo = cpteDispo();
+    const sonder = async () => {
+        if (enCours)
+            return;
+        setEnCours("sonde");
+        setFait(null);
+        const e = {};
+        for (const c of codes) {
+            e[c.code] = await cpteSonder(c.code);
+            setEtat(Object.assign({}, e));
+        }
+        setEnCours(null);
+    };
+    const creer = async () => {
+        if (enCours)
+            return;
+        setEnCours("creation");
+        let n = 0, s = 0, ko = 0;
+        const e = Object.assign({}, etat);
+        for (const c of codes) {
+            const r0 = e[c.code];
+            if (c.parti && !c.repris) {
+                if (!r0 || r0.existe) {
+                    const r = await cpteSupprimer(c.code, c.etiq);
+                    if (r.ok || r.absent) {
+                        e[c.code] = { existe: false };
+                        if (r.ok)
+                            s++;
+                    }
+                    else {
+                        e[c.code] = { erreur: r.erreur };
+                        ko++;
+                    }
+                }
+                continue;
+            }
+            if (r0 && r0.existe)
+                continue;
+            const r = await cpteCreer(c.code, c.etiq);
+            if (r.ok || r.existe) {
+                e[c.code] = { existe: true, nom: c.etiq };
+                if (r.ok)
+                    n++;
+            }
+            else {
+                e[c.code] = { erreur: r.erreur };
+                ko++;
+            }
+            setEtat(Object.assign({}, e));
+        }
+        setEtat(e);
+        setEnCours(null);
+        setFait({ n, s, ko });
+    };
+    const lib = (c) => {
+        const r = etat[c.code];
+        if (!r)
+            return { t: "—", col: "var(--txt3)" };
+        if (r.erreur)
+            return { t: "⚠ " + cpteLib(r.erreur), col: "#b45309" };
+        if (c.parti && !c.repris)
+            return r.existe ? { t: "⚠ compte à supprimer (parti)", col: "#b45309" } : { t: "✅ aucun compte (parti)", col: "var(--txt3)" };
+        if (!r.existe)
+            return { t: "❌ compte manquant", col: "#dc2626" };
+        return r.nom && r.nom !== c.etiq ? { t: "✅ compte existant · étiquette à corriger (à sa prochaine connexion)", col: "#b45309" } : { t: "✅ compte existant", col: "#16a34a" };
+    };
+    const manquants = codes.filter(c => { const r = etat[c.code]; return r && !r.erreur && ((!c.parti || c.repris) ? !r.existe : r.existe); }).length;
+    return React.createElement("div", { "data-comptestuile": "1", style: Object.assign(Object.assign({}, S.card), { marginBottom: 10 }) },
+        React.createElement("div", { style: { fontWeight: 700, color: "#388bfd", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD10 Comptes"),
+        React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8, lineHeight: 1.45 } }, "Chaque code a, en coulisse, un compte Google (Firebase Authentication). Il se cr\u00E9e tout seul \u00E0 la premi\u00E8re connexion de chacun, ou ici d'un coup. Dans cette version rien n'est verrouill\u00E9 : un compte absent ne bloque personne."),
+        bac && React.createElement("div", { style: { fontSize: 11, color: "#c2410c", fontWeight: 700 } }, "\uD83E\uDDEA Bac \u00E0 sable : les comptes ne se g\u00E8rent pas d'ici."),
+        !bac && !dispo && React.createElement("div", { style: { fontSize: 11, color: "#dc2626", fontWeight: 700 } }, "Biblioth\u00E8que Authentication absente de cette page : rien \u00E0 faire ici."),
+        !bac && dispo && React.createElement("div", null,
+            CPTE.inactif && React.createElement("div", { "data-cpteinactif": "1", style: { fontSize: 11, color: "#dc2626", fontWeight: 700, marginBottom: 6 } }, "\u26D4 Authentication n'est pas activ\u00E9 dans la console Firebase (Authentication \u2192 Sign-in method \u2192 E-mail/Mot de passe). Tant que ce n'est pas fait, aucun compte ne peut se cr\u00E9er \u2014 l'application fonctionne comme avant."),
+            React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 } },
+                React.createElement("button", { "data-cptesonder": "1", disabled: !!enCours || netOff, onClick: sonder, style: Object.assign(Object.assign({}, S.btnP), { opacity: (enCours || netOff) ? .6 : 1 }) }, enCours === "sonde" ? "⏳ Vérification…" : "🔎 Vérifier les comptes"),
+                React.createElement("button", { "data-cptecreer": "1", disabled: !!enCours || netOff || !Object.keys(etat).length, onClick: creer, style: Object.assign(Object.assign({}, S.btnP), { background: "#16a34a", opacity: (enCours || netOff || !Object.keys(etat).length) ? .6 : 1 }) }, enCours === "creation" ? "⏳ Création…" : "Créer les comptes manquants" + (manquants ? " (" + manquants + ")" : ""))),
+            netOff && React.createElement("div", { style: { fontSize: 11, color: "#dc2626", fontWeight: 700, marginBottom: 6 } }, "\uD83D\uDCF4 Hors ligne \u2014 Google est injoignable."),
+            fait && React.createElement("div", { "data-cptefait": "1", style: { fontSize: 11, color: "var(--txt2)", marginBottom: 6 } }, fait.n + " compte" + (fait.n > 1 ? "s" : "") + " créé" + (fait.n > 1 ? "s" : "") + (fait.s ? ", " + fait.s + " supprimé" + (fait.s > 1 ? "s" : "") + " (partis)" : "") + (fait.ko ? ", " + fait.ko + " en échec" : "") + "."),
+            React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 11 } },
+                React.createElement("tbody", null,
+                    codes.map(c => {
+                        const l = lib(c);
+                        return React.createElement("tr", { key: [c.etiq, c.code].join("|"), "data-cpteligne": c.etiq, style: { borderTop: "1px solid var(--border)" } },
+                            React.createElement("td", { style: { padding: "3px 4px", fontWeight: 700, color: c.parti ? "var(--txt3)" : "var(--txt)" } },
+                                c.qui,
+                                c.parti ? " · parti" : ""),
+                            React.createElement("td", { style: { padding: "3px 4px", fontFamily: "'JetBrains Mono',monospace", color: "var(--txt2)" } }, showPins ? c.code : "••••"),
+                            React.createElement("td", { "data-cpteetat": "1", style: { padding: "3px 4px", color: l.col, fontWeight: 700 } }, l.t));
+                    }),
+                    codes.length === 0 && React.createElement("tr", null,
+                        React.createElement("td", { style: { padding: 4, color: "var(--txt3)" } }, "Aucun code d\u00E9fini.")))),
+            React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginTop: 6 } }, "Les codes en clair : \u00AB Afficher tous les codes \u00BB dans la carte \uD83D\uDD10 Codes PIN et droits. Supprimer un code, changer un code ou retirer un membre met son compte \u00E0 jour tout seul \u2014 jamais besoin de la console Firebase.")));
+}
 function InactTuile({ min = 5, setMin = null }) {
     return React.createElement("div", { "data-inacttuile": "1", style: Object.assign(Object.assign({}, S.card), { marginBottom: 10 }) },
         React.createElement("div", { style: { fontWeight: 700, color: "#b45309", fontSize: 13, marginBottom: 6 } }, "\uD83D\uDD12 Fermeture apr\u00E8s inactivit\u00E9"),
@@ -10486,11 +10791,14 @@ function InternesTile({ intCfg, setIntCfg, actes = [], pins = [] }) {
                             toast("Ce code est déjà utilisé par un autre rôle", "warn");
                             return;
                         }
+                        if (!BAC)
+                            cpteChanger(intCfg.pin || "", v, "role:internes").then(cpteSuite); /* v10.251 */
                         setIntCfg(p => (Object.assign(Object.assign({}, p), { pin: v })));
                         document.getElementById("nintp").value = "";
                         toast("Code des internes mis à jour");
                     } }, "OK"),
-                intCfg.pin && React.createElement("button", { style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 11 }), onClick: () => { setIntCfg(p => (Object.assign(Object.assign({}, p), { pin: "" }))); toast("Code des internes supprimé — l'accès est fermé"); } }, "Supprimer")),
+                intCfg.pin && React.createElement("button", { style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 11 }), onClick: () => { if (!BAC)
+                        cpteSupprimer(intCfg.pin, "role:internes").then(cpteSuite); setIntCfg(p => (Object.assign(Object.assign({}, p), { pin: "" }))); toast("Code des internes supprimé — l'accès est fermé"); } }, "Supprimer")),
             React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 5 } }, intCfg.pin ? ("Code actuel : " + intCfg.pin) : "Aucun code : les internes ne peuvent pas se connecter.")),
         (() => {
             const off = intCfg.statsOff || [];
@@ -12189,6 +12497,7 @@ function CardioPlanning() {
     const [accessMode, setAccessMode] = useState("ask");
     const [pinInput, setPinInput] = useState("");
     const [pinError, setPinError] = useState(false);
+    const [codeAttente, setCodeAttente] = useState(false); /* v10.251 : Google interrogé */
     const [editPin, setEditPin] = useState(EDIT_PIN_DEFAULT);
     /* ── v9.8 : rôle Administratif (secrétaires + cadres) ── */
     const [adminPin, setAdminPin] = useState("");
@@ -12268,7 +12577,11 @@ function CardioPlanning() {
     else
         toast("PIN incorrect", "warn"); };
     /* ── v9.10 : mode hors ligne (lecture seule) ── */
-    const [netOff, setNetOff] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
+    const [navOff, setNetOff] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
+    const [liaisonOff, setLiaisonOff] = useState(false); /* v10.251 : la liaison Firebase est grise (vrai signal, voir LIAISON) */
+    const netOff = navOff || liaisonOff;
+    const [horsReseau, setHorsReseau] = useState(false); /* v10.251 : écran du code — Google injoignable au moment du code */
+    useEffect(() => { LIAISON.sur = (on) => setLiaisonOff(on); setLiaisonOff(LIAISON.on); return () => { LIAISON.sur = null; }; }, []);
     const [stale, setStale] = useState(false); /* v10.135 : cette copie est dépassée par le serveur */
     const [salleFerm, setSalleFerm] = useState({ type: {}, jours: {} }); /* v10.229 : plages fermées */
     const [salleVideCol, setSalleVideCol] = useState(VIDE_COL_DEF);
@@ -12401,6 +12714,8 @@ function CardioPlanning() {
         ongletMemVider();
         pageMem.current = {};
     } }, [accessMode]);
+    useEffect(() => { if (accessMode === "ask" || accessMode === "view")
+        cpteDeconnecter(); }, [accessMode]); /* v10.251 : retour au code ou consultation = compte Google refermé */
     const [ym, setYM] = useState(() => ({ year: new Date().getFullYear(), month: new Date().getMonth() }));
     const year = ym.year, month = ym.month;
     const setYear = y => setYM(p => (Object.assign(Object.assign({}, p), { year: typeof y === "function" ? y(p.year) : y })));
@@ -13213,6 +13528,8 @@ function CardioPlanning() {
             fromServer.current = true; /* v10.28 : tout ce qui suit vient du serveur */
             if (snap.metadata && snap.metadata.fromCache === false)
                 serverSeen.current = true;
+            if (serverSeen.current && snap.metadata)
+                liaisonMessage(snap.metadata.fromCache === true); /* v10.251 : le vrai signal de Firebase */
             if (snap.exists) {
                 const data0 = snap.data();
                 const data = data0;
@@ -14752,6 +15069,28 @@ function CardioPlanning() {
        éditeurs compris ; le premier garde la main sur Paramètres (restaurer, dégeler). */
     const isEditVrai = (accessMode === "edit" || (accessMode === "medecinEdit" && (((medecins.find(m => m.id === editMedId) || {}).niveau) || "basic") === "editeur" && (((medecins.find(m => m.id === editMedId) || {}).role) || "medecin") !== "attache")) && !netOff;
     const isEdit = isEditVrai && !gelOn; /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
+    /* v10.251 : COPIE DES CODES dans prive/codes — le document que la v10.252 réservera à l'éditeur (règle Firestore), quand les
+       codes quitteront le document principal. Tenue à jour par les appareils d'un éditeur, à chaque changement reçu (le sien
+       ou celui d'un médecin qui change son propre code) ; une écriture au plus par changement. Jamais depuis le bac à sable. */
+    const priveRef = useRef("");
+    useEffect(() => {
+        if (BAC || !isEditVrai || !serverSeen.current || !window.firebaseDB || isFirstLoad.current)
+            return;
+        const meds = {};
+        Object.keys(medPins || {}).forEach(k => { const m = medecins.find(x => String(x.id) === k); const c = medPins[k]; if (!c)
+            return; meds[k] = { code: c, init: m ? m.init : "", nom: m ? ((m.prenom || "") + " " + (m.nom || "")).trim() : "", etiq: m ? cpteEtiquette(m) : "", parti: !!(m && medParti(m)), depart: (m && m.depart) || null }; });
+        const o = { medecins: meds, editeur: editPin || "", secretaires: adminPin || "", cadres: cadrePin || "", internes: (intCfg && intCfg.pin) || "" };
+        const sig = JSON.stringify(o);
+        if (priveRef.current === sig)
+            return;
+        priveRef.current = sig;
+        try {
+            trafEcr(window.firebaseDB.collection("prive").doc("codes").set(Object.assign({}, o, { at: Date.now(), v: verCourt(), a: APPAREIL.id }))).catch(e => { priveRef.current = ""; cpteLog("copie des codes non écrite", cpteErr(e)); });
+        }
+        catch (e) {
+            priveRef.current = "";
+        }
+    }, [medPins, editPin, adminPin, cadrePin, intCfg, medecins, isEditVrai]);
     /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
        une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
     const verrouDeb = useMemo(() => verrouDebut(), [PCFG.len, PCFG.startM, vacs]);
@@ -16912,6 +17251,8 @@ function CardioPlanning() {
         }
         if (!window.confirm("Supprimer " + (m.nom || "") + " ? Cette fiche n'a aucune case dans le planning."))
             return;
+        if (!BAC && medPins[m.id])
+            cpteSupprimer(medPins[m.id], cpteEtiquette(m)).then(cpteSuite); /* v10.251 */
         setMedecins(p => p.filter(x => x.id !== m.id));
         setMedPins(p => { if (!p[m.id])
             return p; const q = Object.assign({}, p); delete q[m.id]; return q; });
@@ -17113,6 +17454,28 @@ function CardioPlanning() {
         localStorage.removeItem("cp6_bac");
     }
     catch (e) { } window.location.reload(); };
+    /* v10.251 : les codes en service et ceux des partis (compte à supprimer), pour la carte 🔐 Comptes */
+    const cpteListe = () => {
+        const L = [];
+        if (editPin)
+            L.push({ code: editPin, etiq: "role:editeur", qui: "Éditeur", partage: true });
+        if (adminPin && adminPin.length >= 3)
+            L.push({ code: adminPin, etiq: "role:secretaires", qui: "Secrétaires", partage: true });
+        if (cadrePin && cadrePin.length >= 3)
+            L.push({ code: cadrePin, etiq: "role:cadres", qui: "Cadres", partage: true });
+        if (intCfg && intCfg.pin && intCfg.pin.length >= 3)
+            L.push({ code: intCfg.pin, etiq: "role:internes", qui: "Internes", partage: true });
+        (medecins || []).forEach(m => {
+            const c = medPins[String(m.id)];
+            if (!c || c.length < 3)
+                return;
+            const parti = medParti(m);
+            if (!parti && L.some(x => x.code === c))
+                return;
+            L.push({ code: c, etiq: cpteEtiquette(m), qui: (m.init || "") + (m.role === "attache" ? " (attaché)" : ""), parti, repris: parti && L.some(x => x.code === c && !x.parti) });
+        });
+        return L;
+    };
     const bacProfil = accessMode === "edit" ? "edit" : accessMode === "view" ? "view" : accessMode === "medecinEdit" ? "med:" + editMedId : accessMode === "adminEdit" ? (isCadre ? "cadre" : "admin") : accessMode === "interneEdit" ? "interne" : "edit";
     const bacConnecter = (v) => {
         setPinInput("");
@@ -17150,6 +17513,84 @@ function CardioPlanning() {
         }
     };
     /* ── Login ── */
+    /* v10.251 : UNE SEULE fonction d'entrée (la touche Entrée et le bouton faisaient deux fois le même code). Étapes :
+       (1) à quel profil correspond le code tapé — vérification INCHANGÉE (codes du document) ; (2) pas de réseau = pas de
+       modification : navigateur hors ligne, ou Google injoignable dans les 6 s → message « consultation seule » ; (3) le compte
+       Google du code est ouvert, créé s'il manque, ré-étiqueté s'il le faut — une erreur de Google ne bloque pas ; (4) le profil
+       s'applique comme avant. Dans le bac à sable, pas de compte (ce sont les mêmes codes : rien à préparer). */
+    const codeProfil = (v) => {
+        if (v === editPin)
+            return { type: "edit", etiq: "role:editeur" };
+        const medEntry = Object.entries(medPins).find(([id, pin]) => pin === v && pin.length >= 3 && !medParti(medecins.find(m => m.id === parseInt(id))));
+        if (medEntry) {
+            const m = medecins.find(x => x.id === parseInt(medEntry[0]));
+            return { type: "med", id: parseInt(medEntry[0]), attache: !!(m && m.role === "attache"), etiq: cpteEtiquette(m) };
+        }
+        if (adminEnabled) {
+            const okA = adminPin && adminPin.length >= 3 && v === adminPin;
+            const okC = cadrePin && cadrePin.length >= 3 && v === cadrePin;
+            if (okA)
+                return { type: "admin", etiq: "role:secretaires" };
+            if (okC)
+                return { type: "cadre", etiq: "role:cadres" };
+        }
+        if (intCfg.show === true && intCfg.pin && intCfg.pin.length >= 3 && v === intCfg.pin)
+            return { type: "interne", etiq: "role:internes" };
+        return null;
+    };
+    const codeAppliquer = (q) => {
+        setPinError(false);
+        if (q.type === "edit") {
+            setAccessMode("edit");
+            return;
+        }
+        if (q.type === "med") {
+            setEditMedId(q.id);
+            setAccessMode("medecinEdit");
+            if (q.attache)
+                setTab("attache");
+            return;
+        } /* v10.72 : un ATTACHE ouvre sur l'onglet Attaches */
+        if (q.type === "admin" || q.type === "cadre") {
+            setIsCadre(q.type === "cadre");
+            setAdminAsk(true);
+            return;
+        }
+        if (q.type === "interne")
+            setInterneAsk(true);
+    };
+    const entrerCode = async () => {
+        if (codeAttente)
+            return;
+        const v = pinInput, q = codeProfil(v);
+        if (!q) {
+            setPinError(true);
+            return;
+        }
+        if (navOff || (typeof navigator !== "undefined" && navigator.onLine === false)) {
+            setHorsReseau(true);
+            setPinError(false);
+            return;
+        }
+        if (cpteDispo() && !BAC) {
+            setCodeAttente(true);
+            let r;
+            try {
+                r = await cpteEntrer(v, q.etiq);
+            }
+            catch (e) {
+                r = { ok: true, erreur: String(e) };
+            }
+            setCodeAttente(false);
+            if (r && r.ok === false) {
+                setHorsReseau(true);
+                setPinError(false);
+                return;
+            }
+        }
+        setHorsReseau(false);
+        codeAppliquer(q);
+    };
     // Show loading while Firebase connects (so medPins are available for login)
     if (accessMode === "ask" && fbStatus === "connecting" && !PLANNING_DOC)
         return (React.createElement("div", { style: { minHeight: "100vh", background: "#1a1f2e", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "sans-serif", color: "#4ade80", fontSize: 20 } }, "\u2665 Chargement..."));
@@ -17173,67 +17614,14 @@ function CardioPlanning() {
                         "\u2713 ",
                         Object.keys(medPins).length,
                         " PIN(s) m\u00E9decin")),
-                React.createElement("input", { value: pinInput, onChange: e => setPinInput(e.target.value), onKeyDown: e => {
-                        if (e.key === "Enter") {
-                            if (pinInput === editPin) {
-                                setAccessMode("edit");
-                                setPinError(false);
-                                return;
-                            }
-                            const medEntry = Object.entries(medPins).find(([id, pin]) => pin === pinInput && pin.length >= 3 && !medParti(medecins.find(m => m.id === parseInt(id))));
-                            if (medEntry) {
-                                setEditMedId(parseInt(medEntry[0]));
-                                setAccessMode("medecinEdit");
-                                setPinError(false);
-                                /* v10.72 : un ATTACHE ouvre directement sur l'onglet Attaches — son planning
-                                   n'est pas dans l'onglet Planning, qui ne montre que les medecins. */
-                                const _mA = medecins.find(m => m.id === parseInt(medEntry[0]));
-                                if (_mA && _mA.role === "attache")
-                                    setTab("attache");
-                            }
-                            else if (adminEnabled && (() => { const okA = adminPin && adminPin.length >= 3 && pinInput === adminPin; const okC = cadrePin && cadrePin.length >= 3 && pinInput === cadrePin; if (okA || okC)
-                                setIsCadre(!!okC && !okA); return okA || okC; })()) {
-                                setAdminAsk(true);
-                                setPinError(false);
-                            }
-                            else if (intCfg.show === true && intCfg.pin && intCfg.pin.length >= 3 && pinInput === intCfg.pin) {
-                                setInterneAsk(true);
-                                setPinError(false);
-                            }
-                            else
-                                setPinError(true);
-                        }
-                    }, type: "password", placeholder: "PIN", style: Object.assign(Object.assign({}, S.fi), { width: "100%", textAlign: "center", letterSpacing: 6, fontSize: 16, marginBottom: 8 }) }),
+                React.createElement("input", { value: pinInput, onChange: e => setPinInput(e.target.value), onKeyDown: e => { if (e.key === "Enter")
+                        entrerCode(); }, type: "password", placeholder: "PIN", style: Object.assign(Object.assign({}, S.fi), { width: "100%", textAlign: "center", letterSpacing: 6, fontSize: 16, marginBottom: 8 }) }),
                 pinError && React.createElement("div", { style: { color: "#ef4444", fontSize: 12, marginBottom: 8 } }, "Code incorrect"),
-                React.createElement("button", { style: { width: "100%", padding: "10px", borderRadius: 9, border: "none", background: "#1d4ed8", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 }, onClick: () => {
-                        if (pinInput === editPin) {
-                            setAccessMode("edit");
-                            setPinError(false);
-                            return;
-                        }
-                        // Check medecin PINs
-                        const medEntry = Object.entries(medPins).find(([id, pin]) => pin === pinInput && pin.length >= 3 && !medParti(medecins.find(m => m.id === parseInt(id))));
-                        if (medEntry) {
-                            setEditMedId(parseInt(medEntry[0]));
-                            setAccessMode("medecinEdit");
-                            setPinError(false);
-                            const _mA = medecins.find(m => m.id === parseInt(medEntry[0])); /* v10.72 : attache -> onglet Attaches */
-                            if (_mA && _mA.role === "attache")
-                                setTab("attache");
-                        }
-                        else if (adminEnabled && (() => { const okA = adminPin && adminPin.length >= 3 && pinInput === adminPin; const okC = cadrePin && cadrePin.length >= 3 && pinInput === cadrePin; if (okA || okC)
-                            setIsCadre(!!okC && !okA); return okA || okC; })()) {
-                            setAdminAsk(true);
-                            setPinError(false);
-                        }
-                        else if (intCfg.show === true && intCfg.pin && intCfg.pin.length >= 3 && pinInput === intCfg.pin) {
-                            setInterneAsk(true);
-                            setPinError(false);
-                        }
-                        else {
-                            setPinError(true);
-                        }
-                    } }, "\u270F\uFE0F \u00C9dition"),
+                horsReseau && React.createElement("div", { "data-horsreseau": "1", style: { color: "#b45309", background: "rgba(180,83,9,.08)", border: "1px solid #b45309", borderRadius: 8, padding: "8px 10px", fontSize: 12, fontWeight: 700, marginBottom: 8, lineHeight: 1.4 } },
+                    "\uD83D\uDCF4 Pas de connexion internet : consultation seule. Reconnectez-vous pour modifier le planning.",
+                    React.createElement("button", { style: { display: "block", width: "100%", marginTop: 8, padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt)", cursor: "pointer", fontSize: 13, fontWeight: 700 }, onClick: () => setAccessMode("view") }, "\uD83D\uDC41 Consulter")),
+                codeAttente && React.createElement("div", { "data-codeattente": "1", style: { color: "var(--txt3)", fontSize: 12, marginBottom: 8 } }, "\u23F3 V\u00E9rification\u2026"),
+                React.createElement("button", { style: { width: "100%", padding: "10px", borderRadius: 9, border: "none", background: "#1d4ed8", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 }, disabled: codeAttente, onClick: () => entrerCode() }, "\u270F\uFE0F \u00C9dition"),
                 adminAsk && React.createElement("div", { style: { marginTop: 10, padding: 10, borderRadius: 9, border: "1.5px solid #7c3aed", background: "rgba(124,58,237,.08)" } },
                     React.createElement("div", { style: { fontSize: 11, color: "#7c3aed", fontWeight: 800, marginBottom: 6 } }, "🗝 Accès " + (isCadre ? "cadre" : "secrétaire") + " — votre prénom :"),
                     React.createElement("input", { value: adminNameInput, onChange: e => setAdminNameInput(e.target.value), placeholder: "Pr\u00E9nom", style: Object.assign(Object.assign({}, S.fi), { width: "100%", textAlign: "center", marginBottom: 8 }) }),
@@ -17516,7 +17904,7 @@ header::-webkit-scrollbar { display: none; }
             gelHeure(gel.at),
             " \u2014 lecture seule pour tout le monde",
             isEditVrai ? " · dégel dans Paramètres" : ""),
-        netOff && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, "\uD83D\uDCF4 Hors ligne \u2014 dernier planning re\u00E7u \u00B7 lecture seule"),
+        netOff && React.createElement("div", { "data-botbar": "1", "data-liaison": !navOff && liaisonOff ? "1" : undefined, style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#64748b", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 502, fontWeight: 600 } }, !navOff && liaisonOff ? "📡 Connexion perdue — modifications suspendues (reprise automatique dès que Firebase répond)" : "📴 Hors ligne — dernier planning reçu · lecture seule"),
         isMedEdit && botOn && !BAC && React.createElement("div", { "data-botbar": "1", style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1d4ed8", color: "#fff", textAlign: "center", fontSize: 12, padding: "6px", zIndex: 500, fontWeight: 600 } },
             "\u270F\uFE0F ",
             isInterEdit ? "Édition étendue" : "Mode édition restreinte",
@@ -18321,15 +18709,19 @@ header::-webkit-scrollbar { display: none; }
                                 toast("Les deux nouveaux PIN ne correspondent pas", "warn");
                             }
                             else {
+                                if (!BAC)
+                                    cpteChanger(editPin, a, "role:editeur").then(cpteSuite);
                                 setEditPin(a);
                                 ["pinOld", "pinN1", "pinN2"].forEach(x => { document.getElementById(x).value = ""; });
                                 toast("PIN mis à jour");
-                            } } }, "Changer le PIN")),
+                            } /* v10.251 : le compte suit le code */ } }, "Changer le PIN")),
                     React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "var(--txt)", margin: "12px 0 6px", paddingTop: 10, borderTop: "1px solid var(--border)" } }, "\uD83D\uDDDD R\u00F4les secr\u00E9taires et cadres"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "PIN secr\u00E9taires (partag\u00E9) : \u00E0 la connexion, chaque personne saisit son pr\u00E9nom (m\u00E9moris\u00E9 sur son appareil). Le r\u00F4le peut poser, modifier et retirer les activit\u00E9s coch\u00E9es \u00AB \u270F\uFE0F secr\u00E9taires \u00BB sur la ligne de n'importe quel m\u00E9decin."),
                     React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } },
                         React.createElement("input", { type: "password", id: "nap", placeholder: adminPin ? "PIN défini — nouveau PIN" : "Définir le PIN", style: Object.assign(Object.assign({}, S.fi), { flex: 1, textAlign: "center", letterSpacing: 4 }) }),
                         React.createElement("button", { style: S.btnP, onClick: () => { const v = document.getElementById("nap").value; if (v.length >= 4) {
+                                if (!BAC)
+                                    cpteChanger(adminPin, v, "role:secretaires").then(cpteSuite);
                                 setAdminPin(v);
                                 toast("PIN administratif mis à jour");
                             }
@@ -18343,6 +18735,8 @@ header::-webkit-scrollbar { display: none; }
                                     toast("Ce PIN est déjà utilisé par un autre rôle", "warn");
                                     return;
                                 }
+                                if (!BAC)
+                                    cpteChanger(cadrePin, v, "role:cadres").then(cpteSuite);
                                 setCadrePin(v);
                                 toast("PIN cadre mis à jour");
                             }
@@ -18405,6 +18799,14 @@ header::-webkit-scrollbar { display: none; }
                                     React.createElement("b", null, "Administratif :"),
                                     " ",
                                     React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, adminPin || "— non défini —")),
+                                React.createElement("div", null,
+                                    React.createElement("b", null, "Cadres :"),
+                                    " ",
+                                    React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, cadrePin || "— non défini —")),
+                                React.createElement("div", null,
+                                    React.createElement("b", null, "Internes :"),
+                                    " ",
+                                    React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, (intCfg && intCfg.pin) || "— non défini —")),
                                 Object.entries(medPins).filter(([, p2]) => p2 && p2.length >= 3).map(([mid2, p2]) => { const m2 = medecins.find(x => String(x.id) === String(mid2)); return React.createElement("div", { key: mid2 },
                                     React.createElement("b", null,
                                         m2 ? m2.init : mid2,
@@ -18413,6 +18815,7 @@ header::-webkit-scrollbar { display: none; }
                                     React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, p2)); }),
                                 Object.entries(medPins).filter(([, p2]) => p2 && p2.length >= 3).length === 0 && React.createElement("div", { style: { color: "var(--txt3)" } }, "Aucun PIN m\u00E9decin d\u00E9fini.")),
                             React.createElement("button", { style: Object.assign(Object.assign({}, S.qBtn), { marginTop: 8 }), onClick: () => setShowPins(false) }, "Masquer"))),
+                isEdit && React.createElement(ComptesTuile, { codes: cpteListe(), netOff: netOff, bac: BAC, showPins: showPins }),
                 isEdit && React.createElement("div", { style: Object.assign(Object.assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#e3b341", fontSize: 13, marginBottom: 6 } }, "\uD83C\uDFAF Colonne du m\u00E9decin connect\u00E9"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginBottom: 8 } }, "\u00C0 l'ouverture avec son PIN, chacun arrive centr\u00E9 sur sa colonne (Planning pour un m\u00E9decin, Attach\u00E9s pour un attach\u00E9). Une tuile allum\u00E9e ajoute un pointill\u00E9 violet sur sa colonne, pour la retrouver apr\u00E8s avoir fait d\u00E9filer ; \u00E9teignez la tuile de qui ne le souhaite pas."),
@@ -20107,12 +20510,21 @@ header::-webkit-scrollbar { display: none; }
                                 const m2 = medecins.find(m => m.id === parseInt(conflict[0]));
                                 return toast(`Ce PIN est déjà utilisé par ${(m2 === null || m2 === void 0 ? void 0 : m2.init) || "un autre médecin"}`, "warn");
                             }
+                            /* v10.251 : un code d'un PARTI se redonne, avec avertissement — jamais interdit */
+                            const ancienParti = cpteAncien(v, medPins, medecins);
+                            if (ancienParti && parseInt(ancienParti.id) !== mData.id && !window.confirm("⚠ Ce code a appartenu à " + (ancienParti.prenom || "") + " " + (ancienParti.nom || ancienParti.init) + ", parti" + (ancienParti.depart ? " le " + offFr(ancienParti.depart) : "") + ".\n\nLe redonner à " + (mData.init || "") + " ?"))
+                                return;
+                            const ancienCode = medPins[mData.id] || "";
                             setMedPins(p => { const n = Object.assign(Object.assign({}, p), { [mData.id]: v }); Object.keys(n).forEach(k => { if (k !== String(mData.id) && n[k] === v)
                                 delete n[k]; }); return n; }); /* v10.151 : retiré au parti qui l'avait */
+                            if (!BAC)
+                                (ancienParti ? cpteSupprimer(v, "parti") : Promise.resolve()).then(() => cpteChanger(ancienCode, v, cpteEtiquette(mData))).then(cpteSuite); /* v10.251 : le compte suit le code */
                             toast(`PIN de ${mData.init} enregistré`);
                             setModal(null);
                         } }, "OK")),
                 medPins[mData.id] && React.createElement("button", { style: Object.assign(Object.assign({}, S.qBtn), { marginTop: 8, width: "100%" }), onClick: () => {
+                        if (!BAC)
+                            cpteSupprimer(medPins[mData.id], cpteEtiquette(mData)).then(cpteSuite); /* v10.251 */
                         setMedPins(p => { const n = Object.assign({}, p); delete n[mData.id]; return n; });
                         toast(`PIN de ${mData.init} supprimé`);
                         setModal(null);
