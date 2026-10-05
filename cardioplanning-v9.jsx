@@ -50,7 +50,7 @@ function photoVersion(data0,prec){
   if(VER_PHOTO.fait||BAC||!data0||!data0.planV2||typeof window==="undefined"||!window.firebaseDB)return Promise.resolve(false);
   VER_PHOTO.fait=true;
   var ts=Date.now(),ver=String(APP_VERSION).split(" ")[0];
-  var pl=Object.assign({},data0,{_ts:ts,_verArr:ver,_verPrec:String(prec||"")});
+  var pl=sansCodes(Object.assign({},data0,{_ts:ts,_verArr:ver,_verPrec:String(prec||"")}));   /* v10.252 : sans les codes */
   return Promise.resolve(window.firebaseDB.collection("backups").doc("b"+ts).set(pl)).then(function(){return true;})
     .catch(function(e){VER_PHOTO.err=String((e&&(e.message||e.code))||e).slice(0,200);console.log("photo de version:",e);return false;});
 }
@@ -269,6 +269,73 @@ function cpteSuite(r){if(r&&r.erreur&&r.erreur!=="sans"&&TOAST_HUB.f)TOAST_HUB.f
 function cpteDeconnecter(){if(!cpteDispo())return;try{window.cpAuth.deconnecter();}catch(e){}}
 /* le « parti » qui tenait ce code — pour l'avertissement « ce code a appartenu au Dr X, parti » */
 function cpteAncien(code,medPins,medecins){var ks=Object.keys(medPins||{});for(var i=0;i<ks.length;i++){if(medPins[ks[i]]!==code)continue;var m=(medecins||[]).find(function(x){return String(x.id)===ks[i];});if(m&&medParti(m))return m;}return null;}
+/* v10.252 : COMPTES, étape 2 — LE SERVEUR VÉRIFIE. Une règle Firestore exige un compte connecté pour toute écriture ; le
+   profil de ce compte est lu dans profils/<empreinte> (une fiche par code, écrite par l'éditeur seul, jamais le code lui-
+   même ni le nom d'affichage, que le compte peut changer). Les codes ont quitté le document partagé pour prive/codes
+   (éditeur seul) ; l'accueil ouvre le compte du code tapé (sans le créer) puis lit sa fiche. Tant que le document partagé
+   porte encore les codes (bouton « Retirer » pas encore pressé) l'ancienne reconnaissance sert de secours. */
+function cpteCle(code){return cpteEmail(code).split("@")[0];}
+function cpteCleDe(email){return String(email||"").split("@")[0];}
+function cpteMoi(){try{return cpteDispo()?window.cpAuth.utilisateur():null;}catch(e){return null;}}
+function cpteConnecte(){if(!cpteDispo())return true;return !!cpteMoi();}   /* sans bibliothèque (bancs) : comme avant */
+/* OUVRIR : connecter le compte du code tapé, SANS le créer. {ok:true,uid,nom} / {inconnu:true} / {ok:false,reseau:false} / {ok:true,erreur} */
+function cpteOuvrir(code){
+  if(!cpteDispo())return Promise.resolve({ok:true,sans:true});
+  var A=window.cpAuth;
+  return cpteDelai(A.connecter(cpteEmail(code),cpteMdp(code))).then(function(u){return {ok:true,uid:u&&u.uid,nom:(u&&u.nom)||""};},function(e){
+    if(cpteReseau(e))return {ok:false,reseau:false};
+    if(cpteInconnu(e))return {inconnu:true};
+    cpteNote(e);cpteLog("connexion impossible",cpteErr(e));return {ok:true,erreur:cpteErr(e)};});}
+/* la fiche profils/<clé> du compte connecté : {existe:true,f,cle} / {existe:false,cle} / {erreur,reseau,cle} */
+function snapExiste(sn){return !!(sn&&(typeof sn.exists==="function"?sn.exists():sn.exists));}
+function profilLire(){
+  var u=cpteMoi();if(!u||!u.email||typeof window==="undefined"||!window.firebaseDB)return Promise.resolve({existe:false,sans:true});
+  var cle=cpteCleDe(u.email);
+  return cpteDelai(window.firebaseDB.collection("profils").doc(cle).get()).then(function(sn){var d=snapExiste(sn)&&typeof sn.data==="function"?(sn.data()||{}):null;return d?{existe:true,f:d,cle:cle}:{existe:false,cle:cle};},function(e){return {erreur:cpteErr(e),reseau:cpteReseau(e),cle:cle};});}
+/* fiche → profil d'entrée (même forme que l'ancienne reconnaissance par les codes) ; null si rien d'ouvert ne correspond */
+function profilVersQ(f,medecins,adminEnabled,intShow){
+  if(!f||f.parti===true)return null;
+  if(f.p==="editeur")return {type:"edit",etiq:"role:editeur"};
+  if(f.p==="medecin"||f.p==="attache"){var m=(medecins||[]).find(function(x){return String(x.id)===String(f.id);});if(!m||medParti(m))return null;return {type:"med",id:m.id,attache:(m.role||"medecin")==="attache",etiq:cpteEtiquette(m)};}
+  if(f.p==="secretaires")return adminEnabled?{type:"admin",etiq:"role:secretaires"}:null;
+  if(f.p==="cadres")return adminEnabled?{type:"cadre",etiq:"role:cadres"}:null;
+  if(f.p==="internes")return intShow?{type:"interne",etiq:"role:internes"}:null;
+  return null;}
+/* les fiches à écrire par l'éditeur : clé → {p,id,niv,parti} — jamais le code. Un code redonné : la personne en activité l'emporte. */
+function profilsDe(medecins,medPins,editPin,adminPin,cadrePin,intPin){
+  var o={};
+  if(editPin&&editPin.length>=3)o[cpteCle(editPin)]={p:"editeur"};
+  if(adminPin&&adminPin.length>=3)o[cpteCle(adminPin)]={p:"secretaires"};
+  if(cadrePin&&cadrePin.length>=3)o[cpteCle(cadrePin)]={p:"cadres"};
+  if(intPin&&intPin.length>=3)o[cpteCle(intPin)]={p:"internes"};
+  var meds=(medecins||[]).filter(function(m){return m&&!medParti(m);}).concat((medecins||[]).filter(function(m){return m&&medParti(m);}));
+  meds.forEach(function(m){var c=medPins&&medPins[String(m.id)];if(!c||String(c).length<3)return;var k=cpteCle(c);if(o[k])return;
+    var f={p:(m.role||"medecin")==="attache"?"attache":"medecin",id:m.id};if(f.p==="medecin")f.niv=m.niveau||"basic";if(medParti(m))f.parti=true;o[k]=f;});
+  return o;}
+/* écrire les fiches (éditeur) : chaque fiche posée, les fiches en trop effacées ; rend le nombre écrit */
+function profilsEcrire(prof){
+  var db=typeof window!=="undefined"?window.firebaseDB:null;if(!db)return Promise.reject(new Error("sans base"));
+  var col=db.collection("profils"),ks=Object.keys(prof||{}),at=Date.now(),v=verCourt();
+  var poser=function(){if(typeof db.batch==="function"){var b=db.batch();ks.forEach(function(k){b.set(col.doc(k),Object.assign({},prof[k],{at:at,v:v}));});return b.commit();}
+    return Promise.all(ks.map(function(k){return col.doc(k).set(Object.assign({},prof[k],{at:at,v:v}));}));};
+  return Promise.resolve(poser()).then(function(){
+    return Promise.resolve(col.get()).then(function(sn){var vieux=[];if(sn&&typeof sn.forEach==="function")sn.forEach(function(d){if(d&&d.id&&!prof[d.id])vieux.push(d.id);});
+      return Promise.all(vieux.map(function(id){return col.doc(id).delete();})).then(function(){return {n:ks.length,otees:vieux.length};});},
+      function(){return {n:ks.length,otees:0};});});}
+/* un document sans ses codes (sauvegardes, photos de version, bac) ; les codes EN SERVICE y reviennent à la restauration tant qu'ils vivent dans le document partagé */
+function sansCodes(doc){var d=Object.assign({},doc||{});EXP_CODES.forEach(function(k){delete d[k];});
+  if(d.intCfg!==undefined){var c=lireJson(d.intCfg,null);if(c&&typeof c==="object"&&c.pin!==undefined){var c2=Object.assign({},c);delete c2.pin;d.intCfg=typeof d.intCfg==="string"?JSON.stringify(c2):c2;}}return d;}
+function codesRestaurer(rest,lg){var d=sansCodes(rest);Object.keys(rest).forEach(function(k){if(!(k in d))delete rest[k];});if(d.intCfg!==undefined)rest.intCfg=d.intCfg;
+  if(!lg)return rest;if(lg.medPins)rest.medPins=JSON.stringify(lg.medPins);if(lg.editPin)rest.editPin=lg.editPin;if(lg.adminPin!==undefined)rest.adminPin=lg.adminPin;if(lg.cadrePin!==undefined)rest.cadrePin=lg.cadrePin;
+  if(lg.intPin!==undefined){var c=lireJson(rest.intCfg,{})||{};rest.intCfg=JSON.stringify(Object.assign({},c,{pin:lg.intPin}));}return rest;}
+/* les codes encore présents dans le document partagé (secours, migration, bouton « Remettre ») */
+function codesDuDocument(data){var lg={};if(!data)return null;if(data.editPin)lg.editPin=data.editPin;if(data.adminPin!==undefined)lg.adminPin=data.adminPin;if(data.cadrePin!==undefined)lg.cadrePin=data.cadrePin;
+  if(data.medPins){var mp=lireJson(data.medPins,null);if(mp&&typeof mp==="object")lg.medPins=mp;}
+  var ic=lireJson(data.intCfg,null);if(ic&&ic.pin!==undefined)lg.intPin=ic.pin||"";
+  return Object.keys(lg).length?lg:null;}
+/* le texte des règles Firestore : la nouvelle (à coller) et la précédente (marche arrière) — carte 🔐 Comptes */
+var REGLE_TXT="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    // ── v10.246 : TAMPON HORAIRE (inchangé) ─────────────────────────────────────────────\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n\n    // ── v10.252 : COMPTES ET PROFILS ────────────────────────────────────────────────────\n    // Un compte Google connecté (adresse c-<empreinte>@comptes.cardioplanning.app) ; sa fiche\n    // profils/<empreinte>, écrite par l'éditeur seul, dit qui il est. Jamais le nom d'affichage.\n    function connecte() {\n      return request.auth != null && request.auth.token.email is string;\n    }\n    function cle() {\n      return request.auth.token.email.split('@')[0];\n    }\n    function ficheExiste() {\n      return exists(/databases/$(database)/documents/profils/$(cle()));\n    }\n    function fiche() {\n      return get(/databases/$(database)/documents/profils/$(cle())).data;\n    }\n    function aProfil() {\n      return connecte() && ficheExiste()\n        && fiche().p in ['editeur', 'medecin', 'attache', 'secretaires', 'cadres', 'internes']\n        && fiche().get('parti', false) != true;\n    }\n    function editeur() {\n      return aProfil()\n        && (fiche().p == 'editeur' || (fiche().p == 'medecin' && fiche().get('niv', '') == 'editeur'));\n    }\n    function moi(id) {\n      return aProfil() && fiche().p in ['medecin', 'attache'] && string(fiche().id) == id;\n    }\n\n    // Le cahier : lecture libre (Consulter), écriture par un profil, tampon frais sur main et bac.\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && id != 'main' && id != 'bac';\n    }\n    match /archives/{id} {\n      allow read: if true;\n      allow write: if editeur();\n    }\n    match /backups/{id} {\n      allow read: if editeur();\n      allow create: if aProfil();\n      allow update, delete: if editeur();\n    }\n    match /sessions/{id} {\n      allow read: if aProfil();\n      allow write: if moi(id);\n    }\n    match /push/{id} {\n      allow read: if editeur();\n      allow write: if aProfil();\n    }\n    match /signalements/{id} {\n      allow read: if editeur();\n      allow create: if request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur();\n    }\n    match /prive/{id} {\n      allow read, write: if editeur();\n    }\n    match /profils/{id} {\n      allow read: if editeur() || (connecte() && cle() == id);\n      allow write: if editeur();\n    }\n  }\n}\n";
+var REGLE_AVANT_TXT="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if (id != 'main' && id != 'bac') || tamponFrais();\n      allow delete: if id != 'main' && id != 'bac';\n    }\n    match /{coll}/{doc=**} { allow read, write: if coll != 'planning'; }\n  }\n}\n";
 
 /* v10.251 : LIAISON. Le feu gris suivait le navigateur, qui ne sait pas toujours que le réseau est tombé. Le vrai signal est
    celui de Firebase : (1) chaque écriture doit être ACCUSÉE par le serveur — sans accusé pendant plus de LIAISON.delai,
@@ -391,7 +458,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.251 — 02/10/2026";
+const APP_VERSION="v10.252 — 03/10/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6621,8 +6688,13 @@ const HELP_SECTIONS=[
   HP({children:["Une page endormie (téléphone verrouillé, onglet laissé en arrière-plan) se ferme ",HE("b",null,"à son réveil"),", sans rien envoyer de ce qu'elle gardait en attente. Une modification faite juste avant de changer d'application part normalement : l'application attend son envoi avant de s'endormir."]}),
   HP({children:["Un ",HE("b",null,"code personnel de médecin")," ne reste ouvert que sur un seul appareil : l'entrer sur un autre appareil ferme le premier, qui l'annonce sur son écran du code. Deux onglets du même navigateur comptent comme un seul appareil. Les codes partagés (éditeur, secrétaires, cadres, internes) ne sont pas concernés : plusieurs postes peuvent travailler en même temps."]}),
   HT({children:"6. Les comptes et la connexion perdue (v10.251)"}),
-  HP({children:["Chaque code a désormais, en coulisse, un ",HE("b",null,"compte Google")," (Firebase Authentication), créé tout seul à la première connexion ou d'un coup depuis Paramètres → 🔐 Comptes. Pour l'équipe rien ne change : on tape son code, puis son prénom pour un code partagé. Dans cette version rien n'est verrouillé par ces comptes ; c'est la préparation du verrou de la base (version suivante)."]}),
+  HP({children:["Chaque code a, en coulisse, un ",HE("b",null,"compte Google")," (Firebase Authentication), créé tout seul à la première connexion ou d'un coup depuis Paramètres → 🔐 Comptes. Pour l'équipe rien ne change : on tape son code, puis son prénom pour un code partagé. Depuis la v10.252, ce compte est ce que le serveur vérifie (voir le point 7)."]}),
   HP({children:["Sans réseau, on ne peut plus entrer en modification : l'écran du code dit « ",HE("b",null,"Pas de connexion internet : consultation seule")," » et propose 👁 Consulter. En cours de travail, si Firebase ne répond plus pendant plus de quelques secondes, le bandeau « ",HE("b",null,"Connexion perdue — modifications suspendues")," » apparaît et les modifications sont bloquées ; tout reprend tout seul dès que Firebase répond. Le feu de liaison suit désormais ce vrai signal, et non plus seulement celui du navigateur."]}),
+  HT({children:"7. Le serveur vérifie qui écrit (v10.252)"}),
+  HP({children:["La base Firebase refuse désormais ",HE("b",null,"toute modification qui n'arrive pas d'un compte connu"),". Chaque compte a une ",HE("b",null,"fiche profil"),", écrite par l'éditeur seul (collection « profils »), qui dit s'il est éditeur, médecin, attaché, secrétaire, cadre ou interne ; c'est cette fiche que le serveur consulte, jamais le nom du compte (qu'un compte peut changer). Les codes eux-mêmes ont quitté le document partagé : ils vivent dans « prive/codes », lisible et modifiable par l'éditeur seul. Pour l'équipe rien ne change : on tape son code, puis son prénom pour un code partagé ; l'application ouvre le compte du code et lit sa fiche. Un code d'une personne partie n'ouvre plus rien, même si son compte existe encore."]}),
+  HP({children:["Ce qui change en pratique : ",HE("b",null,"seul l'éditeur change les codes")," (Équipe et Paramètres) ; un signalement 🐞 reste possible sans code, mais seul l'éditeur lit la liste ; les sauvegardes ne contiennent plus les codes et seul l'éditeur peut les lire, les comparer ou les restaurer ; la sauvegarde automatique du jour, le numéro de version et la photo de passage de version partent du premier appareil ",HE("b",null,"entré avec un code"),", plus d'un simple appareil en consultation. Le bac à sable suit le même chemin (mêmes codes, mêmes comptes). Coût : une lecture Firebase par modification (la fiche), rien de plus."]}),
+  HP({children:["Mise en ligne, dans l'ordre : (1) publier l'application ; (2) ouvrir Paramètres → 🔐 Comptes en éditeur : « fiches profils : N écrites ✅ » ; (3) copier la règle depuis cette carte et la publier dans la console Firebase (Firestore → Règles) ; (4) carte 🛡️ : les trois épreuves doivent être vertes ; (5) bouton ",HE("b",null,"Retirer les codes du document partagé"),". Un téléphone resté sur une ancienne version continue de fonctionner jusqu'à l'étape 5 ; ensuite il ne reconnaît plus les codes (consultation seule) et affiche le bandeau « version périmée » : mettre à jour."]}),
+  HP({children:["Marche arrière en une minute, depuis un téléphone : Console Firebase → Firestore → Règles → l'historique des versions (à gauche) → republier la version précédente — ou coller « Règle précédente » depuis la carte 🔐. L'application v10.252 fonctionne aussi bien sous l'ancienne règle. Si vous revenez aussi à une ancienne version de l'application : d'abord ",HE("b",null,"Remettre les codes")," (carte 🔐). Si la carte 🔐 dit « copie privée illisible », c'est que la règle a été publiée avant que les fiches existent : republiez l'ancienne règle, ouvrez l'application en éditeur (les fiches s'écrivent), puis la nouvelle."]}),
  )},
  {id:"fermees",icon:"🚫",title:"Plages fermées — fermer une salle sur une demi-journée",body:()=>HE("div",null,
   HP({children:["Depuis la v10.229, une salle peut être ",HE("b",null,"fermée sur une demi-journée")," : sa case est ",HE("b",null,"grisée et hachurée")," (hachures depuis la v10.235, pour ne pas la confondre avec la couleur d'une salle vide) dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ",HE("b",null,"proposée à personne")," sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."]}),
@@ -8639,13 +8711,29 @@ function ProtectionTuile({netOff=false,bloque=false}){
   const ecart=Math.round(HORL.dec/1000);
   const horl=HORL.sure?"réglée sur le serveur"+(ecart?" (cet appareil "+(ecart>0?"retarde":"avance")+" de "+Math.abs(ecart)+" s)":" (aucun écart)")
     :HORL.tete?"réglée sur l'heure de la page"+(ecart?" (écart "+ecart+" s)":" (aucun écart)")+" — affinée à la prochaine modification":"heure de l'appareil — comparée au serveur dès la prochaine modification";
-  const tester=()=>{
+  /* v10.252 : trois épreuves. (1) tampon vieux de 20 min → doit être REFUSÉ (règle du tampon) ; (2) écriture SANS compte, par une
+     liaison Firestore à part (« cp-sans », jamais connectée) → doit être REFUSÉE (règle des comptes) ; (3) écriture avec MON
+     compte et un tampon frais → doit PASSER. Chaque écriture est minuscule (_regleTest) et ne touche rien. */
+  const [lignes,setLignes]=useState([]);
+  const epreuve=(p,ms)=>new Promise(res=>{let fini=false;const t=setTimeout(()=>{if(!fini){fini=true;res({k:"?",m:"pas de réponse en 10 s"});}},ms||10000);
+    Promise.resolve(p).then(()=>{if(fini)return;fini=true;clearTimeout(t);res({k:"ok"});},e=>{if(fini)return;fini=true;clearTimeout(t);res(estRefus(e)?{k:"refus"}:{k:"?",m:String((e&&(e.code||e.message))||e).slice(0,100)});});});
+  const sansCompteDoc=()=>{try{const fb=window.firebase;if(!fb||!fb.app||!fb.firestore)return null;let app=null;try{app=fb.app("cp-sans");}catch(e){app=fb.initializeApp(fb.app().options,"cp-sans");}return app.firestore().collection("planning").doc(PLAN_ID);}catch(e){return null;}};
+  const tester=async()=>{
     if(!PLANNING_DOC||!window.firebaseSetDoc){setRes({k:"?",m:"Pas de connexion à la base."});return;}
-    setRes({k:"…",m:"Test en cours…"});
-    let fini=false;const t=setTimeout(()=>{if(!fini){fini=true;setRes({k:"?",m:"Pas de réponse du serveur en 10 s (hors ligne ?). Réessayez avec du réseau."});}},10000);
-    Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,{_regleTest:Date.now(),_ecr:{t:horlNow()-20*60000,n:-1,a:APPAREIL.id,v:verCourt()}},{merge:true}))
-      .then(()=>{if(fini)return;fini=true;clearTimeout(t);setRes({k:"non",m:"La règle n'est PAS encore publiée : une écriture vieille de 20 minutes vient d'être acceptée (elle ne touche rien)."});})
-      .catch(e=>{if(fini)return;fini=true;clearTimeout(t);setRes(estRefus(e)?{k:"oui",m:"La règle est ACTIVE : une écriture vieille de 20 minutes vient d'être refusée par le serveur."}:{k:"?",m:"Réponse inattendue du serveur : "+String((e&&(e.code||e.message))||e).slice(0,120)});});
+    setRes({k:"…",m:"Tests en cours…"});setLignes([]);const L=[];
+    const r1=await epreuve(window.firebaseSetDoc(PLANNING_DOC,{_regleTest:Date.now(),_ecr:{t:horlNow()-20*60000,n:-1,a:APPAREIL.id,v:verCourt()}},{merge:true}));
+    L.push({t:"Écriture vieille de 20 minutes",ok:r1.k==="refus",m:r1.k==="refus"?"refusée ✅ (règle du tampon active)":r1.k==="ok"?"ACCEPTÉE ⚠ — la règle du tampon n'est pas publiée":"? "+(r1.m||"")});setLignes(L.slice());
+    const d2=sansCompteDoc();
+    if(d2){const r2=await epreuve(d2.set({_regleTest:Date.now(),_ecr:{t:horlNow(),n:-2,a:APPAREIL.id,v:verCourt()}},{merge:true}));
+      L.push({t:"Écriture sans compte connecté",ok:r2.k==="refus",m:r2.k==="refus"?"refusée ✅ (règle des comptes active)":r2.k==="ok"?"ACCEPTÉE ⚠ — la règle des comptes n'est pas publiée":"? "+(r2.m||"")});}
+    else L.push({t:"Écriture sans compte connecté",ok:null,m:"test impossible ici (bibliothèque absente)"});
+    setLignes(L.slice());
+    const r3=await epreuve(window.firebaseSetDoc(PLANNING_DOC,{_regleTest:Date.now(),_ecr:{t:horlNow(),n:-3,a:APPAREIL.id,v:verCourt()}},{merge:true}));
+    L.push({t:"Écriture avec mon compte, tampon frais",ok:r3.k==="ok",m:r3.k==="ok"?"acceptée ✅":r3.k==="refus"?"REFUSÉE ⚠ — ma fiche profils manque ou la règle est trop stricte : republiez l'ancienne règle (carte 🔐)":"? "+(r3.m||"")});
+    setLignes(L.slice());
+    const l1=L[0],l2=L[1],l3=L[2];
+    const oui=l1.ok===true&&(l2.ok===true||l2.ok===null)&&l3.ok===true,rien=l1.ok===false&&(l2.ok===false||l2.ok===null)&&l3.ok===true;
+    setRes(oui?{k:"oui",m:l2.ok===null?"La règle du tampon est active et mon compte passe (épreuve sans compte impossible ici).":"Les deux règles sont actives et mon compte passe."}:rien?{k:"non",m:"Aucune règle publiée (sans conséquence)."}:{k:"?",m:"Résultat mélangé : lisez les lignes ci-dessus."});
   };
   const lg=(l,v,c)=><div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:11.5,padding:"2px 0",borderBottom:"1px solid var(--border2)"}}><span style={{color:"var(--txt2)"}}>{l}</span><b style={{color:c||"var(--txt)",textAlign:"right"}}>{v}</b></div>;
   return <div data-protection="1" style={{...S.card,marginBottom:10}}>
@@ -8654,7 +8742,8 @@ function ProtectionTuile({netOff=false,bloque=false}){
     {lg("Cet appareil",APPAREIL.lib)}
     {lg("Heure utilisée",horl)}
     {lg("Écritures refusées depuis l'ouverture",String(REFUS.n),REFUS.n?"#dc2626":undefined)}
-    <button data-protest="1" disabled={netOff||bloque} onClick={tester} style={{marginTop:8,width:"100%",fontSize:12,padding:"7px 10px",borderRadius:8,cursor:netOff||bloque?"default":"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"var(--bg2)",color:"#16a34a",opacity:netOff||bloque?.5:1}}>🧪 La règle est-elle publiée ?</button>
+    <button data-protest="1" disabled={netOff||bloque} onClick={tester} style={{marginTop:8,width:"100%",fontSize:12,padding:"7px 10px",borderRadius:8,cursor:netOff||bloque?"default":"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"var(--bg2)",color:"#16a34a",opacity:netOff||bloque?.5:1}}>🧪 Les règles sont-elles publiée ?</button>
+    {lignes.map((l,i)=><div key={i} data-protligne={l.ok===true?"ok":l.ok===false?"ko":"?"} style={{marginTop:4,fontSize:11,display:"flex",justifyContent:"space-between",gap:8}}><span style={{color:"var(--txt2)"}}>{l.t}</span><b style={{color:l.ok===true?"#16a34a":l.ok===false?"#dc2626":"var(--txt3)",textAlign:"right"}}>{l.m}</b></div>)}
     {res&&<div data-protres={res.k} style={{marginTop:6,fontSize:11.5,fontWeight:700,color:res.k==="oui"?"#16a34a":res.k==="non"?"#d97706":"var(--txt2)"}}>{res.k==="oui"?"✅ ":res.k==="non"?"⏳ ":""}{res.m}</div>}
   </div>;
 }
@@ -8663,8 +8752,11 @@ function ProtectionTuile({netOff=false,bloque=false}){
    aucune lecture Firestore), les comptes des partis à supprimer, le bouton « Créer les comptes manquants » (qui supprime
    aussi ceux des partis), et l'état d'Authentication. Les codes en clair ne s'affichent qu'une fois « Afficher tous les
    codes » déverrouillé (carte des codes PIN, juste au-dessus). Indisponible dans le bac à sable. */
-function ComptesTuile({codes=[],netOff=false,bac=false,showPins=false}){
+function ComptesTuile({codes=[],netOff=false,bac=false,showPins=false,priveEtat="",profEtat=null,codesDoc=false,onRetirer=null,onRemettre=null}){
   const [etat,setEtat]=useState({});   // code → {existe,nom} | {erreur}
+  const [regle,setRegle]=useState("");   // v10.252 : "" | "nouvelle" | "avant"
+  const [copie,setCopie]=useState("");
+  const copier=(txt,k)=>{try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>setCopie(k),()=>setCopie("ko"));return;}}catch(e){}setCopie("ko");};
   const [enCours,setEnCours]=useState(null);   // null | "sonde" | "creation"
   const [fait,setFait]=useState(null);
   const dispo=cpteDispo();
@@ -8687,7 +8779,24 @@ function ComptesTuile({codes=[],netOff=false,bac=false,showPins=false}){
   const manquants=codes.filter(c=>{const r=etat[c.code];return r&&!r.erreur&&((!c.parti||c.repris)?!r.existe:r.existe);}).length;
   return <div data-comptestuile="1" style={{...S.card,marginBottom:10}}>
     <div style={{fontWeight:700,color:"#388bfd",fontSize:13,marginBottom:6}}>🔐 Comptes</div>
-    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.45}}>Chaque code a, en coulisse, un compte Google (Firebase Authentication). Il se crée tout seul à la première connexion de chacun, ou ici d'un coup. Dans cette version rien n'est verrouillé : un compte absent ne bloque personne.</div>
+    <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8,lineHeight:1.45}}>Chaque code a, en coulisse, un compte Google (Firebase Authentication). Depuis la v10.252, le serveur n'accepte une modification que d'un compte connu, dont il lit le profil dans une fiche écrite d'ici (jamais le code). Les codes eux-mêmes ne sont lisibles que par l'éditeur.</div>
+    {!bac&&<div data-cptefiches="1" style={{fontSize:11.5,padding:"6px 8px",borderRadius:7,background:"var(--bg)",border:"1px solid var(--border)",marginBottom:8,lineHeight:1.5}}>
+      <div><b>Codes :</b> {priveEtat==="lu"?"copie privée lue ✅":priveEtat==="absent"?"copie privée absente — reprise du document partagé, écrite à l'instant":priveEtat==="erreur"?"⚠ copie privée illisible (règle publiée avant les fiches ? voir l'Aide)":priveEtat==="vide"?"⚠ aucune copie privée et aucun code dans le document : rien n'est écrit — « Remettre » impossible ; republiez l'ancienne règle et ouvrez l'application depuis un appareil qui a encore les codes":"lecture…"}</div>
+      <div><b>Fiches profils :</b> {profEtat?(profEtat.ok?profEtat.n+" écrite"+(profEtat.n>1?"s":"")+" ✅ ("+new Date(profEtat.at).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+")":"⚠ non écrites ("+cpteLib(profEtat.err)+")"):"pas encore écrites"}</div>
+      <div><b>Mon compte :</b> <span data-cptemoi="1" style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,wordBreak:"break-all"}}>{(cpteMoi()||{}).email||"—"}</span> <span style={{color:"var(--txt3)"}}>(l'adresse à donner au simulateur de règles de la console)</span></div>
+      <div><b>Document partagé :</b> {codesDoc?"porte encore les codes (lisibles par tous — à retirer une fois la règle publiée et testée)":"ne porte plus les codes ✅"}</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+        {codesDoc&&<button data-cpteretirer="1" disabled={netOff||!onRetirer||priveEtat!=="lu"} onClick={()=>onRetirer&&onRetirer()} style={{...S.btnP,background:"#b45309",opacity:(netOff||priveEtat!=="lu")?.6:1}}>🔒 Retirer les codes du document partagé</button>}
+        {!codesDoc&&<button data-cpteremettre="1" disabled={netOff||!onRemettre||priveEtat!=="lu"} onClick={()=>onRemettre&&onRemettre()} style={{...S.btnP,background:"#6b7280",opacity:(netOff||priveEtat!=="lu")?.6:1}}>↩ Remettre les codes (marche arrière)</button>}
+        <button data-cpteregle="nouvelle" onClick={()=>{setRegle(r=>r==="nouvelle"?"":"nouvelle");setCopie("");}} style={{...S.btnP,background:"var(--bg2)",color:"var(--txt)",border:"1px solid var(--border)"}}>📜 Règle Firestore v10.252</button>
+        <button data-cpteregle="avant" onClick={()=>{setRegle(r=>r==="avant"?"":"avant");setCopie("");}} style={{...S.btnP,background:"var(--bg2)",color:"var(--txt)",border:"1px solid var(--border)"}}>📜 Règle précédente (marche arrière)</button>
+      </div>
+      {regle&&<div style={{marginTop:6}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}><span style={{fontSize:11,color:"var(--txt2)"}}>{regle==="nouvelle"?"À coller dans Console Firebase → Firestore → Règles → Publier (après avoir vu « fiches profils écrites ✅ » ci-dessus) :":"L'ancienne règle, à republier si quelque chose bloque — puis « Remettre les codes » si vous revenez aussi à une ancienne version :"}</span>
+          <button data-cptecopier="1" onClick={()=>copier(regle==="nouvelle"?REGLE_TXT:REGLE_AVANT_TXT,regle)} style={{...S.btnP,fontSize:11}}>{copie===regle?"✅ Copié":copie==="ko"?"Sélectionnez et copiez":"Copier"}</button></div>
+        <textarea readOnly value={regle==="nouvelle"?REGLE_TXT:REGLE_AVANT_TXT} style={{width:"100%",height:160,fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"var(--bg2)",color:"var(--txt)",border:"1px solid var(--border)",borderRadius:6,padding:6,boxSizing:"border-box"}}/>
+      </div>}
+    </div>}
     {bac&&<div style={{fontSize:11,color:"#c2410c",fontWeight:700}}>🧪 Bac à sable : les comptes ne se gèrent pas d'ici.</div>}
     {!bac&&!dispo&&<div style={{fontSize:11,color:"#dc2626",fontWeight:700}}>Bibliothèque Authentication absente de cette page : rien à faire ici.</div>}
     {!bac&&dispo&&<div>
@@ -8701,12 +8810,12 @@ function ComptesTuile({codes=[],netOff=false,bac=false,showPins=false}){
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><tbody>
         {codes.map(c=>{const l=lib(c);return <tr key={[c.etiq,c.code].join("|")} data-cpteligne={c.etiq} style={{borderTop:"1px solid var(--border)"}}>
           <td style={{padding:"3px 4px",fontWeight:700,color:c.parti?"var(--txt3)":"var(--txt)"}}>{c.qui}{c.parti?" · parti":""}</td>
-          <td style={{padding:"3px 4px",fontFamily:"'JetBrains Mono',monospace",color:"var(--txt2)"}}>{showPins?c.code:"••••"}</td>
+          <td style={{padding:"3px 4px",fontFamily:"'JetBrains Mono',monospace",color:"var(--txt2)"}}>{showPins?c.code:"••••"}{showPins&&<div data-cpteadresse="1" style={{fontSize:9,color:"var(--txt3)",wordBreak:"break-all"}}>{cpteEmail(c.code)}</div>}</td>
           <td data-cpteetat="1" style={{padding:"3px 4px",color:l.col,fontWeight:700}}>{l.t}</td>
         </tr>;})}
         {codes.length===0&&<tr><td style={{padding:4,color:"var(--txt3)"}}>Aucun code défini.</td></tr>}
       </tbody></table>
-      <div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>Les codes en clair : « Afficher tous les codes » dans la carte 🔐 Codes PIN et droits. Supprimer un code, changer un code ou retirer un membre met son compte à jour tout seul — jamais besoin de la console Firebase.</div>
+      <div style={{fontSize:10,color:"var(--txt3)",marginTop:6}}>Les codes en clair : « Afficher tous les codes » dans la carte 🔐 Codes PIN et droits. Supprimer un code, changer un code ou retirer un membre met son compte ET sa fiche à jour tout seul — jamais besoin de la console Firebase. Seul l'éditeur change les codes.</div>
     </div>}
   </div>;
 }
@@ -9531,7 +9640,7 @@ function InternesEquipe({intCfg,setIntCfg,isEdit}){
   </div>;
 }
 
-function InternesTile({intCfg,setIntCfg,actes=[],pins=[]}){
+function InternesTile({intCfg,setIntCfg,actes=[],pins=[],pin="",setPin=null}){   /* v10.252 : le code des internes arrive à part (prive/codes) */
   const num=(v)=>Math.max(0,Math.min(9,parseInt(v||"0",10)||0));
   const maj=(patch)=>setIntCfg(p=>({...p,...patch}));
   const inp=(k,def)=><input type="number" min={0} max={9} value={intCfg[k]===undefined?def:intCfg[k]} onChange={e=>{const o={};o[k]=num(e.target.value);maj(o);}} style={{...S.fi,width:52,textAlign:"center"}}/>;
@@ -9557,15 +9666,15 @@ function InternesTile({intCfg,setIntCfg,actes=[],pins=[]}){
       <div style={{fontSize:12.5,fontWeight:700,color:"var(--txt)",marginBottom:3}}>🔑 Code des internes</div>
       <div style={{fontSize:11,color:"var(--txt3)",marginBottom:7}}>Un seul code, partagé par tous les internes. À la connexion, il ouvre l'onglet Internes et demande un prénom (pour savoir qui modifie quoi). Les onglets Planning, CHL, CHB, PT Cardio, PT Angio et Aide restent consultables, sans modification possible.</div>
       <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-        <input type="password" id="nintp" placeholder={intCfg.pin?"Code défini — nouveau code":"Définir le code"} style={{...S.fi,flex:1,minWidth:150,textAlign:"center",letterSpacing:4}}/>
+        <input type="password" id="nintp" placeholder={pin?"Code défini — nouveau code":"Définir le code"} style={{...S.fi,flex:1,minWidth:150,textAlign:"center",letterSpacing:4}}/>
         <button style={S.btnP} onClick={()=>{const v=(document.getElementById("nintp").value||"").trim();
           if(v.length<4){toast("Min 4 car.","warn");return;}
           if((pins||[]).filter(Boolean).indexOf(v)>=0){toast("Ce code est déjà utilisé par un autre rôle","warn");return;}
-          if(!BAC)cpteChanger(intCfg.pin||"",v,"role:internes").then(cpteSuite);   /* v10.251 */
-          setIntCfg(p=>({...p,pin:v}));document.getElementById("nintp").value="";toast("Code des internes mis à jour");}}>OK</button>
-        {intCfg.pin&&<button style={{...S.icnBtn,fontSize:11}} onClick={()=>{if(!BAC)cpteSupprimer(intCfg.pin,"role:internes").then(cpteSuite);setIntCfg(p=>({...p,pin:""}));toast("Code des internes supprimé — l'accès est fermé");}}>Supprimer</button>}
+          if(!BAC)cpteChanger(pin||"",v,"role:internes").then(cpteSuite);   /* v10.251 */
+          if(setPin)setPin(v);document.getElementById("nintp").value="";toast("Code des internes mis à jour");}}>OK</button>
+        {pin&&<button style={{...S.icnBtn,fontSize:11}} onClick={()=>{if(!BAC)cpteSupprimer(pin,"role:internes").then(cpteSuite);if(setPin)setPin("");toast("Code des internes supprimé — l'accès est fermé");}}>Supprimer</button>}
       </div>
-      <div style={{fontSize:11,color:"var(--txt3)",marginTop:5}}>{intCfg.pin?("Code actuel : "+intCfg.pin):"Aucun code : les internes ne peuvent pas se connecter."}</div>
+      <div style={{fontSize:11,color:"var(--txt3)",marginTop:5}}>{pin?("Code actuel : "+pin):"Aucun code : les internes ne peuvent pas se connecter."}</div>
     </div>
     {(()=>{ /* v10.68 : SEULEMENT les colonnes du tableau 📊 — la disponibilité des
        activités se règle dans l'onglet Activités (coche 🎓), pas ici. */
@@ -10950,7 +11059,7 @@ function CardioPlanning(){
   },[]);
   /* v10.228 : retour à l'accueil (♥) = mémoire des onglets vidée — poste partagé */
   useEffect(()=>{if(accessMode==="ask"){ongletMemVider();pageMem.current={};}},[accessMode]);
-  useEffect(()=>{if(accessMode==="ask"||accessMode==="view")cpteDeconnecter();},[accessMode]);   /* v10.251 : retour au code ou consultation = compte Google refermé */
+  useEffect(()=>{if(accessMode==="ask"||(accessMode==="view"&&!BAC))cpteDeconnecter();if(accessMode==="ask"){priveLu.current=false;priveRef.current="";}},[accessMode]);   /* v10.251 : retour au code ou consultation = compte Google refermé ; v10.252 : pas dans le bac (le compte de l'éditeur sert à tous les profils simulés) */
   const [ym,setYM]=useState(()=>({year:new Date().getFullYear(),month:new Date().getMonth()}));
   const year=ym.year, month=ym.month;
   const setYear=y=>setYM(p=>({...p,year:typeof y==="function"?y(p.year):y}));
@@ -11037,7 +11146,19 @@ function CardioPlanning(){
   const [tourMed,setTourMed]=useState({});
   const [planningType,setPlanningType]=useState({});
   const [notes,setNotes]=useState({});
-  const [medPins,setMedPins]=useState({}); // {medId: "pin"}
+  /* v10.252 : la photo de passage de version et le numéro de version ne partent plus que d'un appareil CONNECTÉ (la règle
+     refuse le reste) : vus sur l'écran du code, ils attendent l'entrée d'un code. */
+  const verRetard=useRef(null);
+  const verInscrire=(data0,prec)=>{verRetard.current=null;cpteLog("passage de version inscrit",String(prec||""));
+    photoVersion(data0,prec).then(ok=>{if(ok&&bkListRef.current)bkListRef.current();});
+    Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,avecTampon({appVer:APP_VERSION}),{merge:true})).catch(e=>console.log("appVer:",e));};
+  const [medPins,setMedPins]=useState({}); // {medId: "pin"}   /* v10.252 : lus dans prive/codes (éditeur) — plus jamais dans le document partagé */
+  const [intPin,setIntPin]=useState("");   /* v10.252 : le code des internes, sorti d'intCfg */
+  const codesMain=useRef(null);   /* v10.252 : les codes encore présents dans le document partagé (secours, migration), ou null */
+  const [codesDoc,setCodesDoc]=useState(false);   /* le même, pour l'affichage */
+  const [priveEtat,setPriveEtat]=useState("");   /* "" | "lu" | "absent" | "erreur" */
+  const [profEtat,setProfEtat]=useState(null);   /* {n,ok,at,err} — dernière écriture des fiches profils */
+  const [pinMotif,setPinMotif]=useState("");   /* "" | "parti" | "fiche" | "reseau" */
   const [tourMins,setTourMins]=useState({coro:3,pace:1,eep:1,ett:1});
   const [tourMinsHard,setTourMinsHard]=useState({coro:2,pace:1,eep:1,ett:0});
   const [tourCfg,setTourCfg]=useState({});
@@ -11451,8 +11572,8 @@ function CardioPlanning(){
           {const sv=verNum(data.appVer),mv=verNum(APP_VERSION),srv=snap.metadata&&snap.metadata.fromCache===false;
             if(sv>mv){if(!VER_STALE.on){VER_STALE.on=true;VER_STALE.serveur=String(data.appVer);setStale(true);}}
             else if(sv<mv&&srv&&window.firebaseSetDoc){
-              photoVersion(data0,data.appVer).then(ok=>{if(ok&&bkListRef.current)bkListRef.current();});   /* v10.248 : la photo de l'état laissé par l'ancienne version, prise sur CE message (déjà en mémoire) */
-              Promise.resolve(window.firebaseSetDoc(PLANNING_DOC,avecTampon({appVer:APP_VERSION}),{merge:true})).catch(e=>console.log("appVer:",e));}}
+              if(cpteConnecte())verInscrire(data0,data.appVer);
+              else{if(!verRetard.current)cpteLog("passage de version différé à l'entrée d'un code",String(data.appVer||""));verRetard.current={data0,prec:data.appVer};}}}   /* v10.252 : sans compte connecté, le serveur refuserait — différé à l'entrée d'un code */
           /* v10.229 : gel du planning — lu sur chaque message, avant tout le reste */
           {let g=null;try{g=data.gel?JSON.parse(data.gel):null;}catch(e){g=null;}if(BAC||!(g&&g.at))g=null;
             GEL.on=!!g;GEL.raw=g?String(data.gel):"";setGel(pg=>JSON.stringify(pg)===JSON.stringify(g)?pg:g);}
@@ -11545,11 +11666,9 @@ function CardioPlanning(){
                 Promise.resolve(setDoc(PLANNING_DOC,{actesV2:mp,actesV2Order:arrA.map(x=>String(x.id))},{merge:true})).catch(e=>console.log("migration actes:",e));}
             }
           }
-            if(data.editPin)setEditPin(data.editPin);
-            if(data.adminPin!==undefined)setAdminPin(data.adminPin);
-          if(data.cadrePin!==undefined)setCadrePin(data.cadrePin);
+          codesMain.current=codesDuDocument(data);setCodesDoc(!!codesMain.current);   /* v10.252 : les codes du document partagé ne sont plus lus dans l'état — gardés à part, pour le secours et la migration */
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
-          if(data.intCfg){try{setIntCfg(pv=>({...pv,...JSON.parse(data.intCfg)}));}catch(e){}}
+          if(data.intCfg){try{setIntCfg(pv=>({...pv,...JSON.parse(data.intCfg)}));}catch(e){}}   /* v10.252 : un « pin » encore présent (ancien emplacement) y reste tel quel jusqu'au bouton « Retirer » — jamais lu, jamais réécrit d'ici */
           if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
           if(data.specColors){try{setSpecColors(JSON.parse(data.specColors)||{});}catch(e){}}
           if(data.vacs!==undefined){try{setVacs(JSON.parse(data.vacs)||[]);}catch(e){}}
@@ -11603,7 +11722,6 @@ function CardioPlanning(){
             if(found.length>0)setSalleReg(found.map(s=>({n:s,s:guess(s)})));
           }
           if(data.periodCfg)setPeriodCfg(JSON.parse(data.periodCfg));
-          if(data.medPins)setMedPins(JSON.parse(data.medPins));
           }
           isFirstLoad.current=!serverSeen.current;
           localChange.current=false;
@@ -11641,7 +11759,7 @@ function CardioPlanning(){
     try{
       const cur=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data()||{};
       const ts=Date.now();
-      const payload={...cur,_ts:ts};
+      const payload=sansCodes({...cur,_ts:ts});   /* v10.252 : jamais les codes dans une sauvegarde */
       await window.firebaseDB.collection("backups").doc("b"+ts).set(payload);
       await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon({_lastBackupAt:ts}),{merge:true});
       /* v10.248 : purge en deux comptes — 45 sauvegardes quotidiennes, et à part les 3 dernières photos de version */
@@ -11730,7 +11848,7 @@ function CardioPlanning(){
   /* v10.142 : signalements — lus à l'ouverture (badge sur l'onglet Paramètres) et à chaque visite de Paramètres */
   const [sigList,setSigList]=useState([]);
   const refreshSig=useCallback(async()=>{try{const snap=await window.firebaseDB.collection("signalements").get();const l=[];snap.forEach(d2=>{const x=d2.data()||{};l.push({id:d2.id,ts:x.ts||0,auteur:x.auteur,texte:x.texte,ctx:x.ctx||{},journal:x.journal||[],prec:x.prec||[],traite:!!x.traite});});l.sort((a,b)=>b.ts-a.ts);setSigList(l);}catch(e){}},[]);
-  useEffect(()=>{refreshSig();},[refreshSig]);
+  useEffect(()=>{if(accessMode==="edit"||accessMode==="medecinEdit")refreshSig();},[refreshSig,accessMode]);   /* v10.252 : lecture réservée aux éditeurs par la règle */
   useEffect(()=>{if(tab==="partage")refreshSig();},[tab,refreshSig]);
   const sigTraite=async(id,v)=>{try{await window.firebaseDB.collection("signalements").doc(id).set({traite:!!v},{merge:true});toast(v?"Signalement traité":"Signalement rouvert");}catch(e){toast("Échec de l'enregistrement","warn");}refreshSig();};
   const sigDel=async(id)=>{try{await window.firebaseDB.collection("signalements").doc(id).delete();toast("Signalement supprimé");}catch(e){toast("Échec de la suppression","warn");}refreshSig();};
@@ -11818,6 +11936,7 @@ function CardioPlanning(){
       if(!data){toast("Sauvegarde introuvable","warn");return;}
       const{_ts,gel:_gelAncien,_verArr:_va,_verPrec:_vp,...rest}=data;   /* v10.248 : les marques de photo de version restent dans la sauvegarde */   /* v10.229 : un gel enregistré DANS la sauvegarde ne revient jamais ; le gel EN COURS, lui, survit à la restauration */
       delete rest._ecr;mapPending.current={};mapMigr.current={};   /* v10.246 : aucune de nos entrées en attente ne doit repasser par-dessus la sauvegarde */
+      codesRestaurer(rest,BAC?null:codesMain.current);   /* v10.252 : une vieille sauvegarde porte des codes — ôtés ; ceux EN SERVICE reviennent s'ils vivent encore dans le document partagé */
       if(BAC){delete rest._bacDe;delete rest._bacDep;rest._bacDe={ts:_ts||0,at:Date.now()};planPending.current={};planSynced.current=null;
         try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : l'historique repart de l'heure de la sauvegarde */
         await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
@@ -11840,14 +11959,11 @@ function CardioPlanning(){
       if(!cur){toast("Restauration impossible : la base ne répond pas — rien n'a changé","warn");return false;}
       if(!BAC){const okB=await makeBackup(true);if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Restaurer quand même ?"))return false;}
       const rest=Object.assign({},data.doc||{});
-      EXP_HORS.forEach(k=>{delete rest[k];});EXP_CODES.forEach(k=>{delete rest[k];});
+      EXP_HORS.forEach(k=>{delete rest[k];});
       rest.planV2=data.plan&&typeof data.plan==="object"?data.plan:{};
-      EXP_CODES.forEach(k=>{if(cur[k]!==undefined)rest[k]=cur[k];});
+      if(rest.intCfg===undefined&&cur.intCfg!==undefined)rest.intCfg=cur.intCfg;
+      codesRestaurer(rest,codesDuDocument(cur));   /* v10.252 : codes EN SERVICE (ceux du document, s'il en porte encore) */
       ["_lastBackupAt","_bacDe","_bacDep"].forEach(k=>{if(cur[k]!==undefined)rest[k]=cur[k];});
-      const pinInt=(lireJson(cur.intCfg,{})||{}).pin;
-      if(rest.intCfg!==undefined){const c=lireJson(rest.intCfg,null);
-        if(c&&typeof c==="object"){const c2=Object.assign({},c);delete c2.pin;if(pinInt!==undefined)c2.pin=pinInt;rest.intCfg=typeof rest.intCfg==="string"?JSON.stringify(c2):c2;}}
-      else if(cur.intCfg!==undefined)rest.intCfg=cur.intCfg;
       if(GEL.on&&GEL.raw)rest.gel=GEL.raw;
       if(verNum(rest.appVer)<verNum(APP_VERSION))rest.appVer=APP_VERSION;
       jrnMuet();
@@ -11874,9 +11990,13 @@ function CardioPlanning(){
       .catch(e=>{console.log("gel:",e);toast("Échec — le gel n'a pas changé","warn");});
   },[]);
   useEffect(()=>{if(gelOn){setModal(null);}},[gelOn]);   /* une modale ouverte au moment du gel se referme : rien n'y serait enregistré */
+  const bkAutoFait=useRef(false);
   useEffect(()=>{
-    // Au chargement : backup auto si la dernière date de plus de 72 h
+    // À l'entrée d'un code (v10.252 : plus au chargement — un appareil sans compte ne peut plus écrire) : backup auto si la dernière date de plus de 24 h
     if(BAC)return;   /* v10.175 : jamais depuis le bac à sable */
+    if(accessMode==="ask"||accessMode==="view"||bkAutoFait.current||!cpteConnecte())return;
+    bkAutoFait.current=true;
+    if(verRetard.current)verInscrire(verRetard.current.data0,verRetard.current.prec);   /* v10.252 : passage de version différé */
     const t=setTimeout(async()=>{
       try{
         const d=await window.firebaseDB.collection("planning").doc(PLAN_ID).get();
@@ -11887,7 +12007,7 @@ function CardioPlanning(){
       }catch(e){console.log("backup check:",e);}
     },6000);
     return ()=>clearTimeout(t);
-  },[]);
+  },[accessMode]);
 
 /* ── Purge des dérogations et remplacements Tour d'une liste de semaines ── */
   const purgeTourExtras=useCallback((weekKeys)=>{
@@ -12253,8 +12373,7 @@ function CardioPlanning(){
       return changed?next:prev;
     });
   },[medecins]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({editPin});},[editPin]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes});},[adminPin,cadrePin,adminEnabled,adminCanReports,adminCanNotes]);
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminEnabled,adminCanReports,adminCanNotes});},[adminEnabled,adminCanReports,adminCanNotes]);   /* v10.252 : les codes vivent dans prive/codes */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({intCfg:JSON.stringify(intCfg)});},[intCfg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
@@ -12311,7 +12430,6 @@ function CardioPlanning(){
     setPtOrder(nx);
   };
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({astreinte:JSON.stringify(astreinte)});},[astreinte]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({medPins:JSON.stringify(medPins)});},[medPins]);
 
   useEffect(()=>{ applyTheme(darkMode); },[darkMode]);
   /* v10.106 : sur iPhone, telecharger le fichier d'archive met la page en arriere-plan
@@ -12332,16 +12450,53 @@ function CardioPlanning(){
      éditeurs compris ; le premier garde la main sur Paramètres (restaurer, dégeler). */
   const isEditVrai=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"&&(((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")!=="attache"))&&!netOff;
   const isEdit=isEditVrai&&!gelOn;  /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
-  /* v10.251 : COPIE DES CODES dans prive/codes — le document que la v10.252 réservera à l'éditeur (règle Firestore), quand les
-     codes quitteront le document principal. Tenue à jour par les appareils d'un éditeur, à chaque changement reçu (le sien
-     ou celui d'un médecin qui change son propre code) ; une écriture au plus par changement. Jamais depuis le bac à sable. */
-  const priveRef=useRef("");
-  useEffect(()=>{if(BAC||!isEditVrai||!serverSeen.current||!window.firebaseDB||isFirstLoad.current)return;
-    const meds={};Object.keys(medPins||{}).forEach(k=>{const m=medecins.find(x=>String(x.id)===k);const c=medPins[k];if(!c)return;meds[k]={code:c,init:m?m.init:"",nom:m?((m.prenom||"")+" "+(m.nom||"")).trim():"",etiq:m?cpteEtiquette(m):"",parti:!!(m&&medParti(m)),depart:(m&&m.depart)||null};});
-    const o={medecins:meds,editeur:editPin||"",secretaires:adminPin||"",cadres:cadrePin||"",internes:(intCfg&&intCfg.pin)||""};
-    const sig=JSON.stringify(o);if(priveRef.current===sig)return;priveRef.current=sig;
-    try{trafEcr(window.firebaseDB.collection("prive").doc("codes").set(Object.assign({},o,{at:Date.now(),v:verCourt(),a:APPAREIL.id}))).catch(e=>{priveRef.current="";cpteLog("copie des codes non écrite",cpteErr(e));});}catch(e){priveRef.current="";}
-  },[medPins,editPin,adminPin,cadrePin,intCfg,medecins,isEditVrai]);
+  /* v10.252 : LES CODES VIVENT DANS prive/codes (éditeur seul, règle Firestore). À l'entrée d'un éditeur : lecture une fois ;
+     absent (première ouverture de cette version) → repris du document partagé, qui les porte encore. Puis, à chaque changement,
+     la copie est réécrite et les FICHES profils/<empreinte> (clé → profil, jamais le code) sont posées — c'est la liste que la
+     règle consulte. La signature des fiches est gardée dans prive/codes (profSig) : rien n'est réécrit si rien n'a changé. */
+  const priveRef=useRef("");const priveLu=useRef(false);const profSigRef=useRef("");
+  const priveContenu=(mp,ep,ap,cp,ip)=>{const meds={};Object.keys(mp||{}).forEach(k=>{const m=medecins.find(x=>String(x.id)===k);const c=mp[k];if(!c)return;meds[k]={code:c,init:m?m.init:"",nom:m?((m.prenom||"")+" "+(m.nom||"")).trim():"",etiq:m?cpteEtiquette(m):"",parti:!!(m&&medParti(m)),depart:(m&&m.depart)||null};});
+    const prof=profilsDe(medecins,mp,ep,ap,cp,ip);const profSig=JSON.stringify(prof);
+    return {o:{medecins:meds,editeur:ep||"",secretaires:ap||"",cadres:cp||"",internes:ip||""},prof,profSig};};
+  useEffect(()=>{if(BAC||!isEditVrai||!window.firebaseDB||priveLu.current)return;
+    let vivant=true;
+    (async()=>{let r;try{const sn=await window.firebaseDB.collection("prive").doc("codes").get();const d=snapExiste(sn)&&typeof sn.data==="function"?(sn.data()||{}):null;r=d?{lu:true,d}:{absent:true};}catch(e){r={erreur:cpteErr(e)};}
+      if(!vivant)return;
+      if(r.lu){const d=r.d;const mp={};Object.keys(d.medecins||{}).forEach(k=>{const c=d.medecins[k]&&d.medecins[k].code;if(c)mp[k]=c;});
+        setMedPins(mp);if(d.editeur)setEditPin(d.editeur);setAdminPin(d.secretaires||"");setCadrePin(d.cadres||"");setIntPin(d.internes||"");
+        profSigRef.current=d.profSig||"";if(d.profAt)setProfEtat({n:d.profN||0,ok:true,at:d.profAt});
+        const pc=priveContenu(mp,d.editeur||editPin,d.secretaires||"",d.cadres||"",d.internes||"");if(pc.profSig===profSigRef.current)priveRef.current=JSON.stringify(pc.o)+"|"+pc.profSig;   /* rien à réécrire si rien n'a changé */
+        priveLu.current=true;setPriveEtat("lu");}
+      else if(r.absent&&!codesMain.current){setPriveEtat("vide");cpteLog("copie des codes absente et document sans codes : rien n'est écrit (garde-fou)");}   /* sinon des fiches seraient posées à partir de rien, et les vraies effacées */
+      else if(r.absent){const lg=codesMain.current||{};if(lg.medPins)setMedPins(lg.medPins);if(lg.editPin)setEditPin(lg.editPin);if(lg.adminPin!==undefined)setAdminPin(lg.adminPin);if(lg.cadrePin!==undefined)setCadrePin(lg.cadrePin);if(lg.intPin!==undefined)setIntPin(lg.intPin);
+        priveLu.current=true;setPriveEtat("absent");cpteLog("copie des codes absente : reprise du document partagé");}
+      else{setPriveEtat("erreur");cpteLog("copie des codes illisible",r.erreur);}
+    })();return ()=>{vivant=false;};},[isEditVrai]);
+  useEffect(()=>{if(BAC||!isEditVrai||!serverSeen.current||!window.firebaseDB||isFirstLoad.current||!priveLu.current)return;
+    const {o,prof,profSig}=priveContenu(medPins,editPin,adminPin,cadrePin,intPin);
+    const sig=JSON.stringify(o)+"|"+profSig;if(priveRef.current===sig)return;priveRef.current=sig;
+    const fiches=profSig!==profSigRef.current;
+    (async()=>{let pr=null;
+      if(fiches){try{pr=await profilsEcrire(prof);profSigRef.current=profSig;setProfEtat({n:pr.n,ok:true,at:Date.now()});cpteLog("fiches profils écrites",String(pr.n)+(pr.otees?" (+"+pr.otees+" effacée(s))":""));}
+        catch(e){setProfEtat({n:Object.keys(prof).length,ok:false,at:Date.now(),err:cpteErr(e)});cpteLog("fiches profils non écrites",cpteErr(e));}}
+      const ext=pr?{profSig,profN:pr.n,profAt:Date.now()}:{profSig:profSigRef.current,profN:(profEtat&&profEtat.n)||Object.keys(prof).length,profAt:(profEtat&&profEtat.at)||Date.now()};
+      try{await trafEcr(window.firebaseDB.collection("prive").doc("codes").set(Object.assign({},o,ext,{at:Date.now(),v:verCourt(),a:APPAREIL.id})));setPriveEtat("lu");}
+      catch(e){priveRef.current="";cpteLog("copie des codes non écrite",cpteErr(e));}
+    })();
+  },[medPins,editPin,adminPin,cadrePin,intPin,medecins,isEditVrai,priveEtat]);
+  /* v10.252 : RETIRER les codes du document partagé (une fois la règle publiée et testée) ; REMETTRE = marche arrière complète */
+  const codesRetirer=async()=>{if(BAC||!window.firebaseSetDoc||!PLANNING_DOC)return;
+    const FV=typeof window!=="undefined"&&window.firebase&&window.firebase.firestore&&window.firebase.firestore.FieldValue;
+    if(!FV||typeof FV.delete!=="function"){toast("Bibliothèque Firestore indisponible","warn");return;}
+    if(!window.confirm("Retirer les codes du document partagé ?\n\nÀ faire seulement une fois la nouvelle règle publiée et testée (carte 🛡️). Un téléphone resté sur une version plus ancienne ne reconnaîtra plus les codes : consultation seule."))return;
+    const o={medPins:FV.delete(),editPin:FV.delete(),adminPin:FV.delete(),cadrePin:FV.delete(),intCfg:JSON.stringify(Object.assign({},intCfg,{pin:undefined}))};
+    try{await window.firebaseSetDoc(PLANNING_DOC,avecTampon(o),{merge:true});fieldSync.current.intCfg=JSON.stringify(o.intCfg);setIntCfg(p=>{const n={...p};delete n.pin;return n;});codesMain.current=null;setCodesDoc(false);cpteLog("codes retirés du document partagé");toast("Codes retirés du document partagé");}
+    catch(e){toast("Échec : "+cpteLib(cpteErr(e)),"warn");}};
+  const codesRemettre=async()=>{if(BAC||!window.firebaseSetDoc||!PLANNING_DOC)return;
+    if(!window.confirm("Remettre les codes dans le document partagé ?\n\nMarche arrière : à faire seulement si vous revenez à l'ancienne règle ou à une version plus ancienne de l'application."))return;
+    const o={medPins:JSON.stringify(medPins||{}),editPin:editPin||"",adminPin:adminPin||"",cadrePin:cadrePin||"",intCfg:JSON.stringify(Object.assign({},intCfg,{pin:intPin||""}))};
+    try{await window.firebaseSetDoc(PLANNING_DOC,avecTampon(o),{merge:true});fieldSync.current.intCfg=JSON.stringify(o.intCfg);setIntCfg(p=>({...p,pin:intPin||""}));codesMain.current={medPins:medPins||{},editPin:editPin||"",adminPin:adminPin||"",cadrePin:cadrePin||"",intPin:intPin||""};setCodesDoc(true);cpteLog("codes remis dans le document partagé");toast("Codes remis dans le document partagé");}
+    catch(e){toast("Échec : "+cpteLib(cpteErr(e)),"warn");}};
   /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
      une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
   const verrouDeb=useMemo(()=>verrouDebut(),[PCFG.len,PCFG.startM,vacs]);
@@ -13944,7 +14099,7 @@ function CardioPlanning(){
      (mêmes setAccessMode / setEditMedId / setIsCadre), la vérification du code en moins. */
   const bacCopie=async()=>{const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};
     try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : les essais précédents s'effacent */
-    await window.firebaseDB.collection("planning").doc("bac").set(avecTampon({...d,_bacDep:Date.now()}));};   /* v10.246 : tampon neuf (celui de la copie est ancien) */   /* v10.238 : l'heure de la copie borne le vrai historique */
+    await window.firebaseDB.collection("planning").doc("bac").set(avecTampon({...sansCodes(d),_bacDep:Date.now()}));};   /* v10.252 : jamais les codes dans le bac (ils y seraient lisibles par tous) */   /* v10.246 : tampon neuf (celui de la copie est ancien) */   /* v10.238 : l'heure de la copie borne le vrai historique */
   const bacEntrer=async()=>{if(!window.confirm("Entrer dans le bac à sable ?\n\nLe planning réel est recopié dans un espace de test à part, puis l'application se recharge. Rien de ce que vous y ferez ne touchera au vrai planning."))return;
     try{await bacCopie();localStorage.setItem("cp6_bac","1");window.location.reload();}catch(e){toast("Échec de la copie vers le bac à sable","warn");}};
   const bacRaz=async()=>{if(!window.confirm("Remettre le bac à sable à zéro ?\n\nSon contenu est remplacé par une copie fraîche du planning réel, puis l'application se recharge."))return;
@@ -13955,7 +14110,7 @@ function CardioPlanning(){
     if(editPin)L.push({code:editPin,etiq:"role:editeur",qui:"Éditeur",partage:true});
     if(adminPin&&adminPin.length>=3)L.push({code:adminPin,etiq:"role:secretaires",qui:"Secrétaires",partage:true});
     if(cadrePin&&cadrePin.length>=3)L.push({code:cadrePin,etiq:"role:cadres",qui:"Cadres",partage:true});
-    if(intCfg&&intCfg.pin&&intCfg.pin.length>=3)L.push({code:intCfg.pin,etiq:"role:internes",qui:"Internes",partage:true});
+    if(intPin&&intPin.length>=3)L.push({code:intPin,etiq:"role:internes",qui:"Internes",partage:true});
     (medecins||[]).forEach(m=>{const c=medPins[String(m.id)];if(!c||c.length<3)return;const parti=medParti(m);
       if(!parti&&L.some(x=>x.code===c))return;
       L.push({code:c,etiq:cpteEtiquette(m),qui:(m.init||"")+(m.role==="attache"?" (attaché)":""),parti,repris:parti&&L.some(x=>x.code===c&&!x.parti)});});
@@ -13973,26 +14128,47 @@ function CardioPlanning(){
      modification : navigateur hors ligne, ou Google injoignable dans les 6 s → message « consultation seule » ; (3) le compte
      Google du code est ouvert, créé s'il manque, ré-étiqueté s'il le faut — une erreur de Google ne bloque pas ; (4) le profil
      s'applique comme avant. Dans le bac à sable, pas de compte (ce sont les mêmes codes : rien à préparer). */
-  const codeProfil=(v)=>{
-    if(v===editPin)return {type:"edit",etiq:"role:editeur"};
-    const medEntry=Object.entries(medPins).find(([id,pin])=>pin===v&&pin.length>=3&&!medParti(medecins.find(m=>m.id===parseInt(id))));
-    if(medEntry){const m=medecins.find(x=>x.id===parseInt(medEntry[0]));return {type:"med",id:parseInt(medEntry[0]),attache:!!(m&&m.role==="attache"),etiq:cpteEtiquette(m)};}
-    if(adminEnabled){const okA=adminPin&&adminPin.length>=3&&v===adminPin;const okC=cadrePin&&cadrePin.length>=3&&v===cadrePin;if(okA)return {type:"admin",etiq:"role:secretaires"};if(okC)return {type:"cadre",etiq:"role:cadres"};}
-    if(intCfg.show===true&&intCfg.pin&&intCfg.pin.length>=3&&v===intCfg.pin)return {type:"interne",etiq:"role:internes"};
+  /* v10.252 : SECOURS — l'ancienne reconnaissance, sur les codes que le document partagé porte ENCORE (jusqu'au bouton « Retirer »).
+     Sert aussi sans bibliothèque Authentication (bancs). Null dès que les codes ont quitté le document. */
+  const codeProfil=(v)=>{const lg=codesMain.current;if(!lg||!v)return null;
+    if(v===(lg.editPin||EDIT_PIN_DEFAULT))return {type:"edit",etiq:"role:editeur"};   /* comme avant : sans code éditeur enregistré, le code par défaut */
+    const mp=lg.medPins||{};
+    const medEntry=Object.entries(mp).find(([id,pin])=>pin===v&&String(pin).length>=3&&!medParti(medecins.find(m=>m.id===parseInt(id))));
+    if(medEntry){const m=medecins.find(x=>x.id===parseInt(medEntry[0]));if(!m)return null;return {type:"med",id:parseInt(medEntry[0]),attache:!!(m&&m.role==="attache"),etiq:cpteEtiquette(m)};}
+    if(adminEnabled){const okA=lg.adminPin&&lg.adminPin.length>=3&&v===lg.adminPin;const okC=lg.cadrePin&&lg.cadrePin.length>=3&&v===lg.cadrePin;if(okA)return {type:"admin",etiq:"role:secretaires"};if(okC)return {type:"cadre",etiq:"role:cadres"};}
+    if(intCfg.show===true&&lg.intPin&&lg.intPin.length>=3&&v===lg.intPin)return {type:"interne",etiq:"role:internes"};
     return null;};
   const codeAppliquer=(q)=>{setPinError(false);
     if(q.type==="edit"){setAccessMode("edit");return;}
     if(q.type==="med"){setEditMedId(q.id);setAccessMode("medecinEdit");if(q.attache)setTab("attache");return;}   /* v10.72 : un ATTACHE ouvre sur l'onglet Attaches */
     if(q.type==="admin"||q.type==="cadre"){setIsCadre(q.type==="cadre");setAdminAsk(true);return;}
     if(q.type==="interne")setInterneAsk(true);};
+  /* v10.252 : ENTRÉE. (1) pas de réseau = pas de modification ; (2) le compte Google du code tapé s'ouvre — sans le créer :
+     inconnu de Google → secours (codes du document, puis création comme en v10.251) ou « Code incorrect » ; (3) sa FICHE
+     profils/<empreinte> dit le profil ; parti → refusé ; pas de fiche (règle pas encore publiée, éditeur pas encore passé) →
+     secours ; (4) le profil s'applique comme avant ; l'étiquette du compte est corrigée si besoin (sans valeur pour la règle).
+     Le bac à sable suit le même chemin (mêmes codes, mêmes comptes) ; il ne crée jamais de compte. */
   const entrerCode=async()=>{if(codeAttente)return;
-    const v=pinInput,q=codeProfil(v);
-    if(!q){setPinError(true);return;}
+    const v=pinInput;setPinMotif("");
     if(navOff||(typeof navigator!=="undefined"&&navigator.onLine===false)){setHorsReseau(true);setPinError(false);return;}
-    if(cpteDispo()&&!BAC){setCodeAttente(true);let r;try{r=await cpteEntrer(v,q.etiq);}catch(e){r={ok:true,erreur:String(e)};}setCodeAttente(false);
-      if(r&&r.ok===false){setHorsReseau(true);setPinError(false);return;}}
+    if(!cpteDispo()){const q0=codeProfil(v);if(!q0){setPinError(true);return;}setHorsReseau(false);codeAppliquer(q0);return;}
+    setCodeAttente(true);let q=null;
+    try{const r=await cpteOuvrir(v);
+      if(r&&r.ok===false){setCodeAttente(false);setHorsReseau(true);setPinError(false);return;}
+      if(r&&r.inconnu){q=codeProfil(v);
+        if(q&&!BAC){const r2=await cpteEntrer(v,q.etiq);if(r2&&r2.ok===false){setCodeAttente(false);setHorsReseau(true);setPinError(false);return;}}}
+      else{const f=await profilLire();
+        if(f.existe){q=profilVersQ(f.f,medecins,adminEnabled,intCfg.show===true);
+          if(!q){setCodeAttente(false);setPinError(true);setPinMotif(f.f&&f.f.parti===true?"parti":"fiche");cpteLog("fiche sans profil ouvert",JSON.stringify(f.f||{}));cpteDeconnecter();return;}}
+        else if(f.erreur&&f.reseau){setCodeAttente(false);setHorsReseau(true);setPinError(false);cpteDeconnecter();return;}
+        else{q=codeProfil(v);if(f.erreur)cpteLog("fiche illisible",f.erreur);if(!q)cpteLog("compte connu, aucune fiche et aucun code dans le document");}
+        if(q&&r&&r.nom!==q.etiq&&!BAC){try{cpteDelai(window.cpAuth.renommer(q.etiq)).catch(()=>{});}catch(e){}}
+      }
+    }catch(e){q=codeProfil(v);}
+    setCodeAttente(false);
+    if(!q){setPinError(true);cpteDeconnecter();return;}
     setHorsReseau(false);codeAppliquer(q);};
-  // Show loading while Firebase connects (so medPins are available for login)
+  // Show loading while Firebase connects
   if(accessMode==="ask"&&fbStatus==="connecting"&&!PLANNING_DOC) return(
     <div style={{minHeight:"100vh",background:"#1a1f2e",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",color:"#4ade80",fontSize:20}}>
       ♥ Chargement...
@@ -14015,11 +14191,11 @@ function CardioPlanning(){
         <div style={{color:"var(--txt3)",fontSize:12,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           — édition —
           {fbStatus==="connecting"&&<span style={{fontSize:10,color:"#f59e0b"}}>⏳ Chargement...</span>}
-          {fbStatus==="ok"&&Object.keys(medPins).length>0&&<span style={{fontSize:10,color:"#4ade80"}}>✓ {Object.keys(medPins).length} PIN(s) médecin</span>}
+          {fbStatus==="ok"&&<span style={{fontSize:10,color:"#4ade80"}}>{cpteDispo()?"✓ comptes":"✓ prêt"}</span>}{/* v10.252 : plus de codes lisibles ici */}
         </div>
         <input value={pinInput} onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")entrerCode();}}
           type="password" placeholder="PIN" style={{...S.fi,width:"100%",textAlign:"center",letterSpacing:6,fontSize:16,marginBottom:8}}/>
-        {pinError&&<div style={{color:"#ef4444",fontSize:12,marginBottom:8}}>Code incorrect</div>}
+        {pinError&&<div data-pinerr={pinMotif||"code"} style={{color:"#ef4444",fontSize:12,marginBottom:8}}>{pinMotif==="parti"?"Ce code appartient à une personne partie : il n'ouvre plus l'application.":pinMotif==="fiche"?"Code non reconnu par le serveur — demandez à l'éditeur.":"Code incorrect"}</div>}
         {horsReseau&&<div data-horsreseau="1" style={{color:"#b45309",background:"rgba(180,83,9,.08)",border:"1px solid #b45309",borderRadius:8,padding:"8px 10px",fontSize:12,fontWeight:700,marginBottom:8,lineHeight:1.4}}>📴 Pas de connexion internet : consultation seule. Reconnectez-vous pour modifier le planning.<button style={{display:"block",width:"100%",marginTop:8,padding:"8px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontSize:13,fontWeight:700}} onClick={()=>setAccessMode("view")}>👁 Consulter</button></div>}{/* v10.251 */}
         {codeAttente&&<div data-codeattente="1" style={{color:"var(--txt3)",fontSize:12,marginBottom:8}}>⏳ Vérification…</div>}
         <button style={{width:"100%",padding:"10px",borderRadius:9,border:"none",background:"#1d4ed8",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700}}
@@ -15084,7 +15260,7 @@ header::-webkit-scrollbar { display: none; }
               </div>}
           </div>}
 
-          {isEdit&&<ComptesTuile codes={cpteListe()} netOff={netOff} bac={BAC} showPins={showPins}/>}{/* v10.251 */}
+          {isEdit&&<ComptesTuile codes={cpteListe()} netOff={netOff} bac={BAC} showPins={showPins} priveEtat={priveEtat} profEtat={profEtat} codesDoc={codesDoc} onRetirer={codesRetirer} onRemettre={codesRemettre}/>}{/* v10.251 ; v10.252 : fiches, retirer / remettre, règle */}
           {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.131 : sa propre carte */}
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🎯 Colonne du médecin connecté</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>À l'ouverture avec son PIN, chacun arrive centré sur sa colonne (Planning pour un médecin, Attachés pour un attaché). Une tuile allumée ajoute un pointillé violet sur sa colonne, pour la retrouver après avoir fait défiler ; éteignez la tuile de qui ne le souhaite pas.</div>
@@ -15180,7 +15356,7 @@ header::-webkit-scrollbar { display: none; }
             </div>
           </div>}
 
-          <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]}/>
+          <InternesTile intCfg={intCfg} setIntCfg={setIntCfg} actes={actes} pins={[editPin,adminPin,cadrePin]} pin={intPin} setPin={setIntPin}/>
           <div style={{...S.card,marginBottom:10}}>
             <div style={{fontWeight:700,color:"#e3b341",fontSize:13,marginBottom:6}}>🔔 Notifications aux secrétaires</div>
             <div>
