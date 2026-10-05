@@ -1055,7 +1055,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.252 — 03/10/2026";
+const APP_VERSION = "v10.253 — 05/10/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -9863,7 +9863,7 @@ function ProtectionTuile({ netOff = false, bloque = false }) {
         lg("Cet appareil", APPAREIL.lib),
         lg("Heure utilisée", horl),
         lg("Écritures refusées depuis l'ouverture", String(REFUS.n), REFUS.n ? "#dc2626" : undefined),
-        React.createElement("button", { "data-protest": "1", disabled: netOff || bloque, onClick: tester, style: { marginTop: 8, width: "100%", fontSize: 12, padding: "7px 10px", borderRadius: 8, cursor: netOff || bloque ? "default" : "pointer", fontWeight: 800, border: "1.5px solid #16a34a", background: "var(--bg2)", color: "#16a34a", opacity: netOff || bloque ? .5 : 1 } }, "\uD83E\uDDEA Les r\u00E8gles sont-elles publi\u00E9e ?"),
+        React.createElement("button", { "data-protest": "1", disabled: netOff || bloque, onClick: tester, style: { marginTop: 8, width: "100%", fontSize: 12, padding: "7px 10px", borderRadius: 8, cursor: netOff || bloque ? "default" : "pointer", fontWeight: 800, border: "1.5px solid #16a34a", background: "var(--bg2)", color: "#16a34a", opacity: netOff || bloque ? .5 : 1 } }, "\uD83E\uDDEA Les r\u00E8gles sont-elles publi\u00E9es ?"),
         lignes.map((l, i) => React.createElement("div", { key: i, "data-protligne": l.ok === true ? "ok" : l.ok === false ? "ko" : "?", style: { marginTop: 4, fontSize: 11, display: "flex", justifyContent: "space-between", gap: 8 } },
             React.createElement("span", { style: { color: "var(--txt2)" } }, l.t),
             React.createElement("b", { style: { color: l.ok === true ? "#16a34a" : l.ok === false ? "#dc2626" : "var(--txt3)", textAlign: "right" } }, l.m))),
@@ -14029,10 +14029,11 @@ function CardioPlanning() {
                     }
                     if (data.intCfg) {
                         try {
-                            setIntCfg(pv => (Object.assign(Object.assign({}, pv), JSON.parse(data.intCfg))));
+                            const ic = JSON.parse(data.intCfg) || {};
+                            setIntCfg(pv => { const n = Object.assign(Object.assign({}, pv), ic); delete n.pin; return n; });
                         }
                         catch (e) { }
-                    } /* v10.252 : un « pin » encore présent (ancien emplacement) y reste tel quel jusqu'au bouton « Retirer » — jamais lu, jamais réécrit d'ici */
+                    } /* v10.253 : l'état ne porte JAMAIS le code des internes (il vit dans intPin) — sinon, au bouton « Retirer », l'écho local du serveur fusionnait dans un état qui avait encore le pin et l'effet de sauvegarde le RÉÉCRIVAIT aussitôt (05/10/2026) */
                     if (data.ptOrder) {
                         try {
                             setPtOrder(JSON.parse(data.ptOrder) || []);
@@ -15233,8 +15234,9 @@ function CardioPlanning() {
         saveToFirebase({ adminEnabled, adminCanReports, adminCanNotes }); }, [adminEnabled, adminCanReports, adminCanNotes]); /* v10.252 : les codes vivent dans prive/codes */
     useEffect(() => { if (!isFirstLoad.current)
         saveToFirebase({ ideCfg: JSON.stringify(ideCfg) }); }, [ideCfg]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ intCfg: JSON.stringify(intCfg) }); }, [intCfg]);
+    useEffect(() => { if (isFirstLoad.current)
+        return; const lg = codesMain.current; const c = Object.assign({}, intCfg); delete c.pin; if (lg && lg.intPin !== undefined)
+        c.pin = lg.intPin; saveToFirebase({ intCfg: JSON.stringify(c) }); }, [intCfg]); /* v10.253 : le pin n'est remis que si le document porte ENCORE les codes (transition) — jamais après « Retirer » */
     useEffect(() => { if (!isFirstLoad.current)
         saveToFirebase({ ptOrder: JSON.stringify(ptOrder) }); }, [ptOrder]);
     useEffect(() => { if (!isFirstLoad.current)
@@ -15456,16 +15458,16 @@ function CardioPlanning() {
         if (!window.confirm("Retirer les codes du document partagé ?\n\nÀ faire seulement une fois la nouvelle règle publiée et testée (carte 🛡️). Un téléphone resté sur une version plus ancienne ne reconnaîtra plus les codes : consultation seule."))
             return;
         const o = { medPins: FV.delete(), editPin: FV.delete(), adminPin: FV.delete(), cadrePin: FV.delete(), intCfg: JSON.stringify(Object.assign({}, intCfg, { pin: undefined })) };
+        codesMain.current = null; /* v10.253 : AVANT l'envoi — l'écho local arrive avant la réponse du serveur */
         try {
             await window.firebaseSetDoc(PLANNING_DOC, avecTampon(o), { merge: true });
-            fieldSync.current.intCfg = JSON.stringify(o.intCfg);
-            setIntCfg(p => { const n = Object.assign({}, p); delete n.pin; return n; });
             codesMain.current = null;
             setCodesDoc(false);
             cpteLog("codes retirés du document partagé");
             toast("Codes retirés du document partagé");
         }
         catch (e) {
+            codesMain.current = { medPins: medPins || {}, editPin: editPin || "", adminPin: adminPin || "", cadrePin: cadrePin || "", intPin: intPin || "" };
             toast("Échec : " + cpteLib(cpteErr(e)), "warn");
         }
     };
@@ -15477,8 +15479,6 @@ function CardioPlanning() {
         const o = { medPins: JSON.stringify(medPins || {}), editPin: editPin || "", adminPin: adminPin || "", cadrePin: cadrePin || "", intCfg: JSON.stringify(Object.assign({}, intCfg, { pin: intPin || "" })) };
         try {
             await window.firebaseSetDoc(PLANNING_DOC, avecTampon(o), { merge: true });
-            fieldSync.current.intCfg = JSON.stringify(o.intCfg);
-            setIntCfg(p => (Object.assign(Object.assign({}, p), { pin: intPin || "" })));
             codesMain.current = { medPins: medPins || {}, editPin: editPin || "", adminPin: adminPin || "", cadrePin: cadrePin || "", intPin: intPin || "" };
             setCodesDoc(true);
             cpteLog("codes remis dans le document partagé");
@@ -19270,7 +19270,7 @@ header::-webkit-scrollbar { display: none; }
                                 React.createElement("div", null,
                                     React.createElement("b", null, "Internes :"),
                                     " ",
-                                    React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, (intCfg && intCfg.pin) || "— non défini —")),
+                                    React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace" } }, intPin || "— non défini —")),
                                 Object.entries(medPins).filter(([, p2]) => p2 && p2.length >= 3).map(([mid2, p2]) => { const m2 = medecins.find(x => String(x.id) === String(mid2)); return React.createElement("div", { key: mid2 },
                                     React.createElement("b", null,
                                         m2 ? m2.init : mid2,
