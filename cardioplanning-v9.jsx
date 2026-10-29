@@ -3,10 +3,17 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 // In CodeSandbox: data is kept in memory only (no persistence)
 // In production (Netlify): Firebase syncs automatically
 const db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseDB : null;
-/* v10.175 : BAC À SABLE — un second cahier Firebase (planning/bac), copie du vrai, où l'éditeur teste
+/* v10.175 : BAC À SABLE — un second cahier Firebase (planning/bac), copie du vrai, où l'on teste
    sans risque. Le drapeau est propre au navigateur (cp6_bac) ; l'application entière lit et écrit dans
    le cahier désigné ici, et nulle part ailleurs. Dans le bac : ni sauvegarde, ni restauration, ni
-   archivage, ni signalement ; tout le reste (verrous, notifications, Construire) est identique. */
+   archivage, ni signalement ; tout le reste (verrous, notifications, Construire) est identique.
+   v10.254 : BAC PARTAGÉ — toute l'équipe peut le rejoindre depuis l'écran d'accueil (bouton « Essayer le bac à
+   sable », puis son code habituel) ; entrer ne copie plus rien, on rejoint le bac tel qu'il est, et chacun y voit
+   en direct ce que font les autres (même cahier). Seul l'éditeur (bacMaitre) recopie le vrai planning dedans
+   (↺), y charge une sauvegarde (liste et flèches ‹ › du bandeau) ou y change de profil sans code. La fermeture
+   après inactivité (5 min, y compris en simple consultation ici) FAIT SORTIR du bac : au réveil, on tape son
+   code et on est dans le vrai planning. Présence : planning/presence-bac, un « je suis là » par minute et par
+   appareil qui peut modifier (une consultation sans code n'écrit pas, elle n'est pas comptée). */
 var BAC=(function(){try{return localStorage.getItem("cp6_bac")==="1";}catch(e){return false;}})();
 var PLAN_ID=BAC?"bac":"main";
 /* v10.238 : HISTORIQUE DES CASES — un cahier PAR PÉRIODE (planning/hist-<période>), une ligne compacte par
@@ -79,7 +86,7 @@ function gelMuet(){var n=Date.now();if(n-(GEL.t||0)>10000){GEL.t=n;try{jlog("GEL
    file tournante (300 entrées au plus). AUCUN état React, AUCUN affichage ici : la tuile 📡 des Paramètres ne lit ces
    compteurs que pendant qu'on lui demande de mesurer. La latence est celle des VRAIES écritures : délai entre l'envoi et
    l'accusé du serveur (la promesse de Firestore) — elle ne génère donc aucun trafic supplémentaire. */
-var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[],lire:[],aff:[],poids:null};   /* v10.242 : poids = dernier poids du planning mesuré (pour les signalements) */
+var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[],lire:[],aff:[],poids:null,ong:[],clic:[],clicT:null,tabPrec:undefined};   /* v10.242 : poids = dernier poids du planning mesuré (pour les signalements) */
 /* v10.234 : CE QUE COÛTE UN MESSAGE À L'APPAREIL. Le réseau mesuré (latence), restait l'appareil : à chaque message il relit
    le planning complet (lire = durée du traitement du message) puis redessine l'écran (aff = délai jusqu'après la peinture
    suivante). Deux relevés d'horloge par message, 20 valeurs gardées. Page en arrière-plan : pas de peinture, on ne mesure pas. */
@@ -92,6 +99,28 @@ function trafRecu(suite,moi,args){
   if(typeof document!=="undefined"&&!document.hidden&&typeof requestAnimationFrame==="function")
     requestAnimationFrame(()=>setTimeout(()=>{TRAFIC.aff.push(Math.round(P.now()-t));if(TRAFIC.aff.length>20)TRAFIC.aff.shift();},0));
   return r;
+}
+/* v10.255 : RÉPONSE AUX CLICS ET AUX CHANGEMENTS D'ONGLET (mesure seule, rien n'est écrit ni envoyé). Un écouteur unique relève
+   l'heure de chaque clic avant tout traitement, puis le temps écoulé jusqu'à l'écran redessiné (dessin + attente du poste) :
+   « clic » = tout clic (dont l'ouverture d'une modale), « onglet » = un clic qui a changé d'onglet. 20 valeurs gardées. */
+function trafPoser(tab,t,P){
+  if(typeof requestAnimationFrame!=="function")return;
+  requestAnimationFrame(()=>setTimeout(()=>{tab.push(Math.round(P.now()-t));if(tab.length>20)tab.shift();},0));
+}
+function trafClicInit(){
+  if(typeof document==="undefined"||typeof performance==="undefined"||!performance.now)return;
+  if(document.__trafClic)return;document.__trafClic=1;
+  document.addEventListener("click",()=>{
+    if(document.hidden)return;
+    const t=performance.now();TRAFIC.clicT=t;
+    trafPoser(TRAFIC.clic,t,performance);
+  },true);
+}
+function trafOnglet(){
+  const P=(typeof performance!=="undefined"&&performance.now)?performance:null;
+  const t=TRAFIC.clicT;TRAFIC.clicT=null;
+  if(!P||t===null||P.now()-t>3000||(typeof document!=="undefined"&&document.hidden))return;
+  trafPoser(TRAFIC.ong,t,P);
 }
 function trafMed(a){if(!a||!a.length)return null;const l=a.slice().sort((x,y)=>x-y);return l[Math.floor(l.length/2)];}
 function trafFil(k){TRAFIC.fil.push({t:Date.now(),k:k});if(TRAFIC.fil.length>300)TRAFIC.fil.splice(0,TRAFIC.fil.length-300);}
@@ -106,12 +135,12 @@ function trafEcr(p){
    relevés au moment de l'envoi. Lecture seule de TRAFIC : ne coûte rien, n'écrit rien. */
 function trafLigne(){try{const b=trafBilan(Date.now());const ms=v=>v===null?"—":(v<1000?v+" ms":(v/1000).toFixed(1)+" s");const P=TRAFIC.poids;
   return "latence dernière "+ms(b.latDer)+" · médiane "+ms(b.latMed)+(b.nLat?" ("+b.nLat+")":"")+" · lecture "+ms(b.lireMed)+" (pire "+ms(b.lireMax)+") · redessin "+ms(b.affMed)+" (pire "+ms(b.affMax)+")"
-    +" · 1 min : "+b.r60+" reçus, "+b.e60+" envoyées · en attente "+b.vol+" · refusées "+b.ko+" · poids "+(P==null?"—":Math.round(P/1024)+" Ko ("+Math.min(100,Math.round(P/10485.76))+" %)");}catch(e){return "?";}}
+    +" · onglet "+ms(b.ongMed)+" (pire "+ms(b.ongMax)+") · clic "+ms(b.clicMed)+" (pire "+ms(b.clicMax)+")"+" · 1 min : "+b.r60+" reçus, "+b.e60+" envoyées · en attente "+b.vol+" · refusées "+b.ko+" · poids "+(P==null?"—":Math.round(P/1024)+" Ko ("+Math.min(100,Math.round(P/10485.76))+" %)");}catch(e){return "?";}}
 function trafBilan(now){
   let e10=0,r10=0,e60=0,r60=0;const bar=[];for(let i=0;i<60;i++)bar.push(0);
   TRAFIC.fil.forEach(x=>{const a=now-x.t;if(a<0||a>=60000)return;if(x.k==="e")e60++;else r60++;if(a<10000){if(x.k==="e")e10++;else r10++;}bar[59-Math.floor(a/1000)]++;});
   const l=TRAFIC.lat.slice().sort((a,b)=>a-b);
-  return {e10,r10,e60,r60,bar,ecr:TRAFIC.ecr,recu:TRAFIC.recu,ko:TRAFIC.ko,vol:TRAFIC.vol,latDer:TRAFIC.lat.length?TRAFIC.lat[TRAFIC.lat.length-1]:null,latMed:l.length?l[Math.floor(l.length/2)]:null,nLat:l.length,lireMed:trafMed(TRAFIC.lire),lireMax:TRAFIC.lire.length?Math.max.apply(null,TRAFIC.lire):null,affMed:trafMed(TRAFIC.aff),affMax:TRAFIC.aff.length?Math.max.apply(null,TRAFIC.aff):null,nTrt:TRAFIC.lire.length,depuis:Math.round((now-TRAFIC.t0)/60000)};
+  return {e10,r10,e60,r60,bar,ecr:TRAFIC.ecr,recu:TRAFIC.recu,ko:TRAFIC.ko,vol:TRAFIC.vol,latDer:TRAFIC.lat.length?TRAFIC.lat[TRAFIC.lat.length-1]:null,latMed:l.length?l[Math.floor(l.length/2)]:null,nLat:l.length,lireMed:trafMed(TRAFIC.lire),lireMax:TRAFIC.lire.length?Math.max.apply(null,TRAFIC.lire):null,affMed:trafMed(TRAFIC.aff),affMax:TRAFIC.aff.length?Math.max.apply(null,TRAFIC.aff):null,ongMed:trafMed(TRAFIC.ong),ongMax:TRAFIC.ong.length?Math.max.apply(null,TRAFIC.ong):null,clicMed:trafMed(TRAFIC.clic),clicMax:TRAFIC.clic.length?Math.max.apply(null,TRAFIC.clic):null,nTrt:TRAFIC.lire.length,depuis:Math.round((now-TRAFIC.t0)/60000)};
 }
 function sansIndef(v){
   if(Array.isArray(v))return v.map(x=>x===undefined?null:sansIndef(x));
@@ -177,7 +206,8 @@ function fbEtape(nom){var db=typeof window!=="undefined"?window.firebaseDB:null;
 function fermerApp(motif,info){
   if(FERME.on)return;FERME.on=true;INACT.actif=false;INACT.gen++;
   try{jlog("FERMETURE",[motif==="autre"?"code ouvert sur un autre appareil ("+((info&&info.lib)||"?")+")":"inactivité ("+INACT.min+" min)"]);}catch(e){}
-  try{localStorage.setItem("cp6_ferme",JSON.stringify({m:motif,lib:(info&&info.lib)||"",t:(info&&info.t)||0,min:INACT.min}));}catch(e){}
+  try{localStorage.setItem("cp6_ferme",JSON.stringify({m:motif,lib:(info&&info.lib)||"",t:(info&&info.t)||0,min:INACT.min,bac:!!BAC}));}catch(e){}
+  if(BAC){try{localStorage.removeItem("cp6_bac");}catch(e){}}   /* v10.254 : la fermeture fait sortir du bac — au réveil, le vrai planning */
   Promise.resolve(fbEtape("disableNetwork")).catch(function(){}).then(function(){
     var w=fbEtape("waitForPendingWrites");if(!w)return true;   // réseau coupé : ne se résout que si RIEN n'attend
     return Promise.race([w.then(function(){return false;},function(){return true;}),attendreMs(600).then(function(){return true;})]);
@@ -458,7 +488,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.252 — 03/10/2026";
+const APP_VERSION="v10.255 — 27/10/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6713,11 +6743,13 @@ const HELP_SECTIONS=[
   HP({children:["La colonne est ",HE("b",null,"exactement celle de son onglet"),", dessinée par le même code : mêmes ronds, mêmes couleurs, salle vide colorée, plage fermée grisée, alertes et notes. Un clic ouvre la même fenêtre que dans l'onglet d'origine, avec les mêmes droits et les mêmes verrous. Poser un médecin depuis cette colonne revient à le poser dans sa propre colonne : tout se met à jour en même temps, rien n'est écrit deux fois."]}),
   HP({last:true,children:["Réglage ",HE("b",null,"propre à cet appareil"),", vide par défaut : personne d'autre ne voit vos colonnes, et elles disparaissent dès qu'on les décoche (",HBtn({kind:"ghost",children:"✕ Tout décocher"}),"). Le bouton 👁 prend un liseré tant qu'une colonne est cochée. Ces colonnes ne sont pas imprimées. Seul ce qui est déjà une colonne dans un onglet salle peut être affiché : pour une activité qui n'en a pas, cochez-lui une colonne de reprise ↩ dans Paramètres → Activités."]}))},
  {id:"bac",icon:"🧪",title:"Bac à sable — tester sans risque",body:()=>HE("div",null,
-  HP({children:["Un espace de test à part, réservé à l'éditeur (Paramètres → 🧪 Bac à sable). En y entrant, l'application recopie le planning réel dans un cahier Firebase distinct, puis se recharge dessus : tout ce que vous y faites reste dans cette copie. Le bac est propre au navigateur qui l'a activé — vos collègues continuent de voir le vrai planning, et d'y travailler."]}),
+  HP({children:["Un espace de test à part, ouvert à toute l'équipe depuis la v10.254. Sur l'écran d'accueil, le bouton ",HBtn({kind:"ghost",children:"🧪 Essayer le bac à sable"})," ouvre le bac ; on y tape ensuite son code habituel et on y a son vrai profil — un médecin y voit et y fait ce qu'un médecin voit et fait, une secrétaire ce qu'une secrétaire voit et fait. Le bac est un cahier Firebase distinct, copie du planning réel : tout ce qu'on y fait reste dans cette copie, et le vrai planning ne bouge pas d'une case."]}),
+  HP({children:[HE("b",null,"Plusieurs personnes à la fois"),". Le bac est partagé : entrer ne copie rien, on le rejoint tel qu'il est, et chacun voit en direct ce que font les autres, comme dans le vrai planning. Seul l'éditeur remplace son contenu — par une copie fraîche du vrai planning (↺ Remettre à zéro) ou par une sauvegarde ; si d'autres appareils sont dans le bac à ce moment-là, il en est averti, car leurs essais sont remplacés. Le bandeau indique qui d'autre modifie le bac (👥) ; une personne entrée en simple consultation n'est pas comptée."]}),
+  HP({children:[HE("b",null,"On en sort tout seul"),". Au bout du délai sans action (5 min, réglable dans Paramètres), l'application se ferme comme ailleurs ",HE("i",null,"et"),", dans le bac, fait aussi sortir du bac : au réveil, on tape son code et on est dans le vrai planning. Le délai vaut aussi pour la consultation sans code, dans le bac seulement."]}),
   HP({children:[HE("b",null,"Ce qui s'y comporte comme dans le vrai")," : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."]}),
   HP({children:[HE("b",null,"Ce qui est désactivé")," : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."]}),
   HP({children:[HE("b",null,"L'historique des cases dans le bac"),", depuis la v10.238 : il montre le vrai historique jusqu'au moment où le bac a été copié — ou, si vous avez chargé une sauvegarde, jusqu'à l'heure de cette sauvegarde — puis vos essais du bac, à la suite. Vos essais ne se mêlent jamais au vrai historique, et la remise à zéro (ou le chargement d'une autre sauvegarde) les efface."]}),
-  HP({children:[HE("b",null,"Le bandeau orange"),", en bas de l'écran, rappelle où vous êtes et porte trois commandes. ",HE("b",null,"Connecté comme"),", pour passer d'un profil à l'autre sans PIN — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation. ",HBtn({kind:"ghost",children:"↺ Remettre à zéro"}),", qui remplace le bac par une copie fraîche du planning réel. ",HBtn({kind:"ghost",children:"🚪 Sortir du bac"}),", qui ramène au vrai planning. L'écran d'accueil (PIN) affiche le même rappel, avec son bouton Sortir."]})
+  HP({children:[HE("b",null,"Le bandeau orange"),", en bas de l'écran, rappelle où vous êtes et porte ",HBtn({kind:"ghost",children:"🚪 Sortir du bac"}),", qui ramène au vrai planning. L'écran d'accueil (code) affiche le même rappel, avec son bouton Sortir. Pour l'éditeur seul, le bandeau porte en plus : ",HE("b",null,"Connecté comme"),", pour passer d'un profil à l'autre sans code — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation ; ",HE("b",null,"la sauvegarde affichée"),", une liste des sauvegardes avec les flèches ‹ (plus ancienne) et › (plus récente), pour feuilleter les sauvegardes sans passer par Paramètres — pratique pour retrouver le moment où un problème est apparu ; et ",HBtn({kind:"ghost",children:"↺ Remettre à zéro"}),", qui remplace le bac par une copie fraîche du planning réel."]})
  )},
  {id:"desactiver",icon:"⏸",title:"Indisponible : les hachures et la désactivation",body:()=>HE("div",null,
   HP({children:["Une case ",HE("b",null,"hachurée")," veut toujours dire la même chose, quel que soit l'onglet : ",HE("b",null,"cette personne n'est pas disponible ce jour-là"),". Ce n'est pas un effet d'affichage mais un ",HE("b",null,"verrou")," : la case ne s'ouvre pas au clic, le planning type ne s'y applique pas, et les répartitions automatiques passent la personne. Couverte sur ",HE("b",null,"toute")," la période affichée, sa colonne disparaît même des grilles."]}),
@@ -8691,6 +8723,8 @@ function TraficTuile({onPing=null,netOff=false,docSize=null}){
       {lg("Latence — médiane ("+b.nLat+" dernière"+(b.nLat>1?"s":"")+")",ms(b.latMed),colLat(b.latMed))}
       {lg("Appareil — lecture d'un message (médiane / pire)",duo(b.lireMed,b.lireMax),colTrt(b.lireMed))}
       {lg("Appareil — jusqu'à l'écran redessiné (médiane / pire)",duo(b.affMed,b.affMax),colTrt(b.affMed))}
+      {lg("Appareil — changement d'onglet jusqu'à l'écran (médiane / pire)",duo(b.ongMed,b.ongMax),colTrt(b.ongMed))}
+      {lg("Appareil — réponse à un clic, modale comprise (médiane / pire)",duo(b.clicMed,b.clicMax),colTrt(b.clicMed))}
       {lg("Poids du planning reçu à chaque message",docSize===null?"—":Math.round(docSize/1024)+" Ko ("+Math.min(100,Math.round(docSize/10485.76))+" % de la limite)",docSize===null?undefined:docSize<629000?undefined:docSize<891000?"#d97706":"#dc2626")}
       {lg("Messages reçus — 10 s / 1 min",b.r10+" / "+b.r60,b.r60>=40?"#dc2626":b.r60>=15?"#d97706":undefined)}
       {lg("Écritures envoyées — 10 s / 1 min",b.e10+" / "+b.e60,b.e60>=40?"#dc2626":b.e60>=15?"#d97706":undefined)}
@@ -8742,7 +8776,7 @@ function ProtectionTuile({netOff=false,bloque=false}){
     {lg("Cet appareil",APPAREIL.lib)}
     {lg("Heure utilisée",horl)}
     {lg("Écritures refusées depuis l'ouverture",String(REFUS.n),REFUS.n?"#dc2626":undefined)}
-    <button data-protest="1" disabled={netOff||bloque} onClick={tester} style={{marginTop:8,width:"100%",fontSize:12,padding:"7px 10px",borderRadius:8,cursor:netOff||bloque?"default":"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"var(--bg2)",color:"#16a34a",opacity:netOff||bloque?.5:1}}>🧪 Les règles sont-elles publiée ?</button>
+    <button data-protest="1" disabled={netOff||bloque} onClick={tester} style={{marginTop:8,width:"100%",fontSize:12,padding:"7px 10px",borderRadius:8,cursor:netOff||bloque?"default":"pointer",fontWeight:800,border:"1.5px solid #16a34a",background:"var(--bg2)",color:"#16a34a",opacity:netOff||bloque?.5:1}}>🧪 Les règles sont-elles publiées ?</button>
     {lignes.map((l,i)=><div key={i} data-protligne={l.ok===true?"ok":l.ok===false?"ko":"?"} style={{marginTop:4,fontSize:11,display:"flex",justifyContent:"space-between",gap:8}}><span style={{color:"var(--txt2)"}}>{l.t}</span><b style={{color:l.ok===true?"#16a34a":l.ok===false?"#dc2626":"var(--txt3)",textAlign:"right"}}>{l.m}</b></div>)}
     {res&&<div data-protres={res.k} style={{marginTop:6,fontSize:11.5,fontWeight:700,color:res.k==="oui"?"#16a34a":res.k==="non"?"#d97706":"var(--txt2)"}}>{res.k==="oui"?"✅ ":res.k==="non"?"⏳ ":""}{res.m}</div>}
   </div>;
@@ -11033,6 +11067,9 @@ function CardioPlanning(){
      mémorise le défilement de la fenêtre à la sortie et on le restaure au retour.
      Volontairement limité à cet onglet. */
   const [tab,setTab]=useState("planning");
+  /* v10.255 : mesure du changement d'onglet (voir trafOnglet) — lecture seule */
+  useEffect(()=>{trafClicInit();},[]);
+  useEffect(()=>{if(TRAFIC.tabPrec===undefined){TRAFIC.tabPrec=tab;return;}if(TRAFIC.tabPrec===tab)return;TRAFIC.tabPrec=tab;trafOnglet();},[tab]);
   /* v10.132 : écran étroit (< 760 px, même seuil que TableScroll), plateau ⋯ et menu du filtre */
   const [narrow,setNarrow]=useState(typeof window!=="undefined"&&window.innerWidth/ZOOM.f<760);
   const [moreOpen,setMoreOpen]=useState(false);
@@ -11668,7 +11705,7 @@ function CardioPlanning(){
           }
           codesMain.current=codesDuDocument(data);setCodesDoc(!!codesMain.current);   /* v10.252 : les codes du document partagé ne sont plus lus dans l'état — gardés à part, pour le secours et la migration */
           if(data.ideCfg){try{setIdeCfg(JSON.parse(data.ideCfg));}catch(e){}}
-          if(data.intCfg){try{setIntCfg(pv=>({...pv,...JSON.parse(data.intCfg)}));}catch(e){}}   /* v10.252 : un « pin » encore présent (ancien emplacement) y reste tel quel jusqu'au bouton « Retirer » — jamais lu, jamais réécrit d'ici */
+          if(data.intCfg){try{const ic=JSON.parse(data.intCfg)||{};setIntCfg(pv=>{const n={...pv,...ic};delete n.pin;return n;});}catch(e){}}   /* v10.253 : l'état ne porte JAMAIS le code des internes (il vit dans intPin) — sinon, au bouton « Retirer », l'écho local du serveur fusionnait dans un état qui avait encore le pin et l'effet de sauvegarde le RÉÉCRIVAIT aussitôt (05/10/2026) */
           if(data.ptOrder){try{setPtOrder(JSON.parse(data.ptOrder)||[]);}catch(e){}}
           if(data.specColors){try{setSpecColors(JSON.parse(data.specColors)||{});}catch(e){}}
           if(data.vacs!==undefined){try{setVacs(JSON.parse(data.vacs)||[]);}catch(e){}}
@@ -12299,7 +12336,7 @@ function CardioPlanning(){
   useEffect(()=>{INACT.min=inactMin;if(!isFirstLoad.current)saveToFirebase({inactMin});},[inactMin]);   /* v10.247 */
   /* v10.247 : FERMETURE APRÈS INACTIVITÉ — armée pour tout profil qui peut modifier (pas « Consulter », pas l'écran du code) */
   useEffect(()=>{if(accessMode!=="ask")setFermeMsg(null);
-    if(accessMode==="ask"||accessMode==="view"){INACT.actif=false;INACT.reste=null;setInactReste(null);inactRebrancher();return;}
+    if(accessMode==="ask"||(accessMode==="view"&&!BAC)){INACT.actif=false;INACT.reste=null;setInactReste(null);inactRebrancher();return;}   /* v10.254 : dans le bac, « Consulter » est armé aussi — pour en sortir au bout du délai */
     INACT.actif=true;INACT.der=INACT.now();INACT.reste=null;INACT.surReste=setInactReste;setInactReste(null);
     const act=()=>inactAction();
     const vis=()=>{if(inactCachee())inactCache(false);else inactVisible();};
@@ -12375,7 +12412,7 @@ function CardioPlanning(){
   },[medecins]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({adminEnabled,adminCanReports,adminCanNotes});},[adminEnabled,adminCanReports,adminCanNotes]);   /* v10.252 : les codes vivent dans prive/codes */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ideCfg:JSON.stringify(ideCfg)});},[ideCfg]);
-  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({intCfg:JSON.stringify(intCfg)});},[intCfg]);
+  useEffect(()=>{if(isFirstLoad.current)return;const lg=codesMain.current;const c=Object.assign({},intCfg);delete c.pin;if(lg&&lg.intPin!==undefined)c.pin=lg.intPin;saveToFirebase({intCfg:JSON.stringify(c)});},[intCfg]);   /* v10.253 : le pin n'est remis que si le document porte ENCORE les codes (transition) — jamais après « Retirer » */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({ptOrder:JSON.stringify(ptOrder)});},[ptOrder]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({specColors:JSON.stringify(specColors)});},[specColors]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({vacs:JSON.stringify(vacs),vacRule:vacRule?1:0});},[vacs,vacRule]);
@@ -12450,6 +12487,23 @@ function CardioPlanning(){
      éditeurs compris ; le premier garde la main sur Paramètres (restaurer, dégeler). */
   const isEditVrai=(accessMode==="edit"||(accessMode==="medecinEdit"&&(((medecins.find(m=>m.id===editMedId)||{}).niveau)||"basic")==="editeur"&&(((medecins.find(m=>m.id===editMedId)||{}).role)||"medecin")!=="attache"))&&!netOff;
   const isEdit=isEditVrai&&!gelOn;  /* v10.73 : jamais d'attache editeur */ // hors ligne : lecture seule
+  /* v10.254 : BAC PARTAGÉ. bacMaitre = cette session du bac a été ouverte par un éditeur (code éditeur ou médecin éditeur) ;
+     il garde la main même après avoir changé de profil dans le bandeau (sinon il s'y enfermerait). bacAutres = les autres
+     appareils présents (planning/presence-bac : {<appareil>:{t,qui}}, écrit toutes les 60 s, périmé après 150 s). */
+  const [bacMaitre,setBacMaitre]=useState(false);
+  useEffect(()=>{if(BAC&&isEditVrai)setBacMaitre(true);},[isEditVrai]);
+  useEffect(()=>{if(BAC&&bacMaitre)refreshBackupList();},[bacMaitre,refreshBackupList]);   /* la liste du bandeau (lecture réservée à l'éditeur par la règle) */
+  const [bacAutres,setBacAutres]=useState([]);
+  useEffect(()=>{
+    if(!BAC||accessMode==="ask"||accessMode==="view"||typeof window==="undefined"||!window.firebaseDB)return;
+    let ref=null,off=null,id=null;
+    const qui=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):accessMode==="adminEdit"?((adminName||"?")+(isCadre?" (cadre)":" (secrétaire)")):accessMode==="interneEdit"?((interneName||"?")+" (interne)"):"Éditeur";
+    const la=()=>{try{Promise.resolve(ref.set({[APPAREIL.id]:{t:Date.now(),qui}},{merge:true})).catch(e=>console.log("presence:",e));}catch(e){}};
+    try{ref=window.firebaseDB.collection("planning").doc("presence-bac");la();id=setInterval(la,60000);
+      off=ref.onSnapshot(sn=>{const d=sn&&sn.exists&&typeof sn.data==="function"?sn.data():null;const now=Date.now();
+        setBacAutres(Object.keys(d||{}).filter(k=>k!==APPAREIL.id&&d[k]&&d[k].t&&now-d[k].t<150000).map(k=>({id:k,qui:(d[k].qui||"?")})));},()=>{});}catch(e){}
+    return ()=>{try{if(id)clearInterval(id);if(typeof off==="function")off();if(ref)Promise.resolve(ref.set({[APPAREIL.id]:{t:0,qui}},{merge:true})).catch(()=>{});}catch(e){}};
+  },[accessMode,editMedId,adminName,interneName,isCadre]);
   /* v10.252 : LES CODES VIVENT DANS prive/codes (éditeur seul, règle Firestore). À l'entrée d'un éditeur : lecture une fois ;
      absent (première ouverture de cette version) → repris du document partagé, qui les porte encore. Puis, à chaque changement,
      la copie est réécrite et les FICHES profils/<empreinte> (clé → profil, jamais le code) sont posées — c'est la liste que la
@@ -12490,12 +12544,13 @@ function CardioPlanning(){
     if(!FV||typeof FV.delete!=="function"){toast("Bibliothèque Firestore indisponible","warn");return;}
     if(!window.confirm("Retirer les codes du document partagé ?\n\nÀ faire seulement une fois la nouvelle règle publiée et testée (carte 🛡️). Un téléphone resté sur une version plus ancienne ne reconnaîtra plus les codes : consultation seule."))return;
     const o={medPins:FV.delete(),editPin:FV.delete(),adminPin:FV.delete(),cadrePin:FV.delete(),intCfg:JSON.stringify(Object.assign({},intCfg,{pin:undefined}))};
-    try{await window.firebaseSetDoc(PLANNING_DOC,avecTampon(o),{merge:true});fieldSync.current.intCfg=JSON.stringify(o.intCfg);setIntCfg(p=>{const n={...p};delete n.pin;return n;});codesMain.current=null;setCodesDoc(false);cpteLog("codes retirés du document partagé");toast("Codes retirés du document partagé");}
-    catch(e){toast("Échec : "+cpteLib(cpteErr(e)),"warn");}};
+    codesMain.current=null;   /* v10.253 : AVANT l'envoi — l'écho local arrive avant la réponse du serveur */
+    try{await window.firebaseSetDoc(PLANNING_DOC,avecTampon(o),{merge:true});codesMain.current=null;setCodesDoc(false);cpteLog("codes retirés du document partagé");toast("Codes retirés du document partagé");}
+    catch(e){codesMain.current={medPins:medPins||{},editPin:editPin||"",adminPin:adminPin||"",cadrePin:cadrePin||"",intPin:intPin||""};toast("Échec : "+cpteLib(cpteErr(e)),"warn");}};
   const codesRemettre=async()=>{if(BAC||!window.firebaseSetDoc||!PLANNING_DOC)return;
     if(!window.confirm("Remettre les codes dans le document partagé ?\n\nMarche arrière : à faire seulement si vous revenez à l'ancienne règle ou à une version plus ancienne de l'application."))return;
     const o={medPins:JSON.stringify(medPins||{}),editPin:editPin||"",adminPin:adminPin||"",cadrePin:cadrePin||"",intCfg:JSON.stringify(Object.assign({},intCfg,{pin:intPin||""}))};
-    try{await window.firebaseSetDoc(PLANNING_DOC,avecTampon(o),{merge:true});fieldSync.current.intCfg=JSON.stringify(o.intCfg);setIntCfg(p=>({...p,pin:intPin||""}));codesMain.current={medPins:medPins||{},editPin:editPin||"",adminPin:adminPin||"",cadrePin:cadrePin||"",intPin:intPin||""};setCodesDoc(true);cpteLog("codes remis dans le document partagé");toast("Codes remis dans le document partagé");}
+    try{await window.firebaseSetDoc(PLANNING_DOC,avecTampon(o),{merge:true});codesMain.current={medPins:medPins||{},editPin:editPin||"",adminPin:adminPin||"",cadrePin:cadrePin||"",intPin:intPin||""};setCodesDoc(true);cpteLog("codes remis dans le document partagé");toast("Codes remis dans le document partagé");}
     catch(e){toast("Échec : "+cpteLib(cpteErr(e)),"warn");}};
   /* v10.106 : borne du verrou (voir le bloc au-dessus de CardioPlanning). Calculee
      une fois : elle ne bouge qu'au changement de periode ou de calendrier scolaire. */
@@ -14100,10 +14155,22 @@ function CardioPlanning(){
   const bacCopie=async()=>{const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};
     try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : les essais précédents s'effacent */
     await window.firebaseDB.collection("planning").doc("bac").set(avecTampon({...sansCodes(d),_bacDep:Date.now()}));};   /* v10.252 : jamais les codes dans le bac (ils y seraient lisibles par tous) */   /* v10.246 : tampon neuf (celui de la copie est ancien) */   /* v10.238 : l'heure de la copie borne le vrai historique */
-  const bacEntrer=async()=>{if(!window.confirm("Entrer dans le bac à sable ?\n\nLe planning réel est recopié dans un espace de test à part, puis l'application se recharge. Rien de ce que vous y ferez ne touchera au vrai planning."))return;
-    try{await bacCopie();localStorage.setItem("cp6_bac","1");window.location.reload();}catch(e){toast("Échec de la copie vers le bac à sable","warn");}};
-  const bacRaz=async()=>{if(!window.confirm("Remettre le bac à sable à zéro ?\n\nSon contenu est remplacé par une copie fraîche du planning réel, puis l'application se recharge."))return;
-    try{await bacCopie();window.location.reload();}catch(e){toast("Échec de la remise à zéro","warn");}};
+  /* v10.254 : rejoindre le bac = poser le drapeau et recharger — AUCUNE copie (le bac est partagé : on le prend tel qu'il est) ;
+     on tape ensuite son code habituel sur l'écran d'accueil du bac. */
+  const bacRejoindre=()=>{try{localStorage.setItem("cp6_bac","1");}catch(e){}window.location.reload();};
+  /* v10.254 : ce que le maître charge dans le bac le remplace POUR TOUT LE MONDE. Seul : sans question ; d'autres appareils
+     présents : une confirmation qui les compte. */
+  const bacConfirmer=(quoi)=>{if(!bacAutres.length)return true;const n=bacAutres.length;
+    return window.confirm(quoi+"\n\n⚠ "+n+" autre"+(n>1?"s":"")+" appareil"+(n>1?"s sont":" est")+" dans le bac ("+bacAutres.map(a=>a.qui).join(", ")+") : "+(n>1?"leurs":"ses")+" essais seront remplacés.");};
+  const bacRaz=async()=>{if(!bacConfirmer("Remettre le bac à sable à zéro ?\nSon contenu est remplacé par une copie fraîche du planning réel."))return;
+    try{mapPending.current={};mapMigr.current={};planPending.current={};planSynced.current=null;await bacCopie();toast("↺ Copie fraîche du vrai planning chargée dans le bac","info");}catch(e){toast("Échec de la remise à zéro","warn");}};
+  /* v10.254 : la liste et les flèches du bandeau — "vrai" = copie fraîche ; sinon l'identifiant d'une sauvegarde (restoreBackup, qui
+     dans le bac charge sans toucher au vrai). ‹ = plus ancienne, › = plus récente ; depuis la copie fraîche, ‹ va à la plus récente. */
+  const bacPos=bacDe?backupList.findIndex(b=>b.ts===bacDe.ts):-1;
+  const bacAller=(v)=>{if(v==="vrai"){bacRaz();return;}const b=backupList.find(x=>x.id===v);if(!b)return;
+    if(!bacConfirmer("Charger la sauvegarde du "+new Date(b.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+" dans le bac ?"))return;restoreBackup(v);};
+  const bacPas=(d)=>{if(d>0){const k=bacPos<0?0:bacPos+1;if(k<backupList.length)bacAller(backupList[k].id);return;}
+    if(bacPos<0)return;if(bacPos===0)bacAller("vrai");else bacAller(backupList[bacPos-1].id);};
   const bacSortir=()=>{try{localStorage.removeItem("cp6_bac");}catch(e){}window.location.reload();};
   /* v10.251 : les codes en service et ceux des partis (compte à supprimer), pour la carte 🔐 Comptes */
   const cpteListe=()=>{const L=[];
@@ -14184,7 +14251,7 @@ function CardioPlanning(){
         {fermeMsg&&<div data-fermemsg={fermeMsg.m} style={{fontSize:12,fontWeight:700,color:"#b45309",background:"rgba(180,83,9,.08)",border:"1px solid #b45309",borderRadius:8,padding:"8px 10px",marginBottom:14,lineHeight:1.4}}>{/* v10.247 */}
           {fermeMsg.m==="autre"
             ?"🔒 Votre code a été ouvert sur un autre appareil"+(fermeMsg.lib?" ("+fermeMsg.lib+(fermeMsg.t?", "+new Date(fermeMsg.t).getHours()+" h "+String(new Date(fermeMsg.t).getMinutes()).padStart(2,"0"):"")+")":"")+" : cette session a été fermée."
-            :"🔒 Application fermée après "+(fermeMsg.min||5)+" minutes sans activité. Entrez votre code pour reprendre."}
+            :"🔒 Application fermée après "+(fermeMsg.min||5)+" minutes sans activité. Entrez votre code pour reprendre."+(fermeMsg.bac?" Vous avez quitté le bac à sable.":"")}
         </div>}
         {BAC&&<div style={{fontSize:11,fontWeight:700,color:"#c2410c",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>🧪 Bac à sable — espace de test<button onClick={bacSortir} style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6,border:"1px solid #c2410c",background:"none",color:"#c2410c",cursor:"pointer"}}>Sortir</button></div>}{/* v10.175 */}
         <button style={{width:"100%",padding:"11px",borderRadius:9,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt)",cursor:"pointer",fontSize:14,marginBottom:14,fontWeight:600}} onClick={()=>setAccessMode("view")}>👁 Consulter</button>
@@ -14212,6 +14279,7 @@ function CardioPlanning(){
           <button style={{width:"100%",padding:"9px",borderRadius:9,border:"none",background:"#0e9f9f",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:800}}
             onClick={()=>{const n=(interneNameInput||"").trim();if(!n)return;setInterneName(n);try{localStorage.setItem("cp6_interneName",n);}catch(e){}setAccessMode("interneEdit");setInterneAsk(false);setTab("internes");}}>Entrer (interne)</button>
         </div>}
+        {!BAC&&<button data-bacessai="1" onClick={bacRejoindre} title="Un espace de test partagé par toute l'équipe : rien de ce qui s'y fait ne touche au vrai planning" style={{width:"100%",marginTop:12,padding:"7px",borderRadius:8,border:"1px dashed #c2410c",background:"none",color:"#c2410c",cursor:"pointer",fontSize:11,fontWeight:700}}>🧪 Essayer le bac à sable</button>}{/* v10.254 : puis son code habituel, sur l'écran d'accueil du bac */}
         <div style={{marginTop:14,fontSize:10,color:"var(--txt3)",textAlign:"center"}}>{APP_VERSION}</div>
       </div>
     </div>
@@ -14439,8 +14507,9 @@ header::-webkit-scrollbar { display: none; }
 
       {BAC&&<div data-botbar="1" style={{position:"fixed",bottom:0,left:0,right:0,background:"#c2410c",color:"#fff",textAlign:"center",fontSize:12,padding:"6px 8px",zIndex:520,fontWeight:700,display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"center",gap:8}}>{/* v10.175 : bandeau du bac à sable — remplace les bandeaux de profil, qu'il porte lui-même */}
         <span>🧪 BAC À SABLE — rien ici n'est réel{bacDe&&<span data-bacde="1"> · 📥 sauvegarde du {new Date(bacDe.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})} chargée</span>}</span>
-        <label style={{display:"flex",alignItems:"center",gap:4,fontWeight:600}}>Connecté comme
-          <select value={bacProfil} onChange={e=>bacConnecter(e.target.value)} style={{fontSize:12,padding:"2px 4px",borderRadius:6,border:"none",color:"#c2410c",fontWeight:700}}>
+        {accessMode!=="view"&&<span data-bacpresence={bacAutres.length} title={bacAutres.length?bacAutres.map(a=>a.qui).join(", "):"Personne d'autre ne modifie le bac en ce moment"} style={{fontWeight:600,opacity:.9}}>{bacAutres.length?"👥 +"+bacAutres.length+" ("+bacAutres.map(a=>a.qui).join(", ")+")":"👤 seul dans le bac"}</span>}{/* v10.254 : présence */}
+        {bacMaitre&&<label style={{display:"flex",alignItems:"center",gap:4,fontWeight:600}}>Connecté comme{/* v10.254 : réservé à l'éditeur */}
+          <select data-bacprofil="1" value={bacProfil} onChange={e=>bacConnecter(e.target.value)} style={{fontSize:12,padding:"2px 4px",borderRadius:6,border:"none",color:"#c2410c",fontWeight:700}}>
             <option value="edit">Éditeur</option>
             <option value="view">Consultation</option>
             {medecins.filter(m=>!medParti(m)).map(m=><option key={m.id} value={"med:"+m.id}>{m.role==="attache"?"Attaché "+m.nom:"Dr "+m.nom+" — "+(m.niveau==="editeur"?"éditeur":m.niveau==="inter"?"intermédiaire":"basique")}</option>)}
@@ -14448,8 +14517,16 @@ header::-webkit-scrollbar { display: none; }
             <option value="cadre">Cadre</option>
             <option value="interne">Interne</option>
           </select>
-        </label>
-        <button onClick={bacRaz} style={{fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,.6)",background:"none",color:"#fff",cursor:"pointer"}}>↺ Remettre à zéro</button>
+        </label>}
+        {bacMaitre&&<span style={{display:"flex",alignItems:"center",gap:3}}>{/* v10.254 : quelle sauvegarde le bac montre — sans passer par Paramètres */}
+          <button data-bacprec="1" onClick={()=>bacPas(+1)} title="Sauvegarde plus ancienne" disabled={!backupList.length||bacPos>=backupList.length-1} style={{fontSize:12,fontWeight:800,padding:"2px 7px",borderRadius:6,border:"1px solid rgba(255,255,255,.6)",background:"none",color:"#fff",cursor:"pointer"}}>‹</button>
+          <select data-bacliste="1" value={bacPos>=0?backupList[bacPos].id:"vrai"} onChange={e=>bacAller(e.target.value)} style={{fontSize:12,padding:"2px 4px",borderRadius:6,border:"none",color:"#c2410c",fontWeight:700,maxWidth:230}}>
+            <option value="vrai">Vrai planning — copie fraîche</option>
+            {backupList.map(b=><option key={b.id} value={b.id}>{"📥 "+new Date(b.ts).toLocaleString("fr-FR",{weekday:"short",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+(b.ver?" · "+b.ver.replace(/ — .*$/,""):"")}</option>)}
+          </select>
+          <button data-bacsuiv="1" onClick={()=>bacPas(-1)} title="Sauvegarde plus récente" disabled={bacPos<0} style={{fontSize:12,fontWeight:800,padding:"2px 7px",borderRadius:6,border:"1px solid rgba(255,255,255,.6)",background:"none",color:"#fff",cursor:"pointer"}}>›</button>
+        </span>}
+        {bacMaitre&&<button data-bacraz="1" onClick={bacRaz} style={{fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,.6)",background:"none",color:"#fff",cursor:"pointer"}}>↺ Remettre à zéro</button>}
         <button onClick={bacSortir} style={{fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6,border:"none",background:"#fff",color:"#c2410c",cursor:"pointer"}}>🚪 Sortir du bac</button>
       </div>}
 
@@ -15252,7 +15329,7 @@ header::-webkit-scrollbar { display: none; }
                   <div><b>Éditeur :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{editPin}</span></div>
                   <div><b>Administratif :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{adminPin||"— non défini —"}</span></div>
                   <div><b>Cadres :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{cadrePin||"— non défini —"}</span></div>{/* v10.251 */}
-                  <div><b>Internes :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{(intCfg&&intCfg.pin)||"— non défini —"}</span></div>
+                  <div><b>Internes :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{intPin||"— non défini —"}</span></div>
                   {Object.entries(medPins).filter(([,p2])=>p2&&p2.length>=3).map(([mid2,p2])=>{const m2=medecins.find(x=>String(x.id)===String(mid2));return <div key={mid2}><b>{m2?m2.init:mid2} :</b> <span style={{fontFamily:"'JetBrains Mono',monospace"}}>{p2}</span></div>;})}
                   {Object.entries(medPins).filter(([,p2])=>p2&&p2.length>=3).length===0&&<div style={{color:"var(--txt3)"}}>Aucun PIN médecin défini.</div>}
                 </div>
@@ -15537,11 +15614,8 @@ header::-webkit-scrollbar { display: none; }
           {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.175 : bac à sable */}
             <div style={{fontWeight:700,color:"#c2410c",fontSize:13,marginBottom:6}}>🧪 Bac à sable</div>
             {BAC
-              ?<div style={{fontSize:11,color:"var(--txt2)"}}>Vous êtes dans le bac à sable : ce que vous voyez est une copie du planning réel, prise à l'entrée ou à la dernière remise à zéro. Les verrous, les notifications et Construire s'y comportent exactement comme dans le vrai ; sauvegardes, restauration, archivage et signalements sont désactivés. Le bandeau orange, en bas, permet de changer de profil sans PIN, de repartir d'une copie fraîche, ou de sortir.</div>
-              :<div>
-                <div style={{fontSize:11,color:"var(--txt3)",marginBottom:8}}>Un espace de test à part, copie du planning réel au moment où vous y entrez. Tout s'y comporte comme dans le vrai — verrous, notifications, Construire — mais rien de ce que vous y faites ne touche au planning réel. Le bac est propre à ce navigateur : vos collègues ne le voient pas.</div>
-                <button onClick={bacEntrer} style={{width:"100%",padding:"9px",borderRadius:8,border:"1.5px solid #c2410c",background:"rgba(194,65,12,.10)",color:"#c2410c",fontWeight:800,cursor:"pointer",fontSize:13}}>🧪 Entrer dans le bac à sable</button>
-              </div>}
+              ?<div style={{fontSize:11,color:"var(--txt2)"}}>Vous êtes dans le bac à sable, partagé par toute l'équipe : ce que vous voyez est une copie du planning réel, prise à la dernière remise à zéro, plus les essais de chacun depuis. Les verrous, les notifications et Construire s'y comportent exactement comme dans le vrai ; sauvegardes, restauration, archivage et signalements sont désactivés. Le bandeau orange, en bas, permet de changer de profil sans code, de choisir la sauvegarde affichée, de repartir d'une copie fraîche, ou de sortir.</div>
+              :<div style={{fontSize:11,color:"var(--txt3)"}}>Un espace de test partagé par toute l'équipe, copie du planning réel à la dernière remise à zéro. Tout s'y comporte comme dans le vrai — verrous, notifications, Construire — mais rien de ce qui s'y fait ne touche au planning réel. On le rejoint depuis l'écran d'accueil (bouton 🧪 Essayer le bac à sable, puis son code habituel) ; au bout de {inactMin} min sans action, on en sort.</div>}{/* v10.254 : l'entrée se fait depuis l'accueil, sans copie */}
           </div>}
           <TraficTuile docSize={docSize} netOff={netOff} onPing={()=>{if(PLANNING_DOC&&setDoc)Promise.resolve(setDoc(PLANNING_DOC,{_ping:Date.now()},{merge:true})).catch(()=>{});}}/>
           <ProtectionTuile netOff={netOff} bloque={BAC||gelOn||stale}/>   {/* v10.246 */}

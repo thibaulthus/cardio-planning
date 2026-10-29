@@ -201,7 +201,7 @@ function gelMuet() { var n = Date.now(); if (n - (GEL.t || 0) > 10000) {
    file tournante (300 entrées au plus). AUCUN état React, AUCUN affichage ici : la tuile 📡 des Paramètres ne lit ces
    compteurs que pendant qu'on lui demande de mesurer. La latence est celle des VRAIES écritures : délai entre l'envoi et
    l'accusé du serveur (la promesse de Firestore) — elle ne génère donc aucun trafic supplémentaire. */
-var TRAFIC = { t0: Date.now(), ecr: 0, ko: 0, recu: 0, vol: 0, lat: [], fil: [], lire: [], aff: [], poids: null }; /* v10.242 : poids = dernier poids du planning mesuré (pour les signalements) */
+var TRAFIC = { t0: Date.now(), ecr: 0, ko: 0, recu: 0, vol: 0, lat: [], fil: [], lire: [], aff: [], poids: null, ong: [], clic: [], clicT: null, tabPrec: undefined }; /* v10.242 : poids = dernier poids du planning mesuré (pour les signalements) */
 /* v10.234 : CE QUE COÛTE UN MESSAGE À L'APPAREIL. Le réseau mesuré (latence), restait l'appareil : à chaque message il relit
    le planning complet (lire = durée du traitement du message) puis redessine l'écran (aff = délai jusqu'après la peinture
    suivante). Deux relevés d'horloge par message, 20 valeurs gardées. Page en arrière-plan : pas de peinture, on ne mesure pas. */
@@ -221,6 +221,37 @@ function trafRecu(suite, moi, args) {
         requestAnimationFrame(() => setTimeout(() => { TRAFIC.aff.push(Math.round(P.now() - t)); if (TRAFIC.aff.length > 20)
             TRAFIC.aff.shift(); }, 0));
     return r;
+}
+/* v10.255 : RÉPONSE AUX CLICS ET AUX CHANGEMENTS D'ONGLET (mesure seule, rien n'est écrit ni envoyé). Un écouteur unique relève
+   l'heure de chaque clic avant tout traitement, puis le temps écoulé jusqu'à l'écran redessiné (dessin + attente du poste) :
+   « clic » = tout clic (dont l'ouverture d'une modale), « onglet » = un clic qui a changé d'onglet. 20 valeurs gardées. */
+function trafPoser(tab, t, P) {
+    if (typeof requestAnimationFrame !== "function")
+        return;
+    requestAnimationFrame(() => setTimeout(() => { tab.push(Math.round(P.now() - t)); if (tab.length > 20)
+        tab.shift(); }, 0));
+}
+function trafClicInit() {
+    if (typeof document === "undefined" || typeof performance === "undefined" || !performance.now)
+        return;
+    if (document.__trafClic)
+        return;
+    document.__trafClic = 1;
+    document.addEventListener("click", () => {
+        if (document.hidden)
+            return;
+        const t = performance.now();
+        TRAFIC.clicT = t;
+        trafPoser(TRAFIC.clic, t, performance);
+    }, true);
+}
+function trafOnglet() {
+    const P = (typeof performance !== "undefined" && performance.now) ? performance : null;
+    const t = TRAFIC.clicT;
+    TRAFIC.clicT = null;
+    if (!P || t === null || P.now() - t > 3000 || (typeof document !== "undefined" && document.hidden))
+        return;
+    trafPoser(TRAFIC.ong, t, P);
 }
 function trafMed(a) { if (!a || !a.length)
     return null; const l = a.slice().sort((x, y) => x - y); return l[Math.floor(l.length / 2)]; }
@@ -246,7 +277,7 @@ function trafLigne() {
         const ms = v => v === null ? "—" : (v < 1000 ? v + " ms" : (v / 1000).toFixed(1) + " s");
         const P = TRAFIC.poids;
         return "latence dernière " + ms(b.latDer) + " · médiane " + ms(b.latMed) + (b.nLat ? " (" + b.nLat + ")" : "") + " · lecture " + ms(b.lireMed) + " (pire " + ms(b.lireMax) + ") · redessin " + ms(b.affMed) + " (pire " + ms(b.affMax) + ")"
-            + " · 1 min : " + b.r60 + " reçus, " + b.e60 + " envoyées · en attente " + b.vol + " · refusées " + b.ko + " · poids " + (P == null ? "—" : Math.round(P / 1024) + " Ko (" + Math.min(100, Math.round(P / 10485.76)) + " %)");
+            + " · onglet " + ms(b.ongMed) + " (pire " + ms(b.ongMax) + ") · clic " + ms(b.clicMed) + " (pire " + ms(b.clicMax) + ")" + " · 1 min : " + b.r60 + " reçus, " + b.e60 + " envoyées · en attente " + b.vol + " · refusées " + b.ko + " · poids " + (P == null ? "—" : Math.round(P / 1024) + " Ko (" + Math.min(100, Math.round(P / 10485.76)) + " %)");
     }
     catch (e) {
         return "?";
@@ -268,7 +299,7 @@ function trafBilan(now) {
             r10++;
     } bar[59 - Math.floor(a / 1000)]++; });
     const l = TRAFIC.lat.slice().sort((a, b) => a - b);
-    return { e10, r10, e60, r60, bar, ecr: TRAFIC.ecr, recu: TRAFIC.recu, ko: TRAFIC.ko, vol: TRAFIC.vol, latDer: TRAFIC.lat.length ? TRAFIC.lat[TRAFIC.lat.length - 1] : null, latMed: l.length ? l[Math.floor(l.length / 2)] : null, nLat: l.length, lireMed: trafMed(TRAFIC.lire), lireMax: TRAFIC.lire.length ? Math.max.apply(null, TRAFIC.lire) : null, affMed: trafMed(TRAFIC.aff), affMax: TRAFIC.aff.length ? Math.max.apply(null, TRAFIC.aff) : null, nTrt: TRAFIC.lire.length, depuis: Math.round((now - TRAFIC.t0) / 60000) };
+    return { e10, r10, e60, r60, bar, ecr: TRAFIC.ecr, recu: TRAFIC.recu, ko: TRAFIC.ko, vol: TRAFIC.vol, latDer: TRAFIC.lat.length ? TRAFIC.lat[TRAFIC.lat.length - 1] : null, latMed: l.length ? l[Math.floor(l.length / 2)] : null, nLat: l.length, lireMed: trafMed(TRAFIC.lire), lireMax: TRAFIC.lire.length ? Math.max.apply(null, TRAFIC.lire) : null, affMed: trafMed(TRAFIC.aff), affMax: TRAFIC.aff.length ? Math.max.apply(null, TRAFIC.aff) : null, ongMed: trafMed(TRAFIC.ong), ongMax: TRAFIC.ong.length ? Math.max.apply(null, TRAFIC.ong) : null, clicMed: trafMed(TRAFIC.clic), clicMax: TRAFIC.clic.length ? Math.max.apply(null, TRAFIC.clic) : null, nTrt: TRAFIC.lire.length, depuis: Math.round((now - TRAFIC.t0) / 60000) };
 }
 function sansIndef(v) {
     if (Array.isArray(v))
@@ -1068,7 +1099,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.254 — 05/10/2026";
+const APP_VERSION = "v10.255 — 27/10/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -9793,6 +9824,8 @@ function TraficTuile({ onPing = null, netOff = false, docSize = null }) {
             lg("Latence — médiane (" + b.nLat + " dernière" + (b.nLat > 1 ? "s" : "") + ")", ms(b.latMed), colLat(b.latMed)),
             lg("Appareil — lecture d'un message (médiane / pire)", duo(b.lireMed, b.lireMax), colTrt(b.lireMed)),
             lg("Appareil — jusqu'à l'écran redessiné (médiane / pire)", duo(b.affMed, b.affMax), colTrt(b.affMed)),
+            lg("Appareil — changement d'onglet jusqu'à l'écran (médiane / pire)", duo(b.ongMed, b.ongMax), colTrt(b.ongMed)),
+            lg("Appareil — réponse à un clic, modale comprise (médiane / pire)", duo(b.clicMed, b.clicMax), colTrt(b.clicMed)),
             lg("Poids du planning reçu à chaque message", docSize === null ? "—" : Math.round(docSize / 1024) + " Ko (" + Math.min(100, Math.round(docSize / 10485.76)) + " % de la limite)", docSize === null ? undefined : docSize < 629000 ? undefined : docSize < 891000 ? "#d97706" : "#dc2626"),
             lg("Messages reçus — 10 s / 1 min", b.r10 + " / " + b.r60, b.r60 >= 40 ? "#dc2626" : b.r60 >= 15 ? "#d97706" : undefined),
             lg("Écritures envoyées — 10 s / 1 min", b.e10 + " / " + b.e60, b.e60 >= 40 ? "#dc2626" : b.e60 >= 15 ? "#d97706" : undefined),
@@ -12944,6 +12977,13 @@ function CardioPlanning() {
        mémorise le défilement de la fenêtre à la sortie et on le restaure au retour.
        Volontairement limité à cet onglet. */
     const [tab, setTab] = useState("planning");
+    /* v10.255 : mesure du changement d'onglet (voir trafOnglet) — lecture seule */
+    useEffect(() => { trafClicInit(); }, []);
+    useEffect(() => { if (TRAFIC.tabPrec === undefined) {
+        TRAFIC.tabPrec = tab;
+        return;
+    } if (TRAFIC.tabPrec === tab)
+        return; TRAFIC.tabPrec = tab; trafOnglet(); }, [tab]);
     /* v10.132 : écran étroit (< 760 px, même seuil que TableScroll), plateau ⋯ et menu du filtre */
     const [narrow, setNarrow] = useState(typeof window !== "undefined" && window.innerWidth / ZOOM.f < 760);
     const [moreOpen, setMoreOpen] = useState(false);
