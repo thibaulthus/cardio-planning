@@ -1104,7 +1104,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.257 — 31/10/2026";
+const APP_VERSION = "v10.258 — 31/10/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -4169,7 +4169,7 @@ function PlanTypeGrid({ medecins, actes, planningType, setPlanningType, isEdit, 
    Rien n'est écrit avant « ✓ Valider » : l'activité, sa salle et la note partent ensemble ;
    « ← Retour » revient au choix, sans rien poser. Sans `titre`, l'en-tête reste celui de la
    modale qui l'affiche (modale de case). */
-function ValidPose({ titre = null, sous = null, med, acte, salle, note, canNote, setNote, onRetour, onValider, onClose }) {
+function ValidPose({ titre = null, sous = null, med, acte, salle, note, canNote, setNote, onRetour, onValider, onClose, info = null }) {
     return (React.createElement(React.Fragment, null,
         titre && React.createElement("div", { style: S.mHd },
             React.createElement("div", null,
@@ -4186,6 +4186,7 @@ function ValidPose({ titre = null, sous = null, med, acte, salle, note, canNote,
                     med.nom)),
             acte && React.createElement(Badge, { a: acte, hideSalle: true }),
             salle && React.createElement("span", { style: { fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: "var(--txt)", border: "1px solid var(--border)", background: "var(--bg)", borderRadius: 4, padding: "3px 7px" } }, salle)),
+        info,
         React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", fontWeight: 700, textTransform: "uppercase", marginBottom: 5 } }, "\uD83D\uDCDD Note"),
         canNote
             ? React.createElement("textarea", { value: note || "", onChange: e => setNote(e.target.value), placeholder: "Facultative \u2014 visible au survol de la case\u2026", autoFocus: true, style: { width: "100%", padding: "6px 8px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--inp)", color: "var(--txt)", fontSize: 12, fontFamily: "'Sora',sans-serif", resize: "vertical", minHeight: 48, outline: "none" } })
@@ -7837,7 +7838,7 @@ const HELP_SECTIONS = [
     { id: "colplanning", icon: "👁", title: "Colonnes de salles et d'activités dans le Planning", body: () => HE("div", null, HP({ children: ["Accès : éditeur et intermédiaires. Pour construire le planning en voyant tout le monde, le bouton ", HBtn({ kind: "ghost", children: "👁" }), " de la barre du Planning ouvre la liste de ", HE("b", null, "toutes les colonnes des onglets salles"), " — CHL, CHB (avec le BIP), PT Cardio (avec la Stimulation) et PT Angio — et un champ de recherche (« bip », « stim », « CHB-2 »…). Chaque colonne cochée s'ajoute ", HE("b", null, "tout à droite, après les médecins"), ", derrière un trait vertical (v10.240)."] }), HP({ children: ["La colonne est ", HE("b", null, "exactement celle de son onglet"), ", dessinée par le même code : mêmes ronds, mêmes couleurs, salle vide colorée, plage fermée grisée, alertes et notes. Un clic ouvre la même fenêtre que dans l'onglet d'origine, avec les mêmes droits et les mêmes verrous. Poser un médecin depuis cette colonne revient à le poser dans sa propre colonne : tout se met à jour en même temps, rien n'est écrit deux fois."] }), HP({ last: true, children: ["Réglage ", HE("b", null, "propre à cet appareil"), ", vide par défaut : personne d'autre ne voit vos colonnes, et elles disparaissent dès qu'on les décoche (", HBtn({ kind: "ghost", children: "✕ Tout décocher" }), "). Le bouton 👁 prend un liseré tant qu'une colonne est cochée. Ces colonnes ne sont pas imprimées. Seul ce qui est déjà une colonne dans un onglet salle peut être affiché : pour une activité qui n'en a pas, cochez-lui une colonne de reprise ↩ dans Paramètres → Activités."] })) },
     { id: "bac", icon: "🧪", title: "Bac à sable — tester sans risque", body: () => HE("div", null, HP({ children: ["Un espace de test à part, ouvert à toute l'équipe depuis la v10.254. Sur l'écran d'accueil, le bouton ", HBtn({ kind: "ghost", children: "🧪 Essayer le bac à sable" }), " ouvre le bac ; on y tape ensuite son code habituel et on y a son vrai profil — un médecin y voit et y fait ce qu'un médecin voit et fait, une secrétaire ce qu'une secrétaire voit et fait. Le bac est un cahier Firebase distinct, copie du planning réel : tout ce qu'on y fait reste dans cette copie, et le vrai planning ne bouge pas d'une case."] }), HP({ children: [HE("b", null, "Plusieurs personnes à la fois"), ". Le bac est partagé : entrer ne copie rien, on le rejoint tel qu'il est, et chacun voit en direct ce que font les autres, comme dans le vrai planning. Seul l'éditeur remplace son contenu — par une copie fraîche du vrai planning (↺ Remettre à zéro) ou par une sauvegarde ; si d'autres appareils sont dans le bac à ce moment-là, il en est averti, car leurs essais sont remplacés. Le bandeau indique qui d'autre modifie le bac (👥) ; une personne entrée en simple consultation n'est pas comptée."] }), HP({ children: [HE("b", null, "On en sort tout seul"), ". Au bout du délai sans action (5 min, réglable dans Paramètres), l'application se ferme comme ailleurs ", HE("i", null, "et"), ", dans le bac, fait aussi sortir du bac : au réveil, on tape son code et on est dans le vrai planning. Le délai vaut aussi pour la consultation sans code, dans le bac seulement."] }), HP({ children: [HE("b", null, "Ce qui s'y comporte comme dans le vrai"), " : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."] }), HP({ children: [HE("b", null, "Ce qui est désactivé"), " : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."] }), HP({ children: [HE("b", null, "L'historique des cases dans le bac"), ", depuis la v10.238 : il montre le vrai historique jusqu'au moment où le bac a été copié — ou, si vous avez chargé une sauvegarde, jusqu'à l'heure de cette sauvegarde — puis vos essais du bac, à la suite. Vos essais ne se mêlent jamais au vrai historique, et la remise à zéro (ou le chargement d'une autre sauvegarde) les efface."] }), HP({ children: [HE("b", null, "Le bandeau orange"), ", en bas de l'écran, rappelle où vous êtes et porte ", HBtn({ kind: "ghost", children: "🚪 Sortir du bac" }), ", qui ramène au vrai planning. L'écran d'accueil (code) affiche le même rappel, avec son bouton Sortir. Pour l'éditeur seul, le bandeau porte en plus : ", HE("b", null, "Connecté comme"), ", pour passer d'un profil à l'autre sans code — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation ; ", HE("b", null, "la sauvegarde affichée"), ", une liste des sauvegardes avec les flèches ‹ (plus ancienne) et › (plus récente), pour feuilleter les sauvegardes sans passer par Paramètres — pratique pour retrouver le moment où un problème est apparu ; et ", HBtn({ kind: "ghost", children: "↺ Remettre à zéro" }), ", qui remplace le bac par une copie fraîche du planning réel."] })) },
     { id: "desactiver", icon: "⏸", title: "Indisponible : les hachures et la désactivation", body: () => HE("div", null, HP({ children: ["Une case ", HE("b", null, "hachurée"), " veut toujours dire la même chose, quel que soit l'onglet : ", HE("b", null, "cette personne n'est pas disponible ce jour-là"), ". Ce n'est pas un effet d'affichage mais un ", HE("b", null, "verrou"), " : la case ne s'ouvre pas au clic, le planning type ne s'y applique pas, et les répartitions automatiques passent la personne. Couverte sur ", HE("b", null, "toute"), " la période affichée, sa colonne disparaît même des grilles."] }), HP({ children: ["Deux situations produisent une hachure : une ", HE("b", null, "désactivation posée à la main"), " (ci-dessous), et un ", HE("b", null, "rôle de Dr Junior dont le nom du semestre n'a pas encore été saisi"), " (section suivante). Dans les deux cas, le contenu déjà posé n'est pas effacé : il reste sous les hachures."] }), HT({ children: "Désactiver quelqu'un" }), HP({ children: ["Pour un long congé, un départ, une période sans remplaçant : plutôt qu'une ligne remplie d'absences, on ", HE("b", null, "désactive"), " la personne sur des dates. Dans l'onglet ", HE("b", null, "Type"), ", cliquez sur ", HE("b", null, "la pastille ronde"), " d'un médecin (éditeur seulement) : la fenêtre propose « sur toute la période affichée » ou « de date à date », et liste les indisponibilités déjà posées avec un bouton ▶ Réactiver chacune."] }), HP({ children: ["Pendant ses dates, la personne sort du ", HE("b", null, "tour, des gardes, du bip"), " et des demandes de Construire. Sa pastille reste dans Type (grisée ⏸) pour la réactiver, et elle redevient disponible ", HE("b", null, "le jour de son retour"), ", sans autre manipulation. Ce sont des ", HE("b", null, "dates"), " qui sont enregistrées : changer la durée des périodes ne déplace rien."] }), HT({ children: "🚪 Quand quelqu'un quitte le service" }), HP({ children: ["Ne supprimez pas sa fiche : indiquez sa ", HE("b", null, "date de départ"), ", dans la fiche (Équipe › ✏️ › « Parti le »). C'est une désactivation sans fin : à partir de cette date la personne sort du tour, des gardes, des salles, du planning type, des demandes de Construire et des rappels ; les stats la comptent jusqu'au départ. Son ", HE("b", null, "PIN n'ouvre plus l'application"), ", et il peut être donné à un nouveau venu. Sa fiche passe dans le groupe replié « Anciens membres » en bas d'Équipe, d'où on peut la rouvrir — ou annuler le départ (v10.151)."] }), HP({ children: ["Tout son historique ", HE("b", null, "reste lisible"), ", dans les périodes vivantes comme dans les archives. La corbeille 🗑️ refuse désormais de supprimer une fiche qui a des cases dans le planning : elle ne sert plus qu'aux fiches créées par erreur. Et chaque archive emporte une copie des fiches de l'équipe : même une fiche disparue y garde son nom et sa couleur."] }), HP({ children: [HE("b", null, "Dans les onglets salles"), " (v10.241) : les fenêtres de CHL, CHB, PT Cardio et PT Angio — et les colonnes 👁 du Planning, qui les ouvrent — montrent la personne ", HE("b", null, "grisée, « ⏸ Indisponible — parti le … »"), " sur ses dates, et ne permettent plus de la poser. Avant, un départ ou une désactivation en cours de période la laissait proposée."] }), HT({ children: "⚠ Les limites à connaître" }), HP({ children: ["• ", HE("b", null, "Retirez ses activités avant de désactiver"), " : la désactivation n'efface ", HE("b", null, "rien"), '. La fenêtre compte ce qui est posé sur les dates choisies et propose « 🧹 Retirer ses activités sur ces dates » (gardes, tour et absences comprises).'] }), HP({ children: ["• L'", HE("b", null, "astreinte"), " n'est pas couverte : gérez-la à part dans son onglet."] }), HP({ last: true, children: ["• L'éditeur peut toujours poser ", HE("b", null, "à la main"), " un tour ou une garde sur quelqu'un de désactivé, depuis les tuiles 2 et 3 de Construire — le verrou porte sur les cases et les automatismes, pas sur un geste délibéré."] })) },
-    { id: "internes", icon: "🎓", title: "Internes — l'onglet et les semestres", body: () => HE("div", null, HP({ children: ["L'onglet ", HE("b", null, "🎓 Internes"), " est facultatif : il s'affiche si la coche est mise dans ", HE("b", null, "Paramètres → tuile Internes"), ". Contrairement à tous les autres onglets, il travaille ", HE("b", null, "par semestre de 6 mois"), " et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant."] }), HT({ children: "Les semestres et les fiches" }), HP({ children: ["Tout se règle dans l'onglet ", HE("b", null, "Équipe"), ", section Internes. Un semestre démarre le ", HE("b", null, "2 mai"), " ou le ", HE("b", null, "2 novembre"), ", reporté au ", HE("b", null, "lundi suivant"), " si la date tombe un vendredi, un samedi ou un dimanche ; les dates restent modifiables à la main. Chaque interne y reçoit un nom, des initiales et une ", HE("b", null, "couleur"), ", reprise partout."] }), HP({ children: ["« + Semestre suivant » se bloque à ", HE("b", null, "deux semestres ouverts"), " (l'actuel et le prochain) — on ne connaît les internes que quelques semaines à l'avance. Un semestre ", HE("b", null, "pas encore commencé"), " peut être supprimé (🗑) : la fin du précédent est recollée automatiquement."] }), HP({ children: ["La coche ☑ devant chaque interne dit s'il a ", HE("b", null, "accès aux salles"), ". Sans elle, il n'est pas proposé dans les fenêtres de CHL, CHB, PT Cardio et PT Angio — c'est ce qui réserve certaines activités (ETT, ETO…) à un ou deux internes. Elle ne gêne pas les activités à salle que les internes posent eux-mêmes (voir plus bas)."] }), HT({ children: "Ce qu'ils peuvent avoir, ce qu'ils peuvent poser" }), HP({ children: ["C'est l'onglet ", HE("b", null, "Activités"), " qui décide, avec la coche ", HChip({ txt: "🎓 Internes", bg: "#0e9f9f" }), " : une activité cochée peut leur être posée. Une ", HE("b", null, "seconde coche"), " dit s'ils peuvent la poser ", HE("b", null, "eux-mêmes"), " (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur ou un intermédiaire — une secrétaire ou un cadre ne pose et ne retire que les activités cochées pour son rôle (celles des plannings CHL, CHB, PT Cardio, PT Angio) : tour, absences, FMC et gardes d'internes leur restent fermés. Les activités ", HE("b", null, "à salle"), " suivent la même règle (v10.256) : cochées ", HE("b", null, "posable par eux"), ", tous les internes les posent eux-mêmes, dans la rubrique « Avec salle » de leur fenêtre — sans choix si l'activité n'a qu'une salle (Épreuve d'effort), avec choix sinon. Depuis la v10.257, ces activités sont aussi proposées pour ", HE("b", null, "tous les internes"), " à l'éditeur, aux intermédiaires, et à la cadre ou aux secrétaires si leur coche est mise dans la fiche de l'activité. Non cochées « posable par eux », elles ne sont posées que par un éditeur, un intermédiaire ou un cadre, depuis l'onglet Internes ou les onglets de salle, pour les internes qui ont l'accès aux salles."] }), HP({ children: ["Sur un ", HE("b", null, "lundi"), ", poser HC, USIC ou une activité sans salle propose de ", HE("b", null, "remplir la semaine"), " : le remplissage saute les repos de garde, absences et FMC déjà posés. Le ", HE("b", null, "samedi"), " n'a qu'une case, pour le HC du samedi matin."] }), HP({ children: [HE("b", null, "Absence et FMC"), " (v10.177) : après le clic, la fenêtre demande la ", HE("b", null, "durée"), ". Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du ", HE("b", null, "lundi au vendredi"), " de la semaine cliquée, sans week-end. FMC : ce créneau, 1, 2 ou 3 jours, à la suite du jour cliqué. Ce sont des journées entières : elles remplacent ce qui s'y trouve, repos de garde compris ; les jours hors semestre sont sautés."] }), HP({ children: [HE("b", null, "Activité avec salle"), " (v10.177) : la salle choisie, un écran ", HE("b", null, "✓ Valider"), " affiche l'interne, l'activité et la salle, avec une ", HE("b", null, "note facultative"), ". Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille rouge cerclée de blanc, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ", HE("b", null, "← Retour"), " revient en arrière sans rien poser."] }), HT({ children: "Les gardes" }), HP({ children: ["La colonne ", HE("b", null, "Garde"), " de l'onglet fonctionne comme celle des médecins, ", HE("b", null, "sans répartition automatique"), ". La garde se pose sur la nuit et le ", HBadg({ txt: "RG", color: "#ffe599" }), " repos est posé tout seul le lendemain — sauté, avec un avertissement, si l'interne est absent ou en FMC ce jour-là. ⇄ échange deux gardes directement, dans la liste de celles du semestre."] }), HP({ children: ["Un ", HE("b", null, "interne extérieur"), " au service se saisit au nom libre : il apparaît dans la colonne, sans repos chez nous. Un jour ", HE("b", null, "sans personne de garde"), " est signalé en rouge. Dans le Planning, la colonne « 🎓 Garde int. » s'affiche à la demande depuis la ligne Filtre, en ", HE("b", null, "lecture seule"), ", et se remasque à chaque ouverture."] }), HT({ children: "Jauge, statistiques, PIN" }), HP({ children: [HBtn({ kind: "ghost", children: "🚦" }), " affiche la ", HE("b", null, "jauge"), " H et U à gauche de chaque demi-journée, en rouge sous les seuils réglés dans Paramètres (un seuil à 0 = pas d'alerte). ", HBtn({ kind: "ghost", children: "📊" }), " ouvre les ", HE("b", null, "statistiques du semestre"), " : gardes par catégorie, HC, USIC et les activités retenues — les colonnes affichées se choisissent dans Paramètres, tuile Internes."] }), HP({ last: true, children: ["Un ", HE("b", null, "PIN interne partagé"), " se définit dans la même tuile. Avec lui, un interne saisit son prénom, arrive directement sur son onglet et ", HE("b", null, "ne peut modifier que celui-là"), " : Planning, CHL, CHB, PT Cardio, PT Angio et l'Aide lui restent visibles en lecture seule."] })) },
+    { id: "internes", icon: "🎓", title: "Internes — l'onglet et les semestres", body: () => HE("div", null, HP({ children: ["L'onglet ", HE("b", null, "🎓 Internes"), " est facultatif : il s'affiche si la coche est mise dans ", HE("b", null, "Paramètres → tuile Internes"), ". Contrairement à tous les autres onglets, il travaille ", HE("b", null, "par semestre de 6 mois"), " et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant."] }), HT({ children: "Les semestres et les fiches" }), HP({ children: ["Tout se règle dans l'onglet ", HE("b", null, "Équipe"), ", section Internes. Un semestre démarre le ", HE("b", null, "2 mai"), " ou le ", HE("b", null, "2 novembre"), ", reporté au ", HE("b", null, "lundi suivant"), " si la date tombe un vendredi, un samedi ou un dimanche ; les dates restent modifiables à la main. Chaque interne y reçoit un nom, des initiales et une ", HE("b", null, "couleur"), ", reprise partout."] }), HP({ children: ["« + Semestre suivant » se bloque à ", HE("b", null, "deux semestres ouverts"), " (l'actuel et le prochain) — on ne connaît les internes que quelques semaines à l'avance. Un semestre ", HE("b", null, "pas encore commencé"), " peut être supprimé (🗑) : la fin du précédent est recollée automatiquement."] }), HP({ children: ["La coche ☑ devant chaque interne dit s'il a ", HE("b", null, "accès aux salles"), ". Sans elle, il n'est pas proposé dans les fenêtres de CHL, CHB, PT Cardio et PT Angio — c'est ce qui réserve certaines activités (ETT, ETO…) à un ou deux internes. Elle ne gêne pas les activités à salle que les internes posent eux-mêmes (voir plus bas)."] }), HT({ children: "Ce qu'ils peuvent avoir, ce qu'ils peuvent poser" }), HP({ children: ["C'est l'onglet ", HE("b", null, "Activités"), " qui décide, avec la coche ", HChip({ txt: "🎓 Internes", bg: "#0e9f9f" }), " : une activité cochée peut leur être posée. Une ", HE("b", null, "seconde coche"), " dit s'ils peuvent la poser ", HE("b", null, "eux-mêmes"), " (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur ou un intermédiaire — une secrétaire ou un cadre ne pose et ne retire que les activités cochées pour son rôle (celles des plannings CHL, CHB, PT Cardio, PT Angio) : tour, absences, FMC et gardes d'internes leur restent fermés. Les activités ", HE("b", null, "à salle"), " suivent la même règle (v10.256) : cochées ", HE("b", null, "posable par eux"), ", tous les internes les posent eux-mêmes, dans la rubrique « Avec salle » de leur fenêtre — sans choix si l'activité n'a qu'une salle (Épreuve d'effort), avec choix sinon. Depuis la v10.257, ces activités sont aussi proposées pour ", HE("b", null, "tous les internes"), " à l'éditeur, aux intermédiaires, et à la cadre ou aux secrétaires si leur coche est mise dans la fiche de l'activité. Non cochées « posable par eux », elles ne sont posées que par un éditeur, un intermédiaire ou un cadre, depuis l'onglet Internes ou les onglets de salle, pour les internes qui ont l'accès aux salles."] }), HP({ children: [HE("b", null, "HC, USIC et activités sans salle"), " (v10.258) : du lundi au vendredi, quel que soit le jour cliqué, la fenêtre demande la ", HE("b", null, "durée"), " — ce créneau, cette journée, ou la semaine (lundi → vendredi de la semaine cliquée, matin et après-midi). Journée et semaine ne remplacent ", HE("b", null, "jamais"), " une demi-journée déjà occupée (EE, consultation, repos, absence, FMC…) et sautent les fériés et les jours hors semestre ; le message final compte les demi-journées posées et celles laissées. Le ", HE("b", null, "repos de garde"), " se pose toujours à la journée. Le ", HE("b", null, "samedi"), " n'a qu'une case, pour le HC du samedi matin."] }), HP({ children: [HE("b", null, "Absence et FMC"), " (v10.177) : après le clic, la fenêtre demande la ", HE("b", null, "durée"), ". Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du ", HE("b", null, "lundi au vendredi"), " de la semaine cliquée, sans week-end. FMC : ce créneau, 1, 2 ou 3 jours, à la suite du jour cliqué. Ce sont des journées entières : elles remplacent ce qui s'y trouve, repos de garde compris ; les jours hors semestre sont sautés."] }), HP({ children: [HE("b", null, "Activité avec salle"), " (v10.177) : la salle choisie, un écran ", HE("b", null, "✓ Valider"), " affiche l'interne, l'activité et la salle, avec une ", HE("b", null, "note facultative"), ". Depuis la v10.258, chaque salle proposée indique ", HE("b", null, "libre"), " ou ", HE("b", null, "occupée par…"), " sur le créneau (médecins et internes confondus ; pour une salle fixe comme EE-CHL, l'information figure sur l'écran ✓ Valider) — c'est un avertissement, jamais une interdiction : un médecin et un interne dans la même salle est courant. Et dans l'autre sens, les fenêtres de case des médecins voient désormais les internes déjà en salle. Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille rouge cerclée de blanc, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ", HE("b", null, "← Retour"), " revient en arrière sans rien poser."] }), HT({ children: "Les gardes" }), HP({ children: ["La colonne ", HE("b", null, "Garde"), " de l'onglet fonctionne comme celle des médecins, ", HE("b", null, "sans répartition automatique"), ". La garde se pose sur la nuit et le ", HBadg({ txt: "RG", color: "#ffe599" }), " repos est posé tout seul le lendemain — sauté, avec un avertissement, si l'interne est absent ou en FMC ce jour-là. ⇄ échange deux gardes directement, dans la liste de celles du semestre."] }), HP({ children: ["Un ", HE("b", null, "interne extérieur"), " au service se saisit au nom libre : il apparaît dans la colonne, sans repos chez nous. Un jour ", HE("b", null, "sans personne de garde"), " est signalé en rouge. Dans le Planning, la colonne « 🎓 Garde int. » s'affiche à la demande depuis la ligne Filtre, en ", HE("b", null, "lecture seule"), ", et se remasque à chaque ouverture."] }), HT({ children: "Jauge, statistiques, PIN" }), HP({ children: [HBtn({ kind: "ghost", children: "🚦" }), " affiche la ", HE("b", null, "jauge"), " H et U à gauche de chaque demi-journée, en rouge sous les seuils réglés dans Paramètres (un seuil à 0 = pas d'alerte). ", HBtn({ kind: "ghost", children: "📊" }), " ouvre les ", HE("b", null, "statistiques du semestre"), " : gardes par catégorie, HC, USIC et les activités retenues — les colonnes affichées se choisissent dans Paramètres, tuile Internes."] }), HP({ last: true, children: ["Un ", HE("b", null, "PIN interne partagé"), " se définit dans la même tuile. Avec lui, un interne saisit son prénom, arrive directement sur son onglet et ", HE("b", null, "ne peut modifier que celui-là"), " : Planning, CHL, CHB, PT Cardio, PT Angio et l'Aide lui restent visibles en lecture seule. Depuis la v10.258, il dispose aussi des flèches ", HE("b", null, "↶ ↷"), " en haut à gauche : ce retour arrière est propre à l'appareil et ne défait jamais le travail d'un autre. Enfin, quand une pose est refusée (planning gelé, journée passée, période non diffusée, plage fermée), la fenêtre n'affiche plus « Posé » : c'est le message du refus qui reste, et rien n'est écrit."] })) },
     { id: "juniors", icon: "🩺", title: "Dr Juniors — un rôle, un nom par semestre", body: () => HE("div", null, HP({ children: ["Une fiche de ", HE("b", null, "Dr Junior"), " ne décrit pas une personne, mais un ", HE("b", null, "rôle"), " : son nom, sa couleur, sa surspécialité, son planning type, ses coches tour et gardes. Tout cela ", HE("b", null, "ne change pas"), " quand le titulaire change — c'est l'intérêt du mécanisme : le planning type se fait une fois pour toutes, et il n'y a jamais de fiche à recréer."] }), HP({ children: ["Ce qui change, c'est le ", HE("b", null, "nom du titulaire"), ", saisi ", HE("b", null, "semestre par semestre"), " dans la fiche (onglet Équipe), aux ", HE("b", null, "mêmes dates que les internes"), ". Dès qu'il est saisi, ce sont ses initiales et son nom qui apparaissent partout — cases, fenêtres, infobulles, impression, export — et ", HE("b", null, "à la date près"), " : une case du 4 mai affiche le nouveau titulaire même si vous la regardez depuis le mois d'avril."] }), HT({ children: "Un rôle sans titulaire" }), HP({ children: ["Tant qu'aucun nom n'est saisi pour un semestre, le rôle est ", HE("b", null, "hachuré et verrouillé"), " sur ces dates (voir la section précédente), et sa colonne disparaît si toute la période est concernée. La personne n'existe pas encore : rien ne peut lui être posé, pas même un congé. ", HE("b", null, "Saisir le nom déverrouille"), " aussitôt, sans autre manipulation."] }), HP({ children: ["⚠ Conséquence pratique : ", HE("b", null, "saisissez les noms avant de construire la période"), ". Sinon le planning type saute ces mois, et il faudra le réappliquer une fois les noms entrés."] }), HP({ children: ["Effacer un nom déjà saisi ", HE("b", null, "n'efface aucune activité"), " : les cases se reverrouillent, le contenu reste dessous. La fiche le ", HE("b", null, "compte"), " et propose de retirer ces activités si c'est ce que vous voulez."] }), HP({ children: ["Un rôle ", HE("b", null, "sans titulaire sur toute la période"), " ne compte pas pour une personne : il sort des listes et des totaux des tuiles Tour et Gardes (et des Stats), et la répartition automatique l'ignore. Ses cases restent visibles, hachurées, dans le planning — et l'éditeur peut toujours lui poser une garde à la main depuis la grille."] }), HT({ children: "Le rappel des congés et des préférences" }), HP({ children: ["Le rappel affiché dans le Planning (« Poser vos congés… », « Dire vos préférences… ») ne s'adresse à un rôle junior que si ", HE("b", null, "le semestre en cours aujourd'hui"), ", celui de la personne connectée, recouvre la période demandée, au moins en partie (v10.149). Deux fois par an, le junior ne reçoit donc rien : la période suivante appartient à son successeur. Une fois par an — la période à cheval sur la bascule — il le reçoit."] }), HP({ children: ["Dans la tuile 1 de Construire, le rôle reste dans la liste et dans le compte : ses congés sont ", HE("b", null, "saisis par l'éditeur"), ", et une mention « junior suivant » le rappelle sous son nom. Rien à régler : tout découle des semestres de Paramètres › Internes."] }), HT({ children: "Quand le changement tombe au milieu d'une période" }), HP({ last: true, children: ["Le changement du 2 novembre tombe sur une frontière de période : rien à gérer. Seule la période ", HE("b", null, "mars-juin"), " contient une bascule. Dans ce cas, l'en-tête de colonne montre ", HE("b", null, "un seul jeu d'initiales"), ", celui du titulaire du moment, et bascule tout seul le jour dit. Dans Construire, le tour et les gardes, le rôle reste ", HE("b", null, "une seule ligne"), " portant les deux noms (« X puis Y ») : il compte ainsi sur la période entière, comme tout le monde."] })) },
     { id: "legende", icon: "🎨", title: "Légende", body: () => HE("div", null, HP({ children: [HAvat({ txt: "TH", color: "#ec4899" }), " pastille d'initiales : chaque médecin a sa couleur · ", HBadg({ txt: "CORO", color: "#76a5af" }), " badge d'activité, dans la couleur de l'activité."] }), HP({ children: ["Fiches Équipe : ", HChip({ txt: "Garde", bg: "#16a34a" }), " / ", HChip({ txt: "Sans garde", bg: "#dc2626" }), " · ", HChip({ txt: "TM", bg: "#1d4ed8" }), " / ", HChip({ txt: "Sans TM", bg: "#d97706" }), "."] }), HP({ children: ["Sur-spécialités : ", HE("span", { style: { color: "#76a5af", fontWeight: 800 } }, "Coro"), " · ", HE("span", { style: { color: "#e3b341", fontWeight: 800 } }, "Pace"), " · ", HE("span", { style: { color: "#8b5cf6", fontWeight: 800 } }, "EEP"), " · ", HE("span", { style: { color: "#ec4899", fontWeight: 800 } }, "ETT"), "."] }), HP({ children: ["⭐ souhaite (garde ou tour) · 🚫 préfère éviter · ⇄ échange · ✂ temps partiel · 📝 note sur la case."] }), HP({ children: ["👁 en haut de l'écran : mode consultation (lecture seule) · pastille ", HE("span", { style: { display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: "#3fb950", margin: "0 2px" } }), " verte en haut : synchronisation Firebase active (grise = hors ligne)."] }), HP({ last: true, children: ["Fonds : jaune pâle = week-end · bleuté = aujourd'hui · vert clair + contour vert = astreinte de la semaine · contour violet = exception d'astreinte posée sur un jour précis."] })) }
 ];
@@ -11161,13 +11162,13 @@ function intGardeVeille(getEntries, mid, y, m, d) {
     const v = intDecal(intISO2(y, m, d), -1).split("-").map(Number);
     return ["N", "JOUR"].some(sl => getEntries(mid, v[0], v[1] - 1, v[2], sl).some(e => e && e.acteId === "GARDE"));
 }
-function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getEntries, setEntry, canSalle = false, salleReg = [], intSelf = false, notes = {}, setNotes = null, adminKey = null }) {
+function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getEntries, setEntry, canSalle = false, salleReg = [], intSelf = false, notes = {}, setNotes = null, adminKey = null, salleQui = null }) {
     const [cren, setCren] = useState(slot0 === "AM" ? "AM" : "M");
     const [per, setPer] = useState(null);
     const [pd1, setPd1] = useState(intISO2(y, m, d));
     const [pd2, setPd2] = useState(intISO2(y, m + 1, 0));
     const [pSel, setPSel] = useState(null);
-    const [semQ, setSemQ] = useState(null); /* lundi : {id,salle} en attente du choix semaine / créneau */
+    const [semQ, setSemQ] = useState(null); /* v10.258 : {id,salle} en attente de sa durée (créneau / journée / semaine), tous les jours de la semaine */
     const [salleQ, setSalleQ] = useState(null); /* v10.62 : activité à salle en attente du choix de salle */
     const [durQ, setDurQ] = useState(null); /* v10.177 : ABS ou FMC en attente de sa durée */
     const [pend, setPend] = useState(null); /* v10.177 : activité à salle en attente de ✓ Valider — {id,salle,note} */
@@ -11209,61 +11210,75 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
     const gardeV = intGardeVeille(getEntries, mid, y, m, d);
     const retire = (c) => { setEntry(mid, y, m, d, c.sl, null); };
     const crenLbl = sam ? "Samedi matin" : (cren === "M" ? "Matin" : cren === "AM" ? "Après-midi" : "Journée");
+    const libJ = (i3) => { const p = i3.split("-").map(Number); return JOURSL[dow(p[0], p[1] - 1, p[2])].slice(0, 3) + ". " + p[2] + "/" + String(p[1]).padStart(2, "0"); };
     const cycleCren = () => { if (sam)
         return; setCren(c => c === "M" ? "AM" : c === "AM" ? "J" : "M"); };
     /* v10.177 : les demi-journées qu'une pose « au créneau » écrit — sert à la note de la validation */
     const slotsPose = sam ? ["M"] : (cren === "J" ? ["M", "AM"] : [cren]);
     const canNote = !!setNotes && canSalle;
+    /* v10.258 : « Posé » n'est annoncé que si la case a vraiment été écrite (setEntry renvoie true). Sur un refus
+       (gel, journée passée, période non diffusée, plage fermée), c'est le message du refus qui reste à l'écran. */
     const poseCren = (acteId, salle) => {
         const ent = () => salle ? { acteId: acteId, salle: salle } : { acteId: acteId };
         if (sam) {
-            setEntry(mid, y, m, d, "M", ent());
-            toast("Posé — samedi matin");
+            if (setEntry(mid, y, m, d, "M", ent()) === true)
+                toast("Posé — samedi matin");
             onClose();
             return;
         }
+        let ok = false;
         if (cren === "J") {
-            setEntry(mid, y, m, d, "M", ent());
-            setEntry(mid, y, m, d, "AM", ent());
+            const a1 = setEntry(mid, y, m, d, "M", ent()) === true, a2 = setEntry(mid, y, m, d, "AM", ent()) === true;
+            ok = a1 || a2;
         }
         else
-            setEntry(mid, y, m, d, cren, ent());
-        toast("Posé");
+            ok = setEntry(mid, y, m, d, cren, ent()) === true;
+        if (ok)
+            toast("Posé");
         onClose();
     };
     const poseJour = (acteId) => {
         setEntry(mid, y, m, d, "M", null);
         if (!sam)
             setEntry(mid, y, m, d, "AM", null);
-        setEntry(mid, y, m, d, "JOUR", { acteId: acteId });
-        toast((acteById(acteId) || { label: acteId }).label + " — journée");
+        if (setEntry(mid, y, m, d, "JOUR", { acteId: acteId }) === true)
+            toast((acteById(acteId) || { label: acteId }).label + " — journée");
         onClose();
     };
-    /* v10.177 : l'absence et la FMC ne passent plus par ici (elles ont leur ligne de durée) —
-       il ne reste que HC, USIC et les activités sans salle, du lundi au vendredi. */
-    const remplirSemaine = (acteId, salle) => {
-        let poses = 0, sautes = 0;
-        for (let i = 0; i < 5; i++) {
-            const iso3 = intDecal(iso, i);
-            const p = iso3.split("-").map(Number);
-            if (!dansSem(iso3)) {
-                sautes++;
-                continue;
+    /* v10.258 : une demi-journée est OCCUPÉE dès qu'elle porte quelque chose (EE, consultation, HC, repos,
+       absence, FMC…) — le remplissage d'une journée ou d'une semaine ne remplace jamais rien. */
+    const occupe = (yy, mm, dd, sl) => intJourBloque(getEntries, mid, yy, mm, dd) || getEntries(mid, yy, mm, dd, sl).some(e => e && (e._blocked || e.acteId));
+    /* v10.258 : REMPLISSAGE de la journée ou de la semaine — HC, USIC et activités sans salle, du lundi au vendredi,
+       matin et après-midi. Sautés, et comptés comme « laissés » : les demi-journées déjà occupées, les jours fériés
+       (une ligne fériée n'a qu'une case « journée » : un HC posé dessous serait invisible mais compté) et les jours
+       hors semestre. Un refus d'écriture (gel, période…) laisse son propre message. */
+    const poseJours = (acteId, salle, jours) => {
+        let poses = 0, laisses = 0, refus = 0;
+        jours.forEach(i3 => {
+            const p = i3.split("-").map(Number);
+            const yy = p[0], mm = p[1] - 1, dd = p[2];
+            if (!dansSem(i3) || isFerie(yy, mm, dd)) {
+                laisses += 2;
+                return;
             }
             ["M", "AM"].forEach(sl => {
-                if (intSlotProtege(getEntries, mid, p[0], p[1] - 1, p[2], sl)) {
-                    sautes++;
+                if (occupe(yy, mm, dd, sl)) {
+                    laisses++;
                     return;
                 }
-                setEntry(mid, p[0], p[1] - 1, p[2], sl, salle ? { acteId: acteId, salle: salle } : { acteId: acteId });
-                poses++;
+                if (setEntry(mid, yy, mm, dd, sl, salle ? { acteId: acteId, salle: salle } : { acteId: acteId }) === true)
+                    poses++;
+                else
+                    refus++;
             });
-        }
-        toast(poses + " demi-journée(s) posée(s)" + (sautes ? ", " + sautes + " préservée(s) (repos, absence, FMC ou hors semestre)" : ""));
+        });
+        if (poses || !refus)
+            toast(poses + " demi-journée(s) posée(s)" + (laisses ? " · " + laisses + " laissée(s) (déjà occupée, férié ou hors semestre)" : ""), poses ? "ok" : "warn");
         onClose();
     };
+    const lundi = intDecal(iso, -((dw + 6) % 7));
+    const semJours = [0, 1, 2, 3, 4].map(i => intDecal(lundi, i));
     const clic = (acteId) => {
-        /* v10.60 : le lundi, TOUTE activité propose de remplir la semaine — sauf le repos de garde */
         if (acteId === "REPOS_GARDE") {
             poseJour(acteId);
             return;
@@ -11277,18 +11292,33 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
             toast("La journée porte une absence, une FMC ou un repos — retirez-les d'abord (croix ci-dessus)", "warn");
             return;
         }
-        if (dw === 1 && !sam) {
-            setSemQ({ id: acteId, salle: null });
+        if (sam) {
+            poseCren(acteId);
             return;
         }
-        poseCren(acteId);
+        /* v10.258 : du lundi au vendredi, TOUTE activité sans salle demande sa durée (créneau / journée / semaine) —
+           remplace la question « remplir la semaine ? » qui n'existait que le lundi */
+        setSemQ({ id: acteId, salle: null });
     };
+    const semOpts = (() => {
+        if (!semQ)
+            return [];
+        const o = [];
+        if (cren !== "J")
+            o.push({ t: cren === "M" ? "Ce matin" : "Cet après-midi", s: libJ(iso), cren: true });
+        o.push({ t: "Cette journée", s: libJ(iso), jours: [iso] });
+        o.push({ t: "La semaine", s: libJ(semJours[0]) + " → " + libJ(semJours[4]), jours: semJours });
+        return o;
+    })();
+    const poseSem = (o) => { const q = semQ; setSemQ(null); if (o.cren) {
+        poseCren(q.id, q.salle);
+        return;
+    } poseJours(q.id, q.salle, o.jours); };
     /* v10.177 : la LIGNE DE DURÉE d'une absence ou d'une FMC — journées entières (case JOUR,
        comme l'écran de période), jours hors semestre sautés, remplace ce qui s'y trouve.
        Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du lundi au vendredi de la
        semaine cliquée (sa règle : pas de week-end chez les internes). FMC : ce créneau, 1, 2 ou
        3 jours calendaires à partir du jour cliqué. */
-    const libJ = (i3) => { const p = i3.split("-").map(Number); return JOURSL[dow(p[0], p[1] - 1, p[2])].slice(0, 3) + ". " + p[2] + "/" + String(p[1]).padStart(2, "0"); };
     const durOpts = (() => {
         if (!durQ)
             return [];
@@ -11321,7 +11351,7 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
             poseCren(aid);
             return;
         }
-        let poses = 0, sautes = 0;
+        let poses = 0, sautes = 0, refus = 0;
         o.jours.forEach(i3 => {
             if (!dansSem(i3)) {
                 sautes++;
@@ -11330,12 +11360,22 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
             const p = i3.split("-").map(Number);
             setEntry(mid, p[0], p[1] - 1, p[2], "M", null);
             setEntry(mid, p[0], p[1] - 1, p[2], "AM", null);
-            setEntry(mid, p[0], p[1] - 1, p[2], "JOUR", { acteId: aid });
-            poses++;
+            if (setEntry(mid, p[0], p[1] - 1, p[2], "JOUR", { acteId: aid }) === true)
+                poses++;
+            else
+                refus++; /* v10.258 : seul ce qui est écrit compte */
         });
-        toast((acteById(aid) || { label: aid }).label + " — " + poses + " journée(s) posée(s)" + (sautes ? ", " + sautes + " hors semestre" : ""));
+        if (poses || !refus)
+            toast((acteById(aid) || { label: aid }).label + " — " + poses + " journée(s) posée(s)" + (sautes ? ", " + sautes + " hors semestre" : ""));
         onClose();
     };
+    /* v10.258 : DISPONIBILITÉ d'une salle sur le(s) créneau(x) visé(s) — médecins et internes confondus, l'interne
+       lui-même exclu. On avertit, on n'interdit jamais : un médecin et un interne dans la même salle est courant. */
+    const quiDans = (s) => { if (!salleQui)
+        return []; const r = []; slotsPose.forEach(sl => salleQui(s, y, m, d, sl).forEach(q => { if (q.id !== mid && !r.find(x => x.id === q.id))
+        r.push(q); })); return r; };
+    const dispoTxt = (s) => { const q = quiDans(s); return q.length ? "occupée par " + q.map(x => x.init).join(", ") : "libre"; };
+    const dispoLigne = (s) => { const q = quiDans(s); return React.createElement("div", { "data-dispo": q.length ? "occupee" : "libre", style: { fontSize: 11, fontWeight: 700, color: q.length ? "#b45309" : "#15803d", background: q.length ? "#fff8e6" : "rgba(34,197,94,.10)", border: "1px solid " + (q.length ? "#f59e0b" : "#86efac"), borderRadius: 7, padding: "6px 10px", marginBottom: 10 } }, q.length ? "⚠ " + s + " déjà occupée par " + q.map(x => x.init).join(", ") + " sur ce créneau — vous pouvez poser quand même" : "✓ " + s + " libre sur ce créneau"); };
     /* v10.177 : une activité à salle se VALIDE — rien n'est écrit avant ✓, la note part avec la pose */
     const ouvrePend = (id, salle) => { setSalleQ(null); setPend({ id: id, salle: salle, note: (notes || {})[nk(mid, y, m, d, slotsPose[0])] || "" }); };
     const clicSalle = (t) => {
@@ -11375,7 +11415,7 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
             toast("Vérifiez les deux dates", "warn");
             return;
         }
-        let poses = 0, sautes = 0, it = pd1, n = 0;
+        let poses = 0, sautes = 0, refus = 0, it = pd1, n = 0;
         while (it <= pd2 && n < 92) {
             n++;
             const p = it.split("-").map(Number);
@@ -11393,17 +11433,20 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                     sautes++;
                 }
                 else {
-                    setEntry(mid, yy, mm, dd, "M", null);
-                    setEntry(mid, yy, mm, dd, "AM", null);
-                    setEntry(mid, yy, mm, dd, "JOUR", null);
-                    poses++;
+                    const e1 = setEntry(mid, yy, mm, dd, "M", null) === true, e2 = setEntry(mid, yy, mm, dd, "AM", null) === true, e3 = setEntry(mid, yy, mm, dd, "JOUR", null) === true;
+                    if (e1 || e2 || e3)
+                        poses++;
+                    else
+                        refus++;
                 }
             }
             else if (pSel === "ABSENCE" || pSel === "FORMATION" || pSel === "REPOS_GARDE") {
                 setEntry(mid, yy, mm, dd, "M", null);
                 setEntry(mid, yy, mm, dd, "AM", null);
-                setEntry(mid, yy, mm, dd, "JOUR", { acteId: pSel });
-                poses++;
+                if (setEntry(mid, yy, mm, dd, "JOUR", { acteId: pSel }) === true)
+                    poses++;
+                else
+                    refus++;
             }
             else {
                 if (t === 0 || t === 6 || fer) {
@@ -11415,13 +11458,16 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                         sautes++;
                         return;
                     }
-                    setEntry(mid, yy, mm, dd, sl, { acteId: pSel });
-                    poses++;
+                    if (setEntry(mid, yy, mm, dd, sl, { acteId: pSel }) === true)
+                        poses++;
+                    else
+                        refus++; /* v10.258 : seul ce qui est écrit compte */
                 });
             }
             it = intDecal(it, 1);
         }
-        toast(poses + " élément(s) modifié(s)" + (sautes ? ", " + sautes + " sauté(s) (protégé ou hors semestre)" : ""));
+        if (poses || !refus)
+            toast(poses + " élément(s) modifié(s)" + (sautes ? ", " + sautes + " sauté(s) (protégé ou hors semestre)" : ""));
         onClose();
     };
     const btnO = { fontSize: 11, padding: "5px 12px", borderRadius: 7, border: "1.5px solid #1d4ed8", background: "rgba(29,78,216,.08)", color: "#1d4ed8", fontWeight: 800, cursor: "pointer" };
@@ -11458,14 +11504,14 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                                 : React.createElement("button", { onClick: () => retire(c), style: { width: 18, height: 18, borderRadius: 9, border: "1px solid #fecdd3", background: "#fff1f2", color: "#dc2626", fontSize: 10, fontWeight: 800, cursor: "pointer", lineHeight: 1, padding: 0 } }, "\u00D7"),
                         nkC && (c.salle || noteV) && (canNote || noteV) && React.createElement(NoteChamp, { value: noteV, readOnly: !canNote, onCommit: v => setNotes(n => (Object.assign(Object.assign({}, n), { [nkC]: v }))), placeholder: "\uD83D\uDCDD Note (visible au survol de la case)\u2026", style: { flexBasis: "100%", padding: "4px 7px", borderRadius: 6, border: "1px solid var(--border)", background: canNote ? "var(--inp)" : "var(--bg)", color: "var(--txt)", fontSize: 11, outline: "none", fontFamily: "'Sora',sans-serif" } }));
                 })),
-            pend && React.createElement(ValidPose, { med: med, acte: acteById(pend.id) || null, salle: pend.salle, note: pend.note, canNote: canNote, setNote: v => setPend(p => (Object.assign(Object.assign({}, p), { note: v }))), onRetour: retourPend, onValider: validePend, onClose: onClose }),
+            pend && React.createElement(ValidPose, { med: med, acte: acteById(pend.id) || null, salle: pend.salle, note: pend.note, canNote: canNote, info: pend.salle ? dispoLigne(pend.salle) : null, setNote: v => setPend(p => (Object.assign(Object.assign({}, p), { note: v }))), onRetour: retourPend, onValider: validePend, onClose: onClose }),
             semQ && React.createElement("div", { style: { border: "1.5px solid #388bfd", background: "rgba(56,139,253,.07)", borderRadius: 9, padding: "10px 12px", marginBottom: 10 } },
-                React.createElement("div", { style: { fontSize: 12.5, fontWeight: 800, color: "var(--txt)", marginBottom: 3 } }, "Lundi + " + ((acteById(semQ.id) || {}).short || semQ.id) + (semQ.salle ? " (" + semQ.salle + ")" : "") + " : remplir toute la semaine ?"),
-                React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8 } }, "Du lundi au vendredi, matin et apr\u00E8s-midi. Les repos de garde, absences et FMC d\u00E9j\u00E0 pos\u00E9s sont pr\u00E9serv\u00E9s."),
-                React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
-                    React.createElement("button", { onClick: () => remplirSemaine(semQ.id, semQ.salle), style: { fontSize: 12, padding: "7px 13px", borderRadius: 7, border: "none", background: "#1d4ed8", color: "#fff", fontWeight: 800, cursor: "pointer" } }, "\uD83D\uDCC5 Toute la semaine"),
-                    React.createElement("button", { onClick: () => { const a = semQ; setSemQ(null); poseCren(a.id, a.salle); }, style: btnO }, "Seulement " + crenLbl.toLowerCase()),
-                    retourBtn(() => setSemQ(null)))),
+                React.createElement("div", { style: { fontSize: 12.5, fontWeight: 800, color: "var(--txt)", marginBottom: 6 } }, ((acteById(semQ.id) || {}).label || semQ.id) + " de " + med.init + " : sur quelle durée ?"),
+                React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 } }, semOpts.map((o, i) => React.createElement("button", { key: "s" + i, onClick: () => poseSem(o), style: { padding: "6px 9px", borderRadius: 6, border: "1px solid var(--border)", cursor: "pointer", background: "var(--bg2)", color: "var(--txt)", fontSize: 11, fontWeight: 800, textAlign: "left", lineHeight: 1.35 } },
+                    o.t,
+                    React.createElement("span", { style: { display: "block", fontSize: 10, fontWeight: 600, color: "var(--txt3)" } }, o.s)))),
+                React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8, lineHeight: 1.5 } }, "Journ\u00E9e et semaine : matin et apr\u00E8s-midi, du lundi au vendredi. Une demi-journ\u00E9e d\u00E9j\u00E0 occup\u00E9e (EE, consultation, repos, absence, FMC\u2026) n'est jamais remplac\u00E9e ; les f\u00E9ri\u00E9s et les jours hors semestre sont saut\u00E9s."),
+                retourBtn(() => setSemQ(null))),
             per === null && !semQ && !pend && React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 5 } }, durQ ? (isFmc ? "Formation" : "Absence") : salleQ ? "Salle" : "Ajouter"),
                 !salleQ && !durQ && React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 10 } }, tuiles.map(t => {
@@ -11502,7 +11548,12 @@ function InternesCellModal({ med, y, m, d, slot0, onClose, actes, acteById, getE
                         } g.l.push(s); });
                         return grpsS.map(g => React.createElement("div", { key: g.st, style: { marginBottom: 6 } },
                             grpsS.length > 1 && React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "var(--txt3)", textTransform: "uppercase", marginBottom: 3 } }, g.st === "ANGIO" ? "PT Angio" : g.st),
-                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, g.l.map(s => React.createElement("button", { key: s, onClick: () => choisitSalle(s), style: { padding: "5px 10px", borderRadius: 5, border: "1px solid var(--border)", cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: "var(--bg2)", color: "var(--txt)" } }, s)))));
+                            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, g.l.map(s => {
+                                const occ = quiDans(s).length > 0; /* v10.258 : libre / occupée par … — avertit, n'interdit pas */
+                                return React.createElement("button", { key: s, onClick: () => choisitSalle(s), "data-dispo": occ ? "occupee" : "libre", style: { padding: "5px 10px", borderRadius: 5, border: "1px solid " + (occ ? "#f59e0b" : "#86efac"), cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, background: occ ? "#fff8e6" : "rgba(34,197,94,.10)", color: "var(--txt)", textAlign: "left", lineHeight: 1.35 } },
+                                    s,
+                                    React.createElement("span", { style: { display: "block", fontSize: 9.5, fontWeight: 700, fontFamily: "'Sora',sans-serif", color: occ ? "#b45309" : "#15803d" } }, dispoTxt(s)));
+                            }))));
                     })(),
                     React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", marginBottom: 8 } }, "La salle choisie, un \u00E9cran de validation permet d'ajouter une note avant d'\u00E9crire."),
                     retourBtn(() => setSalleQ(null))),
@@ -11639,11 +11690,11 @@ function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEn
     };
     const pose = (h, yy, mm, dd, silencieux) => {
         if (h.ext) {
-            setEntry("IEXT", yy, mm, dd, "N", { acteId: "GARDE", ext: h.ext });
-            return;
+            return setEntry("IEXT", yy, mm, dd, "N", { acteId: "GARDE", ext: h.ext }) === true;
         }
         const md = h.med;
-        setEntry(md.id, yy, mm, dd, "N", { acteId: "GARDE" });
+        if (setEntry(md.id, yy, mm, dd, "N", { acteId: "GARDE" }) !== true)
+            return false; /* v10.258 : refusée (gel, période…) — le message du refus reste, rien d'autre */
         const iso1 = intDecal(intISO2(yy, mm, dd), 1);
         const L = iso1.split("-").map(Number);
         if (h.sDeb && (iso1 < h.sDeb || iso1 > h.sFin)) {
@@ -11660,6 +11711,7 @@ function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEn
         setEntry(md.id, L[0], L[1] - 1, L[2], "JOUR", { acteId: "REPOS_GARDE" });
         if (!silencieux)
             toast("Garde posée — repos le " + intFmtD(iso1));
+        return true;
     };
     const choisir = (md) => { retire(y, m, d); pose({ med: md, sDeb: md.sDeb, sFin: md.sFin }, y, m, d, false); onClose(); };
     const poseExt = () => {
@@ -11669,8 +11721,8 @@ function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEn
             return;
         }
         retire(y, m, d);
-        pose({ ext: n }, y, m, d, false);
-        toast("Garde extérieure posée — sans repos chez nous");
+        if (pose({ ext: n }, y, m, d, false))
+            toast("Garde extérieure posée — sans repos chez nous");
         onClose();
     };
     /* v10.60 : échange sur le modèle des médecins (v9.82) — la liste des gardes posées
@@ -11750,7 +11802,7 @@ function InternesGardeModal({ y, m, d, jours, onClose, intCfg, getEntries, setEn
                     autresGardes.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Aucune autre garde pos\u00E9e sur la p\u00E9riode affich\u00E9e."))),
             React.createElement("div", { style: { fontSize: 10, color: "var(--txt3)", lineHeight: 1.5 } }, "Le repos du lendemain est pos\u00E9 automatiquement avec la garde et remplace ce qui s'y trouve ; il s'enl\u00E8ve en retirant la garde. Un interne peut \u00EAtre absent ou en FMC le jour de sa garde. Les repos des deux jours sont recalcul\u00E9s lors d'un \u00E9change.")));
 }
-function InternesView({ onCellHistory = null, intCfg, setIntCfg = null, actes, acteById, getEntries, setEntry, isVac, year, month, allDays, viewPeriod, showFull, setShowFull, canEdit, canSalle = false, salleReg = [], intSelf = false, canGarde = true, adminKey = null, prevM, nextM, darkMode, setDarkMode, notes = {}, setNotes = null, annJour = null }) {
+function InternesView({ onCellHistory = null, intCfg, setIntCfg = null, actes, acteById, getEntries, setEntry, salleQui = null, isVac, year, month, allDays, viewPeriod, showFull, setShowFull, canEdit, canSalle = false, salleReg = [], intSelf = false, canGarde = true, adminKey = null, prevM, nextM, darkMode, setDarkMode, notes = {}, setNotes = null, annJour = null }) {
     const [sel, setSel] = useState(null);
     const [gm, setGm] = useState(null);
     const [jaugeOn, setJaugeOn] = useOngletMem("internes.jauge", () => intCfg.jaugeDef !== false); /* v10.65 : affichage en nominal réglé dans Paramètres */
@@ -11930,7 +11982,7 @@ function InternesView({ onCellHistory = null, intCfg, setIntCfg = null, actes, a
                                 exVis.map(a => React.createElement("td", { key: a.id, style: num }, fmtJ(s.ex[a.id]))));
                         })))));
         })(),
-        sel && React.createElement(InternesCellModal, { med: sel.med, y: sel.y, m: sel.m, d: sel.d, slot0: sel.slot0, onClose: () => setSel(null), actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, canSalle: canSalle, salleReg: salleReg, intSelf: intSelf, adminKey: adminKey, notes: notes, setNotes: setNotes }),
+        sel && React.createElement(InternesCellModal, { med: sel.med, y: sel.y, m: sel.m, d: sel.d, slot0: sel.slot0, onClose: () => setSel(null), actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, salleQui: salleQui, canSalle: canSalle, salleReg: salleReg, intSelf: intSelf, adminKey: adminKey, notes: notes, setNotes: setNotes }),
         gm && React.createElement(InternesGardeModal, { y: gm.y, m: gm.m, d: gm.d, jours: jours, onClose: () => setGm(null), intCfg: intCfg, getEntries: getEntries, setEntry: setEntry }));
 }
 /* ════ ARCHIVAGE PAR PÉRIODE (v10.110) ═════════════════════════════════════════
@@ -16280,16 +16332,19 @@ function CardioPlanning() {
         return "free";
     }, [getEntries]);
     /* ── setEntry / addEntry / removeEntry ── */
+    /* v10.258 : renvoie true si la case a été écrite, false si la pose est refusée (gel, journée passée,
+       période non diffusée, plage fermée). Les fenêtres n'annoncent « Posé » que sur true — avant, la fenêtre
+       des internes affichait « Posé » par-dessus le message de refus, et rien n'était écrit. */
     const setEntry = useCallback((medId, y2, m2, d2, slot, entry) => {
         if (vBloque(vRef, y2, m2, d2, vQuoiCell(((planRef.current || {})[sk(y2, m2, d2, slot)] || {})[medId], entry))) {
             vToast(false);
-            return;
+            return false;
         } /* v10.106 */
         {
             const sf = fermRefuse(((planRef.current || {})[sk(y2, m2, d2, slot)] || {})[medId], entry, y2, m2, d2, slot);
             if (sf) {
                 toast("🚫 " + sf + " : plage fermée sur cette demi-journée — rien n'a été posé", "lock");
-                return;
+                return false;
             }
         } /* v10.229 */
         const key = sk(y2, m2, d2, slot);
@@ -16300,6 +16355,7 @@ function CardioPlanning() {
         logCell(entry ? "add" : "del", medId, y2, m2, d2, slot, entry ? entry.acteId : null);
         if (vAvertit(vRef, y2, m2, d2))
             vToast(true);
+        return true;
     }, []);
     /* v9.58 : poser une activité FERME sur une case qui porte un choix ouvert, c'est
        TRANCHER — quel que soit le chemin (salle d'un onglet, modale de case, BIP auto),
@@ -17603,7 +17659,10 @@ function CardioPlanning() {
         removeTourPeriod(medId, du, au);
     }, [clearPeriodActs, removeTourPeriod]);
     /* ── salleOcc ── */
-    const salleOcc = useCallback((acteId, y2, m2, d2, slot) => {
+    /* v10.258 : `avecInt` — les internes du semestre entrent dans l'occupation (modale de case du Planning :
+       avertir, jamais interdire). Sans ce drapeau (grilles des onglets salles), rien ne change : l'interne y reste
+       affiché à part, en rond pointillé, hors conflit — règle de la v10.62. */
+    const salleOcc = useCallback((acteId, y2, m2, d2, slot, avecInt) => {
         const res = {};
         medecins.forEach(med => {
             getEntries(med.id, y2, m2, d2, slot).forEach(e => {
@@ -17615,8 +17674,34 @@ function CardioPlanning() {
                 }
             });
         });
+        if (avecInt) {
+            const sj = intMedsDuJour(intCfg, y2, m2, d2);
+            if (sj)
+                sj.meds.forEach(im => {
+                    getEntries(im.id, y2, m2, d2, slot).forEach(e => {
+                        if ((e && e.acteId) === acteId && e.salle && !e.cond) {
+                            if (!res[e.salle])
+                                res[e.salle] = [];
+                            if (!res[e.salle].find(x => x.id === im.id))
+                                res[e.salle].push(Object.assign(Object.assign({}, im), { isInt: true }));
+                        }
+                    });
+                });
+        }
         return res;
-    }, [medecins, getEntries]);
+    }, [medecins, getEntries, intCfg]);
+    /* v10.258 : qui est dans une salle sur un créneau — médecins ET internes, toutes activités confondues.
+       Sert à la fenêtre de case des internes (« libre » / « occupée par … »). */
+    const salleQui = useCallback((salle, y2, m2, d2, slot) => {
+        const r = [], k = dKey(y2, m2, d2);
+        medecins.forEach(med => { if (getEntries(med.id, y2, m2, d2, slot).some(e => e && e.salle === salle && !e.cond) && !r.find(x => x.id === med.id))
+            r.push({ id: med.id, init: djAff(med, k).init, isInt: false }); });
+        const sj = intMedsDuJour(intCfg, y2, m2, d2);
+        if (sj)
+            sj.meds.forEach(im => { if (getEntries(im.id, y2, m2, d2, slot).some(e => e && e.salle === salle && !e.cond) && !r.find(x => x.id === im.id))
+                r.push({ id: im.id, init: im.init, isInt: true }); });
+        return r;
+    }, [medecins, getEntries, intCfg]);
     /* ── weeks ── */
     const weeks = useMemo(() => {
         const seen = new Set(), ws = [];
@@ -18550,7 +18635,7 @@ header::-webkit-scrollbar { display: none; }
         React.createElement("header", { style: S.hdr },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexShrink: 0 } },
                 React.createElement("span", { onClick: () => { setPinInput(""); setPinError(false); setIsCadre(false); setAccessMode("ask"); }, title: "Retour \u00E0 l'accueil", style: { fontSize: 20, color: "#f85149", cursor: "pointer" } }, "\u2665"),
-                (isEdit || isMedEdit || isAdminEdit) && React.createElement("div", { style: { display: "flex", gap: 3 } },
+                (isEdit || isMedEdit || isAdminEdit || isInterne) && React.createElement("div", { style: { display: "flex", gap: 3 } },
                     React.createElement("button", { onClick: doUndo, disabled: !canUndo, title: "Annuler (retour arri\u00E8re)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canUndo ? "rgba(255,255,255,.1)" : "transparent", color: canUndo ? "#f0f6fc" : "#484f58", cursor: canUndo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B6"),
                     React.createElement("button", { onClick: doRedo, disabled: !canRedo, title: "R\u00E9tablir (retour avant)", style: { width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: canRedo ? "rgba(255,255,255,.1)" : "transparent", color: canRedo ? "#f0f6fc" : "#484f58", cursor: canRedo ? "pointer" : "default", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u21B7")),
                 React.createElement("div", null,
@@ -18805,7 +18890,7 @@ header::-webkit-scrollbar { display: none; }
                     React.createElement(SigBtn, null),
                     React.createElement("button", { onClick: () => setDarkMode(d => !d), style: Object.assign(Object.assign({}, S.arr), { fontSize: 13, width: 30 }) }, darkMode ? "☀️" : "🌓")),
                 React.createElement(ReportsView, { salleReg: salleReg, medecins: medsAff, actes: actes, getEntries: getEntries, tourMed: tourMedVu, planningType: planningType, isVac: isVac, isEdit: isEdit, editMedId: editMedId, accessMode: accessMode, csBlanches: csBlanches, setCsBlanches: setCsBlanches, csRep: csRep, setCsRep: setCsRep, csActsSel: csActsSel, setCsActsSel: setCsActsSel, addEntry: addEntry, setNotes: setNotes, csActsGlobal: csActsGlobal, adminOkKey: roleOkKey, difOk: !!((secrCfg.dif || {})[perIdOf(perStart(year, month).sy, perStart(year, month).sm)]), adminReports: isAdminEdit && adminCanReports, adminName: adminName, removeEntry: removeEntry, year: year, month: month, toast: toast, vRef: vRef, vToast: vToast })),
-            tab === "internes" && React.createElement(InternesView, { annJour: annJourDe("internes"), notes: notesAff, setNotes: setNotes, onCellHistory: isAnyEdit ? openCellHistory : null, intCfg: intCfgAff, setIntCfg: setIntCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, setShowFull: setShowFull, canEdit: isEdit || (isInterEdit && !isAttEdit) || isAdminEdit || isInterne, canSalle: isEdit || (isInterEdit && !isAttEdit) || (isAdminEdit && isCadre), intSelf: isInterne, canGarde: isEdit || isInterne, adminKey: isAdminEdit ? roleOkKey : null, salleReg: salleReg, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
+            tab === "internes" && React.createElement(InternesView, { annJour: annJourDe("internes"), notes: notesAff, setNotes: setNotes, onCellHistory: isAnyEdit ? openCellHistory : null, intCfg: intCfgAff, setIntCfg: setIntCfg, actes: actes, acteById: acteById, getEntries: getEntries, setEntry: setEntry, salleQui: salleQui, isVac: isVac, year: year, month: month, allDays: allDays, viewPeriod: viewPeriod, showFull: showFull, setShowFull: setShowFull, canEdit: isEdit || (isInterEdit && !isAttEdit) || isAdminEdit || isInterne, canSalle: isEdit || (isInterEdit && !isAttEdit) || (isAdminEdit && isCadre), intSelf: isInterne, canGarde: isEdit || isInterne, adminKey: isAdminEdit ? roleOkKey : null, salleReg: salleReg, prevM: prevM, nextM: nextM, darkMode: darkMode, setDarkMode: setDarkMode }),
             tab === "notifications" && React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } },
                     React.createElement("h2", { style: S.mTit }, "\uD83D\uDD14 Notifications"),
@@ -20620,7 +20705,7 @@ header::-webkit-scrollbar { display: none; }
                        surtout MONTRER avant de cliquer s'il en reste une de libre. */
                     const busy = {};
                     actes.filter(ax => ax.hasSalle || ax.fixedSalle).forEach(ax => {
-                        const ao = salleOcc(ax.id, y2, m2, d2, slot);
+                        const ao = salleOcc(ax.id, y2, m2, d2, slot, true); /* v10.258 : internes compris */
                         Object.keys(ao).forEach(s => { if (!busy[s])
                             busy[s] = []; ao[s].forEach(m => { if (!busy[s].find(x => x.id === m.id))
                             busy[s].push(m); }); });
@@ -20694,7 +20779,7 @@ header::-webkit-scrollbar { display: none; }
                                        via le sélecteur _pickSalle ; doAdd remplace la ferme (v9.63). */
                                     const busy = {};
                                     actes.filter(ax => ax.hasSalle || ax.fixedSalle).forEach(ax => {
-                                        const ao = salleOcc(ax.id, y2, m2, d2, slot);
+                                        const ao = salleOcc(ax.id, y2, m2, d2, slot, true); /* v10.258 : internes compris */
                                         Object.keys(ao).forEach(s2 => { if (!busy[s2])
                                             busy[s2] = []; ao[s2].forEach(mm => { if (!busy[s2].find(x => x.id === mm.id))
                                             busy[s2].push(mm); }); });
@@ -20921,7 +21006,7 @@ header::-webkit-scrollbar { display: none; }
                         // Gather all medecins in this physical room across all actes that use it
                         const roomOccupants = [];
                         actes.filter(ax => ax.fixedSalle === a.fixedSalle || ax.salles && ax.salles.includes(a.fixedSalle)).forEach(ax => {
-                            const occ = salleOcc(ax.id, y2, m2, d2, slot)[a.fixedSalle] || [];
+                            const occ = salleOcc(ax.id, y2, m2, d2, slot, true)[a.fixedSalle] || []; /* v10.258 : internes compris */
                             occ.forEach(m => { if (!roomOccupants.find(x => x.id === m.id))
                                 roomOccupants.push(m); });
                         });
@@ -21055,11 +21140,11 @@ header::-webkit-scrollbar { display: none; }
                     if (!a)
                         return null;
                     // Check occupancy for each salle: ALL activities, not just this one
-                    const occ = salleOcc(a.id, y2, m2, d2, slot);
+                    const occ = salleOcc(a.id, y2, m2, d2, slot, true); /* v10.258 : internes compris */
                     // Build full room occupancy across ALL actes
                     const fullRoomOcc = {};
                     actes.filter(ax => ax.hasSalle).forEach(ax => {
-                        const axOcc = salleOcc(ax.id, y2, m2, d2, slot);
+                        const axOcc = salleOcc(ax.id, y2, m2, d2, slot, true);
                         Object.entries(axOcc).forEach(([s, meds]) => {
                             if (!fullRoomOcc[s])
                                 fullRoomOcc[s] = [];
