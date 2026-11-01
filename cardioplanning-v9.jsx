@@ -100,6 +100,11 @@ function trafRecu(suite,moi,args){
     requestAnimationFrame(()=>setTimeout(()=>{TRAFIC.aff.push(Math.round(P.now()-t));if(TRAFIC.aff.length>20)TRAFIC.aff.shift();},0));
   return r;
 }
+/* v10.257 : la même activité à salle « posable par eux » est proposée, pour tous les internes, à l'éditeur, aux intermédiaires,
+   à la cadre et aux secrétaires (ces deux-là selon leur coche dans la fiche de l'activité) — sans « accès aux salles ». */
+/* v10.256 : INTERNES ET ACTIVITÉS À SALLE — l'interne connecté voit, dans sa fenêtre de case, les activités à salle cochées
+   « posable par eux » (rubrique « Avec salle »), sans dépendre de son « accès aux salles » ; une activité qui n'a qu'une
+   salle cochée l'impose (aucun choix, un clic puis ✓ Valider). Limité à la fenêtre des internes. */
 /* v10.255 : RÉPONSE AUX CLICS ET AUX CHANGEMENTS D'ONGLET (mesure seule, rien n'est écrit ni envoyé). Un écouteur unique relève
    l'heure de chaque clic avant tout traitement, puis le temps écoulé jusqu'à l'écran redessiné (dessin + attente du poste) :
    « clic » = tout clic (dont l'ouverture d'une modale), « onglet » = un clic qui a changé d'onglet. 20 valeurs gardées. */
@@ -414,7 +419,7 @@ var EXP_CODES=["medPins","editPin","adminPin","cadrePin"];   /* + le code des in
 var EXP_HORS=["_ts","_verArr","_verPrec","_ecr","gel","_bacDe","_bacDep","_lastBackupAt","planV2","plan"];
 var EXP_RUB=[[["astreinte","astReport"],"l'astreinte"],[["tourWish","tourAvoid","gardeWish","gardeAvoid"],"les souhaits de tour et de garde"],
   [["csRep","csBlanches"],"les reports"],[["intCfg"],"les internes"],[["build"],"Construire"],[["ideCfg"],"les IDE"],
-  [["vacs","vacRule"],"les vacances"],[["salleFerm"],"les plages fermées"],[["annonces"],"les messages"]];
+  [["vacs","vacRule"],"les vacances"],[["salleFerm"],"les plages fermées"],[["annonces"],"les messages"],[["dblOk"],"les doubles en salle validés"]];
 /* équipe et activités d'un cahier : en V2 (map + ordre) depuis la v9.7 ; l'ancien champ en secours (v10.102) */
 function docListeV2(mp,ordRaw,leg){
   if(!mp||typeof mp!=="object")return lireJson(leg,[]);
@@ -488,7 +493,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.255 — 27/10/2026";
+const APP_VERSION="v10.261 — 01/11/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -932,6 +937,60 @@ const pillCols=(c,night)=>{
    celle de bordure générale étant invisible sur ce fond (surtout en mode nuit) */
 const conflBg=night=>({background:night?"rgba(239,68,68,.16)":"#fee2e2",outline:"1px solid #ef4444"});
 const conflSep=night=>night?"#f87171":"#b91c1c";
+/* v10.260 : DOUBLES ACTIVITÉS EN SALLE — le bandeau des onglets CHL, CHB, PT Angio et PT Cardio. La case reste
+   rouge (deux activités différentes dans une même salle sur un créneau — deux médecins sur la même activité, non) ;
+   le bandeau en haut les liste et l'éditeur ou la cadre peut VALIDER une ligne : elle quitte la liste, la case
+   reste rouge. La clé d'une validation porte la date, le créneau, la colonne ET les activités en présence : si la
+   case change (3e activité, activité remplacée), la clé n'est plus la même et l'alerte revient toute seule.
+   Les validations sont partagées (champ dblOk du cahier, comme salleFerm) et partent avec la période à l'archivage. */
+const dblKey=(y,m,d,sl,col,ids)=>dKey(y,m,d)+"|"+sl+"|"+col+"|"+(ids||[]).slice().sort().join("+");
+/* occupation et groupes PAR ACTIVITÉ d'une case de salle (CHL, CHB, PT Angio) — la case (siteCellTd) et le
+   relevé du bandeau (dblReleveSite) appellent la même fonction : jamais de désaccord entre le rouge et la liste */
+function siteCellGrps(c,salle,salleActes,ry,rm,d,sl){
+  const {salleOcc}=c;
+  const occ=[];
+  salleActes.forEach(acte=>{
+    const o=salleOcc(acte.id,ry,rm,d,sl);
+    (o[salle]||[]).forEach(med=>{if(!occ.find(x=>x.med.id===med.id))occ.push({med,acte});});
+  });
+  /* v9.54 : une case se lit PAR ACTIVITÉ — les praticiens d'une même activité
+     s'empilent et l'activité n'est écrite qu'une fois. Le fond rouge ne signale
+     plus deux praticiens ensemble (c'est fréquent et normal dans ces salles)
+     mais DEUX ACTIVITÉS DIFFÉRENTES sur le même créneau. */
+  const grps=[];
+  occ.forEach(({med,acte})=>{
+    const k=(acte&&acte.id)||"";
+    let g=grps.find(x=>x.k===k);
+    if(!g){g={k,acte,meds:[]};grps.push(g);}
+    g.meds.push(med);
+  });
+  return {occ,grps};
+}
+/* activités distinctes d'une case de PT Cardio (même règle que le rouge de actCellTd) */
+function actCellIds(grps){const ids={};(grps||[]).forEach(g=>{if(g.acte&&g.acte.id)ids[g.acte.id]=1;});return Object.keys(ids);}
+function dblReleveSite(c,salles,wdays){
+  const out=[];const {siteActes}=c;
+  (wdays||[]).forEach(({y,m,d})=>{if(isWE(y,m,d))return;["M","AM"].forEach(sl=>{(salles||[]).forEach(salle=>{
+    if(salle==="CHB-BIP"||String(salle).indexOf("RECAP:")===0)return;   /* colonnes de reprise : pas de salle */
+    const salleActes=siteActes.filter(a=>a.salles.includes(salle));
+    const {grps}=siteCellGrps(c,salle,salleActes,y,m,d,sl);
+    if(grps.length<2)return;
+    const ids=grps.map(g=>g.k);
+    out.push({y,m,d,sl,col:salle,ids,key:dblKey(y,m,d,sl,salle,ids),grps:grps.map(g=>({acte:g.acte,meds:g.meds})),salleActes});
+  });});});
+  return out;
+}
+function dblReleveAct(c,rows,wdays){
+  const out=[];
+  (wdays||[]).forEach(({y,m,d})=>{if(isWE(y,m,d))return;["M","AM"].forEach(sl=>{(rows||[]).forEach(row=>{
+    const grps=salleGroups(row,actOcc(c,row,d,sl,y,m));
+    const ids=actCellIds(grps);
+    if(ids.length<2)return;
+    const col=row.salle||row.key||row.label;
+    out.push({y,m,d,sl,col,ids,key:dblKey(y,m,d,sl,col,ids),row,grps:grps.map(g=>({acte:g.acte,meds:(g.meds||[]).filter(mm=>mm&&mm.id!==IDE_MED.id)}))});
+  });});});
+  return out;
+}
 /* v9.56 — CHOIX OUVERT (étape 1/4).
    Une case de planning type porte soit UNE activité ferme, soit 2 à 3 branches
    entre lesquelles le choix n'est pas encore fait. À l'application, chaque branche
@@ -1120,6 +1179,46 @@ function IssuePanel({iss,open,setOpen,onGo}){
       ))}</div>}
     </div>}
   </>
+  );
+}
+/* v10.260 : BANDEAU DES DOUBLES EN SALLE — même forme que le bandeau rouge du Planning. Chaque ligne ouvre la
+   case ; « ✓ OK » la valide (elle passe dans la liste repliée des validés, d'où « ↩ annuler » la ramène). */
+function DblPanel({liste,ok,setOk,onGo}){
+  const [open,setOpen]=useState(false);
+  const [vus,setVus]=useState(false);
+  const okm=ok||{};
+  const aFaire=(liste||[]).filter(it=>!okm[it.key]);
+  const valides=(liste||[]).filter(it=>!!okm[it.key]);
+  if(!aFaire.length&&!valides.length)return null;
+  const JRS=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+  const lib=it=>it.grps.map(g=>((g.acte&&(g.acte.short||g.acte.label))||"?")+(g.meds&&g.meds.length?" ("+g.meds.map(mm=>mm.init).join(", ")+")":"")).join(" + ");
+  const row=(it,valide)=>(
+    <div key={it.key} data-dbl={valide?"ok":"afaire"} style={{display:"flex",alignItems:"center",gap:6,borderBottom:"1px dotted var(--border)"}}>
+      <button onClick={()=>onGo&&onGo(it)} title="Ouvrir cette case"
+        style={{flex:1,textAlign:"left",background:"none",border:"none",padding:"3px 2px",cursor:"pointer",fontSize:11,color:valide?"var(--txt3)":"var(--txt)",fontFamily:"inherit"}}>
+        <b>{JRS[dow(it.y,it.m,it.d)]+" "+String(it.d).padStart(2,"0")+"/"+String(it.m+1).padStart(2,"0")+" "+it.sl}</b>{" — "}
+        <b style={{fontFamily:"'JetBrains Mono',monospace"}}>{it.col}</b>{" — "+lib(it)}
+      </button>
+      {setOk&&(valide
+        ?<button data-dblundo="1" onClick={()=>setOk(o=>{const n={...(o||{})};delete n[it.key];return n;})} title="Remettre cette alerte dans la liste" style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--txt2)",cursor:"pointer",whiteSpace:"nowrap"}}>↩ annuler</button>
+        :<button data-dblok="1" onClick={()=>setOk(o=>({...(o||{}),[it.key]:1}))} title="Valider ce double : il quitte la liste, la case reste rouge" style={{fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:6,border:"1px solid #16a34a",background:"rgba(22,163,74,.12)",color:"#16a34a",cursor:"pointer",whiteSpace:"nowrap"}}>✓ OK</button>)}
+    </div>
+  );
+  const n=aFaire.length,nv=valides.length;
+  return(
+    <div data-dblpanel="1" style={{background:n?"rgba(248,81,73,.12)":"var(--bg2)",border:n?"1px solid #f85149":"1px solid var(--border)",borderRadius:8,padding:"7px 11px",marginBottom:8}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setOpen(v=>!v)}>
+        <span style={{color:n?"#f85149":"var(--txt3)",fontWeight:800,fontSize:12}}>{n?("⚠ "+n+" double"+(n>1?"s":"")+" activité"+(n>1?"s":"")+" en salle à revoir"):("✓ Aucun double en salle à revoir")}{nv?(" · "+nv+" validé"+(nv>1?"s":"")):""}</span>
+        <span style={{marginLeft:"auto",color:n?"#f85149":"var(--txt3)",fontSize:11,fontWeight:700}}>{open?"▲ replier":"▼ détail"}</span>
+      </div>
+      {open&&<div style={{marginTop:6,display:"flex",flexDirection:"column",gap:2}}>
+        {aFaire.map(it=>row(it,false))}
+        {nv>0&&<div style={{marginTop:n?6:0}}>
+          <button onClick={()=>setVus(v=>!v)} style={{background:"none",border:"none",padding:"2px 0",cursor:"pointer",fontSize:11,fontWeight:700,color:"var(--txt3)",fontFamily:"inherit"}}>{(vus?"▲ ":"▼ ")+nv+" double"+(nv>1?"s":"")+" validé"+(nv>1?"s":"")+" (case toujours rouge)"}</button>
+          {vus&&<div style={{display:"flex",flexDirection:"column",gap:2}}>{valides.map(it=>row(it,true))}</div>}
+        </div>}
+      </div>}
+    </div>
   );
 }
 function Av({med}){return <div style={{...S.av,background:med.color}}>{med.init}</div>;}
@@ -1771,22 +1870,7 @@ function siteCellTd(c,salle,d,sl,ry,rm){
     );
   }
   const salleActes=siteActes.filter(a=>a.salles.includes(salle));
-  const occ=[];
-  salleActes.forEach(acte=>{
-    const o=salleOcc(acte.id,ry,rm,d,sl);
-    (o[salle]||[]).forEach(med=>{if(!occ.find(x=>x.med.id===med.id))occ.push({med,acte});});
-  });
-  /* v9.54 : une case se lit PAR ACTIVITÉ — les praticiens d'une même activité
-     s'empilent et l'activité n'est écrite qu'une fois. Le fond rouge ne signale
-     plus deux praticiens ensemble (c'est fréquent et normal dans ces salles)
-     mais DEUX ACTIVITÉS DIFFÉRENTES sur le même créneau. */
-  const grps=[];
-  occ.forEach(({med,acte})=>{
-    const k=(acte&&acte.id)||"";
-    let g=grps.find(x=>x.k===k);
-    if(!g){g={k,acte,meds:[]};grps.push(g);}
-    g.meds.push(med);
-  });
+  const {occ,grps}=siteCellGrps(c,salle,salleActes,ry,rm,d,sl);   /* v10.260 : même calcul que le bandeau des doubles */
   const conflict=grps.length>1;
   /* v10.62 : les internes s'affichent dans la case (rond pointillé) SANS entrer
      dans l'occupation ni dans le conflit — supervision volontaire, sa règle. */
@@ -1834,7 +1918,7 @@ function siteCellTd(c,salle,d,sl,ry,rm){
   );
 }
 
-function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+function SiteView({dbl=null,salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},printWk=null,onPrint=null,site,year,month,prevM,nextM,actes,medecins,getEntries,salleOcc,allDays,isEdit,onPickSite,notes={},salleReg=[],darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,colOrder=null,onOrder=null,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const siteActes=siteActesDe(site,actes);   /* v10.240 : sorti de SiteView — la colonne 👁 du Planning s'en sert aussi */
   // Effective days for 4M mode
@@ -1861,6 +1945,7 @@ function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,i
      appelle la même fonction : même rendu, même clic, aucune copie qui pourrait diverger. */
   const cxS={year,month,actes,medecins,getEntries,intCfg,isEdit,onPickSite,darkMode,onCellHistory,siteActes,salleOcc,notes,salleFerm,salleVide,issMap};
   function renderCell(salle,d,sl,ry,rm){return siteCellTd(cxS,salle,d,sl,ry,rm);}
+  const dblListe=dbl?dblReleveSite(cxS,sallesVues,wdays):null;   /* v10.260 : éditeur et cadre seulement (dbl fourni) */
 
   /* v10.171 : sous 760 px, les outils se replient sous ⋯ (mécanisme de Planning, v10.132) ; 📅 reste. */
   const outils=<React.Fragment>
@@ -1889,6 +1974,7 @@ function SiteView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,i
 
     return(
     <div>{hdr}
+      {dbl&&<DblPanel liste={dblListe} ok={dbl.ok} setOk={dbl.setOk} onGo={it=>{if(isEdit)onPickSite({salle:it.col,siteActes:it.salleActes,d:it.d,sl:it.sl,y:it.y,m:it.m});}}/>}
       <TableScroll jours fit memX={"site:"+site}>
         <table style={{borderCollapse:"collapse"}}>
           <thead>
@@ -1969,8 +2055,7 @@ function actCellTd(c,row,d,sl,ry,rm){
   /* v10.53 : notes par médecin — infobulle « INIT : note » sur la case */
   const _nMeds=[];_grpsA.forEach(g=>(g.meds||[]).concat(g.imeds||[]).forEach(m=>{if(m&&m.id!==IDE_MED.id&&!_nMeds.find(x=>x.id===m.id))_nMeds.push(m);}));   /* v10.178 : internes compris */
   const noteTips=_nMeds.map(m=>{const n=notes[nk(m.id,ry,rm,d,sl)];return n?(m.init+" : "+n):null;}).filter(Boolean).join("  |  ");
-  const _idsA={};_grpsA.forEach(g=>{if(g.acte&&g.acte.id)_idsA[g.acte.id]=1;});
-  const conflA=Object.keys(_idsA).length>1;
+  const conflA=actCellIds(_grpsA).length>1;   /* v10.260 : même calcul que le bandeau des doubles */
   /* v10.62 : internes de la case — rond pointillé, jamais dans le conflit */
   const semJA=intMedsDuJour(intCfg,ry,rm,d);
   if(semJA)semJA.meds.forEach(im=>{
@@ -2041,7 +2126,7 @@ function actCellTd(c,row,d,sl,ry,rm){
 }
 
 /* ════ ACT TAB VIEW (PT Cardio / PT Angio) ════ */
-function ActTabView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
+function ActTabView({dbl=null,salleVide=null,isVac=null,salleFerm=null,onCellHistory=null,issMap={},title,titleColor,rows,year,month,prevM,nextM,medecins,actes,getEntries,notes={},allDays,isEdit,onPickAct,darkMode,setDarkMode,showFull,setShowFull,viewPeriod,allDays4,setViewPeriod,ideFeature,ideOn,setIdeOn,ideCfg,setIdeCfg,canIde,orderCtl,onOrder,printWk,onPrint,intCfg=null,colHide=null,onHide=null,narrow=false,moreOpen=false,setMoreOpen=null}){
   const today=new Date();
   const atvEffDays2=useMemo(()=>{
     const p=perStart(year,month);
@@ -2061,6 +2146,7 @@ function ActTabView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null
      du Planning appelle les mêmes fonctions. */
   const cxA={year,month,medecins,actes,getEntries,notes,intCfg,salleFerm,salleVide,darkMode,isEdit,onPickAct,issMap,onCellHistory,ideActive:!!(ideFeature&&ideOn)};
   function getOcc(row,d,sl,ry,rm){return actOcc(cxA,row,d,sl,ry,rm);}
+  const dblListe=dbl?dblReleveAct(cxA,rowsVus,wdays):null;   /* v10.260 */
 
   /* ── v9.35 : volet IDE (PT Cardio) ── */
   const [idePanel,setIdePanel]=useState(false);
@@ -2174,6 +2260,7 @@ function ActTabView({salleVide=null,isVac=null,salleFerm=null,onCellHistory=null
 
     return(
     <div>{hdr}
+      {dbl&&<DblPanel liste={dblListe} ok={dbl.ok} setOk={dbl.setOk} onGo={it=>{if(isEdit)onPickAct({row:it.row,d:it.d,sl:it.sl,y:it.y,m:it.m});}}/>}
       <TableScroll jours fit memX="plateau">
         <table style={{borderCollapse:"collapse"}}>
           <thead>
@@ -3212,7 +3299,7 @@ function PlanTypeGrid({medecins,actes,planningType,setPlanningType,isEdit,acteBy
    Rien n'est écrit avant « ✓ Valider » : l'activité, sa salle et la note partent ensemble ;
    « ← Retour » revient au choix, sans rien poser. Sans `titre`, l'en-tête reste celui de la
    modale qui l'affiche (modale de case). */
-function ValidPose({titre=null,sous=null,med,acte,salle,note,canNote,setNote,onRetour,onValider,onClose}){
+function ValidPose({titre=null,sous=null,med,acte,salle,note,canNote,setNote,onRetour,onValider,onClose,info=null}){
   return(
     <>
       {titre&&<div style={S.mHd}>
@@ -3228,6 +3315,7 @@ function ValidPose({titre=null,sous=null,med,acte,salle,note,canNote,setNote,onR
         {acte&&<Badge a={acte} hideSalle={true}/>}
         {salle&&<span style={{fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:"var(--txt)",border:"1px solid var(--border)",background:"var(--bg)",borderRadius:4,padding:"3px 7px"}}>{salle}</span>}
       </div>
+      {info}
       <div style={{fontSize:10,color:"var(--txt3)",fontWeight:700,textTransform:"uppercase",marginBottom:5}}>📝 Note</div>
       {canNote
         ?<textarea value={note||""} onChange={e=>setNote(e.target.value)} placeholder="Facultative — visible au survol de la case…" autoFocus
@@ -6609,8 +6697,8 @@ const HELP_SECTIONS=[
  {id:"onglets",icon:"📑",title:"Les onglets un par un",body:()=>HE("div",null,
   HTab({t:"📅 Planning",children:["vue d'ensemble de tous les médecins. Colonne Garde à gauche, fond vert clair = votre propre semaine d'astreinte (visible par vous seul depuis la v10.174 — qui est d'astreinte se lit dans l'onglet Astreinte), fond jaune pâle = week-end. Filtre par médecins possible. Éditeur et intermédiaires : un appui sur l'initiale en tête de colonne la suit (cadre à la couleur du médecin, autres colonnes estompées) ; un second appui relâche."]}),
   HTab({t:"🧱 Construire",children:["la fabrication du planning en 7 étapes guidées, avec les demandes à l\'équipe (congés, préférences) et le bouton du Bip. Les anciens onglets Tour et Gardes vivent ici, entiers, dans les tuiles 2 et 3."]}),
-  HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour. Le bouton ↔ règle l'",HE("b",null,"ordre des colonnes"),", de gauche à droite, site par site (↩ Ordre par défaut pour revenir en arrière). Le bouton 👁 masque ou réaffiche les colonnes de reprise ↩ sur cet appareil seulement ; les salles restent toujours visibles."]}),
-  HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise. Le bouton 👁 masque ou réaffiche des colonnes sur cet appareil seulement — toutes celles de PT Cardio, les colonnes de reprise de PT Angio."]}),
+  HTab({t:"🏥 CHL / CHB",children:["plannings par site : qui fait quoi dans quelle salle, jour par jour. Le bouton ↔ règle l'",HE("b",null,"ordre des colonnes"),", de gauche à droite, site par site (↩ Ordre par défaut pour revenir en arrière). Le bouton 👁 masque ou réaffiche les colonnes de reprise ↩ sur cet appareil seulement ; les salles restent toujours visibles. Depuis la v10.260, un bandeau en haut (éditeur et cadre) liste les ",HE("b",null,"doubles activités en salle"),", c'est-à-dire les cases rouges : deux activités différentes dans la même salle sur un créneau (deux médecins sur la même activité, c'est normal, rien n'est signalé). Un clic sur une ligne ouvre la case ; « ✓ OK » valide ce double : il quitte la liste (et reste consultable, avec « ↩ annuler »), la case reste rouge. La validation est partagée par toute l'équipe et ne vaut que pour cette situation précise : si la case change, l'alerte revient."]}),
+  HTab({t:"❤️ PT Cardio / 🔬 PT Angio",children:["les plateaux techniques, avec occupation des salles et activités de reprise. Le bouton 👁 masque ou réaffiche des colonnes sur cet appareil seulement — toutes celles de PT Cardio, les colonnes de reprise de PT Angio. Même bandeau des doubles en salle que dans CHL / CHB (v10.260)."]}),
   HTab({t:"🎓 Internes",children:["le planning des internes, par semestre de 6 mois : demi-journées, colonne de garde, jauge et statistiques. Onglet facultatif, activé dans Paramètres."]}),
   HTab({t:"📞 Astreinte",children:["semaines d'astreinte rythmo, répartition automatique, exceptions jour par jour (contour violet), export CSV."]}),
   HTab({t:"📋 Type",children:["le planning type hebdomadaire (le « moule ») et sa fenêtre d'application — appliquer ou retirer, par mois ou par semaines. Depuis la v10.226, le bouton « ▶ PT » d'une case du Planning ouvre cette fenêtre directement sur « Par semaines », la semaine de la case cliquée déjà cochée (on peut la décocher, en ajouter, ou revenir à « Par mois »). Les semaines entièrement passées ne s'affichent plus ; nominal : à partir d'aujourd'hui, seule la semaine en cours peut être rognée. Visible de tous ; modifiable par l'éditeur, les intermédiaires et les cadres."]}),
@@ -6767,22 +6855,22 @@ const HELP_SECTIONS=[
   HP({last:true,children:["• L'éditeur peut toujours poser ",HE("b",null,"à la main")," un tour ou une garde sur quelqu'un de désactivé, depuis les tuiles 2 et 3 de Construire — le verrou porte sur les cases et les automatismes, pas sur un geste délibéré."]}))},
 
  {id:"internes",icon:"🎓",title:"Internes — l'onglet et les semestres",body:()=>HE("div",null,
-  HP({children:["L'onglet ",HE("b",null,"🎓 Internes")," est facultatif : il s'affiche si la coche est mise dans ",HE("b",null,"Paramètres → tuile Internes"),". Contrairement à tous les autres onglets, il travaille ",HE("b",null,"par semestre de 6 mois")," et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant."]}),
+  HP({children:["L'onglet ",HE("b",null,"🎓 Internes")," est facultatif : il s'affiche si la coche est mise dans ",HE("b",null,"Paramètres → tuile Internes"),". Contrairement à tous les autres onglets, il travaille ",HE("b",null,"par semestre de 6 mois")," et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant. Depuis la v10.259, ce planning se remplit sur ",HE("b",null,"tout le semestre")," dès qu'il existe, par tous les profils qui y ont droit, ",HE("b",null,"sans attendre la diffusion")," de la période de 4 mois ; et le HC/USIC d'un interne n'est jamais masqué, même sur une période non diffusée. Gel du planning, journée passée et plages fermées s'appliquent toujours. Depuis la v10.261, la ",HE("b",null,"croix d'une activité posée plusieurs jours de suite")," (HC, USIC, absence, FMC…) demande quoi retirer — seulement ce créneau, jusqu'à la fin, ou toute la série — comme l'absence d'un médecin ; et dans « Modifier sur une période », la date de fin est pré-remplie au dernier jour du mois cliqué."]}),
   HT({children:"Les semestres et les fiches"}),
   HP({children:["Tout se règle dans l'onglet ",HE("b",null,"Équipe"),", section Internes. Un semestre démarre le ",HE("b",null,"2 mai")," ou le ",HE("b",null,"2 novembre"),", reporté au ",HE("b",null,"lundi suivant")," si la date tombe un vendredi, un samedi ou un dimanche ; les dates restent modifiables à la main. Chaque interne y reçoit un nom, des initiales et une ",HE("b",null,"couleur"),", reprise partout."]}),
   HP({children:["« + Semestre suivant » se bloque à ",HE("b",null,"deux semestres ouverts")," (l'actuel et le prochain) — on ne connaît les internes que quelques semaines à l'avance. Un semestre ",HE("b",null,"pas encore commencé")," peut être supprimé (🗑) : la fin du précédent est recollée automatiquement."]}),
-  HP({children:["La coche ☑ devant chaque interne dit s'il a ",HE("b",null,"accès aux salles"),". Sans elle, il n'est pas proposé dans les fenêtres de CHL, CHB, PT Cardio et PT Angio."]}),
+  HP({children:["La coche ☑ devant chaque interne dit s'il a ",HE("b",null,"accès aux salles"),". Sans elle, il n'est pas proposé dans les fenêtres de CHL, CHB, PT Cardio et PT Angio — c'est ce qui réserve certaines activités (ETT, ETO…) à un ou deux internes. Elle ne gêne pas les activités à salle que les internes posent eux-mêmes (voir plus bas)."]}),
   HT({children:"Ce qu'ils peuvent avoir, ce qu'ils peuvent poser"}),
-  HP({children:["C'est l'onglet ",HE("b",null,"Activités")," qui décide, avec la coche ",HChip({txt:"🎓 Internes",bg:"#0e9f9f"})," : une activité cochée peut leur être posée. Une ",HE("b",null,"seconde coche")," dit s'ils peuvent la poser ",HE("b",null,"eux-mêmes")," (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur ou un intermédiaire — une secrétaire ou un cadre ne pose et ne retire que les activités cochées pour son rôle (celles des plannings CHL, CHB, PT Cardio, PT Angio) : tour, absences, FMC et gardes d'internes leur restent fermés. Les activités ",HE("b",null,"à salle")," ne sont jamais posées par eux — elles le sont depuis leur onglet ou depuis les onglets de salle, avec choix de la salle."]}),
-  HP({children:["Sur un ",HE("b",null,"lundi"),", poser HC, USIC ou une activité sans salle propose de ",HE("b",null,"remplir la semaine")," : le remplissage saute les repos de garde, absences et FMC déjà posés. Le ",HE("b",null,"samedi")," n'a qu'une case, pour le HC du samedi matin."]}),
+  HP({children:["C'est l'onglet ",HE("b",null,"Activités")," qui décide, avec la coche ",HChip({txt:"🎓 Internes",bg:"#0e9f9f"})," : une activité cochée peut leur être posée. Une ",HE("b",null,"seconde coche")," dit s'ils peuvent la poser ",HE("b",null,"eux-mêmes")," (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur ou un intermédiaire — une secrétaire ou un cadre ne pose et ne retire que les activités cochées pour son rôle (celles des plannings CHL, CHB, PT Cardio, PT Angio) : tour, absences, FMC et gardes d'internes leur restent fermés. Les activités ",HE("b",null,"à salle")," suivent la même règle (v10.256) : cochées ",HE("b",null,"posable par eux"),", tous les internes les posent eux-mêmes, dans la rubrique « Avec salle » de leur fenêtre — sans choix si l'activité n'a qu'une salle (Épreuve d'effort), avec choix sinon. Depuis la v10.257, ces activités sont aussi proposées pour ",HE("b",null,"tous les internes")," à l'éditeur, aux intermédiaires, et à la cadre ou aux secrétaires si leur coche est mise dans la fiche de l'activité. Non cochées « posable par eux », elles ne sont posées que par un éditeur, un intermédiaire ou un cadre, depuis l'onglet Internes ou les onglets de salle, pour les internes qui ont l'accès aux salles."]}),
+  HP({children:[HE("b",null,"HC, USIC et activités sans salle")," (v10.258) : du lundi au vendredi, quel que soit le jour cliqué, la fenêtre demande la ",HE("b",null,"durée")," — ce créneau, cette journée, ou la semaine (lundi → vendredi de la semaine cliquée, matin et après-midi). Journée et semaine ne remplacent ",HE("b",null,"jamais")," une demi-journée déjà occupée (EE, consultation, repos, absence, FMC…) et sautent les fériés et les jours hors semestre ; le message final compte les demi-journées posées et celles laissées. Le ",HE("b",null,"repos de garde")," se pose toujours à la journée. Le ",HE("b",null,"samedi")," n'a qu'une case, pour le HC du samedi matin."]}),
   HP({children:[HE("b",null,"Absence et FMC")," (v10.177) : après le clic, la fenêtre demande la ",HE("b",null,"durée"),". Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du ",HE("b",null,"lundi au vendredi")," de la semaine cliquée, sans week-end. FMC : ce créneau, 1, 2 ou 3 jours, à la suite du jour cliqué. Ce sont des journées entières : elles remplacent ce qui s'y trouve, repos de garde compris ; les jours hors semestre sont sautés."]}),
-  HP({children:[HE("b",null,"Activité avec salle")," (v10.177) : la salle choisie, un écran ",HE("b",null,"✓ Valider")," affiche l'interne, l'activité et la salle, avec une ",HE("b",null,"note facultative"),". Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille rouge cerclée de blanc, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ",HE("b",null,"← Retour")," revient en arrière sans rien poser."]}),
+  HP({children:[HE("b",null,"Activité avec salle")," (v10.177) : la salle choisie, un écran ",HE("b",null,"✓ Valider")," affiche l'interne, l'activité et la salle, avec une ",HE("b",null,"note facultative"),". Depuis la v10.258, chaque salle proposée indique ",HE("b",null,"libre")," ou ",HE("b",null,"occupée par…")," sur le créneau (médecins et internes confondus ; pour une salle fixe comme EE-CHL, l'information figure sur l'écran ✓ Valider) — c'est un avertissement, jamais une interdiction : un médecin et un interne dans la même salle est courant. Et dans l'autre sens, les fenêtres de case des médecins voient désormais les internes déjà en salle. Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille rouge cerclée de blanc, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ",HE("b",null,"← Retour")," revient en arrière sans rien poser."]}),
   HT({children:"Les gardes"}),
   HP({children:["La colonne ",HE("b",null,"Garde")," de l'onglet fonctionne comme celle des médecins, ",HE("b",null,"sans répartition automatique"),". La garde se pose sur la nuit et le ",HBadg({txt:"RG",color:"#ffe599"})," repos est posé tout seul le lendemain — sauté, avec un avertissement, si l'interne est absent ou en FMC ce jour-là. ⇄ échange deux gardes directement, dans la liste de celles du semestre."]}),
   HP({children:["Un ",HE("b",null,"interne extérieur")," au service se saisit au nom libre : il apparaît dans la colonne, sans repos chez nous. Un jour ",HE("b",null,"sans personne de garde")," est signalé en rouge. Dans le Planning, la colonne « 🎓 Garde int. » s'affiche à la demande depuis la ligne Filtre, en ",HE("b",null,"lecture seule"),", et se remasque à chaque ouverture."]}),
   HT({children:"Jauge, statistiques, PIN"}),
   HP({children:[HBtn({kind:"ghost",children:"🚦"})," affiche la ",HE("b",null,"jauge")," H et U à gauche de chaque demi-journée, en rouge sous les seuils réglés dans Paramètres (un seuil à 0 = pas d'alerte). ",HBtn({kind:"ghost",children:"📊"})," ouvre les ",HE("b",null,"statistiques du semestre")," : gardes par catégorie, HC, USIC et les activités retenues — les colonnes affichées se choisissent dans Paramètres, tuile Internes."]}),
-  HP({last:true,children:["Un ",HE("b",null,"PIN interne partagé")," se définit dans la même tuile. Avec lui, un interne saisit son prénom, arrive directement sur son onglet et ",HE("b",null,"ne peut modifier que celui-là")," : Planning, CHL, CHB, PT Cardio, PT Angio et l'Aide lui restent visibles en lecture seule."]}))},
+  HP({last:true,children:["Un ",HE("b",null,"PIN interne partagé")," se définit dans la même tuile. Avec lui, un interne saisit son prénom, arrive directement sur son onglet et ",HE("b",null,"ne peut modifier que celui-là")," : Planning, CHL, CHB, PT Cardio, PT Angio et l'Aide lui restent visibles en lecture seule. Depuis la v10.258, il dispose aussi des flèches ",HE("b",null,"↶ ↷")," en haut à gauche : ce retour arrière est propre à l'appareil et ne défait jamais le travail d'un autre. Enfin, quand une pose est refusée (planning gelé, journée passée, période non diffusée, plage fermée), la fenêtre n'affiche plus « Posé » : c'est le message du refus qui reste, et rien n'est écrit."]}))},
 
  {id:"juniors",icon:"🩺",title:"Dr Juniors — un rôle, un nom par semestre",body:()=>HE("div",null,
   HP({children:["Une fiche de ",HE("b",null,"Dr Junior")," ne décrit pas une personne, mais un ",HE("b",null,"rôle")," : son nom, sa couleur, sa surspécialité, son planning type, ses coches tour et gardes. Tout cela ",HE("b",null,"ne change pas")," quand le titulaire change — c'est l'intérêt du mécanisme : le planning type se fait une fois pour toutes, et il n'y a jamais de fiche à recréer."]}),
@@ -9742,6 +9830,9 @@ function InternesTile({intCfg,setIntCfg,actes=[],pins=[],pin="",setPin=null}){  
    couvre toujours la journée. Le contenu posé sur la journée (repos, absence)
    s'affiche désormais dans la grille. */
 function intISO2(y,m0,d){return y+"-"+String(m0+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
+/* v10.261 : dernier jour du mois, en date VALIDE. intISO2(y,m+1,0) écrivait « 2027-04-00 » : le champ de fin
+   restait vide et le calendrier s'ouvrait sur aujourd'hui, loin du jour cliqué (signalé le 01/11/2026). */
+function intFinMois(y,m0){const f=new Date(y,m0+1,0);return intISO2(f.getFullYear(),f.getMonth(),f.getDate());}
 function intTxt(bg){try{return hexToLum(bg)>0.35?"#111":"#fff";}catch(e){return "#fff";}}
 function intActesTuiles(actes,sam,self){
   /* v10.68 : ce que l'onglet propose se règle UNIQUEMENT par la coche 🎓 de
@@ -9766,16 +9857,17 @@ function intGardeVeille(getEntries,mid,y,m,d){
   return ["N","JOUR"].some(sl=>getEntries(mid,v[0],v[1]-1,v[2],sl).some(e=>e&&e.acteId==="GARDE"));
 }
 
-function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry,canSalle=false,salleReg=[],intSelf=false,notes={},setNotes=null,adminKey=null}){
+function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,setEntry,canSalle=false,salleReg=[],intSelf=false,notes={},setNotes=null,adminKey=null,salleQui=null}){
   const [cren,setCren]=useState(slot0==="AM"?"AM":"M");
   const [per,setPer]=useState(null);
   const [pd1,setPd1]=useState(intISO2(y,m,d));
-  const [pd2,setPd2]=useState(intISO2(y,m+1,0));
+  const [pd2,setPd2]=useState(intFinMois(y,m));   /* v10.261 */
   const [pSel,setPSel]=useState(null);
-  const [semQ,setSemQ]=useState(null);   /* lundi : {id,salle} en attente du choix semaine / créneau */
+  const [semQ,setSemQ]=useState(null);   /* v10.258 : {id,salle} en attente de sa durée (créneau / journée / semaine), tous les jours de la semaine */
   const [salleQ,setSalleQ]=useState(null); /* v10.62 : activité à salle en attente du choix de salle */
   const [durQ,setDurQ]=useState(null);     /* v10.177 : ABS ou FMC en attente de sa durée */
   const [pend,setPend]=useState(null);     /* v10.177 : activité à salle en attente de ✓ Valider — {id,salle,note} */
+  const [serie,setSerie]=useState(null);   /* v10.261 : {c,deb,fin,go} — activité posée plusieurs jours de suite, retrait en attente */
   const iso=intISO2(y,m,d);
   const dw=dow(y,m,d);
   const sam=dw===6;
@@ -9786,9 +9878,16 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const okAdm=(id)=>!adminKey||(ADM_EXCL.indexOf(id)<0&&(((acteById(id)||{})[adminKey])===true));
   const tuiles=intActesTuiles(actes,sam,intSelf).filter(t=>okAdm(t.id));
   /* v10.62, lot Salles : activités à salle cochées 🎓 — posables ici par l'éditeur,
-     un intermédiaire ou un cadre uniquement, jamais par les internes ni l'administratif.
-     Le choix de salle est obligatoire, la salle s'affiche ensuite sur la pastille. */
-  const tuilesSalle=(canSalle&&!sam&&med.salles===true)?actes.filter(a=>a.interneOk===true&&!a.isSystem&&a.hasSalle&&ABS_IDS.indexOf(a.id)<0&&okAdm(a.id)).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color,salles:a.salles||[],fixedSalle:a.fixedSalle||null})):[];
+     un intermédiaire ou un cadre (interne coché « accès aux salles »), jamais par l'administratif.
+     v10.256 : l'interne connecté (intSelf) les pose AUSSI lui-même, mais seulement celles cochées
+     « posable par les internes eux-mêmes » — quel que soit son « accès aux salles » (qui ne règle plus que ce
+     que le personnel lui pose). Une seule salle cochée dans la fiche de l'activité = salle fixe : aucun choix.
+     Le choix de salle est obligatoire sinon, la salle s'affiche ensuite sur la pastille.
+     v10.257 : une activité à salle « posable par eux » est proposée pour TOUS les internes, à TOUS ceux qui posent
+     ici (éditeur, intermédiaire, cadre, secrétaire — ces deux derniers selon leur coche dans la fiche de l'activité,
+     via okAdm). « Accès aux salles » ne commande plus que les autres activités à salle (ETT, Dobu, ETO…). */
+  const salleTout=canSalle&&med.salles===true;
+  const tuilesSalle=(!sam&&(salleTout||intSelf||canSalle||!!adminKey))?actes.filter(a=>a.interneOk===true&&!a.isSystem&&a.hasSalle&&ABS_IDS.indexOf(a.id)<0&&okAdm(a.id)&&(salleTout||a.interneSelf===true)).map(a=>({id:a.id,short:a.short||a.label,label:a.label,color:a.color,salles:a.salles||[],fixedSalle:a.fixedSalle||((a.salles||[]).length===1?a.salles[0]:null)})):[];
   const salleSite=(s)=>{const r=(salleReg||[]).find(x=>x.n===s);return r?(Array.isArray(r.s)?r.s.join("/"):r.s):"";};
   const mid=med.id;
   const dansSem=(iso2)=>iso2>=med.sDeb&&iso2<=med.sFin;
@@ -9803,56 +9902,108 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   });
   getEntries(mid,y,m,d,"JOUR").forEach(e=>{if(e&&e.acteId)contenu.push({sl:"JOUR",acteId:e.acteId});});
   const gardeV=intGardeVeille(getEntries,mid,y,m,d);
-  const retire=(c)=>{setEntry(mid,y,m,d,c.sl,null);};
+  /* v10.261 : RETRAIT D'UNE SÉRIE. Si la même activité est posée la veille ou le lendemain (M, AM ou JOUR), la croix
+     ne retire plus tout de suite : elle demande « seulement ce créneau / jusqu'à la fin / toute la série », comme
+     l'absence des médecins (v10.244). La série = les jours CONSÉCUTIFS qui portent l'activité ; absence et FMC
+     enjambent les week-ends et fériés (règle des médecins), le reste (HC, USIC…) s'arrête au premier jour sans. */
+  const serieA=(aid,yy,mm,dd)=>["M","AM","JOUR"].some(sl=>getEntries(mid,yy,mm,dd,sl).some(e=>e&&!e._blocked&&!e.cond&&e.acteId===aid));
+  const serieBal=(aid,sens)=>{let cur=new Date(y,m,d),last=new Date(y,m,d);const saute=ABS_IDS.indexOf(aid)>=0;
+    for(let i=0;i<400;i++){cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+sens);const yy=cur.getFullYear(),mm=cur.getMonth(),dd=cur.getDate();
+      if(serieA(aid,yy,mm,dd)){last=new Date(yy,mm,dd);continue;}
+      if(saute&&isWE(yy,mm,dd))continue;
+      break;}
+    return last;};
+  const retireUn=(c)=>{setEntry(mid,y,m,d,c.sl,null);};
+  const retire=(c)=>{
+    if(c.acteId==="REPOS_GARDE"){retireUn(c);return;}
+    const deb=serieBal(c.acteId,-1),fin=serieBal(c.acteId,1);
+    if(deb.getTime()===fin.getTime()){retireUn(c);return;}
+    setSerie({c,deb,fin,go:null});
+  };
+  const serieCourt=t=>String(t.getDate()).padStart(2,"0")+"/"+String(t.getMonth()+1).padStart(2,"0");
+  const serieRetire=(go)=>{
+    if(!serie)return;const aid=serie.c.acteId;let n=0;
+    const deb=go==="tout"?serie.deb:new Date(y,m,d),fin=serie.fin;
+    for(let cur=new Date(deb),i=0;cur.getTime()<=fin.getTime()&&i<400;cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+1),i++){
+      const yy=cur.getFullYear(),mm=cur.getMonth(),dd=cur.getDate();
+      const auClic=yy===y&&mm===m&&dd===d;
+      ["M","AM","JOUR"].forEach(sl=>{
+        if(go==="fin"&&auClic&&serie.c.sl==="AM"&&sl==="M")return;   /* jusqu'à la fin depuis l'après-midi : le matin du jour cliqué reste */
+        if(!getEntries(mid,yy,mm,dd,sl).some(e=>e&&!e._blocked&&!e.cond&&e.acteId===aid))return;
+        if(setEntry(mid,yy,mm,dd,sl,null)===true)n++;
+      });
+    }
+    toast(n+" demi-journée(s) retirée(s)");setSerie(null);onClose();
+  };
   const crenLbl=sam?"Samedi matin":(cren==="M"?"Matin":cren==="AM"?"Après-midi":"Journée");
+  const libJ=(i3)=>{const p=i3.split("-").map(Number);return JOURSL[dow(p[0],p[1]-1,p[2])].slice(0,3)+". "+p[2]+"/"+String(p[1]).padStart(2,"0");};
   const cycleCren=()=>{if(sam)return;setCren(c=>c==="M"?"AM":c==="AM"?"J":"M");};
   /* v10.177 : les demi-journées qu'une pose « au créneau » écrit — sert à la note de la validation */
   const slotsPose=sam?["M"]:(cren==="J"?["M","AM"]:[cren]);
   const canNote=!!setNotes&&canSalle;
+  /* v10.258 : « Posé » n'est annoncé que si la case a vraiment été écrite (setEntry renvoie true). Sur un refus
+     (gel, journée passée, période non diffusée, plage fermée), c'est le message du refus qui reste à l'écran. */
   const poseCren=(acteId,salle)=>{
     const ent=()=>salle?{acteId:acteId,salle:salle}:{acteId:acteId};
-    if(sam){setEntry(mid,y,m,d,"M",ent());toast("Posé — samedi matin");onClose();return;}
-    if(cren==="J"){setEntry(mid,y,m,d,"M",ent());setEntry(mid,y,m,d,"AM",ent());}
-    else setEntry(mid,y,m,d,cren,ent());
-    toast("Posé");onClose();
+    if(sam){if(setEntry(mid,y,m,d,"M",ent())===true)toast("Posé — samedi matin");onClose();return;}
+    let ok=false;
+    if(cren==="J"){const a1=setEntry(mid,y,m,d,"M",ent())===true,a2=setEntry(mid,y,m,d,"AM",ent())===true;ok=a1||a2;}
+    else ok=setEntry(mid,y,m,d,cren,ent())===true;
+    if(ok)toast("Posé");
+    onClose();
   };
   const poseJour=(acteId)=>{
     setEntry(mid,y,m,d,"M",null);
     if(!sam)setEntry(mid,y,m,d,"AM",null);
-    setEntry(mid,y,m,d,"JOUR",{acteId:acteId});
-    toast((acteById(acteId)||{label:acteId}).label+" — journée");onClose();
-  };
-  /* v10.177 : l'absence et la FMC ne passent plus par ici (elles ont leur ligne de durée) —
-     il ne reste que HC, USIC et les activités sans salle, du lundi au vendredi. */
-  const remplirSemaine=(acteId,salle)=>{
-    let poses=0,sautes=0;
-    for(let i=0;i<5;i++){
-      const iso3=intDecal(iso,i);
-      const p=iso3.split("-").map(Number);
-      if(!dansSem(iso3)){sautes++;continue;}
-      ["M","AM"].forEach(sl=>{
-        if(intSlotProtege(getEntries,mid,p[0],p[1]-1,p[2],sl)){sautes++;return;}
-        setEntry(mid,p[0],p[1]-1,p[2],sl,salle?{acteId:acteId,salle:salle}:{acteId:acteId});poses++;
-      });
-    }
-    toast(poses+" demi-journée(s) posée(s)"+(sautes?", "+sautes+" préservée(s) (repos, absence, FMC ou hors semestre)":""));
+    if(setEntry(mid,y,m,d,"JOUR",{acteId:acteId})===true)toast((acteById(acteId)||{label:acteId}).label+" — journée");
     onClose();
   };
+  /* v10.258 : une demi-journée est OCCUPÉE dès qu'elle porte quelque chose (EE, consultation, HC, repos,
+     absence, FMC…) — le remplissage d'une journée ou d'une semaine ne remplace jamais rien. */
+  const occupe=(yy,mm,dd,sl)=>intJourBloque(getEntries,mid,yy,mm,dd)||getEntries(mid,yy,mm,dd,sl).some(e=>e&&(e._blocked||e.acteId));
+  /* v10.258 : REMPLISSAGE de la journée ou de la semaine — HC, USIC et activités sans salle, du lundi au vendredi,
+     matin et après-midi. Sautés, et comptés comme « laissés » : les demi-journées déjà occupées, les jours fériés
+     (une ligne fériée n'a qu'une case « journée » : un HC posé dessous serait invisible mais compté) et les jours
+     hors semestre. Un refus d'écriture (gel, période…) laisse son propre message. */
+  const poseJours=(acteId,salle,jours)=>{
+    let poses=0,laisses=0,refus=0;
+    jours.forEach(i3=>{
+      const p=i3.split("-").map(Number);const yy=p[0],mm=p[1]-1,dd=p[2];
+      if(!dansSem(i3)||isFerie(yy,mm,dd)){laisses+=2;return;}
+      ["M","AM"].forEach(sl=>{
+        if(occupe(yy,mm,dd,sl)){laisses++;return;}
+        if(setEntry(mid,yy,mm,dd,sl,salle?{acteId:acteId,salle:salle}:{acteId:acteId})===true)poses++;else refus++;
+      });
+    });
+    if(poses||!refus)toast(poses+" demi-journée(s) posée(s)"+(laisses?" · "+laisses+" laissée(s) (déjà occupée, férié ou hors semestre)":""),poses?"ok":"warn");
+    onClose();
+  };
+  const lundi=intDecal(iso,-((dw+6)%7));
+  const semJours=[0,1,2,3,4].map(i=>intDecal(lundi,i));
   const clic=(acteId)=>{
-    /* v10.60 : le lundi, TOUTE activité propose de remplir la semaine — sauf le repos de garde */
     if(acteId==="REPOS_GARDE"){poseJour(acteId);return;}
     /* v10.177 : absence et FMC demandent d'abord leur durée, quel que soit le jour */
     if(acteId==="ABSENCE"||acteId==="FORMATION"){setDurQ(acteId);return;}
     if(intJourBloque(getEntries,mid,y,m,d)){toast("La journée porte une absence, une FMC ou un repos — retirez-les d'abord (croix ci-dessus)","warn");return;}
-    if(dw===1&&!sam){setSemQ({id:acteId,salle:null});return;}
-    poseCren(acteId);
+    if(sam){poseCren(acteId);return;}
+    /* v10.258 : du lundi au vendredi, TOUTE activité sans salle demande sa durée (créneau / journée / semaine) —
+       remplace la question « remplir la semaine ? » qui n'existait que le lundi */
+    setSemQ({id:acteId,salle:null});
   };
+  const semOpts=(()=>{
+    if(!semQ)return [];
+    const o=[];
+    if(cren!=="J")o.push({t:cren==="M"?"Ce matin":"Cet après-midi",s:libJ(iso),cren:true});
+    o.push({t:"Cette journée",s:libJ(iso),jours:[iso]});
+    o.push({t:"La semaine",s:libJ(semJours[0])+" → "+libJ(semJours[4]),jours:semJours});
+    return o;
+  })();
+  const poseSem=(o)=>{const q=semQ;setSemQ(null);if(o.cren){poseCren(q.id,q.salle);return;}poseJours(q.id,q.salle,o.jours);};
   /* v10.177 : la LIGNE DE DURÉE d'une absence ou d'une FMC — journées entières (case JOUR,
      comme l'écran de période), jours hors semestre sautés, remplace ce qui s'y trouve.
      Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du lundi au vendredi de la
      semaine cliquée (sa règle : pas de week-end chez les internes). FMC : ce créneau, 1, 2 ou
      3 jours calendaires à partir du jour cliqué. */
-  const libJ=(i3)=>{const p=i3.split("-").map(Number);return JOURSL[dow(p[0],p[1]-1,p[2])].slice(0,3)+". "+p[2]+"/"+String(p[1]).padStart(2,"0");};
   const durOpts=(()=>{
     if(!durQ)return [];
     const o=[];
@@ -9871,16 +10022,21 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const poseDuree=(o)=>{
     const aid=durQ;setDurQ(null);
     if(o.cren){poseCren(aid);return;}
-    let poses=0,sautes=0;
+    let poses=0,sautes=0,refus=0;
     o.jours.forEach(i3=>{
       if(!dansSem(i3)){sautes++;return;}
       const p=i3.split("-").map(Number);
       setEntry(mid,p[0],p[1]-1,p[2],"M",null);setEntry(mid,p[0],p[1]-1,p[2],"AM",null);
-      setEntry(mid,p[0],p[1]-1,p[2],"JOUR",{acteId:aid});poses++;
+      if(setEntry(mid,p[0],p[1]-1,p[2],"JOUR",{acteId:aid})===true)poses++;else refus++;   /* v10.258 : seul ce qui est écrit compte */
     });
-    toast((acteById(aid)||{label:aid}).label+" — "+poses+" journée(s) posée(s)"+(sautes?", "+sautes+" hors semestre":""));
+    if(poses||!refus)toast((acteById(aid)||{label:aid}).label+" — "+poses+" journée(s) posée(s)"+(sautes?", "+sautes+" hors semestre":""));
     onClose();
   };
+  /* v10.258 : DISPONIBILITÉ d'une salle sur le(s) créneau(x) visé(s) — médecins et internes confondus, l'interne
+     lui-même exclu. On avertit, on n'interdit jamais : un médecin et un interne dans la même salle est courant. */
+  const quiDans=(s)=>{if(!salleQui)return [];const r=[];slotsPose.forEach(sl=>salleQui(s,y,m,d,sl).forEach(q=>{if(q.id!==mid&&!r.find(x=>x.id===q.id))r.push(q);}));return r;};
+  const dispoTxt=(s)=>{const q=quiDans(s);return q.length?"occupée par "+q.map(x=>x.init).join(", "):"libre";};
+  const dispoLigne=(s)=>{const q=quiDans(s);return <div data-dispo={q.length?"occupee":"libre"} style={{fontSize:11,fontWeight:700,color:q.length?"#b45309":"#15803d",background:q.length?"#fff8e6":"rgba(34,197,94,.10)",border:"1px solid "+(q.length?"#f59e0b":"#86efac"),borderRadius:7,padding:"6px 10px",marginBottom:10}}>{q.length?"⚠ "+s+" déjà occupée par "+q.map(x=>x.init).join(", ")+" sur ce créneau — vous pouvez poser quand même":"✓ "+s+" libre sur ce créneau"}</div>;};
   /* v10.177 : une activité à salle se VALIDE — rien n'est écrit avant ✓, la note part avec la pose */
   const ouvrePend=(id,salle)=>{setSalleQ(null);setPend({id:id,salle:salle,note:(notes||{})[nk(mid,y,m,d,slotsPose[0])]||""});};
   const clicSalle=(t)=>{
@@ -9900,7 +10056,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const appliquePeriode=()=>{
     if(!pSel){toast("Choisissez une tuile à appliquer","warn");return;}
     if(!pd1||!pd2||pd2<pd1){toast("Vérifiez les deux dates","warn");return;}
-    let poses=0,sautes=0,it=pd1,n=0;
+    let poses=0,sautes=0,refus=0,it=pd1,n=0;
     while(it<=pd2&&n<92){
       n++;
       const p=it.split("-").map(Number);const yy=p[0],mm=p[1]-1,dd=p[2];
@@ -9909,19 +10065,19 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
       if(pSel==="EFF"){
         const repos=getEntries(mid,yy,mm,dd,"JOUR").some(e=>e&&e.acteId==="REPOS_GARDE");
         if(repos&&intGardeVeille(getEntries,mid,yy,mm,dd)){sautes++;}
-        else{setEntry(mid,yy,mm,dd,"M",null);setEntry(mid,yy,mm,dd,"AM",null);setEntry(mid,yy,mm,dd,"JOUR",null);poses++;}
+        else{const e1=setEntry(mid,yy,mm,dd,"M",null)===true,e2=setEntry(mid,yy,mm,dd,"AM",null)===true,e3=setEntry(mid,yy,mm,dd,"JOUR",null)===true;if(e1||e2||e3)poses++;else refus++;}
       }else if(pSel==="ABSENCE"||pSel==="FORMATION"||pSel==="REPOS_GARDE"){
-        setEntry(mid,yy,mm,dd,"M",null);setEntry(mid,yy,mm,dd,"AM",null);setEntry(mid,yy,mm,dd,"JOUR",{acteId:pSel});poses++;
+        setEntry(mid,yy,mm,dd,"M",null);setEntry(mid,yy,mm,dd,"AM",null);if(setEntry(mid,yy,mm,dd,"JOUR",{acteId:pSel})===true)poses++;else refus++;
       }else{
         if(t===0||t===6||fer){it=intDecal(it,1);continue;}
         ["M","AM"].forEach(sl=>{
           if(intSlotProtege(getEntries,mid,yy,mm,dd,sl)){sautes++;return;}
-          setEntry(mid,yy,mm,dd,sl,{acteId:pSel});poses++;
+          if(setEntry(mid,yy,mm,dd,sl,{acteId:pSel})===true)poses++;else refus++;   /* v10.258 : seul ce qui est écrit compte */
         });
       }
       it=intDecal(it,1);
     }
-    toast(poses+" élément(s) modifié(s)"+(sautes?", "+sautes+" sauté(s) (protégé ou hors semestre)":""));
+    if(poses||!refus)toast(poses+" élément(s) modifié(s)"+(sautes?", "+sautes+" sauté(s) (protégé ou hors semestre)":""));
     onClose();
   };
   const btnO={fontSize:11,padding:"5px 12px",borderRadius:7,border:"1.5px solid #1d4ed8",background:"rgba(29,78,216,.08)",color:"#1d4ed8",fontWeight:800,cursor:"pointer"};
@@ -9960,16 +10116,43 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
           </div>;
         })}
       </div>}
-      {pend&&<ValidPose med={med} acte={acteById(pend.id)||null} salle={pend.salle} note={pend.note} canNote={canNote}
+      {serie&&(()=>{const a=acteById(serie.c.acteId)||{short:serie.c.acteId,label:serie.c.acteId};
+        const nJ=Math.round((serie.fin.getTime()-serie.deb.getTime())/86400000)+1;
+        const jClic=new Date(y,m,d);const milieu=serie.deb.getTime()<jClic.getTime()&&serie.fin.getTime()>jClic.getTime();
+        const finApres=serie.fin.getTime()>jClic.getTime()||(serie.c.sl==="M"&&serieA(serie.c.acteId,y,m,d)&&getEntries(mid,y,m,d,"AM").some(e=>e&&e.acteId===serie.c.acteId));
+        const auDebut=jClic.getTime()<=serie.deb.getTime()&&serie.c.sl!=="AM";
+        const bt={background:"#fee2e2",border:"1px solid #fca5a5",color:"#dc2626",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:800,padding:"5px 9px",whiteSpace:"nowrap"};
+        const txt=serie.go==="un"?("ce créneau seulement — "+serieCourt(jClic)):serie.go==="fin"?("du "+serieCourt(jClic)+" au "+serieCourt(serie.fin)):("du "+serieCourt(serie.deb)+" au "+serieCourt(serie.fin));
+        return <div data-serie="1" style={{marginBottom:10,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+          <div style={{fontSize:11.5,fontWeight:800,color:"var(--txt)",lineHeight:1.45}}>
+            {"📅 "+(a.short||a.label)+" court du "+serieCourt(serie.deb)+" au "+serieCourt(serie.fin)+" — que retirer ?"}
+            <span style={{display:"block",fontSize:10,fontWeight:600,color:"var(--txt3)",marginTop:1}}>{nJ+" jours"+(milieu?" — vous avez cliqué au milieu":"")}</span>
+          </div>
+          {!serie.go?
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
+              <button data-serieun="1" style={bt} onClick={()=>setSerie(p=>({...p,go:"un"}))}>{"1️⃣ Seulement ce créneau — "+serieCourt(jClic)}</button>
+              {finApres&&!auDebut&&<button data-seriefin="1" style={bt} onClick={()=>setSerie(p=>({...p,go:"fin"}))}>{"⏭ Jusqu'à la fin — "+serieCourt(jClic)+" au "+serieCourt(serie.fin)}</button>}
+              <button data-serietout="1" style={bt} onClick={()=>setSerie(p=>({...p,go:"tout"}))}>{"⏮⏭ Toute la série — "+serieCourt(serie.deb)+" au "+serieCourt(serie.fin)}</button>
+              <button style={{...bt,background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--txt2)"}} onClick={()=>setSerie(null)}>Annuler</button>
+            </div>
+          :
+            <div style={{marginTop:7}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#991b1b",marginBottom:5}}>{"Retirer "+(a.short||a.label)+" de "+med.init+" "+txt+" ?"}</div>
+              <div style={{display:"flex",gap:5}}>
+                <button style={{...bt,background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--txt2)"}} onClick={()=>setSerie(p=>({...p,go:null}))}>Annuler</button>
+                <button data-serieoui="1" style={{...bt,background:"#dc2626",border:"1px solid #dc2626",color:"#fff"}} onClick={()=>{if(serie.go==="un"){retireUn(serie.c);setSerie(null);}else serieRetire(serie.go);}}>Oui, retirer</button>
+              </div>
+            </div>}
+        </div>;})()}
+      {pend&&<ValidPose med={med} acte={acteById(pend.id)||null} salle={pend.salle} note={pend.note} canNote={canNote} info={pend.salle?dispoLigne(pend.salle):null}
         setNote={v=>setPend(p=>({...p,note:v}))} onRetour={retourPend} onValider={validePend} onClose={onClose}/>}
       {semQ&&<div style={{border:"1.5px solid #388bfd",background:"rgba(56,139,253,.07)",borderRadius:9,padding:"10px 12px",marginBottom:10}}>
-        <div style={{fontSize:12.5,fontWeight:800,color:"var(--txt)",marginBottom:3}}>{"Lundi + "+((acteById(semQ.id)||{}).short||semQ.id)+(semQ.salle?" ("+semQ.salle+")":"")+" : remplir toute la semaine ?"}</div>
-        <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>Du lundi au vendredi, matin et après-midi. Les repos de garde, absences et FMC déjà posés sont préservés.</div>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <button onClick={()=>remplirSemaine(semQ.id,semQ.salle)} style={{fontSize:12,padding:"7px 13px",borderRadius:7,border:"none",background:"#1d4ed8",color:"#fff",fontWeight:800,cursor:"pointer"}}>📅 Toute la semaine</button>
-          <button onClick={()=>{const a=semQ;setSemQ(null);poseCren(a.id,a.salle);}} style={btnO}>{"Seulement "+crenLbl.toLowerCase()}</button>
-          {retourBtn(()=>setSemQ(null))}
+        <div style={{fontSize:12.5,fontWeight:800,color:"var(--txt)",marginBottom:6}}>{((acteById(semQ.id)||{}).label||semQ.id)+" de "+med.init+" : sur quelle durée ?"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+          {semOpts.map((o,i)=><button key={"s"+i} onClick={()=>poseSem(o)} style={{padding:"6px 9px",borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",background:"var(--bg2)",color:"var(--txt)",fontSize:11,fontWeight:800,textAlign:"left",lineHeight:1.35}}>{o.t}<span style={{display:"block",fontSize:10,fontWeight:600,color:"var(--txt3)"}}>{o.s}</span></button>)}
         </div>
+        <div style={{fontSize:10,color:"var(--txt3)",marginBottom:8,lineHeight:1.5}}>Journée et semaine : matin et après-midi, du lundi au vendredi. Une demi-journée déjà occupée (EE, consultation, repos, absence, FMC…) n'est jamais remplacée ; les fériés et les jours hors semestre sont sautés.</div>
+        {retourBtn(()=>setSemQ(null))}
       </div>}
       {per===null&&!semQ&&!pend&&<div>
         <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:.4,marginBottom:5}}>{durQ?(isFmc?"Formation":"Absence"):salleQ?"Salle":"Ajouter"}</div>
@@ -9996,7 +10179,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
             {tuilesSalle.map(t=>
               <button key={t.id} onClick={()=>clicSalle(t)} style={{padding:"9px 11px",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:t.color,color:intTxt(t.color)}}>
                 <span style={{display:"block",fontSize:11,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{t.short}</span>
-                <span style={{display:"block",fontSize:11.5,fontWeight:700}}>{t.label} · salle…</span>
+                <span style={{display:"block",fontSize:11.5,fontWeight:700}}>{t.label}{t.fixedSalle?" · "+t.fixedSalle:" · salle…"}</span>
               </button>)}
           </div>
         </div>}
@@ -10008,7 +10191,8 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
             return grpsS.map(g=><div key={g.st} style={{marginBottom:6}}>
               {grpsS.length>1&&<div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",marginBottom:3}}>{g.st==="ANGIO"?"PT Angio":g.st}</div>}
               <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                {g.l.map(s=><button key={s} onClick={()=>choisitSalle(s)} style={{padding:"5px 10px",borderRadius:5,border:"1px solid var(--border)",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:"var(--bg2)",color:"var(--txt)"}}>{s}</button>)}
+                {g.l.map(s=>{const occ=quiDans(s).length>0;   /* v10.258 : libre / occupée par … — avertit, n'interdit pas */
+                  return <button key={s} onClick={()=>choisitSalle(s)} data-dispo={occ?"occupee":"libre"} style={{padding:"5px 10px",borderRadius:5,border:"1px solid "+(occ?"#f59e0b":"#86efac"),cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,background:occ?"#fff8e6":"rgba(34,197,94,.10)",color:"var(--txt)",textAlign:"left",lineHeight:1.35}}>{s}<span style={{display:"block",fontSize:9.5,fontWeight:700,fontFamily:"'Sora',sans-serif",color:occ?"#b45309":"#15803d"}}>{dispoTxt(s)}</span></button>;})}
               </div>
             </div>);
           })()}
@@ -10023,7 +10207,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
           <span>Du</span><input type="date" value={pd1} onChange={e=>{if(e.target.value)setPd1(e.target.value);}} style={{...S.fi,width:135}}/>
           <span>au</span><input type="date" value={pd2} onChange={e=>{if(e.target.value)setPd2(e.target.value);}} style={{...S.fi,width:135}}/>
           <button onClick={()=>{const l=intDecal(intISO2(y,m,d),-((dow(y,m,d)+6)%7));setPd1(l);setPd2(intDecal(l,6));}} style={{...S.icnBtn,fontSize:10}}>la semaine</button>
-          <button onClick={()=>{setPd1(intISO2(y,m,1));setPd2(intISO2(y,m+1,0));}} style={{...S.icnBtn,fontSize:10}}>le mois</button>
+          <button onClick={()=>{setPd1(intISO2(y,m,1));setPd2(intFinMois(y,m));}} style={{...S.icnBtn,fontSize:10}}>le mois</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
           {intActesTuiles(actes,false,intSelf).filter(t=>okAdm(t.id)).map(t=>
@@ -10134,9 +10318,9 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
     return h;
   };
   const pose=(h,yy,mm,dd,silencieux)=>{
-    if(h.ext){setEntry("IEXT",yy,mm,dd,"N",{acteId:"GARDE",ext:h.ext});return;}
+    if(h.ext){return setEntry("IEXT",yy,mm,dd,"N",{acteId:"GARDE",ext:h.ext})===true;}
     const md=h.med;
-    setEntry(md.id,yy,mm,dd,"N",{acteId:"GARDE"});
+    if(setEntry(md.id,yy,mm,dd,"N",{acteId:"GARDE"})!==true)return false;   /* v10.258 : refusée (gel, période…) — le message du refus reste, rien d'autre */
     const iso1=intDecal(intISO2(yy,mm,dd),1);
     const L=iso1.split("-").map(Number);
     if(h.sDeb&&(iso1<h.sDeb||iso1>h.sFin)){if(!silencieux)toast("Garde posée — le lendemain sort de son semestre, pas de repos posé","info");return;}
@@ -10145,13 +10329,13 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
     setEntry(md.id,L[0],L[1]-1,L[2],"AM",null);
     setEntry(md.id,L[0],L[1]-1,L[2],"JOUR",{acteId:"REPOS_GARDE"});
     if(!silencieux)toast("Garde posée — repos le "+intFmtD(iso1));
+    return true;
   };
   const choisir=(md)=>{retire(y,m,d);pose({med:md,sDeb:md.sDeb,sFin:md.sFin},y,m,d,false);onClose();};
   const poseExt=()=>{
     const n=extNom.trim();
     if(!n){toast("Saisissez le nom de l'interne extérieur","warn");return;}
-    retire(y,m,d);pose({ext:n},y,m,d,false);
-    toast("Garde extérieure posée — sans repos chez nous");onClose();
+    retire(y,m,d);if(pose({ext:n},y,m,d,false))toast("Garde extérieure posée — sans repos chez nous");onClose();
   };
   /* v10.60 : échange sur le modèle des médecins (v9.82) — la liste des gardes posées
      de la période affichée, un clic pour échanger, plus de date à saisir. Un absent
@@ -10235,7 +10419,7 @@ function InternesGardeModal({y,m,d,jours,onClose,intCfg,getEntries,setEntry}){
   </Ov>;
 }
 
-function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],intSelf=false,canGarde=true,adminKey=null,prevM,nextM,darkMode,setDarkMode,notes={},setNotes=null,annJour=null}){
+function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,getEntries,setEntry,salleQui=null,isVac,year,month,allDays,viewPeriod,showFull,setShowFull,canEdit,canSalle=false,salleReg=[],intSelf=false,canGarde=true,adminKey=null,prevM,nextM,darkMode,setDarkMode,notes={},setNotes=null,annJour=null}){
   const [sel,setSel]=useState(null);
   const [gm,setGm]=useState(null);
   const [jaugeOn,setJaugeOn]=useOngletMem("internes.jauge",()=>intCfg.jaugeDef!==false); /* v10.65 : affichage en nominal réglé dans Paramètres */
@@ -10409,7 +10593,7 @@ function InternesView({onCellHistory=null,intCfg,setIntCfg=null,actes,acteById,g
         </div>
       </Ov>;
     })()}
-    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} canSalle={canSalle} salleReg={salleReg} intSelf={intSelf} adminKey={adminKey} notes={notes} setNotes={setNotes}/>}
+    {sel&&<InternesCellModal med={sel.med} y={sel.y} m={sel.m} d={sel.d} slot0={sel.slot0} onClose={()=>setSel(null)} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} salleQui={salleQui} canSalle={canSalle} salleReg={salleReg} intSelf={intSelf} adminKey={adminKey} notes={notes} setNotes={setNotes}/>}
     {gm&&<InternesGardeModal y={gm.y} m={gm.m} d={gm.d} jours={jours} onClose={()=>setGm(null)} intCfg={intCfg} getEntries={getEntries} setEntry={setEntry}/>}
   </div>;
 }
@@ -10455,6 +10639,8 @@ function arPerClair(k){const s=String(k);if(!/^\d{4}-\d{2}-\d{2}/.test(s))return
   const p=perOfDay(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10));return perIdOf(p.sy,p.sm);}
 /* notes : "medId|YYYY-MM-DD|SLOT" — le medId peut contenir n'importe quoi */
 function arPerNote(k){const p=String(k).split("|");return p.length>=2?arPerClair(p[1]):null;}
+/* doubles validés (v10.260) : "YYYY-MM-DD|SLOT|colonne|activités" */
+function arPerDbl(k){return arPerClair(String(k).split("|")[0]);}
 /* clé technique Y-M-D, éventuellement suivie de "|SLOT" */
 function arNums(k){const p=String(k).split("|")[0].split("-");
   if(p.length!==3)return null;
@@ -10806,8 +10992,10 @@ function FermLigne({ferm}){
 }
 function gelHeure(at){var t=new Date(at||0),z=function(n){return ("0"+n).slice(-2);};var auj=new Date();var memeJour=t.toDateString()===auj.toDateString();return (memeJour?"":z(t.getDate())+"/"+z(t.getMonth()+1)+" à ")+z(t.getHours())+" h "+z(t.getMinutes());}
 function finLib(iso){var a=String(iso||"").split("-");return a.length===3?a[2]+"/"+a[1]+"/"+a[0]:"";}
-function vBloque(r,y,m,d,quoi){if(r.current.gel||GEL.on)return true;   /* v10.229 : planning gelé — rien ne s'écrit */
-  return (dKey(y,m,d)<r.current.deb&&!r.current.passe)||vFutBloque(r,y,m,d,quoi);}
+function vBloque(r,y,m,d,quoi,interne){if(r.current.gel||GEL.on)return true;   /* v10.229 : planning gelé — rien ne s'écrit */
+  /* v10.259 : la case d'un INTERNE ne connaît pas la diffusion de la période de 4 mois — son planning se remplit sur tout
+     le semestre, par tous les profils autorisés, dès que le semestre existe. Gel et journée passée s'appliquent toujours. */
+  return (dKey(y,m,d)<r.current.deb&&!r.current.passe)||(!interne&&vFutBloque(r,y,m,d,quoi));}
 function vAvertit(r,y,m,d){return dKey(y,m,d)<r.current.deb&&r.current.passe;}
 /* v10.128 : verrou du TOUR — une semaine (clé = son lundi) est close quand son
    VENDREDI est passé. Sa règle du 28/08 : « laisse jusqu'au vendredi, cela
@@ -11005,6 +11193,7 @@ function CardioPlanning(){
   useEffect(()=>{LIAISON.sur=(on)=>setLiaisonOff(on);setLiaisonOff(LIAISON.on);return()=>{LIAISON.sur=null;};},[]);
   const [stale,setStale]=useState(false);   /* v10.135 : cette copie est dépassée par le serveur */
   const [salleFerm,setSalleFerm]=useState({type:{},jours:{}});   /* v10.229 : plages fermées */
+  const [dblOk,setDblOk]=useState({});   /* v10.260 : doubles en salle validés (clé dblKey → 1) */
   const [salleVideCol,setSalleVideCol]=useState(VIDE_COL_DEF);
   /* v10.247 : délai de fermeture après inactivité (commun à l'équipe), bandeau des 30 dernières secondes, et message de
      l'écran du code après une fermeture (lu une fois dans cp6_ferme, puis effacé) */
@@ -11685,6 +11874,7 @@ function CardioPlanning(){
             setBacDe(BAC&&data._bacDe&&data._bacDe.ts?data._bacDe:null);   /* v10.237 */
             BAC_DEP.t=BAC?((data._bacDe&&data._bacDe.ts)||data._bacDep||null):null;   /* v10.238 : jusqu'où le vrai historique vaut dans le bac */
             if(data.salleFerm){try{const f=JSON.parse(data.salleFerm)||{};const nf={type:f.type||{},jours:f.jours||{}};FERM.d=nf;setSalleFerm(nf);}catch(e){}}   /* v10.229 */
+            if(data.dblOk!==undefined){try{const o=JSON.parse(data.dblOk);setDblOk(o&&typeof o==="object"?o:{});}catch(e){}}   /* v10.260 */
             /* ── médecins : version découpée si elle existe, sinon migration ── */
             if(data.medecinsV2){setMedecins(readList("medecinsV2",data.medecinsV2,data.medecinsV2Order));}
             else if(data.medecins&&!listMigrated.current.medecinsV2){
@@ -12332,6 +12522,7 @@ function CardioPlanning(){
   useEffect(()=>{if(isFirstLoad.current)return;   /* v10.246 : salle par salle, plus l'ordre */
     const mp={},ord=[];(salleReg||[]).forEach(x=>{if(x&&x.n&&!(x.n in mp)){mp[x.n]=x;ord.push(x.n);}});flushMap("salleRegV2",mp,ord);},[salleReg]);
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleFerm:JSON.stringify(salleFerm)});},[salleFerm]);   /* v10.229 */
+  useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({dblOk:JSON.stringify(dblOk)});},[dblOk]);   /* v10.260 */
   useEffect(()=>{if(!isFirstLoad.current)saveToFirebase({salleVideCol});},[salleVideCol]);   /* v10.232 */
   useEffect(()=>{INACT.min=inactMin;if(!isFirstLoad.current)saveToFirebase({inactMin});},[inactMin]);   /* v10.247 */
   /* v10.247 : FERMETURE APRÈS INACTIVITÉ — armée pour tout profil qui peut modifier (pas « Consulter », pas l'écran du code) */
@@ -12571,6 +12762,10 @@ function CardioPlanning(){
   const [vUnlock,setVUnlock]=useState(false);
   const vRef=useRef({deb:verrouJ,passe:false,ed:false});
   const planRef=useRef(plan);planRef.current=plan;   /* v10.146 : lu par setEntry/addEntry pour juger la nature d'une écriture */
+  /* v10.259 : les identifiants des internes (tous semestres) + l'interne extérieur — leurs cases échappent au masque du tour
+     et au verrou de diffusion (voir vBloque et getEntries) */
+  const intIds=useMemo(()=>{const S=new Set(["IEXT"]);((intCfg&&intCfg.sems)||[]).forEach(se=>(se.meds||[]).forEach(im=>S.add(im.id)));return S;},[intCfg]);
+  const intIdsRef=useRef(intIds);intIdsRef.current=intIds;
   const tourMedRef=useRef(tourMed);tourMedRef.current=tourMed;   /* v10.166 : lu par applyTPForWeek — toujours le tour COURANT */
   vRef.current={deb:verrouJ,passe:isEdit&&vUnlock,ed:isEdit,arch:perArchivee,clos:perClose,gel:gelOn};
   /* un seul message par geste : les operations de masse appellent l'ecriture en boucle */
@@ -13015,12 +13210,12 @@ function CardioPlanning(){
   },[tourMedAff,tourMasque]);
   const getEntries=useCallback((medId,y2,m2,d2,slot)=>{
     const es=expEntries(planAff,tourMedVu,tourDerogAff,medId,y2,m2,d2,slot);
-    if(tourMasque&&es.length&&tourMasque(y2,m2,d2)){
+    if(tourMasque&&es.length&&!intIds.has(medId)&&tourMasque(y2,m2,d2)){   /* v10.259 : le HC/USIC d'un interne n'est jamais masqué */
       const f=es.filter(e=>!(e&&(e.acteId==="TOUR_HC"||e.acteId==="TOUR_USIC")));
       if(f.length!==es.length)return f;
     }
     return es;
-  },[planAff,tourMedVu,tourDerogAff,tourMasque]);
+  },[planAff,tourMedVu,tourDerogAff,tourMasque,intIds]);
 
   const getEntry=useCallback((medId,y2,m2,d2,slot)=>getEntries(medId,y2,m2,d2,slot)[0]||null,[getEntries]);
 
@@ -13037,13 +13232,17 @@ function CardioPlanning(){
   },[getEntries]);
 
   /* ── setEntry / addEntry / removeEntry ── */
+  /* v10.258 : renvoie true si la case a été écrite, false si la pose est refusée (gel, journée passée,
+     période non diffusée, plage fermée). Les fenêtres n'annoncent « Posé » que sur true — avant, la fenêtre
+     des internes affichait « Posé » par-dessus le message de refus, et rien n'était écrit. */
   const setEntry=useCallback((medId,y2,m2,d2,slot,entry)=>{
-    if(vBloque(vRef,y2,m2,d2,vQuoiCell(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry))){vToast(false);return;}   /* v10.106 */
-    {const sf=fermRefuse(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry,y2,m2,d2,slot);if(sf){toast("🚫 "+sf+" : plage fermée sur cette demi-journée — rien n'a été posé","lock");return;}}   /* v10.229 */
+    if(vBloque(vRef,y2,m2,d2,vQuoiCell(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry),intIdsRef.current.has(medId))){vToast(false);return false;}   /* v10.106 ; v10.259 : interne */
+    {const sf=fermRefuse(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry,y2,m2,d2,slot);if(sf){toast("🚫 "+sf+" : plage fermée sur cette demi-journée — rien n'a été posé","lock");return false;}}   /* v10.229 */
     const key=sk(y2,m2,d2,slot);
     setPlan(p=>{const dm={...(p[key]||{})};if(entry)dm[medId]=entry;else delete dm[medId];return{...p,[key]:dm};});
     logCell(entry?"add":"del",medId,y2,m2,d2,slot,entry?entry.acteId:null);
     if(vAvertit(vRef,y2,m2,d2))vToast(true);
+    return true;
   },[]);
 
   /* v9.58 : poser une activité FERME sur une case qui porte un choix ouvert, c'est
@@ -13052,7 +13251,7 @@ function CardioPlanning(){
      et l'entrée posée garde leur mémoire dans `wasCond`, ce qui permet de rétablir le
      choix si on la retire ensuite. */
   const addEntry=useCallback((medId,y2,m2,d2,slot,entry)=>{
-    if(vBloque(vRef,y2,m2,d2,vQuoiCell(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry))){vToast(false);return;}   /* v10.106 */
+    if(vBloque(vRef,y2,m2,d2,vQuoiCell(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry),intIdsRef.current.has(medId))){vToast(false);return;}   /* v10.106 ; v10.259 : interne */
     {const sf=fermRefuse(((planRef.current||{})[sk(y2,m2,d2,slot)]||{})[medId],entry,y2,m2,d2,slot);if(sf){toast("🚫 "+sf+" : plage fermée sur cette demi-journée — rien n'a été posé","lock");return;}}   /* v10.229 */
     const key=sk(y2,m2,d2,slot);
     let refusedBy=null;
@@ -13958,15 +14157,32 @@ function CardioPlanning(){
   },[clearPeriodActs,removeTourPeriod]);
 
   /* ── salleOcc ── */
-  const salleOcc=useCallback((acteId,y2,m2,d2,slot)=>{
+  /* v10.258 : `avecInt` — les internes du semestre entrent dans l'occupation (modale de case du Planning :
+     avertir, jamais interdire). Sans ce drapeau (grilles des onglets salles), rien ne change : l'interne y reste
+     affiché à part, en rond pointillé, hors conflit — règle de la v10.62. */
+  const salleOcc=useCallback((acteId,y2,m2,d2,slot,avecInt)=>{
     const res={};
     medecins.forEach(med=>{
       getEntries(med.id,y2,m2,d2,slot).forEach(e=>{
         if((e&&e.acteId)===acteId&&e.salle&&!e.cond){if(!res[e.salle])res[e.salle]=[];if(!res[e.salle].find(x=>x.id===med.id))res[e.salle].push(djAff(med,dKey(y2,m2,d2)));}
       });
     });
+    if(avecInt){const sj=intMedsDuJour(intCfg,y2,m2,d2);if(sj)sj.meds.forEach(im=>{
+      getEntries(im.id,y2,m2,d2,slot).forEach(e=>{
+        if((e&&e.acteId)===acteId&&e.salle&&!e.cond){if(!res[e.salle])res[e.salle]=[];if(!res[e.salle].find(x=>x.id===im.id))res[e.salle].push({...im,isInt:true});}
+      });
+    });}
     return res;
-  },[medecins,getEntries]);
+  },[medecins,getEntries,intCfg]);
+  /* v10.258 : qui est dans une salle sur un créneau — médecins ET internes, toutes activités confondues.
+     Sert à la fenêtre de case des internes (« libre » / « occupée par … »). */
+  const salleQui=useCallback((salle,y2,m2,d2,slot)=>{
+    const r=[],k=dKey(y2,m2,d2);
+    medecins.forEach(med=>{if(getEntries(med.id,y2,m2,d2,slot).some(e=>e&&e.salle===salle&&!e.cond)&&!r.find(x=>x.id===med.id))r.push({id:med.id,init:djAff(med,k).init,isInt:false});});
+    const sj=intMedsDuJour(intCfg,y2,m2,d2);
+    if(sj)sj.meds.forEach(im=>{if(getEntries(im.id,y2,m2,d2,slot).some(e=>e&&e.salle===salle&&!e.cond)&&!r.find(x=>x.id===im.id))r.push({id:im.id,init:im.init,isInt:true});});
+    return r;
+  },[medecins,getEntries,intCfg]);
 
   /* ── weeks ── */
   const weeks=useMemo(()=>{
@@ -14328,6 +14544,7 @@ function CardioPlanning(){
   /* v10.240 : UN SEUL jeu de gestionnaires pour les onglets salles ET les colonnes 👁 du Planning —
      même droit de modifier (peutSalles), même fenêtre au clic, mêmes verrous (jour passé, plage fermée). */
   const peutSalles=isEdit||isAdminEdit||(isMedEdit&&!isAttEdit);
+  const dblCtl=(isEdit||(isAdminEdit&&isCadre))?{ok:dblOk,setOk:setDblOk}:null;   /* v10.260 : bandeau des doubles — éditeur et cadre */
   const pickSiteDe=(site)=>({salle,siteActes,d,sl,y,m})=>{if(!vOuvre(y,m,d))return;if(!fermOuvre(salle,y,m,d,sl))return;
     let full=siteActes;
     if(site==="CHB"){const bip=actes.find(a=>a.id==="BIP");
@@ -14536,7 +14753,8 @@ header::-webkit-scrollbar { display: none; }
           <span onClick={()=>{setPinInput("");setPinError(false);setIsCadre(false);setAccessMode("ask");}} title="Retour à l'accueil" style={{fontSize:20,color:"#f85149",cursor:"pointer"}}>♥</span>
           {/* v10.27 : l'administratif y a droit aussi — c'est lui qui remplit le plus
               souvent les semaines blanches et les reports. */}
-          {(isEdit||isMedEdit||isAdminEdit)&&<div style={{display:"flex",gap:3}}>
+          {/* v10.258 : l'interne aussi — l'historique est propre à l'appareil et ne défait jamais le travail d'un autre */}
+          {(isEdit||isMedEdit||isAdminEdit||isInterne)&&<div style={{display:"flex",gap:3}}>
             <button onClick={doUndo} disabled={!canUndo} title="Annuler (retour arrière)"
               style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(255,255,255,.25)",background:canUndo?"rgba(255,255,255,.1)":"transparent",color:canUndo?"#f0f6fc":"#484f58",cursor:canUndo?"pointer":"default",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>↶</button>
             <button onClick={doRedo} disabled={!canRedo} title="Rétablir (retour avant)"
@@ -14680,21 +14898,21 @@ header::-webkit-scrollbar { display: none; }
       {/* v10.29 : CONSTRUIRE — pas a pas, memes ecrans, une seule periode */}
       {tab==="construire"&&<BuildTab build={build} setBuild={setBuild} medecins={medsAff} getEntries={getEntries} tourMed={tourMed} isEdit={(isEdit||isInterEdit)&&!isAttEdit} edReel={isEdit} darkMode={darkMode} setDarkMode={setDarkMode} author={authorRef.current} goTab={goTab} onOpenBip={bipOpen} onApplyPT={(per)=>openPtModal(null,"apply",per)} onRemovePT={(per)=>openPtModal(null,"remove",per)} secrDif={secrCfg.dif||{}} onPushDemande={(l)=>annPrevenir(l,true,true)} onDiffuser={(pid)=>setSecrCfg(c=>({...c,dif:{...(c.dif||{}),[pid]:new Date().toLocaleDateString("fr-FR")}}))} onAnnulerDif={(pid)=>setSecrCfg(c=>{const d2={...(c.dif||{})};delete d2[pid];return {...c,dif:d2};})} tourProps={tourProps} gardeProps={gardeProps}/>}
 
-      {tab==="chl"&&<SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={peutSalles} notes={notesAff}
+      {tab==="chl"&&<SiteView dbl={dblCtl} salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHL"]||null} onHide={(cols)=>{setHideModal({site:"CHL",cols});setModal("colHide");}} colOrder={colOrder["CHL"]||null} onOrder={(cols)=>{setColModal({site:"CHL",cols});setModal("colOrder");}} site="CHL" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={peutSalles} notes={notesAff}
         onPickSite={pickSiteDe("CHL")}
         darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/>}
 
       {tab==="chb"&&<div>
-        <SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" salleFerm={salleFerm} intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={peutSalles} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
+        <SiteView dbl={dblCtl} salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["CHB"]||null} onHide={(cols)=>{setHideModal({site:"CHB",cols});setModal("colHide");}} colOrder={colOrder["CHB"]||null} onOrder={(cols)=>{setColModal({site:"CHB",cols});setModal("colOrder");}} site="CHB" salleFerm={salleFerm} intCfg={intCfgAff} darkMode={darkMode} setDarkMode={setDarkMode} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM} actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc} allDays={allDays} isEdit={peutSalles} showFull={showFull} setShowFull={setShowFull} notes={notesAff}
         onPickSite={pickSiteDe("CHB")} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}/></div>}
 
-      {tab==="plateau"&&<ActTabView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" salleFerm={salleFerm} intCfg={intCfgAff}
+      {tab==="plateau"&&<ActTabView dbl={dblCtl} salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} title="❤️ PT Cardio" titleColor="#e3b341" salleFerm={salleFerm} intCfg={intCfgAff}
         rows={ptRows} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["PT"]||null} onHide={(cols)=>{setHideModal({site:"PT",cols});setModal("colHide");}} orderCtl={isEdit} onOrder={()=>setModal("ptOrder")}
         year={year} month={month} prevM={prevM} nextM={nextM} medecins={medsAff} actes={actes}
         getEntries={getEntries} allDays={allDays} notes={notesAff} ideFeature={true} ideOn={ideOn} setIdeOn={setIdeOn} ideCfg={ideCfg} setIdeCfg={setIdeCfg} canIde={isEdit||(isAdminEdit&&isCadre)} printWk={printWk} onPrint={()=>setModal("print")} isEdit={peutSalles} showFull={showFull} setShowFull={setShowFull} darkMode={darkMode} setDarkMode={setDarkMode} showFull={showFull} setShowFull={setShowFull} viewPeriod={viewPeriod} allDays4={allDays4} setViewPeriod={setViewPeriod}
         onPickAct={pickAct}/>}
 
-      {tab==="angio"&&<SiteView salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
+      {tab==="angio"&&<SiteView dbl={dblCtl} salleVide={salleVide} isVac={isVac} onCellHistory={isAnyEdit?openCellHistory:null} issMap={issAllMap} printWk={printWk} onPrint={()=>setModal("print")} narrow={narrow} moreOpen={moreOpen} setMoreOpen={setMoreOpen} colHide={colHide["ANGIO"]||null} onHide={(cols)=>{setHideModal({site:"ANGIO",cols});setModal("colHide");}} colOrder={colOrder["ANGIO"]||null} onOrder={(cols)=>{setColModal({site:"ANGIO",cols});setModal("colOrder");}} site="ANGIO" salleFerm={salleFerm} intCfg={intCfgAff} salleReg={salleReg} year={year} month={month} prevM={prevM} nextM={nextM}
         actes={actes} medecins={medsAff} getEntries={getEntries} salleOcc={salleOcc}
         allDays={allDays} isEdit={peutSalles} notes={notesAff}
         onPickSite={pickSiteDe("ANGIO")}
@@ -14839,7 +15057,7 @@ header::-webkit-scrollbar { display: none; }
       )}
 
       {tab==="reports"&&<div><div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><ReportsView salleReg={salleReg} medecins={medsAff} actes={actes} getEntries={getEntries} tourMed={tourMedVu} planningType={planningType} isVac={isVac} isEdit={isEdit} editMedId={editMedId} accessMode={accessMode} csBlanches={csBlanches} setCsBlanches={setCsBlanches} csRep={csRep} setCsRep={setCsRep} csActsSel={csActsSel} setCsActsSel={setCsActsSel} addEntry={addEntry} setNotes={setNotes} csActsGlobal={csActsGlobal} adminOkKey={roleOkKey} difOk={!!((secrCfg.dif||{})[perIdOf(perStart(year,month).sy,perStart(year,month).sm)])} adminReports={isAdminEdit&&adminCanReports} adminName={adminName} removeEntry={removeEntry} year={year} month={month} toast={toast} vRef={vRef} vToast={vToast}/></div>}
-      {tab==="internes"&&<InternesView annJour={annJourDe("internes")} notes={notesAff} setNotes={setNotes} onCellHistory={isAnyEdit?openCellHistory:null} intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} canGarde={isEdit||isInterne} adminKey={isAdminEdit?roleOkKey:null} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
+      {tab==="internes"&&<InternesView annJour={annJourDe("internes")} notes={notesAff} setNotes={setNotes} onCellHistory={isAnyEdit?openCellHistory:null} intCfg={intCfgAff} setIntCfg={setIntCfg} actes={actes} acteById={acteById} getEntries={getEntries} setEntry={setEntry} salleQui={salleQui} isVac={isVac} year={year} month={month} allDays={allDays} viewPeriod={viewPeriod} showFull={showFull} setShowFull={setShowFull} canEdit={isEdit||(isInterEdit&&!isAttEdit)||isAdminEdit||isInterne} canSalle={isEdit||(isInterEdit&&!isAttEdit)||(isAdminEdit&&isCadre)} intSelf={isInterne} canGarde={isEdit||isInterne} adminKey={isAdminEdit?roleOkKey:null} salleReg={salleReg} prevM={prevM} nextM={nextM} darkMode={darkMode} setDarkMode={setDarkMode}/>}
       {tab==="notifications"&&<div>{/* v10.215 : titre et icônes 🔍 🐞 🌓 en tête de l'onglet, au-dessus de la carte et des messages */}<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><h2 style={S.mTit}>🔔 Notifications</h2><div style={{marginLeft:"auto"}}><SigBtn/><button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div></div>{accessMode==="medecinEdit"&&editMedId!=null&&<PushCarte medId={editMedId} medecins={medecins} onChoix={setPushChoix}/>}{isEdit&&<AnnEditeur annonces={annonces} setAnnonces={setAnnonces} medecins={medsAff} pushMeds={pushMeds}/>}<SecrTab medecins={medsAff} acteById={acteById} secrNotif={secrNotif} setSecrNotif={setSecrNotif} secrAtts={secrCfg.atts||[]} canAck={!netOff&&notifSeulId==null} seulId={notifSeulId} darkMode={darkMode} setDarkMode={setDarkMode}/></div>}
       {tab==="aide"&&<div><div style={{display:"flex",justifyContent:"flex-end",gap:4,marginBottom:6}}>{btnSig}<button onClick={()=>setDarkMode(d=>!d)} style={{...S.arr,fontSize:13,width:30}}>{darkMode?"☀️":"🌓"}</button></div><HelpView/></div>}
       {tab==="astreinte"&&(()=>{
@@ -15839,6 +16057,7 @@ header::-webkit-scrollbar { display: none; }
                 setTourDerog(o=>arPurge(o,arPerClair,okP));
                 setTourPtOte(o=>arPurge(o,arPerTechSem,okP));   /* v10.155 */
                 setNotes(o=>arPurge(o,arPerNote,okP));
+                setDblOk(o=>arPurge(o,arPerDbl,okP));   /* v10.260 */
                 setTourWish(o=>arPurge(o,arPerTechSem,okP));
                 setTourAvoid(o=>arPurge(o,arPerTechSem,okP));
                 setGardeWish(o=>arPurge(o,arPerClair,okP));
@@ -16368,7 +16587,7 @@ header::-webkit-scrollbar { display: none; }
                  surtout MONTRER avant de cliquer s'il en reste une de libre. */
               const busy={};
               actes.filter(ax=>ax.hasSalle||ax.fixedSalle).forEach(ax=>{
-                const ao=salleOcc(ax.id,y2,m2,d2,slot);
+                const ao=salleOcc(ax.id,y2,m2,d2,slot,true);   /* v10.258 : internes compris */
                 Object.keys(ao).forEach(s=>{if(!busy[s])busy[s]=[];ao[s].forEach(m=>{if(!busy[s].find(x=>x.id===m.id))busy[s].push(m);});});
               });
               const freeOf=a=>(a.salles||[]).filter(s=>!((busy[s]||[]).some(m=>m.id!==medId)));
@@ -16434,7 +16653,7 @@ header::-webkit-scrollbar { display: none; }
                              via le sélecteur _pickSalle ; doAdd remplace la ferme (v9.63). */
                           const busy={};
                           actes.filter(ax=>ax.hasSalle||ax.fixedSalle).forEach(ax=>{
-                            const ao=salleOcc(ax.id,y2,m2,d2,slot);
+                            const ao=salleOcc(ax.id,y2,m2,d2,slot,true);   /* v10.258 : internes compris */
                             Object.keys(ao).forEach(s2=>{if(!busy[s2])busy[s2]=[];ao[s2].forEach(mm=>{if(!busy[s2].find(x=>x.id===mm.id))busy[s2].push(mm);});});
                           });
                           const fr=(a.salles||[]).filter(s2=>!((busy[s2]||[]).some(mm=>mm.id!==medId)));
@@ -16642,7 +16861,7 @@ header::-webkit-scrollbar { display: none; }
                     // Gather all medecins in this physical room across all actes that use it
                     const roomOccupants=[];
                     actes.filter(ax=>ax.fixedSalle===a.fixedSalle||ax.salles&&ax.salles.includes(a.fixedSalle)).forEach(ax=>{
-                      const occ=salleOcc(ax.id,y2,m2,d2,slot)[a.fixedSalle]||[];
+                      const occ=salleOcc(ax.id,y2,m2,d2,slot,true)[a.fixedSalle]||[];   /* v10.258 : internes compris */
                       occ.forEach(m=>{ if(!roomOccupants.find(x=>x.id===m.id)) roomOccupants.push(m); });
                     });
                     return roomOccupants;
@@ -16741,11 +16960,11 @@ header::-webkit-scrollbar { display: none; }
             {mData&&mData._pickSalle&&canEditThisMed&&(()=>{
               const a=acteById(mData._pickSalle);if(!a)return null;
               // Check occupancy for each salle: ALL activities, not just this one
-              const occ=salleOcc(a.id,y2,m2,d2,slot);
+              const occ=salleOcc(a.id,y2,m2,d2,slot,true);   /* v10.258 : internes compris */
               // Build full room occupancy across ALL actes
               const fullRoomOcc={};
               actes.filter(ax=>ax.hasSalle).forEach(ax=>{
-                const axOcc=salleOcc(ax.id,y2,m2,d2,slot);
+                const axOcc=salleOcc(ax.id,y2,m2,d2,slot,true);
                 Object.entries(axOcc).forEach(([s,meds])=>{
                   if(!fullRoomOcc[s])fullRoomOcc[s]=[];
                   meds.forEach(m=>{if(!fullRoomOcc[s].find(x=>x.id===m.id))fullRoomOcc[s].push(m);});
