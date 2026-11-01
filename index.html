@@ -1142,7 +1142,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.263 — 01/11/2026";
+const APP_VERSION = "v10.264 — 01/11/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -17928,7 +17928,18 @@ function CardioPlanning() {
     /* v10.258 : `avecInt` — les internes du semestre entrent dans l'occupation (modale de case du Planning :
        avertir, jamais interdire). Sans ce drapeau (grilles des onglets salles), rien ne change : l'interne y reste
        affiché à part, en rond pointillé, hors conflit — règle de la v10.62. */
+    /* v10.264 : MÉMOIRE DE salleOcc. Mesure du 01/11/2026 (v10.263, PC de TH) : CHL 1 028 ms pour 2 430 cases, soit 0,42 ms
+       par case contre 0,08 dans Planning — cinq fois plus cher. Cause : chaque case de salle appelait salleOcc(activité, créneau)
+       pour CHACUNE de ses activités, et salleOcc parcourait tous les médecins à chaque appel ; or la réponse (qui est dans quelle
+       salle pour cette activité à ce créneau) est la même pour les neuf salles de la ligne — elle était recalculée neuf fois, et
+       une dixième par le bandeau des doubles (v10.260). La réponse est désormais gardée le temps que les données ne changent pas
+       (la mémoire se vide dès que le planning, l'équipe ou les internes changent : mêmes dépendances que la fonction). */
+    const salleOccMem = useMemo(() => new Map(), [medecins, getEntries, intCfg]);
     const salleOcc = useCallback((acteId, y2, m2, d2, slot, avecInt) => {
+        const kOcc = acteId + "|" + y2 + "|" + m2 + "|" + d2 + "|" + slot + "|" + (avecInt ? 1 : 0);
+        const memo = salleOccMem.get(kOcc);
+        if (memo)
+            return memo;
         const res = {};
         medecins.forEach(med => {
             getEntries(med.id, y2, m2, d2, slot).forEach(e => {
@@ -17954,8 +17965,9 @@ function CardioPlanning() {
                     });
                 });
         }
+        salleOccMem.set(kOcc, res);
         return res;
-    }, [medecins, getEntries, intCfg]);
+    }, [medecins, getEntries, intCfg, salleOccMem]);
     /* v10.258 : qui est dans une salle sur un créneau — médecins ET internes, toutes activités confondues.
        Sert à la fenêtre de case des internes (« libre » / « occupée par … »). */
     const salleQui = useCallback((salle, y2, m2, d2, slot) => {
