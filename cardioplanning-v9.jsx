@@ -493,7 +493,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.261 — 01/11/2026";
+const APP_VERSION="v10.262 — 01/11/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -6855,7 +6855,7 @@ const HELP_SECTIONS=[
   HP({last:true,children:["• L'éditeur peut toujours poser ",HE("b",null,"à la main")," un tour ou une garde sur quelqu'un de désactivé, depuis les tuiles 2 et 3 de Construire — le verrou porte sur les cases et les automatismes, pas sur un geste délibéré."]}))},
 
  {id:"internes",icon:"🎓",title:"Internes — l'onglet et les semestres",body:()=>HE("div",null,
-  HP({children:["L'onglet ",HE("b",null,"🎓 Internes")," est facultatif : il s'affiche si la coche est mise dans ",HE("b",null,"Paramètres → tuile Internes"),". Contrairement à tous les autres onglets, il travaille ",HE("b",null,"par semestre de 6 mois")," et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant. Depuis la v10.259, ce planning se remplit sur ",HE("b",null,"tout le semestre")," dès qu'il existe, par tous les profils qui y ont droit, ",HE("b",null,"sans attendre la diffusion")," de la période de 4 mois ; et le HC/USIC d'un interne n'est jamais masqué, même sur une période non diffusée. Gel du planning, journée passée et plages fermées s'appliquent toujours. Depuis la v10.261, la ",HE("b",null,"croix d'une activité posée plusieurs jours de suite")," (HC, USIC, absence, FMC…) demande quoi retirer — seulement ce créneau, jusqu'à la fin, ou toute la série — comme l'absence d'un médecin ; et dans « Modifier sur une période », la date de fin est pré-remplie au dernier jour du mois cliqué."]}),
+  HP({children:["L'onglet ",HE("b",null,"🎓 Internes")," est facultatif : il s'affiche si la coche est mise dans ",HE("b",null,"Paramètres → tuile Internes"),". Contrairement à tous les autres onglets, il travaille ",HE("b",null,"par semestre de 6 mois")," et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant. Depuis la v10.259, ce planning se remplit sur ",HE("b",null,"tout le semestre")," dès qu'il existe, par tous les profils qui y ont droit, ",HE("b",null,"sans attendre la diffusion")," de la période de 4 mois ; et le HC/USIC d'un interne n'est jamais masqué, même sur une période non diffusée. Gel du planning, journée passée et plages fermées s'appliquent toujours. Depuis la v10.261, la ",HE("b",null,"croix d'une activité posée plusieurs jours de suite")," (HC, USIC, absence, FMC…) propose d'elle-même quoi retirer — seulement ce créneau, jusqu'à la fin, ou toute la série — comme l'absence d'un médecin (la croix mène au même écran) ; et dans « Modifier sur une période », la date de fin est pré-remplie au dernier jour du mois cliqué."]}),
   HT({children:"Les semestres et les fiches"}),
   HP({children:["Tout se règle dans l'onglet ",HE("b",null,"Équipe"),", section Internes. Un semestre démarre le ",HE("b",null,"2 mai")," ou le ",HE("b",null,"2 novembre"),", reporté au ",HE("b",null,"lundi suivant")," si la date tombe un vendredi, un samedi ou un dimanche ; les dates restent modifiables à la main. Chaque interne y reçoit un nom, des initiales et une ",HE("b",null,"couleur"),", reprise partout."]}),
   HP({children:["« + Semestre suivant » se bloque à ",HE("b",null,"deux semestres ouverts")," (l'actuel et le prochain) — on ne connaît les internes que quelques semaines à l'avance. Un semestre ",HE("b",null,"pas encore commencé")," peut être supprimé (🗑) : la fin du précédent est recollée automatiquement."]}),
@@ -9868,6 +9868,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
   const [durQ,setDurQ]=useState(null);     /* v10.177 : ABS ou FMC en attente de sa durée */
   const [pend,setPend]=useState(null);     /* v10.177 : activité à salle en attente de ✓ Valider — {id,salle,note} */
   const [serie,setSerie]=useState(null);   /* v10.261 : {c,deb,fin,go} — activité posée plusieurs jours de suite, retrait en attente */
+  const [serieOff,setSerieOff]=useState({});   /* v10.262 : séries dont la question a été refermée (Annuler) */
   const iso=intISO2(y,m,d);
   const dw=dow(y,m,d);
   const sam=dw===6;
@@ -9921,7 +9922,7 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
     setSerie({c,deb,fin,go:null});
   };
   const serieCourt=t=>String(t.getDate()).padStart(2,"0")+"/"+String(t.getMonth()+1).padStart(2,"0");
-  const serieRetire=(go)=>{
+  const serieRetire=(serie,go)=>{
     if(!serie)return;const aid=serie.c.acteId;let n=0;
     const deb=go==="tout"?serie.deb:new Date(y,m,d),fin=serie.fin;
     for(let cur=new Date(deb),i=0;cur.getTime()<=fin.getTime()&&i<400;cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+1),i++){
@@ -10116,34 +10117,39 @@ function InternesCellModal({med,y,m,d,slot0,onClose,actes,acteById,getEntries,se
           </div>;
         })}
       </div>}
-      {serie&&(()=>{const a=acteById(serie.c.acteId)||{short:serie.c.acteId,label:serie.c.acteId};
+      {/* v10.262 : la question s'affiche D'ELLE-MÊME pour chaque activité de la case posée plusieurs jours de suite
+          (comme l'absence des médecins), la croix n'est plus nécessaire — elle mène au même écran. */}
+      {!pend&&!semQ&&!salleQ&&!durQ&&(serie?[serie]:(()=>{const vus={},out=[];contenu.forEach(c=>{
+          if(c.acteId==="REPOS_GARDE"||!posable(c.acteId)||vus[c.acteId]||serieOff[c.acteId])return;vus[c.acteId]=1;
+          const deb=serieBal(c.acteId,-1),fin=serieBal(c.acteId,1);if(deb.getTime()!==fin.getTime())out.push({c,deb,fin,go:null});});return out;})()).map(sr=>(()=>{
+        const serie=sr;const a=acteById(serie.c.acteId)||{short:serie.c.acteId,label:serie.c.acteId};
         const nJ=Math.round((serie.fin.getTime()-serie.deb.getTime())/86400000)+1;
         const jClic=new Date(y,m,d);const milieu=serie.deb.getTime()<jClic.getTime()&&serie.fin.getTime()>jClic.getTime();
         const finApres=serie.fin.getTime()>jClic.getTime()||(serie.c.sl==="M"&&serieA(serie.c.acteId,y,m,d)&&getEntries(mid,y,m,d,"AM").some(e=>e&&e.acteId===serie.c.acteId));
         const auDebut=jClic.getTime()<=serie.deb.getTime()&&serie.c.sl!=="AM";
         const bt={background:"#fee2e2",border:"1px solid #fca5a5",color:"#dc2626",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:800,padding:"5px 9px",whiteSpace:"nowrap"};
         const txt=serie.go==="un"?("ce créneau seulement — "+serieCourt(jClic)):serie.go==="fin"?("du "+serieCourt(jClic)+" au "+serieCourt(serie.fin)):("du "+serieCourt(serie.deb)+" au "+serieCourt(serie.fin));
-        return <div data-serie="1" style={{marginBottom:10,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
+        return <div key={serie.c.acteId} data-serie="1" style={{marginBottom:10,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)"}}>
           <div style={{fontSize:11.5,fontWeight:800,color:"var(--txt)",lineHeight:1.45}}>
             {"📅 "+(a.short||a.label)+" court du "+serieCourt(serie.deb)+" au "+serieCourt(serie.fin)+" — que retirer ?"}
             <span style={{display:"block",fontSize:10,fontWeight:600,color:"var(--txt3)",marginTop:1}}>{nJ+" jours"+(milieu?" — vous avez cliqué au milieu":"")}</span>
           </div>
           {!serie.go?
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
-              <button data-serieun="1" style={bt} onClick={()=>setSerie(p=>({...p,go:"un"}))}>{"1️⃣ Seulement ce créneau — "+serieCourt(jClic)}</button>
-              {finApres&&!auDebut&&<button data-seriefin="1" style={bt} onClick={()=>setSerie(p=>({...p,go:"fin"}))}>{"⏭ Jusqu'à la fin — "+serieCourt(jClic)+" au "+serieCourt(serie.fin)}</button>}
-              <button data-serietout="1" style={bt} onClick={()=>setSerie(p=>({...p,go:"tout"}))}>{"⏮⏭ Toute la série — "+serieCourt(serie.deb)+" au "+serieCourt(serie.fin)}</button>
-              <button style={{...bt,background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--txt2)"}} onClick={()=>setSerie(null)}>Annuler</button>
+              <button data-serieun="1" style={bt} onClick={()=>setSerie({...serie,go:"un"})}>{"1️⃣ Seulement ce créneau — "+serieCourt(jClic)}</button>
+              {finApres&&!auDebut&&<button data-seriefin="1" style={bt} onClick={()=>setSerie({...serie,go:"fin"})}>{"⏭ Jusqu'à la fin — "+serieCourt(jClic)+" au "+serieCourt(serie.fin)}</button>}
+              <button data-serietout="1" style={bt} onClick={()=>setSerie({...serie,go:"tout"})}>{"⏮⏭ Toute la série — "+serieCourt(serie.deb)+" au "+serieCourt(serie.fin)}</button>
+              <button style={{...bt,background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--txt2)"}} onClick={()=>{setSerie(null);setSerieOff(o=>({...o,[serie.c.acteId]:1}));}}>Annuler</button>
             </div>
           :
             <div style={{marginTop:7}}>
               <div style={{fontSize:11,fontWeight:700,color:"#991b1b",marginBottom:5}}>{"Retirer "+(a.short||a.label)+" de "+med.init+" "+txt+" ?"}</div>
               <div style={{display:"flex",gap:5}}>
-                <button style={{...bt,background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--txt2)"}} onClick={()=>setSerie(p=>({...p,go:null}))}>Annuler</button>
-                <button data-serieoui="1" style={{...bt,background:"#dc2626",border:"1px solid #dc2626",color:"#fff"}} onClick={()=>{if(serie.go==="un"){retireUn(serie.c);setSerie(null);}else serieRetire(serie.go);}}>Oui, retirer</button>
+                <button style={{...bt,background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--txt2)"}} onClick={()=>setSerie({...serie,go:null})}>Annuler</button>
+                <button data-serieoui="1" style={{...bt,background:"#dc2626",border:"1px solid #dc2626",color:"#fff"}} onClick={()=>{if(serie.go==="un"){retireUn(serie.c);setSerie(null);}else serieRetire(serie,serie.go);}}>Oui, retirer</button>
               </div>
             </div>}
-        </div>;})()}
+        </div>;})())}
       {pend&&<ValidPose med={med} acte={acteById(pend.id)||null} salle={pend.salle} note={pend.note} canNote={canNote} info={pend.salle?dispoLigne(pend.salle):null}
         setNote={v=>setPend(p=>({...p,note:v}))} onRetour={retourPend} onValider={validePend} onClose={onClose}/>}
       {semQ&&<div style={{border:"1.5px solid #388bfd",background:"rgba(56,139,253,.07)",borderRadius:9,padding:"10px 12px",marginBottom:10}}>
