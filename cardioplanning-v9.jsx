@@ -14,7 +14,18 @@ const db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseD
    après inactivité (5 min, y compris en simple consultation ici) FAIT SORTIR du bac : au réveil, on tape son
    code et on est dans le vrai planning. Présence : planning/presence-bac, un « je suis là » par minute et par
    appareil qui peut modifier (une consultation sans code n'écrit pas, elle n'est pas comptée). */
-var BAC=(function(){try{return localStorage.getItem("cp6_bac")==="1";}catch(e){return false;}})();
+/* v10.266 : VERSION D'ESSAI — une seconde application, à l'adresse …/essai/, qui travaille sur des cahiers Firebase
+   à part (planning-essai, backups-essai, archives-essai, sessions-essai, signalements-essai) et jamais sur les vrais.
+   Le drapeau vient de l'en-tête d'index.html (window.CP_ESSAI, posé par « construire.sh --essai ») : le script compilé
+   est LE MÊME dans les deux versions, seul l'en-tête diffère. Les clés de la mémoire du navigateur sont préfixées
+   cp6e_ au lieu de cp6_ : les deux adresses vivent sur le même site et partageraient tout sinon (thème, bac, fermeture…).
+   Les comptes de l'essai sont c-<empreinte>@essai.cardioplanning.app (même empreinte, même fiche profils) : la règle
+   Firestore v10.266 n'autorise un compte essai qu'à écrire dans les cahiers « -essai ». Notifications coupées. */
+var ESSAI=(typeof window!=="undefined"&&window.CP_ESSAI===true);
+var COLL_PLAN=ESSAI?"planning-essai":"planning",COLL_BK=ESSAI?"backups-essai":"backups",COLL_AR=ESSAI?"archives-essai":"archives",
+    COLL_SE=ESSAI?"sessions-essai":"sessions",COLL_SIG=ESSAI?"signalements-essai":"signalements";
+var LS_PFX=ESSAI?"cp6e_":"cp6_";
+var BAC=(function(){try{return localStorage.getItem(LS_PFX+"bac")==="1";}catch(e){return false;}})();
 var PLAN_ID=BAC?"bac":"main";
 /* v10.238 : HISTORIQUE DES CASES — un cahier PAR PÉRIODE (planning/hist-<période>), une ligne compacte par
    modification. Plus de purge à 1000 lignes : le cahier d'une période garde tout, et suit la période jusqu'à son
@@ -22,7 +33,7 @@ var PLAN_ID=BAC?"bac":"main";
    copie ; il lit le VRAI historique jusqu'à son heure de départ (BAC_DEP). */
 var HIST_PFX="hist-";
 var BAC_DEP={t:null};
-const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", PLAN_ID) : null;
+const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, COLL_PLAN, PLAN_ID) : null;
 /* v10.135 : garde-fou de version. Le 28/08, après un plantage, le cache a resservi une
    v9.22 — une copie de juillet qui aurait écrit avec ses règles d'alors, sans verrou du
    passé. Désormais la version la plus récente inscrit son numéro dans Firebase (appVer) ;
@@ -40,7 +51,7 @@ function toast(msg,type,act){if(TOAST_HUB.f)TOAST_HUB.f(msg,type,act);}
    < 760, hauteur des grilles pleine page) se divisent par ZOOM.f pour redevenir des pixels de page.
    v10.185 : le bouton 🔍 est proposé à tous, sans réglage. */
 var ZOOM_DEF=110,ZOOM_PAS=[100,110,120,130];   /* v10.183 : 110 % en nominal (son choix), une fois les grilles au point sur PC et iPhone (v10.181/182) */
-var ZOOM=(function(){var z=ZOOM_DEF;try{var v=parseInt(localStorage.getItem("cp6_zoom"),10);if(ZOOM_PAS.indexOf(v)>=0)z=v;}catch(e){}return {z:z,f:z/100};})();
+var ZOOM=(function(){var z=ZOOM_DEF;try{var v=parseInt(localStorage.getItem((LS_PFX+"zoom")),10);if(ZOOM_PAS.indexOf(v)>=0)z=v;}catch(e){}return {z:z,f:z/100};})();
 function zoomApply(z){ZOOM.z=z;ZOOM.f=z/100;try{document.documentElement.style.zoom=String(ZOOM.f);}catch(e){}}
 zoomApply(ZOOM.z);
 function verNum(v){var m=String(v||"").match(/(\d+)\.(\d+)/);return m?parseInt(m[1],10)*1000+parseInt(m[2],10):0;}
@@ -58,7 +69,7 @@ function photoVersion(data0,prec){
   VER_PHOTO.fait=true;
   var ts=Date.now(),ver=String(APP_VERSION).split(" ")[0];
   var pl=sansCodes(Object.assign({},data0,{_ts:ts,_verArr:ver,_verPrec:String(prec||"")}));   /* v10.252 : sans les codes */
-  return Promise.resolve(window.firebaseDB.collection("backups").doc("b"+ts).set(pl)).then(function(){return true;})
+  return Promise.resolve(window.firebaseDB.collection(COLL_BK).doc("b"+ts).set(pl)).then(function(){return true;})
     .catch(function(e){VER_PHOTO.err=String((e&&(e.message||e.code))||e).slice(0,200);console.log("photo de version:",e);return false;});
 }
 /* v10.248 : message clair quand une sauvegarde échoue — le 01/10/2026, 45 sauvegardes, aucune nouvelle depuis le 29/09 :
@@ -86,7 +97,7 @@ function gelMuet(){var n=Date.now();if(n-(GEL.t||0)>10000){GEL.t=n;try{jlog("GEL
    file tournante (300 entrées au plus). AUCUN état React, AUCUN affichage ici : la tuile 📡 des Paramètres ne lit ces
    compteurs que pendant qu'on lui demande de mesurer. La latence est celle des VRAIES écritures : délai entre l'envoi et
    l'accusé du serveur (la promesse de Firestore) — elle ne génère donc aucun trafic supplémentaire. */
-var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[],lire:[],aff:[],poids:null,ong:[],clic:[],clicT:null,tabPrec:undefined};   /* v10.242 : poids = dernier poids du planning mesuré (pour les signalements) */
+var TRAFIC={t0:Date.now(),ecr:0,ko:0,recu:0,vol:0,lat:[],fil:[],lire:[],aff:[],poids:null,ong:[],clic:[],clicT:null,tabPrec:undefined,parOng:{}};   /* v10.263 : parOng = temps de construction PAR ONGLET {clé:[{ms,n}]} */   /* v10.242 : poids = dernier poids du planning mesuré (pour les signalements) */
 /* v10.234 : CE QUE COÛTE UN MESSAGE À L'APPAREIL. Le réseau mesuré (latence), restait l'appareil : à chaque message il relit
    le planning complet (lire = durée du traitement du message) puis redessine l'écran (aff = délai jusqu'après la peinture
    suivante). Deux relevés d'horloge par message, 20 valeurs gardées. Page en arrière-plan : pas de peinture, on ne mesure pas. */
@@ -120,12 +131,34 @@ function trafClicInit(){
     const t=performance.now();TRAFIC.clicT=t;
     trafPoser(TRAFIC.clic,t,performance);
   },true);
+  /* v10.263 : « Entrer » au clavier (touche Entrée dans le champ du code) relève aussi l'heure, pour la mesure « entrée » */
+  document.addEventListener("keydown",(e)=>{if(!document.hidden&&e&&e.key==="Enter")TRAFIC.clicT=performance.now();},true);
 }
-function trafOnglet(){
+/* v10.263 : MESURE PAR ONGLET — signalement du 31/10/2026 (TH, PC Edge : « onglet 354 ms, pire 719 ms », 0 message échangé :
+   c'est l'appareil qui construit toute la période d'un coup, pas le réseau). Avant de décider d'un rendu par fenêtre, on
+   chiffre : pour chaque onglet, le temps du clic jusqu'à l'écran et le NOMBRE DE CASES construites (les <td> de la page),
+   10 valeurs gardées par onglet ; « entrée » = le premier écran après le code. Lecture seule, rien n'est écrit ni envoyé. */
+function trafPoserOng(cle,t,P){
+  if(typeof requestAnimationFrame!=="function")return;
+  requestAnimationFrame(()=>setTimeout(()=>{
+    const ms2=Math.round(P.now()-t);let n=0;
+    try{n=document.querySelectorAll("main td").length;}catch(e){n=0;}
+    const l=TRAFIC.parOng[cle]||(TRAFIC.parOng[cle]=[]);l.push({ms:ms2,n:n});if(l.length>10)l.shift();
+  },0));
+}
+function trafOnglet(cle){
   const P=(typeof performance!=="undefined"&&performance.now)?performance:null;
   const t=TRAFIC.clicT;TRAFIC.clicT=null;
   if(!P||t===null||P.now()-t>3000||(typeof document!=="undefined"&&document.hidden))return;
-  trafPoser(TRAFIC.ong,t,P);
+  if(cle!=="entrée")trafPoser(TRAFIC.ong,t,P);
+  if(cle)trafPoserOng(cle,t,P);
+}
+/* v10.263 : résumé par onglet — [{cle,nom,med,max,n,k}] trié du plus lent au plus rapide */
+var TRAF_ONG_NOM={entrée:"Entrée (1er écran après le code)",planning:"Planning",chl:"CHL",chb:"CHB",plateau:"PT Cardio",angio:"PT Angio",internes:"Internes",construire:"Construire",astreinte:"Astreinte",reports:"Reports",notifications:"Notifications",attache:"Attachés",plantype:"Type",tourmedical:"Tour",garde:"Gardes",partage:"Paramètres",equipe:"Équipe",activites:"Activités",stats:"Stats",aide:"Aide"};
+function trafParOnglet(){
+  return Object.keys(TRAFIC.parOng).map(cle=>{const l=TRAFIC.parOng[cle];const ms=l.map(x=>x.ms);
+    return {cle,nom:TRAF_ONG_NOM[cle]||cle,med:trafMed(ms),max:Math.max.apply(null,ms),n:l[l.length-1].n,k:l.length};})
+    .filter(x=>x.k>0).sort((a,b)=>(b.med-a.med));
 }
 function trafMed(a){if(!a||!a.length)return null;const l=a.slice().sort((x,y)=>x-y);return l[Math.floor(l.length/2)];}
 function trafFil(k){TRAFIC.fil.push({t:Date.now(),k:k});if(TRAFIC.fil.length>300)TRAFIC.fil.splice(0,TRAFIC.fil.length-300);}
@@ -140,7 +173,7 @@ function trafEcr(p){
    relevés au moment de l'envoi. Lecture seule de TRAFIC : ne coûte rien, n'écrit rien. */
 function trafLigne(){try{const b=trafBilan(Date.now());const ms=v=>v===null?"—":(v<1000?v+" ms":(v/1000).toFixed(1)+" s");const P=TRAFIC.poids;
   return "latence dernière "+ms(b.latDer)+" · médiane "+ms(b.latMed)+(b.nLat?" ("+b.nLat+")":"")+" · lecture "+ms(b.lireMed)+" (pire "+ms(b.lireMax)+") · redessin "+ms(b.affMed)+" (pire "+ms(b.affMax)+")"
-    +" · onglet "+ms(b.ongMed)+" (pire "+ms(b.ongMax)+") · clic "+ms(b.clicMed)+" (pire "+ms(b.clicMax)+")"+" · 1 min : "+b.r60+" reçus, "+b.e60+" envoyées · en attente "+b.vol+" · refusées "+b.ko+" · poids "+(P==null?"—":Math.round(P/1024)+" Ko ("+Math.min(100,Math.round(P/10485.76))+" %)");}catch(e){return "?";}}
+    +" · onglet "+ms(b.ongMed)+" (pire "+ms(b.ongMax)+") · clic "+ms(b.clicMed)+" (pire "+ms(b.clicMax)+")"+" · 1 min : "+b.r60+" reçus, "+b.e60+" envoyées · en attente "+b.vol+" · refusées "+b.ko+" · par onglet (médiane/pire, cases) : "+(trafParOnglet().map(x=>x.nom+" "+x.med+"/"+x.max+" ms ("+x.n+")").join(", ")||"—")+" · poids "+(P==null?"—":Math.round(P/1024)+" Ko ("+Math.min(100,Math.round(P/10485.76))+" %)");}catch(e){return "?";}}
 function trafBilan(now){
   let e10=0,r10=0,e60=0,r60=0;const bar=[];for(let i=0;i<60;i++)bar.push(0);
   TRAFIC.fil.forEach(x=>{const a=now-x.t;if(a<0||a>=60000)return;if(x.k==="e")e60++;else r60++;if(a<10000){if(x.k==="e")e10++;else r10++;}bar[59-Math.floor(a/1000)]++;});
@@ -158,7 +191,7 @@ function sansIndef(v){
    (publiée à part, voir l'Aide) refuse une écriture dont t a plus de 10 minutes : la file d'attente d'une vieille page qui se
    réveille (incident du 25-29/09/2026, Firefox du téléphone) ne passe plus. Écrit ICI, au seul point de passage — et par
    avecTampon pour les rares écritures directes (gel, version, restauration, bac, sauvegarde). */
-var APPAREIL=(function(){var id="",ua="";try{id=localStorage.getItem("cp6_app")||"";if(!/^[a-z0-9]{4}$/.test(id)){id=Math.random().toString(36).slice(2,6);if(id.length<4)id=(id+"0000").slice(0,4);localStorage.setItem("cp6_app",id);}}catch(e){id=id||"????";}
+var APPAREIL=(function(){var id="",ua="";try{id=localStorage.getItem((LS_PFX+"app"))||"";if(!/^[a-z0-9]{4}$/.test(id)){id=Math.random().toString(36).slice(2,6);if(id.length<4)id=(id+"0000").slice(0,4);localStorage.setItem((LS_PFX+"app"),id);}}catch(e){id=id||"????";}
   try{ua=navigator.userAgent||"";}catch(e){}
   var nav=/Edg\//.test(ua)?"Edge":/Firefox\/|FxiOS/.test(ua)?"Firefox":/OPR\//.test(ua)?"Opera":/Chrome\/|CriOS/.test(ua)?"Chrome":/Safari\//.test(ua)?"Safari":"Navigateur";
   var sys=/iPhone/.test(ua)?"iPhone":/iPad/.test(ua)?"iPad":/Android/.test(ua)?"Android":/Windows/.test(ua)?"Windows":/Mac OS X|Macintosh/.test(ua)?"Mac":/Linux/.test(ua)?"Linux":"";
@@ -168,7 +201,7 @@ function horlNow(){return Math.round(Date.now()+HORL.dec);}
 function verCourt(){var m=String(APP_VERSION||"").match(/v?\d+\.\d+/);return m?m[0]:"?";}
 function tampon(){HORL.n++;HORL.dernN=HORL.n;HORL.envoi=Date.now();var o={t:horlNow(),n:HORL.n,a:APPAREIL.id,v:verCourt()};HORL.dernT=o.t;
   try{var fb=typeof window!=="undefined"?window.firebase:null;if(fb&&fb.firestore&&fb.firestore.FieldValue)o.s=fb.firestore.FieldValue.serverTimestamp();}catch(e){}return o;}
-function estCahier(ref){if(!ref)return false;if(ref===PLANNING_DOC)return true;try{return (ref.id==="main"||ref.id==="bac")&&!!ref.parent&&ref.parent.id==="planning";}catch(e){return false;}}
+function estCahier(ref){if(!ref)return false;if(ref===PLANNING_DOC)return true;try{return (ref.id==="main"||ref.id==="bac")&&!!ref.parent&&ref.parent.id===COLL_PLAN;}catch(e){return false;}}
 function avecTampon(obj){return Object.assign({},obj||{},{_ecr:tampon()});}
 /* l'heure du serveur : l'en-tête Date de la page (au chargement), puis l'écho de nos propres écritures (plus précis) */
 function horlCalibrer(){try{if(typeof fetch!=="function")return;var t0=Date.now();
@@ -211,8 +244,8 @@ function fbEtape(nom){var db=typeof window!=="undefined"?window.firebaseDB:null;
 function fermerApp(motif,info){
   if(FERME.on)return;FERME.on=true;INACT.actif=false;INACT.gen++;
   try{jlog("FERMETURE",[motif==="autre"?"code ouvert sur un autre appareil ("+((info&&info.lib)||"?")+")":"inactivité ("+INACT.min+" min)"]);}catch(e){}
-  try{localStorage.setItem("cp6_ferme",JSON.stringify({m:motif,lib:(info&&info.lib)||"",t:(info&&info.t)||0,min:INACT.min,bac:!!BAC}));}catch(e){}
-  if(BAC){try{localStorage.removeItem("cp6_bac");}catch(e){}}   /* v10.254 : la fermeture fait sortir du bac — au réveil, le vrai planning */
+  try{localStorage.setItem((LS_PFX+"ferme"),JSON.stringify({m:motif,lib:(info&&info.lib)||"",t:(info&&info.t)||0,min:INACT.min,bac:!!BAC}));}catch(e){}
+  if(BAC){try{localStorage.removeItem((LS_PFX+"bac"));}catch(e){}}   /* v10.254 : la fermeture fait sortir du bac — au réveil, le vrai planning */
   Promise.resolve(fbEtape("disableNetwork")).catch(function(){}).then(function(){
     var w=fbEtape("waitForPendingWrites");if(!w)return true;   // réseau coupé : ne se résout que si RIEN n'attend
     return Promise.race([w.then(function(){return false;},function(){return true;}),attendreMs(600).then(function(){return true;})]);
@@ -258,7 +291,8 @@ function cpteDispo(){try{return !!(typeof window!=="undefined"&&window.cpAuth&&w
 function cpteHash(s){var h1=0x811c9dc5,h2=0x9747b28c;s=String(s);for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);h1^=c;h1=Math.imul(h1,0x01000193)>>>0;h2=Math.imul(h2^c,0x5bd1e995)>>>0;h2^=h2>>>13;}
   for(var j=0;j<4;j++){h1=Math.imul(h1^(h2>>>7),0x01000193)>>>0;h2=Math.imul(h2^(h1>>>11),0x5bd1e995)>>>0;}
   return ("00000000"+h1.toString(16)).slice(-8)+("00000000"+h2.toString(16)).slice(-8);}
-function cpteEmail(code){return "c-"+cpteHash("cardioplanning|"+String(code))+"@comptes.cardioplanning.app";}
+function cpteEmail(code){return "c-"+cpteHash("cardioplanning|"+String(code))+(ESSAI?"@essai.cardioplanning.app":"@comptes.cardioplanning.app");}
+function cpteEmailReel(code){return "c-"+cpteHash("cardioplanning|"+String(code))+"@comptes.cardioplanning.app";}   /* v10.266 : le vrai compte, sondé par l'essai */
 function cpteMdp(code){code=String(code);return code.length>=6?code:code+"-cp";}
 function cpteErr(e){return String((e&&(e.code||e.message))||e||"");}
 function cpteReseau(e){return /network-request-failed|auth\/timeout|unavailable|deadline/i.test(cpteErr(e));}
@@ -286,6 +320,11 @@ function cpteEntrer(code,etiq){
 /* SONDER (liaison discrète) : {existe:true,nom} / {existe:false} / {erreur} */
 function cpteSonder(code){if(!cpteDispo())return Promise.resolve({erreur:"sans"});
   return cpteDelai(window.cpAuth.sonder(cpteEmail(code),cpteMdp(code))).then(function(u){return {existe:true,nom:(u&&u.nom)||"",uid:u&&u.uid};},function(e){if(cpteInconnu(e))return {existe:false};cpteNote(e);return {erreur:cpteErr(e),reseau:cpteReseau(e)};});}
+/* v10.266 : SONDER LE VRAI COMPTE depuis l'essai (liaison discrète, aussitôt refermée, aucune écriture). Si le code existe
+   pour de vrai, l'essai crée son propre compte @essai avec la même étiquette : on garde les mêmes codes sans jamais
+   les copier nulle part. {existe:true,nom} / {existe:false} / {erreur,reseau} */
+function cpteSonderReel(code){if(!cpteDispo())return Promise.resolve({erreur:"sans"});
+  return cpteDelai(window.cpAuth.sonder(cpteEmailReel(code),cpteMdp(code))).then(function(u){return {existe:true,nom:(u&&u.nom)||""};},function(e){if(cpteInconnu(e))return {existe:false};cpteNote(e);return {erreur:cpteErr(e),reseau:cpteReseau(e)};});}
 /* CRÉER pour un autre (liaison discrète) : {ok} / {existe:true} / {erreur} */
 function cpteCreer(code,etiq){if(!cpteDispo())return Promise.resolve({erreur:"sans"});
   return cpteDelai(window.cpAuth.creer(cpteEmail(code),cpteMdp(code),etiq,false)).then(function(u){cpteLog("compte créé",etiq);return {ok:true,uid:u&&u.uid};},function(e){if(/email-already-in-use/i.test(cpteErr(e)))return {existe:true};cpteNote(e);cpteLog("création impossible",etiq,cpteErr(e));return {erreur:cpteErr(e),reseau:cpteReseau(e)};});}
@@ -369,8 +408,8 @@ function codesDuDocument(data){var lg={};if(!data)return null;if(data.editPin)lg
   var ic=lireJson(data.intCfg,null);if(ic&&ic.pin!==undefined)lg.intPin=ic.pin||"";
   return Object.keys(lg).length?lg:null;}
 /* le texte des règles Firestore : la nouvelle (à coller) et la précédente (marche arrière) — carte 🔐 Comptes */
-var REGLE_TXT="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    // ── v10.246 : TAMPON HORAIRE (inchangé) ─────────────────────────────────────────────\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n\n    // ── v10.252 : COMPTES ET PROFILS ────────────────────────────────────────────────────\n    // Un compte Google connecté (adresse c-<empreinte>@comptes.cardioplanning.app) ; sa fiche\n    // profils/<empreinte>, écrite par l'éditeur seul, dit qui il est. Jamais le nom d'affichage.\n    function connecte() {\n      return request.auth != null && request.auth.token.email is string;\n    }\n    function cle() {\n      return request.auth.token.email.split('@')[0];\n    }\n    function ficheExiste() {\n      return exists(/databases/$(database)/documents/profils/$(cle()));\n    }\n    function fiche() {\n      return get(/databases/$(database)/documents/profils/$(cle())).data;\n    }\n    function aProfil() {\n      return connecte() && ficheExiste()\n        && fiche().p in ['editeur', 'medecin', 'attache', 'secretaires', 'cadres', 'internes']\n        && fiche().get('parti', false) != true;\n    }\n    function editeur() {\n      return aProfil()\n        && (fiche().p == 'editeur' || (fiche().p == 'medecin' && fiche().get('niv', '') == 'editeur'));\n    }\n    function moi(id) {\n      return aProfil() && fiche().p in ['medecin', 'attache'] && string(fiche().id) == id;\n    }\n\n    // Le cahier : lecture libre (Consulter), écriture par un profil, tampon frais sur main et bac.\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && id != 'main' && id != 'bac';\n    }\n    match /archives/{id} {\n      allow read: if true;\n      allow write: if editeur();\n    }\n    match /backups/{id} {\n      allow read: if editeur();\n      allow create: if aProfil();\n      allow update, delete: if editeur();\n    }\n    match /sessions/{id} {\n      allow read: if aProfil();\n      allow write: if moi(id);\n    }\n    match /push/{id} {\n      allow read: if editeur();\n      allow write: if aProfil();\n    }\n    match /signalements/{id} {\n      allow read: if editeur();\n      allow create: if request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur();\n    }\n    match /prive/{id} {\n      allow read, write: if editeur();\n    }\n    match /profils/{id} {\n      allow read: if editeur() || (connecte() && cle() == id);\n      allow write: if editeur();\n    }\n  }\n}\n";
-var REGLE_AVANT_TXT="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if (id != 'main' && id != 'bac') || tamponFrais();\n      allow delete: if id != 'main' && id != 'bac';\n    }\n    match /{coll}/{doc=**} { allow read, write: if coll != 'planning'; }\n  }\n}\n";
+var REGLE_TXT="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    // ── v10.246 : TAMPON HORAIRE (inchangé) ─────────────────────────────────────────────\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n\n    // ── v10.252 : COMPTES ET PROFILS ────────────────────────────────────────────────────\n    // Un compte Google connecté (adresse c-<empreinte>@comptes.cardioplanning.app) ; sa fiche\n    // profils/<empreinte>, écrite par l'éditeur seul, dit qui il est. Jamais le nom d'affichage.\n    function connecte() {\n      return request.auth != null && request.auth.token.email is string;\n    }\n    function cle() {\n      return request.auth.token.email.split('@')[0];\n    }\n    function ficheExiste() {\n      return exists(/databases/$(database)/documents/profils/$(cle()));\n    }\n    function fiche() {\n      return get(/databases/$(database)/documents/profils/$(cle())).data;\n    }\n    function aProfil() {\n      return connecte() && ficheExiste()\n        && fiche().p in ['editeur', 'medecin', 'attache', 'secretaires', 'cadres', 'internes']\n        && fiche().get('parti', false) != true;\n    }\n    function editeur() {\n      return aProfil()\n        && (fiche().p == 'editeur' || (fiche().p == 'medecin' && fiche().get('niv', '') == 'editeur'));\n    }\n    function moi(id) {\n      return aProfil() && fiche().p in ['medecin', 'attache'] && string(fiche().id) == id;\n    }\n\n    // ── v10.266 : VERSION D'ESSAI ─────────────────────────────────────────────────────\n    // L'application d'essai (…/essai/) entre avec des comptes c-<empreinte>@essai.cardioplanning.app\n    // (même empreinte, donc même fiche profils). Un compte essai n'écrit QUE dans les cahiers « -essai » ;\n    // un compte réel n'y écrit jamais. Lecture des vrais cahiers inchangée (c'est ce que fait la copie).\n    function essai() {\n      return connecte() && request.auth.token.email.split('@')[1] == 'essai.cardioplanning.app';\n    }\n\n    // Le cahier : lecture libre (Consulter), écriture par un profil réel, tampon frais sur main et bac.\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && !essai() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && !essai() && id != 'main' && id != 'bac';\n    }\n    match /planning-essai/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && essai() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && essai() && id != 'main' && id != 'bac';\n    }\n    match /archives/{id} {\n      allow read: if true;\n      allow write: if editeur() && !essai();\n    }\n    match /archives-essai/{id} {\n      allow read: if true;\n      allow write: if editeur() && essai();\n    }\n    match /backups/{id} {\n      allow read: if editeur() && !essai();\n      allow create: if aProfil() && !essai();\n      allow update, delete: if editeur() && !essai();\n    }\n    match /backups-essai/{id} {\n      allow read: if editeur() && essai();\n      allow create: if aProfil() && essai();\n      allow update, delete: if editeur() && essai();\n    }\n    match /sessions/{id} {\n      allow read: if aProfil() && !essai();\n      allow write: if moi(id) && !essai();\n    }\n    match /sessions-essai/{id} {\n      allow read: if aProfil() && essai();\n      allow write: if moi(id) && essai();\n    }\n    match /push/{id} {\n      allow read: if editeur() && !essai();\n      allow write: if aProfil() && !essai();\n    }\n    match /push-essai/{id} {\n      allow read: if editeur() && essai();\n      allow write: if aProfil() && essai();\n    }\n    match /signalements/{id} {\n      allow read: if editeur() && !essai();\n      allow create: if !essai()\n        && request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur() && !essai();\n    }\n    match /signalements-essai/{id} {\n      allow read: if editeur() && essai();\n      allow create: if essai()\n        && request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur() && essai();\n    }\n    // Communs aux deux : la copie des codes (lue par l'éditeur, réel ou essai) et les fiches profils — écrits par le vrai éditeur seul.\n    match /prive/{id} {\n      allow read: if editeur();\n      allow write: if editeur() && !essai();\n    }\n    match /profils/{id} {\n      allow read: if editeur() || (connecte() && cle() == id);\n      allow write: if editeur() && !essai();\n    }\n  }\n}\n";
+var REGLE_AVANT_TXT="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    // ── v10.246 : TAMPON HORAIRE (inchangé) ─────────────────────────────────────────────\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n\n    // ── v10.252 : COMPTES ET PROFILS ────────────────────────────────────────────────────\n    // Un compte Google connecté (adresse c-<empreinte>@comptes.cardioplanning.app) ; sa fiche\n    // profils/<empreinte>, écrite par l'éditeur seul, dit qui il est. Jamais le nom d'affichage.\n    function connecte() {\n      return request.auth != null && request.auth.token.email is string;\n    }\n    function cle() {\n      return request.auth.token.email.split('@')[0];\n    }\n    function ficheExiste() {\n      return exists(/databases/$(database)/documents/profils/$(cle()));\n    }\n    function fiche() {\n      return get(/databases/$(database)/documents/profils/$(cle())).data;\n    }\n    function aProfil() {\n      return connecte() && ficheExiste()\n        && fiche().p in ['editeur', 'medecin', 'attache', 'secretaires', 'cadres', 'internes']\n        && fiche().get('parti', false) != true;\n    }\n    function editeur() {\n      return aProfil()\n        && (fiche().p == 'editeur' || (fiche().p == 'medecin' && fiche().get('niv', '') == 'editeur'));\n    }\n    function moi(id) {\n      return aProfil() && fiche().p in ['medecin', 'attache'] && string(fiche().id) == id;\n    }\n\n    // Le cahier : lecture libre (Consulter), écriture par un profil, tampon frais sur main et bac.\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && id != 'main' && id != 'bac';\n    }\n    match /archives/{id} {\n      allow read: if true;\n      allow write: if editeur();\n    }\n    match /backups/{id} {\n      allow read: if editeur();\n      allow create: if aProfil();\n      allow update, delete: if editeur();\n    }\n    match /sessions/{id} {\n      allow read: if aProfil();\n      allow write: if moi(id);\n    }\n    match /push/{id} {\n      allow read: if editeur();\n      allow write: if aProfil();\n    }\n    match /signalements/{id} {\n      allow read: if editeur();\n      allow create: if request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur();\n    }\n    match /prive/{id} {\n      allow read, write: if editeur();\n    }\n    match /profils/{id} {\n      allow read: if editeur() || (connecte() && cle() == id);\n      allow write: if editeur();\n    }\n  }\n}\n";
 
 /* v10.251 : LIAISON. Le feu gris suivait le navigateur, qui ne sait pas toujours que le réseau est tombé. Le vrai signal est
    celui de Firebase : (1) chaque écriture doit être ACCUSÉE par le serveur — sans accusé pendant plus de LIAISON.delai,
@@ -416,7 +455,7 @@ function docSalleReg(d){d=d||{};return d.salleRegV2&&typeof d.salleRegV2==="obje
    dans le fichier sans qu'on y pense (contrôle 42). Les 8 rubriques lisibles restent en tête (anciens lecteurs, contrôle 41) ;
    le planning n'est écrit qu'une fois (« plan », remis en planV2 à la restauration). */
 var EXP_CODES=["medPins","editPin","adminPin","cadrePin"];   /* + le code des internes, rangé dans intCfg.pin */
-var EXP_HORS=["_ts","_verArr","_verPrec","_ecr","gel","_bacDe","_bacDep","_lastBackupAt","planV2","plan"];
+var EXP_HORS=["_ts","_verArr","_verPrec","_ecr","gel","_bacDe","_bacDep","_essaiDep","_lastBackupAt","planV2","plan"];
 var EXP_RUB=[[["astreinte","astReport"],"l'astreinte"],[["tourWish","tourAvoid","gardeWish","gardeAvoid"],"les souhaits de tour et de garde"],
   [["csRep","csBlanches"],"les reports"],[["intCfg"],"les internes"],[["build"],"Construire"],[["ideCfg"],"les IDE"],
   [["vacs","vacRule"],"les vacances"],[["salleFerm"],"les plages fermées"],[["annonces"],"les messages"],[["dblOk"],"les doubles en salle validés"]];
@@ -466,8 +505,8 @@ var NOTE_PAUSE=800;   /* v10.246 : la note part après 0,8 s sans frappe, ou à 
 var JOURNAL=[];
 /* v10.148 : le journal survit au redémarrage — une page blanche emporte sa console, pas ce fichier. La session
    précédente est relue au chargement (JOURNAL_PREC) et jointe au prochain signalement, marquée comme telle. */
-var JOURNAL_PREC=(function(){try{var v=JSON.parse(localStorage.getItem("cp6_journal")||"[]");return Array.isArray(v)?v.slice(-40):[];}catch(e){return [];}})();
-function jlog(niv,args){try{var t=new Date(),p=function(n){return ("0"+n).slice(-2);};var s=Array.prototype.map.call(args,function(a){if(a&&a.stack)return String(a.stack).split("\n").slice(0,3).join(" | ");if(a&&typeof a==="object"){try{return JSON.stringify(a);}catch(e){return String(a);}}return String(a);}).join(" ");JOURNAL.push(p(t.getHours())+":"+p(t.getMinutes())+":"+p(t.getSeconds())+" "+niv+" "+s.replace(/\s+/g," ").slice(0,300));if(JOURNAL.length>40)JOURNAL.shift();try{localStorage.setItem("cp6_journal",JSON.stringify(JOURNAL));}catch(e2){}}catch(e){}}
+var JOURNAL_PREC=(function(){try{var v=JSON.parse(localStorage.getItem((LS_PFX+"journal"))||"[]");return Array.isArray(v)?v.slice(-40):[];}catch(e){return [];}})();
+function jlog(niv,args){try{var t=new Date(),p=function(n){return ("0"+n).slice(-2);};var s=Array.prototype.map.call(args,function(a){if(a&&a.stack)return String(a.stack).split("\n").slice(0,3).join(" | ");if(a&&typeof a==="object"){try{return JSON.stringify(a);}catch(e){return String(a);}}return String(a);}).join(" ");JOURNAL.push(p(t.getHours())+":"+p(t.getMinutes())+":"+p(t.getSeconds())+" "+niv+" "+s.replace(/\s+/g," ").slice(0,300));if(JOURNAL.length>40)JOURNAL.shift();try{localStorage.setItem((LS_PFX+"journal"),JSON.stringify(JOURNAL));}catch(e2){}}catch(e){}}
 (function(){if(typeof window==="undefined"||window.__jlogOn)return;window.__jlogOn=true;
   var ce=console.error.bind(console),cw=console.warn.bind(console);
   console.error=function(){jlog("ERREUR",arguments);ce.apply(null,arguments);};
@@ -493,7 +532,7 @@ const JOURSC=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const JOURSL=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 const SLOTL={M:"Matin",AM:"Après-midi",N:"Nuit",JOUR:"Journée"};
 const SLOTS={M:"M",AM:"AM",N:"N",JOUR:"J"};
-const APP_VERSION="v10.262 — 01/11/2026";
+const APP_VERSION="v10.266 — 04/11/2026";
 jlog("OUVERTURE",[APP_VERSION]);   /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG={len:4,startM:6}; // défaut: 4 mois à partir de Juillet
@@ -1230,7 +1269,7 @@ function Chp({bg,c,children}){return <span style={{fontSize:9,background:bg,colo
 function ZoomBtn(){
   const [,tick]=useState(0);
   const suiv=ZOOM_PAS[(ZOOM_PAS.indexOf(ZOOM.z)+1)%ZOOM_PAS.length];
-  return <button onClick={()=>{zoomApply(suiv);try{localStorage.setItem("cp6_zoom",String(suiv));}catch(e){}window.dispatchEvent(new Event("resize"));tick(t=>t+1);}} title={"Zoom "+ZOOM.z+" % — cliquer pour "+suiv+" % (réglage de cet appareil)"} style={{...S.arr,fontSize:10,width:46,fontWeight:800}}>{"🔍"+ZOOM.z}</button>;
+  return <button onClick={()=>{zoomApply(suiv);try{localStorage.setItem((LS_PFX+"zoom"),String(suiv));}catch(e){}window.dispatchEvent(new Event("resize"));tick(t=>t+1);}} title={"Zoom "+ZOOM.z+" % — cliquer pour "+suiv+" % (réglage de cet appareil)"} style={{...S.arr,fontSize:10,width:46,fontWeight:800}}>{"🔍"+ZOOM.z}</button>;
 }
 function SigBtn(){return <><ZoomBtn/><button onClick={()=>window.dispatchEvent(new Event("cp-signal"))} title="Signaler un problème" style={{...S.arr,fontSize:13,width:30}}>🐞</button></>;}
 function Ov({children,onClose,wide=false,liste=false}){return <div style={S.ov} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div data-ovliste={liste?"1":undefined} style={wide?{...S.mb,width:"96vw",maxWidth:"96vw"}:S.mb}>{children}</div></div>;}   /* v10.242 : liste — fenêtre de choix d'un médecin, élargie sur ordinateur (CSS [data-ovliste]) */   /* v10.176 : wide — la modale 🤝 restait dans les 500 px de S.mb */
@@ -1259,6 +1298,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
      partie → la case du jour est hachurée et verrouillée, et la personne
      redevient disponible le jour de son retour. Des dates, jamais une période. */
   meds=(meds||[]).filter(m=>offEtat(m,allDays4||[])!=="off");
+  const _offMem=new Map();const gvOffL=(m)=>{let l=_offMem.get(m);if(!l){l=medOffL(m);_offMem.set(m,l);}return l;};   /* v10.265 : par rendu */
   const today=new Date();
   const C0=42,C1=24,CG=44;
   // Find garde med for a given day (slot N)
@@ -1462,12 +1502,13 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                     {gi&&gi.med&&<div style={{width:26,height:26,borderRadius:"50%",background:gi.med.color,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,fontWeight:800,margin:"0 auto"}}>{gi.med.init}</div>}
                     {gi&&gi.ext&&<div style={{fontSize:8,fontWeight:800,color:"var(--txt2)",background:"var(--bg2)",border:"1px dashed var(--border)",borderRadius:5,padding:"2px 2px",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{gi.ext}</div>}
                   </td>;})()}
-                {meds.map(med=>{
+                {(()=>{const astIdJ=getAstreinteForDay?getAstreinteForDay(ey,em,d):null;const dkJ=dKey(ey,em,d);   /* v10.265 : une fois par ligne, pas par case */
+                return meds.map(med=>{
                   const es=getEntries(med.id,ey,em,d,sl);
                   const bl=es[0]&&es[0]._blocked;
                   const noteT=notes[nk(med.id,ey,em,d,sl)];const issueT=planIssues[med.id+"|"+ey+"|"+em+"|"+d+"|"+sl];
-                  const offC=offOn(med,ey,em,d);   /* v10.41 : indisponible ce jour-là */
-                  const astId=getAstreinteForDay?getAstreinteForDay(ey,em,d):null;
+                  const offC=gvOffL(med).some(r=>r.du<=dkJ&&dkJ<=r.au);   /* v10.41 : indisponible ce jour-là ; v10.265 : plages lues une fois par médecin */
+                  const astId=astIdJ;
                   const isAst=astId!==null&&String(astId)===String(med.id);
                   let astSh=null;
                   if(isAst){
@@ -1500,7 +1541,7 @@ function GridV({onRemoveGarde=null,planIssues={},allDays,year,month,meds,getEntr
                       <CondBadges es={es} acteById={acteById} noteT={noteT}/>
                     </div>}
                   </td>;
-                })}
+                });})()}
                 {/* v10.240 : colonnes 👁 — la case vient de la fonction de l'onglet d'origine (siteCellTd, actCellTd) */}
                 {extraCols&&extraCols.length>0&&<td style={{padding:0,minWidth:6,width:6,background:"var(--border)"}}/>}
                 {extraCols&&extraCols.map(c=><React.Fragment key={"x"+c.k}>{we?<td style={{...S.td,...S.tdWE,padding:2}}/>:c.td(d,sl,ey,em)}</React.Fragment>)}
@@ -2016,13 +2057,24 @@ function SiteView({dbl=null,salleVide=null,isVac=null,salleFerm=null,onCellHisto
 
 /* ════ v10.240 : OCCUPATION ET CASE DE PT CARDIO, hors du composant ════
    ActTabView et la colonne 👁 du Planning s'en servent tous deux. */
+/* v10.265 : les entrées d'un créneau, médecin par médecin, lues UNE fois par rendu et partagées par toutes les lignes de
+   PT Cardio (chaque ligne, pour chaque activité, relisait toute l'équipe — PT Cardio 347 ms le 01/11/2026). La mémoire vit
+   dans l'objet de contexte `c`, refait à chaque rendu : elle ne survit donc jamais à un changement de données. */
+function actOccEntrees(c,ry,rm,d,sl){
+  const k=ry+"|"+rm+"|"+d+"|"+sl;const mem=c._esMem||(c._esMem={});
+  if(mem[k])return mem[k];
+  const out={meds:[],ide:c.getEntries(IDE_MED.id,ry,rm,d,sl)};
+  c.medecins.forEach(med=>{const es=c.getEntries(med.id,ry,rm,d,sl);if(es.length)out.meds.push({med,es});});
+  return mem[k]=out;
+}
 function actOcc(c,row,d,sl,ry,rm){
-  const {year,month,medecins,actes,getEntries}=c;
+  const {year,month,actes}=c;
   if(!ry)ry=year; if(!rm&&rm!==0)rm=month;
   const occ=[];
+  const ent=actOccEntrees(c,ry,rm,d,sl);
   row.ids.forEach(acteId=>{
-    medecins.forEach(med=>{
-      getEntries(med.id,ry,rm,d,sl).forEach(e=>{
+    ent.meds.forEach(({med,es})=>{
+      es.forEach(e=>{
         const match=(!e.cond)&&(row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId);
         if(match&&!occ.find(x=>x.med.id===med.id&&x.acteId===acteId)){
           const acte=actes.find(a=>a.id===acteId)||{short:acteId,color:row.color,bg:"#111"};
@@ -2030,7 +2082,7 @@ function actOcc(c,row,d,sl,ry,rm){
         }
       });
     });
-    getEntries(IDE_MED.id,ry,rm,d,sl).forEach(e=>{
+    ent.ide.forEach(e=>{
       const match=row.salle?(e.acteId===acteId&&e.salle===row.salle):e.acteId===acteId;
       if(match&&!occ.find(x=>x.med.id===IDE_MED.id&&x.acte&&x.acte.id===acteId)){
         const acte=actes.find(a=>a.id===acteId)||{id:acteId,short:acteId,color:row.color,bg:"#111"};
@@ -6640,7 +6692,7 @@ const HELP_SECTIONS=[
   HP({children:["Les bornes d'une période dépendent des ",HE("b",null,"vacances scolaires"),", qui se saisissent à la main dans ",HE("b",null,"Paramètres"),", année scolaire par année scolaire (Toussaint, Noël, Hiver, Printemps, Été). Si la fin d'une période tombe ",HE("b",null,"dedans"),", elle est repoussée au dernier jour des vacances — sauf au-delà de 21 jours, pour que l'été n'avale pas deux mois."]}),
   HP({children:["« ",HE("b",null,"Coller un calendrier")," » accepte le texte du calendrier officiel et ",HE("b",null,"propose")," les dates trouvées avant de les enregistrer. Le bouton « + Année » prépare l'année suivante ; les années terminées se replient toutes seules et peuvent être supprimées. Un rappel s'affiche dans le Planning dès que la période affichée n'est pas couverte : ",HE("b",null,"rien n'est bloqué"),", mais les bornes seront fausses tant que les dates manquent."]}),
   HT({children:"📡 Trafic et latence (v10.233)"}),
-  HP({children:["Dans Paramètres, la carte ",HE("b",null,"📡 Trafic et latence")," montre ce que l'appareil échange avec le serveur : écritures envoyées, messages reçus (10 s, 1 min, depuis l'ouverture), écritures en attente ou refusées, et la ",HE("b",null,"latence")," — le délai entre une écriture et l'accusé du serveur. Elle ne mesure que si vous appuyez sur ",HBtn({kind:"ghost",children:"▶ Mesurer"})," et s'arrête seule au bout de 2 minutes : éteinte, elle ne coûte rien. ",HBtn({kind:"ghost",children:"⏱ Tester la latence"})," envoie une écriture minuscule pour avoir une mesure tout de suite. Depuis la v10.234 elle distingue le ",HE("b",null,"réseau")," (latence) de l'",HE("b",null,"appareil")," : temps de lecture d'un message, temps jusqu'à l'écran redessiné, et poids du planning reçu à chaque message. À savoir : chaque écriture renvoie le planning à tous les appareils connectés — beaucoup de messages reçus en peu de temps signifie que quelqu'un écrit en rafale."]}),
+  HP({children:["Dans Paramètres, la carte ",HE("b",null,"📡 Trafic et latence")," montre ce que l'appareil échange avec le serveur : écritures envoyées, messages reçus (10 s, 1 min, depuis l'ouverture), écritures en attente ou refusées, et la ",HE("b",null,"latence")," — le délai entre une écriture et l'accusé du serveur. Elle ne mesure que si vous appuyez sur ",HBtn({kind:"ghost",children:"▶ Mesurer"})," et s'arrête seule au bout de 2 minutes : éteinte, elle ne coûte rien. ",HBtn({kind:"ghost",children:"⏱ Tester la latence"})," envoie une écriture minuscule pour avoir une mesure tout de suite. Depuis la v10.234 elle distingue le ",HE("b",null,"réseau")," (latence) de l'",HE("b",null,"appareil")," : temps de lecture d'un message, temps jusqu'à l'écran redessiné, et poids du planning reçu à chaque message. À savoir : chaque écriture renvoie le planning à tous les appareils connectés — beaucoup de messages reçus en peu de temps signifie que quelqu'un écrit en rafale. Depuis la v10.263, un encadré ",HE("b",null,"Construction par onglet")," donne, onglet par onglet, le temps du clic jusqu'à l'écran et le nombre de cases dessinées : c'est ce qui chiffre la lenteur d'un changement d'onglet (l'appareil construit toute la période d'un coup) ; ces chiffres figurent aussi dans la ligne Trafic d'un signalement 🐞."]}),
   HT({children:"Où voit-on les vacances ? (v10.230)"}),
   HP({children:["Dans tous les onglets qui affichent des jours ou des semaines, avec la même teinte gris-bleu. ",HE("b",null,"Onglets par jours")," — Planning, Internes, Attachés, CHL, CHB, PT Cardio, PT Angio, Gardes : la ",HE("b",null,"case de la date"),", à gauche, est teintée, jour par jour, exactement. Seule la date l'est, jamais la case d'une salle : le gris d'une case de salle veut toujours dire « plage fermée »."]}),
   HP({children:[HE("b",null,"Onglets par semaines")," : dans le Tour (Construire), le ",HE("b",null,"libellé de la semaine"),", à gauche, est teinté — d'un gris plus soutenu qu'ailleurs depuis la v10.231, le fond de cette grille étant déjà gris ; dans les Reports, la ",HE("b",null,"case de la semaine")," du tableau des semaines blanches est grisée (le bleu des semaines de tour reste sur les jours) ; dans l'Astreinte, un ",HE("b",null,"liseré gris avec la mention VAC")," précède la date de la tuile — du côté de la date, pas du médecin : c'est la semaine qui est en vacances, pas la personne. Il ne se confond pas avec le bord violet épaissi de la tuile, qui signale des exceptions."]}),
@@ -6830,6 +6882,14 @@ const HELP_SECTIONS=[
   HP({children:["Accès : éditeur et intermédiaires. Pour construire le planning en voyant tout le monde, le bouton ",HBtn({kind:"ghost",children:"👁"})," de la barre du Planning ouvre la liste de ",HE("b",null,"toutes les colonnes des onglets salles")," — CHL, CHB (avec le BIP), PT Cardio (avec la Stimulation) et PT Angio — et un champ de recherche (« bip », « stim », « CHB-2 »…). Chaque colonne cochée s'ajoute ",HE("b",null,"tout à droite, après les médecins"),", derrière un trait vertical (v10.240)."]}),
   HP({children:["La colonne est ",HE("b",null,"exactement celle de son onglet"),", dessinée par le même code : mêmes ronds, mêmes couleurs, salle vide colorée, plage fermée grisée, alertes et notes. Un clic ouvre la même fenêtre que dans l'onglet d'origine, avec les mêmes droits et les mêmes verrous. Poser un médecin depuis cette colonne revient à le poser dans sa propre colonne : tout se met à jour en même temps, rien n'est écrit deux fois."]}),
   HP({last:true,children:["Réglage ",HE("b",null,"propre à cet appareil"),", vide par défaut : personne d'autre ne voit vos colonnes, et elles disparaissent dès qu'on les décoche (",HBtn({kind:"ghost",children:"✕ Tout décocher"}),"). Le bouton 👁 prend un liseré tant qu'une colonne est cochée. Ces colonnes ne sont pas imprimées. Seul ce qui est déjà une colonne dans un onglet salle peut être affiché : pour une activité qui n'en a pas, cochez-lui une colonne de reprise ↩ dans Paramètres → Activités."]}))},
+ {id:"essai",icon:"🧪",title:"Version d'essai — tester une nouvelle version avant de la diffuser",body:()=>HE("div",null,
+  HP({children:["Depuis la v10.266, CardioPlanning existe en ",HE("b",null,"deux applications")," : la vraie, et une ",HE("b",null,"version d'essai"),", à l'adresse de la vraie suivie de ",HE("b",null,"/essai/"),". L'essai se reconnaît à son ",HE("b",null,"bandeau orange « VERSION D'ESSAI »"),", en haut de tous les écrans, et à son icône orange une fois installé sur un téléphone (nom « CardioPlanning ESSAI »). Il sert à essayer une nouvelle version de l'application — un nouvel affichage, un nouveau mécanisme — avec de vraies données, avant de la mettre entre les mains de l'équipe."]}),
+  HP({children:[HE("b",null,"Ses données sont à part"),". L'essai travaille sur ses propres cahiers Firebase (planning, sauvegardes, archives, signalements), jamais sur les vrais : il a même son propre bac à sable. On y entre avec les mêmes codes que dans la vraie application — à la première entrée, le code est vérifié sur le vrai compte, puis l'essai se crée un compte à lui, en coulisse. Côté serveur, la règle Firestore v10.266 n'autorise un compte de l'essai qu'à écrire dans les cahiers de l'essai : même une erreur dans une version en test ne pourrait pas toucher le vrai planning."]}),
+  HP({children:[HE("b",null,"Copier le planning réel"),". Dans les Paramètres de l'essai, la carte 🧪 Version d'essai (éditeur) porte ",HBtn({kind:"ghost",children:"⬇ Copier le planning réel dans l'essai"}),' : le vrai planning est lu (lecture seule) et remplace celui de l\'essai — cases, tour, gardes, notes, historique des cases. La case « copier aussi les archives » ajoute les anciennes périodes, pour tester ce qui ne se voit que sur elles. La carte rappelle la date de la dernière copie.']}),
+  HP({children:[HE("b",null,"Ce qui est coupé"),' : les notifications (un message posé pour voir partirait sinon sur les téléphones de toute l\'équipe) et l\'écriture des fiches profils et de la copie des codes, qui restent du ressort de la vraie application. Les signalements 🐞 faits dans l\'essai arrivent dans les Paramètres de l\'essai, pas dans ceux de la vraie application ; leur ligne de version porte « VERSION D\'ESSAI ».']}),
+  HP({children:[HE("b",null,"Sur un même appareil"),", la vraie application et l'essai ne se mélangent pas : thème, zoom, prénom, bac à sable, fermeture après inactivité — chacun garde les siens. Et « un code, un appareil » ne vaut qu'entre vraies applications : ouvrir l'essai sur le téléphone ne ferme pas la vraie application sur l'ordinateur."]}),
+  HP({children:[HE("b",null,"Pour fabriquer la version d'essai"),' (administrateur) : « bash construire.sh --essai » produit le dossier essai/ (index.html, sw.js, manifest.json, icônes) à partir des mêmes fichiers sources que la vraie application ; on le dépose tel quel dans le dépôt GitHub, à côté des fichiers habituels. Une version peut ainsi vivre dans l\'essai avec un numéro plus récent que le vrai sans que le vrai passe en lecture seule : chaque application a son propre garde-fou de version.']}),
+ )},
  {id:"bac",icon:"🧪",title:"Bac à sable — tester sans risque",body:()=>HE("div",null,
   HP({children:["Un espace de test à part, ouvert à toute l'équipe depuis la v10.254. Sur l'écran d'accueil, le bouton ",HBtn({kind:"ghost",children:"🧪 Essayer le bac à sable"})," ouvre le bac ; on y tape ensuite son code habituel et on y a son vrai profil — un médecin y voit et y fait ce qu'un médecin voit et fait, une secrétaire ce qu'une secrétaire voit et fait. Le bac est un cahier Firebase distinct, copie du planning réel : tout ce qu'on y fait reste dans cette copie, et le vrai planning ne bouge pas d'une case."]}),
   HP({children:[HE("b",null,"Plusieurs personnes à la fois"),". Le bac est partagé : entrer ne copie rien, on le rejoint tel qu'il est, et chacun voit en direct ce que font les autres, comme dans le vrai planning. Seul l'éditeur remplace son contenu — par une copie fraîche du vrai planning (↺ Remettre à zéro) ou par une sauvegarde ; si d'autres appareils sont dans le bac à ce moment-là, il en est averti, car leurs essais sont remplacés. Le bandeau indique qui d'autre modifie le bac (👥) ; une personne entrée en simple consultation n'est pas comptée."]}),
@@ -6922,7 +6982,8 @@ CpGarde.prototype=Object.create(React.Component.prototype);CpGarde.prototype.con
 CpGarde.getDerivedStateFromError=function(e){return {err:e};};
 CpGarde.prototype.componentDidCatch=function(e,info){jlog("PLANTAGE RENDU",[(e&&e.message)||String(e),info&&info.componentStack?String(info.componentStack).trim().split("\n").slice(0,3).join(" | "):""]);};
 CpGarde.prototype.render=function(){
-  if(!this.state.err)return this.props.children;
+  if(!this.state.err){if(!ESSAI)return this.props.children;
+    return React.createElement(React.Fragment,null,React.createElement("div",{"data-essai":"1",style:{position:"sticky",top:0,zIndex:450,background:"#ea580c",color:"#fff",textAlign:"center",fontSize:12,fontWeight:800,letterSpacing:".04em",padding:"5px 8px",boxShadow:"0 2px 8px rgba(0,0,0,.25)"}},"⚠ VERSION D'ESSAI — "+APP_VERSION.split(" — ")[0]+" · rien ici n'est le vrai planning"),this.props.children);}   /* v10.266 */
   var RE=React.createElement,e=this.state.err;
   var rapport=["🐞 Plantage CardioPlanning — "+sigDate(Date.now()),"Version : "+APP_VERSION,"Trafic : "+trafLigne(),"Erreur : "+((e&&e.message)||String(e)),(e&&e.stack?String(e.stack).split("\n").slice(0,4).join("\n"):""),"—","Journal :"].concat(JOURNAL).join("\n");
   return RE("div",{style:{padding:"24px 18px",maxWidth:520,margin:"0 auto",fontFamily:"'Sora',sans-serif",color:"var(--txt,#e6edf3)"}},
@@ -8377,7 +8438,7 @@ function AnnBanniere({annonces,fam,medId=null,masques,setMasques}){   /* v10.209
   if(!list.length)return null;
   const cacher=(id,def)=>{
     setMasques(o=>({...(o||{}),[id]:1}));
-    if(def){try{const h=JSON.parse(localStorage.getItem("cp6_annHide")||"{}")||{};h[id]=1;localStorage.setItem("cp6_annHide",JSON.stringify(h));}catch(e){}}
+    if(def){try{const h=JSON.parse(localStorage.getItem((LS_PFX+"annHide"))||"{}")||{};h[id]=1;localStorage.setItem((LS_PFX+"annHide"),JSON.stringify(h));}catch(e){}}
   };
   return <div className="no-print" style={{marginBottom:8}}>
     {list.map(a=>{const nv=annNivDe(a)[2];return <div key={a.id} style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap",background:nv.bg,border:"1.5px solid "+nv.bd,borderRadius:9,padding:"8px 12px",marginBottom:6,fontSize:12.5,color:nv.tx}}>
@@ -8813,6 +8874,11 @@ function TraficTuile({onPing=null,netOff=false,docSize=null}){
       {lg("Appareil — jusqu'à l'écran redessiné (médiane / pire)",duo(b.affMed,b.affMax),colTrt(b.affMed))}
       {lg("Appareil — changement d'onglet jusqu'à l'écran (médiane / pire)",duo(b.ongMed,b.ongMax),colTrt(b.ongMed))}
       {lg("Appareil — réponse à un clic, modale comprise (médiane / pire)",duo(b.clicMed,b.clicMax),colTrt(b.clicMed))}
+      {(()=>{const po=trafParOnglet();if(!po.length)return null;   /* v10.263 */
+        return <div data-trafong="1" style={{margin:"4px 0 2px",padding:"5px 8px",borderRadius:7,background:"var(--bg2)",border:"1px solid var(--border2)"}}>
+          <div style={{fontSize:10.5,fontWeight:800,color:"var(--txt2)",marginBottom:2}}>Construction par onglet, depuis l'ouverture — médiane / pire · cases dessinées (passages)</div>
+          {po.map(x=><div key={x.cle} style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:11,padding:"1px 0"}}><span style={{color:"var(--txt2)"}}>{x.nom}</span><b style={{color:colTrt(x.med),fontFamily:"'JetBrains Mono',monospace"}}>{ms(x.med)+" / "+ms(x.max)+" · "+x.n.toLocaleString("fr-FR")+" cases ("+x.k+")"}</b></div>)}
+        </div>;})()}
       {lg("Poids du planning reçu à chaque message",docSize===null?"—":Math.round(docSize/1024)+" Ko ("+Math.min(100,Math.round(docSize/10485.76))+" % de la limite)",docSize===null?undefined:docSize<629000?undefined:docSize<891000?"#d97706":"#dc2626")}
       {lg("Messages reçus — 10 s / 1 min",b.r10+" / "+b.r60,b.r60>=40?"#dc2626":b.r60>=15?"#d97706":undefined)}
       {lg("Écritures envoyées — 10 s / 1 min",b.e10+" / "+b.e60,b.e60>=40?"#dc2626":b.e60>=15?"#d97706":undefined)}
@@ -8839,7 +8905,7 @@ function ProtectionTuile({netOff=false,bloque=false}){
   const [lignes,setLignes]=useState([]);
   const epreuve=(p,ms)=>new Promise(res=>{let fini=false;const t=setTimeout(()=>{if(!fini){fini=true;res({k:"?",m:"pas de réponse en 10 s"});}},ms||10000);
     Promise.resolve(p).then(()=>{if(fini)return;fini=true;clearTimeout(t);res({k:"ok"});},e=>{if(fini)return;fini=true;clearTimeout(t);res(estRefus(e)?{k:"refus"}:{k:"?",m:String((e&&(e.code||e.message))||e).slice(0,100)});});});
-  const sansCompteDoc=()=>{try{const fb=window.firebase;if(!fb||!fb.app||!fb.firestore)return null;let app=null;try{app=fb.app("cp-sans");}catch(e){app=fb.initializeApp(fb.app().options,"cp-sans");}return app.firestore().collection("planning").doc(PLAN_ID);}catch(e){return null;}};
+  const sansCompteDoc=()=>{try{const fb=window.firebase;if(!fb||!fb.app||!fb.firestore)return null;let app=null;try{app=fb.app("cp-sans");}catch(e){app=fb.initializeApp(fb.app().options,"cp-sans");}return app.firestore().collection(COLL_PLAN).doc(PLAN_ID);}catch(e){return null;}};
   const tester=async()=>{
     if(!PLANNING_DOC||!window.firebaseSetDoc){setRes({k:"?",m:"Pas de connexion à la base."});return;}
     setRes({k:"…",m:"Tests en cours…"});setLignes([]);const L=[];
@@ -9081,7 +9147,7 @@ var HIST_ALERTE=700000,HIST_MAX=900000,HIST_GARDE=800000;   /* octets : Firebase
    historique jusqu'à l'heure de départ du bac, puis les lignes du bac lui-même. Rend {id: {t,x,k,md,act,a}}. */
 async function histLire(pids){
   const out={},dep=BAC?BAC_DEP.t:null;
-  const lit=async(id,champ,garde)=>{try{const d=(await window.firebaseDB.collection("planning").doc(id).get()).data()||{};const e=d[champ]||{};
+  const lit=async(id,champ,garde)=>{try{const d=(await window.firebaseDB.collection(COLL_PLAN).doc(id).get()).data()||{};const e=d[champ]||{};
     Object.keys(e).forEach(k=>{const x=histDec(e[k]);if(x&&(!garde||garde(x)))out[k]=x;});}catch(err){}};
   const avant=dep?(x=>x.t<=dep):null;
   const l=[lit("journal","entries",avant)];
@@ -11030,13 +11096,14 @@ function vSemAvertit(r,wk){var q=String(wk).split("-").map(Number);var f=new Dat
    · iPhone : uniquement depuis l'application installée sur l'écran d'accueil (iOS ≥ 16.4) ;
      Android et ordinateur : Chrome/Edge sans installation.
    La clé publique (VAPID) est window.PUSH_VAPID dans index.html ; vide = pas configuré. */
-const PUSH_DEV_KEY="cp6_pushDev",PUSH_ON_KEY="cp6_pushOn",PUSH_CHOIX_KEY="cp6_pushChoix";
+const PUSH_DEV_KEY=(LS_PFX+"pushDev"),PUSH_ON_KEY=(LS_PFX+"pushOn"),PUSH_CHOIX_KEY=(LS_PFX+"pushChoix");
 const pushDevId=()=>{try{let d=localStorage.getItem(PUSH_DEV_KEY);if(!d){d="d"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);localStorage.setItem(PUSH_DEV_KEY,d);}return d;}catch(e){return "d0";}};
 const pushLibAppareil=()=>{const u=(typeof navigator!=="undefined"&&navigator.userAgent)||"";if(/iPhone|iPad|iPod/i.test(u))return "iPhone";if(/Android/i.test(u))return "Android";return "ordinateur";};
 const pushInstalle=()=>{try{return !!((typeof navigator!=="undefined"&&navigator.standalone)||(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches));}catch(e){return false;}};
 /* état de départ, sans rien demander au navigateur */
 const pushEtatInitial=(medId)=>{
   if(typeof window==="undefined")return "nonsupp";
+  if(ESSAI)return "essai";   /* v10.266 : jamais de notification depuis l'essai (elles partiraient sur les vrais téléphones) */
   if(!window.PUSH_VAPID)return "noconf";
   if(pushLibAppareil()==="iPhone"&&!pushInstalle())return "ios";
   if(typeof Notification==="undefined"||!("serviceWorker" in navigator)||!window.pushGetToken)return "nonsupp";
@@ -11106,6 +11173,7 @@ function PushCarte({medId,medecins=[],onChoix}){
     <div style={{marginTop:6}}>
       {etat==="noconf"&&<p style={P}>Les notifications ne sont pas encore configurées par l'éditeur (clé d'envoi manquante). Réessayez après la prochaine mise à jour.</p>}
       {etat==="ios"&&<p style={P}>Sur iPhone, les notifications ne fonctionnent que depuis l'application <b>installée sur l'écran d'accueil</b> : dans Safari, bouton Partager puis « Sur l'écran d'accueil ». Ouvrez ensuite CardioPlanning depuis son icône et revenez ici.</p>}
+      {etat==="essai"&&<p style={P}>🧪 Version d'essai : les notifications sont coupées ici — un message posé pour voir partirait sinon sur les téléphones de toute l'équipe.</p>}
       {etat==="nonsupp"&&<p style={P}>Ce navigateur ne permet pas les notifications. Sur ordinateur, Chrome ou Edge conviennent ; sur téléphone, Chrome (Android) ou l'application installée (iPhone).</p>}
       {etat==="refuse"&&<p style={P}>Les notifications ont été <b>refusées</b> pour ce site. Pour les autoriser à nouveau, passez par les réglages du navigateur (icône à gauche de l'adresse → Notifications) — sur iPhone, Réglages → Notifications → CardioPlanning.</p>}
       {(etat==="off"||attente)&&<div>
@@ -11173,20 +11241,20 @@ function CardioPlanning(){
   const [printWk,setPrintWk]=useState(null);
   const [printWhat,setPrintWhat]=useState("plateau");
   const [printSel,setPrintSel]=useState(()=>{const t=new Date();return mondayOf(t.getFullYear(),t.getMonth(),t.getDate());});
-  const [ideOn,setIdeOn]=useState(()=>{try{return localStorage.getItem("cp6_ide_on")==="1";}catch{return false;}});
-  useEffect(()=>{try{localStorage.setItem("cp6_ide_on",ideOn?"1":"0");}catch{}},[ideOn]);
+  const [ideOn,setIdeOn]=useState(()=>{try{return localStorage.getItem((LS_PFX+"ide_on"))==="1";}catch{return false;}});
+  useEffect(()=>{try{localStorage.setItem((LS_PFX+"ide_on"),ideOn?"1":"0");}catch{}},[ideOn]);
   const [adminEnabled,setAdminEnabled]=useState(true);
   const [adminCanReports,setAdminCanReports]=useState(true);
   const [adminCanNotes,setAdminCanNotes]=useState(false);
-  const [adminName,setAdminName]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
+  const [adminName,setAdminName]=useState(()=>{try{return localStorage.getItem((LS_PFX+"adminName"))||"";}catch(e){return "";}});
   const [adminAsk,setAdminAsk]=useState(false);
-  const [adminNameInput,setAdminNameInput]=useState(()=>{try{return localStorage.getItem("cp6_adminName")||"";}catch(e){return "";}});
+  const [adminNameInput,setAdminNameInput]=useState(()=>{try{return localStorage.getItem((LS_PFX+"adminName"))||"";}catch(e){return "";}});
   /* v10.69, lot 5 : acces INTERNE (code partage, defini dans Parametres > tuile
      Internes). Le prenom est demande a la connexion et retenu sur l'appareil,
      exactement comme pour les secretaires et les cadres. */
   const [interneAsk,setInterneAsk]=useState(false);
-  const [interneName,setInterneName]=useState(()=>{try{return localStorage.getItem("cp6_interneName")||"";}catch(e){return "";}});
-  const [interneNameInput,setInterneNameInput]=useState(()=>{try{return localStorage.getItem("cp6_interneName")||"";}catch(e){return "";}});
+  const [interneName,setInterneName]=useState(()=>{try{return localStorage.getItem((LS_PFX+"interneName"))||"";}catch(e){return "";}});
+  const [interneNameInput,setInterneNameInput]=useState(()=>{try{return localStorage.getItem((LS_PFX+"interneName"))||"";}catch(e){return "";}});
   const [showPins,setShowPins]=useState(false);
   const [pinsAsk,setPinsAsk]=useState(false);
   const [pinsTry,setPinsTry]=useState("");
@@ -11205,7 +11273,7 @@ function CardioPlanning(){
      l'écran du code après une fermeture (lu une fois dans cp6_ferme, puis effacé) */
   const [inactMin,setInactMin]=useState(5);
   const [inactReste,setInactReste]=useState(null);
-  const [fermeMsg,setFermeMsg]=useState(()=>{try{const v=JSON.parse(localStorage.getItem("cp6_ferme")||"null");localStorage.removeItem("cp6_ferme");return v&&v.m?v:null;}catch(e){return null;}});
+  const [fermeMsg,setFermeMsg]=useState(()=>{try{const v=JSON.parse(localStorage.getItem((LS_PFX+"ferme"))||"null");localStorage.removeItem((LS_PFX+"ferme"));return v&&v.m?v:null;}catch(e){return null;}});
   const [bacDe,setBacDe]=useState(null);   /* v10.237 : {ts,at} — la sauvegarde chargée dans le bac, ou null */   /* v10.232 : LA couleur des salles vides (une seule) */
   FERM.d=salleFerm;
   const [gel,setGel]=useState(null);   /* v10.229 : {by,at} tant que le planning est gelé par un éditeur */
@@ -11224,7 +11292,7 @@ function CardioPlanning(){
     try{
       if(!window.firebaseDB||!window.firebaseDoc)return;
       const k2=sk(y2,m2,d2,sl2),pid2=BAC?"bac":histPid(k2);if(!pid2)return;   /* v10.238 : le cahier de la période de la case */
-      const jdoc=window.firebaseDoc(window.firebaseDB,"planning",HIST_PFX+pid2);
+      const jdoc=window.firebaseDoc(window.firebaseDB,COLL_PLAN,HIST_PFX+pid2);
       const eid="e"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
       const je=histEnc({t:Date.now(),k:k2,md:medId2,x:action,act:acteId2||null,a:authorRef.current});
       if(updatePaths)Promise.resolve(updatePaths(jdoc,[[["e",eid],je]])).catch(()=>{if(setDoc)Promise.resolve(setDoc(jdoc,{e:{[eid]:je}},{merge:true})).catch(()=>{});});
@@ -11243,7 +11311,7 @@ function CardioPlanning(){
         pids.forEach(pid=>{if(!pid)return;const eid="e"+t0.toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5);(parPid[pid]=parPid[pid]||[]).push([["e",eid],je]);});
       });
       Object.keys(parPid).forEach(pid=>{
-        const jdoc=window.firebaseDoc(window.firebaseDB,"planning",HIST_PFX+pid),pr=parPid[pid];
+        const jdoc=window.firebaseDoc(window.firebaseDB,COLL_PLAN,HIST_PFX+pid),pr=parPid[pid];
         for(let i=0;i<pr.length;i+=200){const lot=pr.slice(i,i+200);
           const repli=()=>{if(!setDoc)return;const o={};lot.forEach(q=>{o[q[0][1]]=q[1];});Promise.resolve(setDoc(jdoc,{e:o},{merge:true})).catch(()=>{});};
           if(updatePaths)Promise.resolve(updatePaths(jdoc,lot)).catch(repli);else repli();}
@@ -11264,7 +11332,8 @@ function CardioPlanning(){
   const [tab,setTab]=useState("planning");
   /* v10.255 : mesure du changement d'onglet (voir trafOnglet) — lecture seule */
   useEffect(()=>{trafClicInit();},[]);
-  useEffect(()=>{if(TRAFIC.tabPrec===undefined){TRAFIC.tabPrec=tab;return;}if(TRAFIC.tabPrec===tab)return;TRAFIC.tabPrec=tab;trafOnglet();},[tab]);
+  useEffect(()=>{if(TRAFIC.tabPrec===undefined){TRAFIC.tabPrec=tab;return;}if(TRAFIC.tabPrec===tab)return;TRAFIC.tabPrec=tab;trafOnglet(tab);},[tab]);
+  useEffect(()=>{if(accessMode!=="ask")trafOnglet("entrée");},[accessMode]);   /* v10.263 : le 1er écran après le code (le clic « Entrer » a relevé l'heure) */
   /* v10.132 : écran étroit (< 760 px, même seuil que TableScroll), plateau ⋯ et menu du filtre */
   const [narrow,setNarrow]=useState(typeof window!=="undefined"&&window.innerWidth/ZOOM.f<760);
   const [moreOpen,setMoreOpen]=useState(false);
@@ -11300,29 +11369,29 @@ function CardioPlanning(){
   /* v9.90 : l'affichage horizontal, inutilisé, a été supprimé — il ne reste que la vue
      « jours en lignes ». Le réglage d'orientation n'a donc plus lieu d'être. */
   const [darkMode,setDarkModeRaw]=useState(()=>{
-    try{const v=localStorage.getItem("cp6_theme");if(v==="dark")return true;if(v==="light")return false;}catch(e){}
+    try{const v=localStorage.getItem((LS_PFX+"theme"));if(v==="dark")return true;if(v==="light")return false;}catch(e){}
     try{return window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;}catch(e){return false;} // auto : reglage clair/sombre du telephone
   });
   /* v10.137 : themeSel = ce que l'utilisateur a choisi (auto / light / dark), pour l'afficher */
-  const [themeSel,setThemeSel]=useState(()=>{try{const v=localStorage.getItem("cp6_theme");return v==="dark"?"dark":v==="light"?"light":"auto";}catch(e){return "auto";}});
+  const [themeSel,setThemeSel]=useState(()=>{try{const v=localStorage.getItem((LS_PFX+"theme"));return v==="dark"?"dark":v==="light"?"light":"auto";}catch(e){return "auto";}});
   /* v10.139 : themeApply pose le mode choisi (auto / light / dark) : mémoire sur l'appareil (effacée en
      auto), état d'affichage, et un toast qui dit ce qui est en vigueur. Le bouton 🌓 des onglets — le seul
      réglage accessible à ceux qui n'ont pas Paramètres — TOURNE désormais Auto → Jour → Nuit → Auto :
      tout le monde peut revenir au suivi du téléphone. Les boutons Jour/Nuit de Paramètres posent en direct. */
   const themeSys=()=>{try{return !!(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);}catch(e){return false;}};
-  const themeApply=(sel,silencieux)=>{try{if(sel==="auto")localStorage.removeItem("cp6_theme");else localStorage.setItem("cp6_theme",sel);}catch(e){}
+  const themeApply=(sel,silencieux)=>{try{if(sel==="auto")localStorage.removeItem((LS_PFX+"theme"));else localStorage.setItem((LS_PFX+"theme"),sel);}catch(e){}
     const dark=sel==="auto"?themeSys():sel==="dark";setThemeSel(sel);setDarkModeRaw(dark);
     if(!silencieux)toast(sel==="auto"?"📱 Auto — suit le téléphone ("+(dark?"sombre":"clair")+")":sel==="dark"?"🌙 Nuit — mémorisé sur cet appareil":"☀️ Jour — mémorisé sur cet appareil","info");};
   const setDarkMode=(fn)=>{if(typeof fn==="function"){themeApply(themeSel==="auto"?"light":themeSel==="light"?"dark":"auto");return;}themeApply(fn?"dark":"light");};
   /* v10.139 : sur téléphone, l'application installée en veille ne reçoit pas toujours le changement
      clair/sombre ; à la reprise on relit le réglage (seulement en auto). */
-  useEffect(()=>{const re=()=>{try{if(localStorage.getItem("cp6_theme"))return;}catch(e){}setDarkModeRaw(themeSys());};
+  useEffect(()=>{const re=()=>{try{if(localStorage.getItem((LS_PFX+"theme")))return;}catch(e){}setDarkModeRaw(themeSys());};
     document.addEventListener("visibilitychange",re);window.addEventListener("pageshow",re);window.addEventListener("focus",re);
     return ()=>{document.removeEventListener("visibilitychange",re);window.removeEventListener("pageshow",re);window.removeEventListener("focus",re);};},[]);
   useEffect(()=>{
     if(!window.matchMedia)return;
     const mq=window.matchMedia("(prefers-color-scheme: dark)");
-    const onChg=(e)=>{try{if(localStorage.getItem("cp6_theme"))return;}catch(err){}setDarkModeRaw(e.matches);};
+    const onChg=(e)=>{try{if(localStorage.getItem((LS_PFX+"theme")))return;}catch(err){}setDarkModeRaw(e.matches);};
     if(mq.addEventListener)mq.addEventListener("change",onChg);else if(mq.addListener)mq.addListener(onChg);
     return ()=>{if(mq.removeEventListener)mq.removeEventListener("change",onChg);else if(mq.removeListener)mq.removeListener(onChg);};
   },[]);
@@ -11338,17 +11407,17 @@ function CardioPlanning(){
     /* v10.115 : « Notifications » rejoint « Reports » — même manœuvre que la v10.78 */
     const apresReports=ids=>{const m=ids.filter(id=>id!=="notifications");
       const i=m.indexOf("reports"); m.splice(i>=0?i+1:m.length,0,"notifications"); return m;};
-    const v5=localStorage.getItem("cp6_taborder_v5");
+    const v5=localStorage.getItem((LS_PFX+"taborder_v5"));
     if(v5) return compl(JSON.parse(v5));
-    const v=localStorage.getItem("cp6_taborder_v4");
+    const v=localStorage.getItem((LS_PFX+"taborder_v4"));
     if(v) return apresReports(compl(JSON.parse(v)));
-    const anc=localStorage.getItem("cp6_taborder_v3");
+    const anc=localStorage.getItem((LS_PFX+"taborder_v3"));
     if(anc){ const m=compl(JSON.parse(anc)).filter(id=>id!=="internes");
       const i=m.indexOf("angio"); m.splice(i>=0?i+1:m.length,0,"internes"); return apresReports(m); }
     return all;
   }catch{ return DEFAULT_TABS.map(t=>t[0]); } });
   const [dragTab,setDragTab]=useState(null);
-  useEffect(()=>{ try{ localStorage.setItem("cp6_taborder_v5",JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
+  useEffect(()=>{ try{ localStorage.setItem((LS_PFX+"taborder_v5"),JSON.stringify(tabOrder)); }catch{} },[tabOrder]);
 
   const [modal,setModal]=useState(null);
   const [mData,setMData]=useState(null);
@@ -11358,13 +11427,13 @@ function CardioPlanning(){
   const [showFull,setShowFull]=useState(false);
   /* v10.170 : colonnes masquées par onglet ({CHL:[...],CHB:[...],ANGIO:[...],PT:[...]}), propres à
      cet appareil comme le thème — mémoire du navigateur, jamais Firebase. */
-  const [colHide,setColHide]=useState(()=>{const v=ld("cp6_colHide",{});return v&&typeof v==="object"?v:{};});
-  useEffect(()=>{sv("cp6_colHide",colHide);},[colHide]);
+  const [colHide,setColHide]=useState(()=>{const v=ld((LS_PFX+"colHide"),{});return v&&typeof v==="object"?v:{};});
+  useEffect(()=>{sv((LS_PFX+"colHide"),colHide);},[colHide]);
   const [hideModal,setHideModal]=useState(null);
   /* v10.240 : colonnes 👁 du Planning (éditeur, intermédiaires) — salles et activités des onglets salles affichées
      à droite des médecins. Réglage propre à CET appareil, vide par défaut : rien ne s'affiche tant qu'on ne coche pas. */
-  const [planCols,setPlanCols]=useState(()=>{const v=ld("cp6_planCols",[]);return Array.isArray(v)?v:[];});
-  useEffect(()=>{sv("cp6_planCols",planCols);},[planCols]);
+  const [planCols,setPlanCols]=useState(()=>{const v=ld((LS_PFX+"planCols"),[]);return Array.isArray(v)?v:[];});
+  useEffect(()=>{sv((LS_PFX+"planCols"),planCols);},[planCols]);
   const [planColQ,setPlanColQ]=useState("");
   const colHideToggle=(site,k)=>setColHide(p=>{const cur=(p&&p[site])||[];return {...p,[site]:cur.includes(k)?cur.filter(x=>x!==k):cur.concat([k])};});
   const viewPeriod=true;const setViewPeriod=()=>{};
@@ -11405,7 +11474,7 @@ function CardioPlanning(){
   const [secrNotif,setSecrNotif]=useState({});
   const [secrCfg,setSecrCfg]=useState({acts:[],dif:{},atts:[]});
   const [annonces,setAnnonces]=useState([]);   /* v10.203 : messages de l'éditeur (bannière + ligne dans la grille) */
-  const [annMasq,setAnnMasq]=useState(()=>{try{return JSON.parse(localStorage.getItem("cp6_annHide")||"{}")||{};}catch(e){return {};}});   /* v10.203 : messages écartés sur cet appareil (+ masqués pour la session) */   /* v10.121 : atts = attachés suivis */
+  const [annMasq,setAnnMasq]=useState(()=>{try{return JSON.parse(localStorage.getItem((LS_PFX+"annHide"))||"{}")||{};}catch(e){return {};}});   /* v10.203 : messages écartés sur cet appareil (+ masqués pour la session) */   /* v10.121 : atts = attachés suivis */
   const [csBlanches,setCsBlanches]=useState({}); // {medId:{"y-m-d":true}} jours sans consultation (logiciel métier)
   const [csRep,setCsRep]=useState({}); // v9.14 {medId:{done:{wk:true},to:{"dKey|sl":{d,sl,n}}}}
   const [csActsSel,setCsActsSel]=useState({});   // {medId:[acteIds]} activités comptées comme consultation
@@ -11423,8 +11492,8 @@ function CardioPlanning(){
   const [expSrc,setExpSrc]=useState("now");
   const [expBusy,setExpBusy]=useState(false);
   const [expSnooze,setExpSnooze]=useState(false);
-  const [expSeuil,setExpSeuil]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expSeuil"))||EXP_SEUIL;}catch(e){return EXP_SEUIL;}});
-  const [expLast,setExpLast]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expLast"))||0;}catch(e){return 0;}});
+  const [expSeuil,setExpSeuil]=useState(()=>{try{return parseInt(localStorage.getItem((LS_PFX+"expSeuil")))||EXP_SEUIL;}catch(e){return EXP_SEUIL;}});
+  const [expLast,setExpLast]=useState(()=>{try{return parseInt(localStorage.getItem((LS_PFX+"expLast")))||0;}catch(e){return 0;}});
   /* v10.169 : la date de la DERNIÈRE SAUVEGARDE est partagée par Firebase. Sans elle, un appareil
      qui n'a jamais sauvegardé se croyait à 999 jours et réclamait une sauvegarde dès sa première
      ouverture. Le compteur de cases, lui, reste local : il ne compte que ce qui a été fait ICI. */
@@ -11432,11 +11501,11 @@ function CardioPlanning(){
   useEffect(()=>{
     if(!expLastFB||expLastFB<=expLast)return;
     setExpLast(expLastFB);setExpN(0);setExpSnooze(false);
-    try{localStorage.setItem("cp6_expLast",String(expLastFB));localStorage.setItem("cp6_expN","0");}catch(e){}
+    try{localStorage.setItem((LS_PFX+"expLast"),String(expLastFB));localStorage.setItem((LS_PFX+"expN"),"0");}catch(e){}
   },[expLastFB,expLast]);
-  const [expN,setExpN]=useState(()=>{try{return parseInt(localStorage.getItem("cp6_expN"))||0;}catch(e){return 0;}});
-  const expBump=useCallback((n)=>{if(!n)return;setExpN(v=>{const t=v+n;try{localStorage.setItem("cp6_expN",String(t));}catch(e){}return t;});},[]);
-  useEffect(()=>{try{localStorage.setItem("cp6_expSeuil",String(expSeuil));}catch(e){}},[expSeuil]);
+  const [expN,setExpN]=useState(()=>{try{return parseInt(localStorage.getItem((LS_PFX+"expN")))||0;}catch(e){return 0;}});
+  const expBump=useCallback((n)=>{if(!n)return;setExpN(v=>{const t=v+n;try{localStorage.setItem((LS_PFX+"expN"),String(t));}catch(e){}return t;});},[]);
+  useEffect(()=>{try{localStorage.setItem((LS_PFX+"expSeuil"),String(expSeuil));}catch(e){}},[expSeuil]);
   const [salleReg,setSalleReg]=useState([]); // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
   /* v10.246 : prise pour le banc protection.js — inerte hors banc (window.__cpBanc n'existe jamais dans l'application) */
   useEffect(()=>{if(typeof window!=="undefined"&&window.__cpBanc)window.__cpBanc.etat={setTourMed,setNotes,setSalleReg,tourMed,notes,salleReg};});
@@ -11879,6 +11948,7 @@ function CardioPlanning(){
             {const im=inactMinOk(data.inactMin);if(im)setInactMin(im);}   /* v10.247 */
             setBacDe(BAC&&data._bacDe&&data._bacDe.ts?data._bacDe:null);   /* v10.237 */
             BAC_DEP.t=BAC?((data._bacDe&&data._bacDe.ts)||data._bacDep||null):null;   /* v10.238 : jusqu'où le vrai historique vaut dans le bac */
+            if(ESSAI)setEssaiDep(data._essaiDep||null);   /* v10.266 */
             if(data.salleFerm){try{const f=JSON.parse(data.salleFerm)||{};const nf={type:f.type||{},jours:f.jours||{}};FERM.d=nf;setSalleFerm(nf);}catch(e){}}   /* v10.229 */
             if(data.dblOk!==undefined){try{const o=JSON.parse(data.dblOk);setDblOk(o&&typeof o==="object"?o:{});}catch(e){}}   /* v10.260 */
             /* ── médecins : version découpée si elle existe, sinon migration ── */
@@ -11979,7 +12049,7 @@ function CardioPlanning(){
   const [bkOpen,setBkOpen]=useState("");        // sauvegarde ancienne dépliée
   const refreshBackupList=useCallback(async()=>{
     try{
-      const snap=await window.firebaseDB.collection("backups").get();
+      const snap=await window.firebaseDB.collection(COLL_BK).get();
       const items=[];snap.forEach(d=>{const x=d.data()||{};items.push({id:d.id,ts:x._ts||0,ver:x._verArr||"",prec:x._verPrec||""});});   /* v10.248 : photos de passage de version */
       items.sort((a,b)=>b.ts-a.ts);
       setBackupList(items);
@@ -11990,15 +12060,15 @@ function CardioPlanning(){
   const makeBackup=useCallback(async(manual)=>{
     if(BAC){if(manual)toast("🧪 Bac à sable : pas de sauvegarde ici","warn");return false;}   /* v10.175 */
     try{
-      const cur=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data()||{};
+      const cur=(await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get()).data()||{};
       const ts=Date.now();
       const payload=sansCodes({...cur,_ts:ts});   /* v10.252 : jamais les codes dans une sauvegarde */
-      await window.firebaseDB.collection("backups").doc("b"+ts).set(payload);
-      await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon({_lastBackupAt:ts}),{merge:true});
+      await window.firebaseDB.collection(COLL_BK).doc("b"+ts).set(payload);
+      await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).set(avecTampon({_lastBackupAt:ts}),{merge:true});
       /* v10.248 : purge en deux comptes — 45 sauvegardes quotidiennes, et à part les 3 dernières photos de version */
       const items=await refreshBackupList();
       for(const it of items.filter(x=>!x.ver).slice(BK_KEEP).concat(items.filter(x=>x.ver).slice(BK_VER))){
-        await window.firebaseDB.collection("backups").doc(it.id).delete();
+        await window.firebaseDB.collection(COLL_BK).doc(it.id).delete();
       }
       await refreshBackupList();
       setBkErr(null);setBkAlarme(null);
@@ -12013,7 +12083,7 @@ function CardioPlanning(){
     setBkPreview(q=>q?{...q,contre,diff:"chargement"}:q);
     try{
       let autrePlan=planRef.current||{},tB=Date.now(),libB="le planning actuel";
-      if(contre!=="actuel"){const d=(await window.firebaseDB.collection("backups").doc(contre).get()).data()||{};autrePlan=d.planV2?d.planV2:(d.plan?JSON.parse(d.plan):{});tB=d._ts||0;libB="la sauvegarde du "+new Date(tB).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});}
+      if(contre!=="actuel"){const d=(await window.firebaseDB.collection(COLL_BK).doc(contre).get()).data()||{};autrePlan=d.planV2?d.planV2:(d.plan?JSON.parse(d.plan):{});tB=d._ts||0;libB="la sauvegarde du "+new Date(tB).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});}
       /* v10.248 : une case présente dans la sauvegarde et absente aujourd'hui parce que sa période a été ARCHIVÉE depuis
          n'est pas une perte : elle est comptée à part (nArch), pas listée parmi les « sans trace » */
       const arch=archRef.current||[];let nArch=0;
@@ -12043,7 +12113,7 @@ function CardioPlanning(){
   };
   const previewBackup=useCallback(async(id,ts,opt)=>{
     try{
-      const snap=await window.firebaseDB.collection("backups").doc(id).get();
+      const snap=await window.firebaseDB.collection(COLL_BK).doc(id).get();
       const d=snap.data()||{};
       /* v10.101 : l'aperçu lisait les champs d'AVANT la v9.7 (plan, medecins), purgés depuis —
          il annonçait donc une sauvegarde vide et toutes les cases actuelles « perdues ».
@@ -12080,14 +12150,14 @@ function CardioPlanning(){
   const [archBytes,setArchBytes]=useState(0);   /* v10.138 : poids des archives (collection à part) */
   /* v10.142 : signalements — lus à l'ouverture (badge sur l'onglet Paramètres) et à chaque visite de Paramètres */
   const [sigList,setSigList]=useState([]);
-  const refreshSig=useCallback(async()=>{try{const snap=await window.firebaseDB.collection("signalements").get();const l=[];snap.forEach(d2=>{const x=d2.data()||{};l.push({id:d2.id,ts:x.ts||0,auteur:x.auteur,texte:x.texte,ctx:x.ctx||{},journal:x.journal||[],prec:x.prec||[],traite:!!x.traite});});l.sort((a,b)=>b.ts-a.ts);setSigList(l);}catch(e){}},[]);
+  const refreshSig=useCallback(async()=>{try{const snap=await window.firebaseDB.collection(COLL_SIG).get();const l=[];snap.forEach(d2=>{const x=d2.data()||{};l.push({id:d2.id,ts:x.ts||0,auteur:x.auteur,texte:x.texte,ctx:x.ctx||{},journal:x.journal||[],prec:x.prec||[],traite:!!x.traite});});l.sort((a,b)=>b.ts-a.ts);setSigList(l);}catch(e){}},[]);
   useEffect(()=>{if(accessMode==="edit"||accessMode==="medecinEdit")refreshSig();},[refreshSig,accessMode]);   /* v10.252 : lecture réservée aux éditeurs par la règle */
   useEffect(()=>{if(tab==="partage")refreshSig();},[tab,refreshSig]);
-  const sigTraite=async(id,v)=>{try{await window.firebaseDB.collection("signalements").doc(id).set({traite:!!v},{merge:true});toast(v?"Signalement traité":"Signalement rouvert");}catch(e){toast("Échec de l'enregistrement","warn");}refreshSig();};
-  const sigDel=async(id)=>{try{await window.firebaseDB.collection("signalements").doc(id).delete();toast("Signalement supprimé");}catch(e){toast("Échec de la suppression","warn");}refreshSig();};
+  const sigTraite=async(id,v)=>{try{await window.firebaseDB.collection(COLL_SIG).doc(id).set({traite:!!v},{merge:true});toast(v?"Signalement traité":"Signalement rouvert");}catch(e){toast("Échec de l'enregistrement","warn");}refreshSig();};
+  const sigDel=async(id)=>{try{await window.firebaseDB.collection(COLL_SIG).doc(id).delete();toast("Signalement supprimé");}catch(e){toast("Échec de la suppression","warn");}refreshSig();};
   const refreshArchList=useCallback(async()=>{
     try{
-      const snap=await window.firebaseDB.collection("archives").get();
+      const snap=await window.firebaseDB.collection(COLL_AR).get();
       const ids=[];let octets=0;snap.forEach(d2=>{if(d2.id&&d2.id.indexOf("per-")===0){ids.push(d2.id.slice(4));try{octets+=new Blob([JSON.stringify(d2.data()||{})]).size;}catch(e){}}});
       ids.sort((a,b)=>{const x=a.split("-"),y2=b.split("-");return (+x[0]-+y2[0])||(+x[1]-+y2[1]);});setArchivedList(ids);
       /* v10.138 : la plus ancienne archive borne la navigation ; le poids total sert à la jauge */
@@ -12101,7 +12171,7 @@ function CardioPlanning(){
     refreshArchList();
     (async()=>{
       try{
-        const d=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data()||{};
+        const d=(await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get()).data()||{};
         let bytes=0;const det={};
         Object.keys(d).forEach(k=>{
           const v=d[k];
@@ -12121,7 +12191,7 @@ function CardioPlanning(){
   const restoreMedPeriod=useCallback(async(id,medId,dateFrom,dateTo)=>{
     if(BAC){toast("🧪 Bac à sable : pas de restauration ici","warn");return 0;}   /* v10.175 */
     try{
-      const d=await window.firebaseDB.collection("backups").doc(id).get();
+      const d=await window.firebaseDB.collection(COLL_BK).doc(id).get();
       const data=d.data();
       if(!data){toast("Sauvegarde introuvable","warn");return 0;}
       const old=data.planV2?data.planV2:(data.plan?JSON.parse(data.plan):null);
@@ -12164,20 +12234,20 @@ function CardioPlanning(){
      date de la sauvegarde chargée pour le bandeau ; la remise à zéro du bac (copie du vrai) l'efface. */
   const restoreBackup=useCallback(async(id)=>{
     try{
-      const d=await window.firebaseDB.collection("backups").doc(id).get();
+      const d=await window.firebaseDB.collection(COLL_BK).doc(id).get();
       const data=d.data();
       if(!data){toast("Sauvegarde introuvable","warn");return;}
       const{_ts,gel:_gelAncien,_verArr:_va,_verPrec:_vp,...rest}=data;   /* v10.248 : les marques de photo de version restent dans la sauvegarde */   /* v10.229 : un gel enregistré DANS la sauvegarde ne revient jamais ; le gel EN COURS, lui, survit à la restauration */
       delete rest._ecr;mapPending.current={};mapMigr.current={};   /* v10.246 : aucune de nos entrées en attente ne doit repasser par-dessus la sauvegarde */
       codesRestaurer(rest,BAC?null:codesMain.current);   /* v10.252 : une vieille sauvegarde porte des codes — ôtés ; ceux EN SERVICE reviennent s'ils vivent encore dans le document partagé */
       if(BAC){delete rest._bacDe;delete rest._bacDep;rest._bacDe={ts:_ts||0,at:Date.now()};planPending.current={};planSynced.current=null;
-        try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : l'historique repart de l'heure de la sauvegarde */
-        await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
+        try{await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : l'historique repart de l'heure de la sauvegarde */
+        await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).set(avecTampon(rest));
         toast("📥 Sauvegarde du "+new Date(_ts||0).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+" chargée dans le bac — le vrai planning n'a pas bougé","info");return;}
       if(GEL.on&&GEL.raw)rest.gel=GEL.raw;
       if(verNum(rest.appVer)<verNum(APP_VERSION))rest.appVer=APP_VERSION;   /* v10.248 : restaurer une vieille sauvegarde ne fait pas croire aux autres appareils à un changement de version */
       planPending.current={};planSynced.current=null;
-      await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest)); // remplacement complet : une restauration EST l'état intégral
+      await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).set(avecTampon(rest)); // remplacement complet : une restauration EST l'état intégral
       toast(GEL.on?"Sauvegarde restaurée — le planning reste gelé : vérifiez-le, puis dégelez":"Sauvegarde restaurée — rechargez la page si besoin","info");
     }catch(e){console.log("restore:",e);toast("Échec de la restauration","warn");}
   },[]);
@@ -12188,7 +12258,7 @@ function CardioPlanning(){
   const restaurerFichier=useCallback(async(data)=>{
     try{
       let cur;
-      try{cur=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data();}catch(e){cur=null;}
+      try{cur=(await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get()).data();}catch(e){cur=null;}
       if(!cur){toast("Restauration impossible : la base ne répond pas — rien n'a changé","warn");return false;}
       if(!BAC){const okB=await makeBackup(true);if(!okB&&!window.confirm("⚠ La sauvegarde de sécurité a échoué. Restaurer quand même ?"))return false;}
       const rest=Object.assign({},data.doc||{});
@@ -12201,11 +12271,11 @@ function CardioPlanning(){
       if(verNum(rest.appVer)<verNum(APP_VERSION))rest.appVer=APP_VERSION;
       jrnMuet();
       mapPending.current={};mapMigr.current={};planPending.current={};planSynced.current=null;
-      await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
+      await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).set(avecTampon(rest));
       let nA=0;
       if(!BAC&&data.archives&&typeof data.archives==="object"){
         for(const id of Object.keys(data.archives)){if(id.indexOf("per-")!==0||!data.archives[id])continue;
-          await window.firebaseDB.collection("archives").doc(id).set(data.archives[id]);nA++;}
+          await window.firebaseDB.collection(COLL_AR).doc(id).set(data.archives[id]);nA++;}
         refreshArchList();
       }
       toast("Fichier restauré"+(nA?" — "+nA+" période"+(nA>1?"s":"")+" archivée"+(nA>1?"s":"")+" remise"+(nA>1?"s":"")+" en place":"")+(GEL.on?" — le planning reste gelé":""),"info");
@@ -12232,7 +12302,7 @@ function CardioPlanning(){
     if(verRetard.current)verInscrire(verRetard.current.data0,verRetard.current.prec);   /* v10.252 : passage de version différé */
     const t=setTimeout(async()=>{
       try{
-        const d=await window.firebaseDB.collection("planning").doc(PLAN_ID).get();
+        const d=await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get();
         const last=(d.data()||{})._lastBackupAt||0;
         if(Date.now()-last>24*3600*1000){const ok=await makeBackup(false);   /* v10.0 : une par jour au lieu d'une tous les 3 jours */
           if(!ok&&Date.now()-last>48*3600*1000)setBkAlarme({last});}   /* v10.248 : panne silencieuse du 29/09 au 01/10/2026 — désormais un bandeau */
@@ -12555,7 +12625,7 @@ function CardioPlanning(){
   useEffect(()=>{
     if(BAC||accessMode!=="medecinEdit"||editMedId==null||typeof window==="undefined"||!window.firebaseDB)return;
     let ref=null,off=null;
-    try{ref=window.firebaseDB.collection("sessions").doc(String(editMedId));
+    try{ref=window.firebaseDB.collection(COLL_SE).doc(String(editMedId));
       Promise.resolve(ref.set({app:APPAREIL.id,lib:APPAREIL.lib,t:Date.now(),v:verCourt()})).catch(e=>console.log("session:",e));
       off=ref.onSnapshot(sn=>{const d=sn&&sn.exists&&typeof sn.data==="function"?sn.data():null;
         if(d&&d.app&&d.app!==APPAREIL.id)fermerApp("autre",{lib:d.lib||"",t:d.t||0});},()=>{});}catch(e){}
@@ -12571,7 +12641,7 @@ function CardioPlanning(){
        d'une case vivante ; on demande l'archive une fois par période et par session. */
     if(archFetched.current[pid])return;
     archFetched.current[pid]=true;
-    window.firebaseDB.collection("archives").doc("per-"+pid).get().then(snap=>{
+    window.firebaseDB.collection(COLL_AR).doc("per-"+pid).get().then(snap=>{
       const d=snap&&snap.data&&snap.data();
       if(d&&d.plan){const frag=JSON.parse(d.plan);if(Object.keys(frag).length>0)setArchPlan(pp=>Object.assign({},pp,frag));}
       /* les annexes RELUES rejoignent le cache — sans elles, une période archivée
@@ -12688,6 +12758,29 @@ function CardioPlanning(){
      il garde la main même après avoir changé de profil dans le bandeau (sinon il s'y enfermerait). bacAutres = les autres
      appareils présents (planning/presence-bac : {<appareil>:{t,qui}}, écrit toutes les 60 s, périmé après 150 s). */
   const [bacMaitre,setBacMaitre]=useState(false);
+  /* v10.266 : VERSION D'ESSAI — copie du planning réel (lecture seule du vrai cahier « planning », écriture dans « planning-essai »).
+     C'est le SEUL endroit du code qui nomme le vrai cahier en dur quand on est dans l'essai. Copie : main (tampon neuf, _essaiDep),
+     les cahiers d'historique hist-* et le journal ; jamais le bac ni la présence ; les archives seulement si la case est cochée. */
+  const [essaiDep,setEssaiDep]=useState(null);
+  const [essaiArch,setEssaiArch]=useState(false);
+  const [essaiBusy,setEssaiBusy]=useState(false);
+  const essaiCopier=async()=>{if(!ESSAI||!isEditVrai||essaiBusy||!window.firebaseDB)return;
+    if(!window.confirm("Remplacer le planning de l'essai par une copie du planning réel ?\n\nTout ce qui a été essayé ici sera perdu"+(essaiArch?", et les archives de l'essai seront remplacées par les vraies":"")+"."))return;
+    setEssaiBusy(true);
+    try{const db=window.firebaseDB;const snap=await db.collection("planning").get();let d=null;const autres=[];
+      snap.forEach(x=>{const id=x.id;if(id==="main")d=x.data()||{};else if(id.indexOf(HIST_PFX)===0&&id!==HIST_PFX+"bac")autres.push([id,x.data()||{}]);else if(id==="journal")autres.push([id,x.data()||{}]);});
+      if(!d){toast("Planning réel introuvable","warn");setEssaiBusy(false);return;}
+      mapPending.current={};mapMigr.current={};planPending.current={};planSynced.current=null;
+      const rest={...sansCodes(d)};delete rest._bacDe;delete rest._bacDep;rest._essaiDep=Date.now();
+      if(verNum(rest.appVer)<verNum(APP_VERSION))rest.appVer=APP_VERSION;
+      let n=0;for(const [id,x] of autres){await db.collection(COLL_PLAN).doc(id).set(x);n++;}
+      try{await db.collection(COLL_PLAN).doc(HIST_PFX+"bac").set({e:{}});}catch(e){}
+      await db.collection(COLL_PLAN).doc("main").set(avecTampon(rest));
+      let nA=0;if(essaiArch){const sa=await db.collection("archives").get();const l=[];sa.forEach(x=>l.push([x.id,x.data()||{}]));for(const [id,x] of l){await db.collection(COLL_AR).doc(id).set(x);nA++;}}
+      jlog("ESSAI",["copie du planning réel",n+" cahier(s) d'historique",nA+" archive(s)"]);
+      toast("⬇ Planning réel copié dans l'essai"+(nA?" ("+nA+" archive"+(nA>1?"s":"")+")":""),"info");}
+    catch(e){console.log("essai:",e);toast("Échec de la copie : "+((e&&e.message)||e),"warn");}
+    setEssaiBusy(false);};
   useEffect(()=>{if(BAC&&isEditVrai)setBacMaitre(true);},[isEditVrai]);
   useEffect(()=>{if(BAC&&bacMaitre)refreshBackupList();},[bacMaitre,refreshBackupList]);   /* la liste du bandeau (lecture réservée à l'éditeur par la règle) */
   const [bacAutres,setBacAutres]=useState([]);
@@ -12696,7 +12789,7 @@ function CardioPlanning(){
     let ref=null,off=null,id=null;
     const qui=accessMode==="medecinEdit"?(((medecins.find(m=>m.id===editMedId)||{}).init)||"?"):accessMode==="adminEdit"?((adminName||"?")+(isCadre?" (cadre)":" (secrétaire)")):accessMode==="interneEdit"?((interneName||"?")+" (interne)"):"Éditeur";
     const la=()=>{try{Promise.resolve(ref.set({[APPAREIL.id]:{t:Date.now(),qui}},{merge:true})).catch(e=>console.log("presence:",e));}catch(e){}};
-    try{ref=window.firebaseDB.collection("planning").doc("presence-bac");la();id=setInterval(la,60000);
+    try{ref=window.firebaseDB.collection(COLL_PLAN).doc("presence-bac");la();id=setInterval(la,60000);
       off=ref.onSnapshot(sn=>{const d=sn&&sn.exists&&typeof sn.data==="function"?sn.data():null;const now=Date.now();
         setBacAutres(Object.keys(d||{}).filter(k=>k!==APPAREIL.id&&d[k]&&d[k].t&&now-d[k].t<150000).map(k=>({id:k,qui:(d[k].qui||"?")})));},()=>{});}catch(e){}
     return ()=>{try{if(id)clearInterval(id);if(typeof off==="function")off();if(ref)Promise.resolve(ref.set({[APPAREIL.id]:{t:0,qui}},{merge:true})).catch(()=>{});}catch(e){}};
@@ -12723,7 +12816,7 @@ function CardioPlanning(){
         priveLu.current=true;setPriveEtat("absent");cpteLog("copie des codes absente : reprise du document partagé");}
       else{setPriveEtat("erreur");cpteLog("copie des codes illisible",r.erreur);}
     })();return ()=>{vivant=false;};},[isEditVrai]);
-  useEffect(()=>{if(BAC||!isEditVrai||!serverSeen.current||!window.firebaseDB||isFirstLoad.current||!priveLu.current)return;
+  useEffect(()=>{if(ESSAI||BAC||!isEditVrai||!serverSeen.current||!window.firebaseDB||isFirstLoad.current||!priveLu.current)return;
     const {o,prof,profSig}=priveContenu(medPins,editPin,adminPin,cadrePin,intPin);
     const sig=JSON.stringify(o)+"|"+profSig;if(priveRef.current===sig)return;priveRef.current=sig;
     const fiches=profSig!==profSigRef.current;
@@ -13117,11 +13210,11 @@ function CardioPlanning(){
     if(!isEdit||BAC||!window.firebaseDB)return;
     (async()=>{
       try{
-        const ref=window.firebaseDB.collection("planning").doc("journal");
+        const ref=window.firebaseDB.collection(COLL_PLAN).doc("journal");
         const es=((await ref.get()).data()||{}).entries||{};const ks=Object.keys(es);
         if(ks.length){
           const par={};ks.forEach(k2=>{const x=es[k2];if(!x||!x.k)return;const pid=histPid(x.k);if(pid)(par[pid]=par[pid]||{})[k2]=histEnc(x);});
-          for(const pid of Object.keys(par))await window.firebaseDB.collection("planning").doc(HIST_PFX+pid).set({e:par[pid]},{merge:true});
+          for(const pid of Object.keys(par))await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX+pid).set({e:par[pid]},{merge:true});
           await ref.delete();
         }
       }catch(e){}
@@ -13129,8 +13222,8 @@ function CardioPlanning(){
         const t=new Date();let p=perOfDay(t.getFullYear(),t.getMonth(),t.getDate());const pids=[];
         for(let i=0;i<3;i++){pids.push(perIdOf(p.sy,p.sm));p=perNext(p.sy,p.sm);}
         for(const pid of pids){
-          const jdoc=window.firebaseDoc(window.firebaseDB,"planning",HIST_PFX+pid);
-          const e=((await window.firebaseDB.collection("planning").doc(HIST_PFX+pid).get()).data()||{}).e||{};
+          const jdoc=window.firebaseDoc(window.firebaseDB,COLL_PLAN,HIST_PFX+pid);
+          const e=((await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX+pid).get()).data()||{}).e||{};
           const n=histOctets(e);if(n<=HIST_ALERTE)continue;
           const a=pid.split("-"),lib=perLibelle(+a[0],+a[1]),nb=Object.keys(e).length;
           if(n<=HIST_MAX){toast("🕘 L'historique des cases de "+lib+" approche de sa limite ("+nb+" modifications) : au-delà d'environ "+Math.round(nb*HIST_MAX/n/100)*100+", les plus anciennes lignes seront effacées","warn");continue;}
@@ -14037,7 +14130,7 @@ function CardioPlanning(){
 
   const diffMedPeriod=useCallback(async(id,medId,dateFrom,dateTo)=>{
     try{
-      const d=await window.firebaseDB.collection("backups").doc(id).get();
+      const d=await window.firebaseDB.collection(COLL_BK).doc(id).get();
       const data=d.data();
       if(!data)return null;
       const old=data.planV2?data.planV2:(data.plan?JSON.parse(data.plan):null);
@@ -14166,7 +14259,16 @@ function CardioPlanning(){
   /* v10.258 : `avecInt` — les internes du semestre entrent dans l'occupation (modale de case du Planning :
      avertir, jamais interdire). Sans ce drapeau (grilles des onglets salles), rien ne change : l'interne y reste
      affiché à part, en rond pointillé, hors conflit — règle de la v10.62. */
+  /* v10.264 : MÉMOIRE DE salleOcc. Mesure du 01/11/2026 (v10.263, PC de TH) : CHL 1 028 ms pour 2 430 cases, soit 0,42 ms
+     par case contre 0,08 dans Planning — cinq fois plus cher. Cause : chaque case de salle appelait salleOcc(activité, créneau)
+     pour CHACUNE de ses activités, et salleOcc parcourait tous les médecins à chaque appel ; or la réponse (qui est dans quelle
+     salle pour cette activité à ce créneau) est la même pour les neuf salles de la ligne — elle était recalculée neuf fois, et
+     une dixième par le bandeau des doubles (v10.260). La réponse est désormais gardée le temps que les données ne changent pas
+     (la mémoire se vide dès que le planning, l'équipe ou les internes changent : mêmes dépendances que la fonction). */
+  const salleOccMem=useMemo(()=>new Map(),[medecins,getEntries,intCfg]);
   const salleOcc=useCallback((acteId,y2,m2,d2,slot,avecInt)=>{
+    const kOcc=acteId+"|"+y2+"|"+m2+"|"+d2+"|"+slot+"|"+(avecInt?1:0);
+    const memo=salleOccMem.get(kOcc);if(memo)return memo;
     const res={};
     medecins.forEach(med=>{
       getEntries(med.id,y2,m2,d2,slot).forEach(e=>{
@@ -14178,8 +14280,9 @@ function CardioPlanning(){
         if((e&&e.acteId)===acteId&&e.salle&&!e.cond){if(!res[e.salle])res[e.salle]=[];if(!res[e.salle].find(x=>x.id===im.id))res[e.salle].push({...im,isInt:true});}
       });
     });}
+    salleOccMem.set(kOcc,res);
     return res;
-  },[medecins,getEntries,intCfg]);
+  },[medecins,getEntries,intCfg,salleOccMem]);
   /* v10.258 : qui est dans une salle sur un créneau — médecins ET internes, toutes activités confondues.
      Sert à la fenêtre de case des internes (« libre » / « occupée par … »). */
   const salleQui=useCallback((salle,y2,m2,d2,slot)=>{
@@ -14347,11 +14450,11 @@ function CardioPlanning(){
       /* v10.250 : les données brutes partent du CAHIER lui-même (planning actuel ou sauvegarde), plus les archives — voir
          expComplet. Le tableau garde l'état affiché. Base muette : export partiel, annoncé comme tel. */
       let src=null,raw=null;
-      if(expSrc!=="now")raw=(await window.firebaseDB.collection("backups").doc(expSrc).get()).data()||{};
-      else if(kind==="donnees"){try{raw=(await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data()||null;}catch(e){raw=null;}}
+      if(expSrc!=="now")raw=(await window.firebaseDB.collection(COLL_BK).doc(expSrc).get()).data()||{};
+      else if(kind==="donnees"){try{raw=(await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get()).data()||null;}catch(e){raw=null;}}
       if(raw){
         let arch=null;
-        if(kind==="donnees"&&!BAC){try{const sn=await window.firebaseDB.collection("archives").get();const a2={};
+        if(kind==="donnees"&&!BAC){try{const sn=await window.firebaseDB.collection(COLL_AR).get();const a2={};
           sn.forEach(d2=>{if(d2.id&&d2.id.indexOf("per-")===0)a2[d2.id]=d2.data()||{};});arch=a2;}catch(e){arch=null;}}
         src=expComplet(raw,arch);
       }else src={plan:plan,notes:notes,tourMed:tourMed,tourDerog:tourDerog,medecins:medecins,actes:actes,salleReg:salleReg,planningType:planningType};
@@ -14360,7 +14463,7 @@ function CardioPlanning(){
       if(kind==="tableau")expTelecharge(nom+".xls",expTable(expPer,src));
       else expTelecharge(nom+"-donnees.json",JSON.stringify(src),"application/json;charset=utf-8");
       const t=Date.now();setExpLast(t);setExpN(0);setExpSnooze(false);setExpLastFB(t);
-      try{localStorage.setItem("cp6_expLast",String(t));localStorage.setItem("cp6_expN","0");}catch(e){}
+      try{localStorage.setItem((LS_PFX+"expLast"),String(t));localStorage.setItem((LS_PFX+"expN"),"0");}catch(e){}
       saveToFirebase({expLast:String(t)});   /* v10.169 : les autres appareils la reprennent */
       if(kind==="tableau")toast("Sauvegarde téléchargée","info");
       else if(!src.doc)toast("⚠ Export PARTIEL : la base n'a pas répondu — le fichier ne contient que les cases, l'équipe, les activités, les salles, le planning type, le tour et les notes","warn");
@@ -14374,12 +14477,12 @@ function CardioPlanning(){
      planning et écrit le bac : c'est le seul endroit du code qui nomme les deux cahiers ; partout ailleurs,
      l'application ne connaît que PLANNING_DOC / PLAN_ID. Le changement de profil refait ce que fait le PIN
      (mêmes setAccessMode / setEditMedId / setIsCadre), la vérification du code en moins. */
-  const bacCopie=async()=>{const d=(await window.firebaseDB.collection("planning").doc("main").get()).data()||{};
-    try{await window.firebaseDB.collection("planning").doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : les essais précédents s'effacent */
-    await window.firebaseDB.collection("planning").doc("bac").set(avecTampon({...sansCodes(d),_bacDep:Date.now()}));};   /* v10.252 : jamais les codes dans le bac (ils y seraient lisibles par tous) */   /* v10.246 : tampon neuf (celui de la copie est ancien) */   /* v10.238 : l'heure de la copie borne le vrai historique */
+  const bacCopie=async()=>{const d=(await window.firebaseDB.collection(COLL_PLAN).doc("main").get()).data()||{};
+    try{await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX+"bac").set({e:{}});}catch(e){}   /* v10.238 : les essais précédents s'effacent */
+    await window.firebaseDB.collection(COLL_PLAN).doc("bac").set(avecTampon({...sansCodes(d),_bacDep:Date.now()}));};   /* v10.252 : jamais les codes dans le bac (ils y seraient lisibles par tous) */   /* v10.246 : tampon neuf (celui de la copie est ancien) */   /* v10.238 : l'heure de la copie borne le vrai historique */
   /* v10.254 : rejoindre le bac = poser le drapeau et recharger — AUCUNE copie (le bac est partagé : on le prend tel qu'il est) ;
      on tape ensuite son code habituel sur l'écran d'accueil du bac. */
-  const bacRejoindre=()=>{try{localStorage.setItem("cp6_bac","1");}catch(e){}window.location.reload();};
+  const bacRejoindre=()=>{try{localStorage.setItem((LS_PFX+"bac"),"1");}catch(e){}window.location.reload();};
   /* v10.254 : ce que le maître charge dans le bac le remplace POUR TOUT LE MONDE. Seul : sans question ; d'autres appareils
      présents : une confirmation qui les compte. */
   const bacConfirmer=(quoi)=>{if(!bacAutres.length)return true;const n=bacAutres.length;
@@ -14393,7 +14496,7 @@ function CardioPlanning(){
     if(!bacConfirmer("Charger la sauvegarde du "+new Date(b.ts).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})+" dans le bac ?"))return;restoreBackup(v);};
   const bacPas=(d)=>{if(d>0){const k=bacPos<0?0:bacPos+1;if(k<backupList.length)bacAller(backupList[k].id);return;}
     if(bacPos<0)return;if(bacPos===0)bacAller("vrai");else bacAller(backupList[bacPos-1].id);};
-  const bacSortir=()=>{try{localStorage.removeItem("cp6_bac");}catch(e){}window.location.reload();};
+  const bacSortir=()=>{try{localStorage.removeItem((LS_PFX+"bac"));}catch(e){}window.location.reload();};
   /* v10.251 : les codes en service et ceux des partis (compte à supprimer), pour la carte 🔐 Comptes */
   const cpteListe=()=>{const L=[];
     if(editPin)L.push({code:editPin,etiq:"role:editeur",qui:"Éditeur",partage:true});
@@ -14442,8 +14545,12 @@ function CardioPlanning(){
     if(navOff||(typeof navigator!=="undefined"&&navigator.onLine===false)){setHorsReseau(true);setPinError(false);return;}
     if(!cpteDispo()){const q0=codeProfil(v);if(!q0){setPinError(true);return;}setHorsReseau(false);codeAppliquer(q0);return;}
     setCodeAttente(true);let q=null;
-    try{const r=await cpteOuvrir(v);
+    try{let r=await cpteOuvrir(v);
       if(r&&r.ok===false){setCodeAttente(false);setHorsReseau(true);setPinError(false);return;}
+      if(r&&r.inconnu&&ESSAI&&!BAC){const sr=await cpteSonderReel(v);   /* v10.266 : première entrée dans l'essai avec ce code */
+        if(sr&&sr.reseau){setCodeAttente(false);setHorsReseau(true);setPinError(false);return;}
+        if(sr&&sr.existe){const r2=await cpteEntrer(v,sr.nom||"");if(r2&&r2.ok===false){setCodeAttente(false);setHorsReseau(true);setPinError(false);return;}
+          if(r2&&r2.uid){r={ok:true,uid:r2.uid,nom:sr.nom||""};cpteLog("essai : compte essai créé d'après le vrai compte",sr.nom||"");}}}
       if(r&&r.inconnu){q=codeProfil(v);
         if(q&&!BAC){const r2=await cpteEntrer(v,q.etiq);if(r2&&r2.ok===false){setCodeAttente(false);setHorsReseau(true);setPinError(false);return;}}}
       else{const f=await profilLire();
@@ -14493,13 +14600,13 @@ function CardioPlanning(){
           <div style={{fontSize:11,color:"#7c3aed",fontWeight:800,marginBottom:6}}>{"🗝 Accès "+(isCadre?"cadre":"secrétaire")+" — votre prénom :"}</div>
           <input value={adminNameInput} onChange={e=>setAdminNameInput(e.target.value)} placeholder="Prénom" style={{...S.fi,width:"100%",textAlign:"center",marginBottom:8}}/>
           <button style={{width:"100%",padding:"9px",borderRadius:9,border:"none",background:"#7c3aed",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:800}}
-            onClick={()=>{const n=(adminNameInput||"").trim();if(!n)return;setAdminName(n);try{localStorage.setItem("cp6_adminName",n);}catch(e){}setAccessMode("adminEdit");setAdminAsk(false);}}>{"Entrer ("+(isCadre?"cadre":"secrétaire")+")"}</button>
+            onClick={()=>{const n=(adminNameInput||"").trim();if(!n)return;setAdminName(n);try{localStorage.setItem((LS_PFX+"adminName"),n);}catch(e){}setAccessMode("adminEdit");setAdminAsk(false);}}>{"Entrer ("+(isCadre?"cadre":"secrétaire")+")"}</button>
         </div>}
         {interneAsk&&<div style={{marginTop:10,padding:10,borderRadius:9,border:"1.5px solid #0e9f9f",background:"rgba(14,159,159,.08)"}}>
           <div style={{fontSize:11,color:"#0e9f9f",fontWeight:800,marginBottom:6}}>🎓 Accès interne — votre prénom :</div>
           <input value={interneNameInput} onChange={e=>setInterneNameInput(e.target.value)} placeholder="Prénom" style={{...S.fi,width:"100%",textAlign:"center",marginBottom:8}}/>
           <button style={{width:"100%",padding:"9px",borderRadius:9,border:"none",background:"#0e9f9f",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:800}}
-            onClick={()=>{const n=(interneNameInput||"").trim();if(!n)return;setInterneName(n);try{localStorage.setItem("cp6_interneName",n);}catch(e){}setAccessMode("interneEdit");setInterneAsk(false);setTab("internes");}}>Entrer (interne)</button>
+            onClick={()=>{const n=(interneNameInput||"").trim();if(!n)return;setInterneName(n);try{localStorage.setItem((LS_PFX+"interneName"),n);}catch(e){}setAccessMode("interneEdit");setInterneAsk(false);setTab("internes");}}>Entrer (interne)</button>
         </div>}
         {!BAC&&<button data-bacessai="1" onClick={bacRejoindre} title="Un espace de test partagé par toute l'équipe : rien de ce qui s'y fait ne touche au vrai planning" style={{width:"100%",marginTop:12,padding:"7px",borderRadius:8,border:"1px dashed #c2410c",background:"none",color:"#c2410c",cursor:"pointer",fontSize:11,fontWeight:700}}>🧪 Essayer le bac à sable</button>}{/* v10.254 : puis son code habituel, sur l'écran d'accueil du bac */}
         <div style={{marginTop:14,fontSize:10,color:"var(--txt3)",textAlign:"center"}}>{APP_VERSION}</div>
@@ -14530,11 +14637,11 @@ function CardioPlanning(){
   /* v10.142 : signalement — le contexte joint, l'envoi (collection à part, hors jauge), le badge Paramètres */
   const sigCtx=()=>{const ps=perStart(year,month);const jr=SCROLL_MEM.jour?String(SCROLL_MEM.jour).split("-"):null;let inst=false;try{inst=!!(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;}catch(e){}
     const lib=(orderedTabs.find(x=>x[0]===tab)||[])[1]||tab;
-    return {version:APP_VERSION,onglet:lib,periode:perLibelle(ps.sy,ps.sm),jour:jr&&jr.length===3?(("0"+jr[2]).slice(-2)+"/"+("0"+(+jr[1]+1)).slice(-2)+"/"+jr[0]):"—",
+    return {version:APP_VERSION+(ESSAI?" (VERSION D'ESSAI)":""),onglet:lib,periode:perLibelle(ps.sy,ps.sm),jour:jr&&jr.length===3?(("0"+jr[2]).slice(-2)+"/"+("0"+(+jr[1]+1)).slice(-2)+"/"+jr[0]):"—",
       mode:(accessMode==="edit"?"éditeur":accessMode==="medecinEdit"?"médecin "+(authorRef.current||"?"):accessMode==="adminEdit"?"administratif "+(authorRef.current||"?"):accessMode==="interneEdit"?"interne "+(authorRef.current||"?"):"consultation")+(VER_STALE.on?" — version périmée":""),
       appareil:(narrow?"téléphone":"ordinateur")+" "+window.innerWidth+"×"+window.innerHeight+(inst?", installée sur l'écran d'accueil":", dans le navigateur"),
       reseau:(netOff||navigator.onLine===false)?"hors ligne":"en ligne",theme:darkMode?"nuit":"jour",navigateur:String(navigator.userAgent||"?").slice(0,200),trafic:trafLigne()};};
-  const sigEnvoyer=async(texte)=>{if(BAC){toast("🧪 Bac à sable : pas de signalement d'ici","warn");return;}const ts=Date.now();await window.firebaseDB.collection("signalements").doc("s"+ts).set({ts,auteur:authorRef.current||"?",texte:String(texte||"").slice(0,2000),ctx:sigCtx(),journal:JOURNAL.slice(),prec:JOURNAL_PREC.slice(),traite:false});toast("Signalement envoyé — merci");refreshSig();
+  const sigEnvoyer=async(texte)=>{if(BAC){toast("🧪 Bac à sable : pas de signalement d'ici","warn");return;}const ts=Date.now();await window.firebaseDB.collection(COLL_SIG).doc("s"+ts).set({ts,auteur:authorRef.current||"?",texte:String(texte||"").slice(0,2000),ctx:sigCtx(),journal:JOURNAL.slice(),prec:JOURNAL_PREC.slice(),traite:false});toast("Signalement envoyé — merci");refreshSig();
     /* v10.219 : un signalement fait par quelqu'un d'autre que l'éditeur → notification seule aux médecins éditeurs
        (sa demande du 15/09). Le code éditeur 1234 n'a pas de nom, donc pas d'appareil : seuls les médecins de niveau
        éditeur peuvent recevoir ; l'auteur lui-même n'est pas prévenu. */
@@ -15835,6 +15942,13 @@ header::-webkit-scrollbar { display: none; }
               <div style={{fontSize:11,color:"var(--txt3)",marginTop:4}}>Les salles créées ici restent disponibles même si aucune activité ne les utilise. Renommer propage aux activités et au planning.</div>
             </div>
 
+          {ESSAI&&isEditVrai&&!BAC&&<div data-essaicarte="1" style={{...S.card,marginBottom:10,border:"1.5px solid #ea580c"}}>{/* v10.266 : version d'essai */}
+            <div style={{fontWeight:700,color:"#ea580c",fontSize:13,marginBottom:6}}>🧪 Version d'essai</div>
+            <div style={{fontSize:11,color:"var(--txt2)",marginBottom:8}}>Cette application est la <b>version d'essai</b> : elle travaille sur ses propres cahiers Firebase et ne peut rien écrire dans le vrai planning (la règle du serveur le lui interdit). {essaiDep?<span>Dernière copie du planning réel : <b>{new Date(essaiDep).toLocaleString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</b>.</span>:<span>Aucune copie du planning réel n'a encore été faite.</span>}</div>
+            <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--txt2)",marginBottom:8}}><input type="checkbox" data-essaiarch="1" checked={essaiArch} onChange={e=>setEssaiArch(e.target.checked)}/> Copier aussi les archives (plus long ; utile pour tester ce qui ne se voit que sur les anciennes périodes)</label>
+            <button data-essaicopier="1" disabled={essaiBusy||netOff} onClick={essaiCopier} style={{width:"100%",padding:"9px",borderRadius:8,border:"none",background:essaiBusy||netOff?"#9ca3af":"#ea580c",color:"#fff",fontWeight:800,cursor:essaiBusy||netOff?"default":"pointer",fontSize:13}}>{essaiBusy?"⏳ Copie en cours…":"⬇ Copier le planning réel dans l'essai"}</button>
+            <div style={{fontSize:11,color:"var(--txt3)",marginTop:4}}>Lit le vrai planning (lecture seule) et remplace celui de l'essai : cases, tour, gardes, historique des cases. Le vrai n'est jamais modifié.</div>
+          </div>}
           {isEdit&&<div style={{...S.card,marginBottom:10}}>{/* v10.175 : bac à sable */}
             <div style={{fontWeight:700,color:"#c2410c",fontSize:13,marginBottom:6}}>🧪 Bac à sable</div>
             {BAC
@@ -16016,7 +16130,7 @@ header::-webkit-scrollbar { display: none; }
                 Object.keys(plan).forEach(k=>{const pid=arPerClair(k);if(pid&&list.indexOf(pid)>=0){(byPer[pid]=byPer[pid]||{})[k]=plan[k];}});
                 try{
                   for(const pid of list){
-                    const ref=window.firebaseDB.collection("archives").doc("per-"+pid);
+                    const ref=window.firebaseDB.collection(COLL_AR).doc("per-"+pid);
                     const prev=(await ref.get()).data()||{};
                     const merged=Object.assign({},prev.plan?JSON.parse(prev.plan):{},byPer[pid]||{});
                     /* les annexes de la période rejoignent le document d'archive, FUSIONNÉES
@@ -16094,7 +16208,7 @@ header::-webkit-scrollbar { display: none; }
                 /* le fichier part en dernier, une fois les écritures critiques confirmées ;
                    le court délai laisse aussi partir l'enregistrement des annexes */
                 /* v10.238 : l'historique des cases de la période part avec elle, dans le fichier ; il reste lisible (un clic droit sur une case archivée le relit) */
-                const histArch={};for(const pid of list){try{const hd=((await window.firebaseDB.collection("planning").doc(HIST_PFX+pid).get()).data()||{}).e||{};if(Object.keys(hd).length)histArch[pid]=hd;}catch(e){}}
+                const histArch={};for(const pid of list){try{const hd=((await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX+pid).get()).data()||{}).e||{};if(Object.keys(hd).length)histArch[pid]=hd;}catch(e){}}
                 const blob=new Blob([JSON.stringify({version:"arch-per-1",plan:byPer,annexes:anxL.parts,historique:histArch},null,1)],{type:"application/json"});
                 const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="archive-cardio-"+list[0]+"_"+list[list.length-1]+".json";
                 setTimeout(()=>{a2.click();},800);
@@ -16125,7 +16239,7 @@ header::-webkit-scrollbar { display: none; }
                             if(BAC){toast("🧪 Bac à sable : pas de désarchivage ici","warn");return;}   /* v10.175 */
                             if(!window.confirm("Désarchiver la période "+perLib(pid)+" ? Elle sera remise dans les données actives, cases ET données datées (les valeurs actives existantes sont conservées en cas de doublon)."))return;
                             try{
-                              const ref=window.firebaseDB.collection("archives").doc("per-"+pid);
+                              const ref=window.firebaseDB.collection(COLL_AR).doc("per-"+pid);
                               const d2=(await ref.get()).data();
                               if(!d2||!d2.plan){toast("Archive introuvable","warn");return;}
                               const frag=JSON.parse(d2.plan);

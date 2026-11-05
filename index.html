@@ -101,8 +101,18 @@ const db = typeof window !== "undefined" && window.firebaseDB ? window.firebaseD
    après inactivité (5 min, y compris en simple consultation ici) FAIT SORTIR du bac : au réveil, on tape son
    code et on est dans le vrai planning. Présence : planning/presence-bac, un « je suis là » par minute et par
    appareil qui peut modifier (une consultation sans code n'écrit pas, elle n'est pas comptée). */
+/* v10.266 : VERSION D'ESSAI — une seconde application, à l'adresse …/essai/, qui travaille sur des cahiers Firebase
+   à part (planning-essai, backups-essai, archives-essai, sessions-essai, signalements-essai) et jamais sur les vrais.
+   Le drapeau vient de l'en-tête d'index.html (window.CP_ESSAI, posé par « construire.sh --essai ») : le script compilé
+   est LE MÊME dans les deux versions, seul l'en-tête diffère. Les clés de la mémoire du navigateur sont préfixées
+   cp6e_ au lieu de cp6_ : les deux adresses vivent sur le même site et partageraient tout sinon (thème, bac, fermeture…).
+   Les comptes de l'essai sont c-<empreinte>@essai.cardioplanning.app (même empreinte, même fiche profils) : la règle
+   Firestore v10.266 n'autorise un compte essai qu'à écrire dans les cahiers « -essai ». Notifications coupées. */
+var ESSAI = (typeof window !== "undefined" && window.CP_ESSAI === true);
+var COLL_PLAN = ESSAI ? "planning-essai" : "planning", COLL_BK = ESSAI ? "backups-essai" : "backups", COLL_AR = ESSAI ? "archives-essai" : "archives", COLL_SE = ESSAI ? "sessions-essai" : "sessions", COLL_SIG = ESSAI ? "signalements-essai" : "signalements";
+var LS_PFX = ESSAI ? "cp6e_" : "cp6_";
 var BAC = (function () { try {
-    return localStorage.getItem("cp6_bac") === "1";
+    return localStorage.getItem(LS_PFX + "bac") === "1";
 }
 catch (e) {
     return false;
@@ -114,7 +124,7 @@ var PLAN_ID = BAC ? "bac" : "main";
    copie ; il lit le VRAI historique jusqu'à son heure de départ (BAC_DEP). */
 var HIST_PFX = "hist-";
 var BAC_DEP = { t: null };
-const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, "planning", PLAN_ID) : null;
+const PLANNING_DOC = db && window.firebaseDoc ? window.firebaseDoc(db, COLL_PLAN, PLAN_ID) : null;
 /* v10.135 : garde-fou de version. Le 28/08, après un plantage, le cache a resservi une
    v9.22 — une copie de juillet qui aurait écrit avec ses règles d'alors, sans verrou du
    passé. Désormais la version la plus récente inscrit son numéro dans Firebase (appVer) ;
@@ -134,7 +144,7 @@ function toast(msg, type, act) { if (TOAST_HUB.f)
    v10.185 : le bouton 🔍 est proposé à tous, sans réglage. */
 var ZOOM_DEF = 110, ZOOM_PAS = [100, 110, 120, 130]; /* v10.183 : 110 % en nominal (son choix), une fois les grilles au point sur PC et iPhone (v10.181/182) */
 var ZOOM = (function () { var z = ZOOM_DEF; try {
-    var v = parseInt(localStorage.getItem("cp6_zoom"), 10);
+    var v = parseInt(localStorage.getItem((LS_PFX + "zoom")), 10);
     if (ZOOM_PAS.indexOf(v) >= 0)
         z = v;
 }
@@ -160,7 +170,7 @@ function photoVersion(data0, prec) {
     VER_PHOTO.fait = true;
     var ts = Date.now(), ver = String(APP_VERSION).split(" ")[0];
     var pl = sansCodes(Object.assign({}, data0, { _ts: ts, _verArr: ver, _verPrec: String(prec || "") })); /* v10.252 : sans les codes */
-    return Promise.resolve(window.firebaseDB.collection("backups").doc("b" + ts).set(pl)).then(function () { return true; })
+    return Promise.resolve(window.firebaseDB.collection(COLL_BK).doc("b" + ts).set(pl)).then(function () { return true; })
         .catch(function (e) { VER_PHOTO.err = String((e && (e.message || e.code)) || e).slice(0, 200); console.log("photo de version:", e); return false; });
 }
 /* v10.248 : message clair quand une sauvegarde échoue — le 01/10/2026, 45 sauvegardes, aucune nouvelle depuis le 29/09 :
@@ -366,12 +376,12 @@ function sansIndef(v) {
 var APPAREIL = (function () {
     var id = "", ua = "";
     try {
-        id = localStorage.getItem("cp6_app") || "";
+        id = localStorage.getItem((LS_PFX + "app")) || "";
         if (!/^[a-z0-9]{4}$/.test(id)) {
             id = Math.random().toString(36).slice(2, 6);
             if (id.length < 4)
                 id = (id + "0000").slice(0, 4);
-            localStorage.setItem("cp6_app", id);
+            localStorage.setItem((LS_PFX + "app"), id);
         }
     }
     catch (e) {
@@ -405,7 +415,7 @@ function tampon() {
 function estCahier(ref) { if (!ref)
     return false; if (ref === PLANNING_DOC)
     return true; try {
-    return (ref.id === "main" || ref.id === "bac") && !!ref.parent && ref.parent.id === "planning";
+    return (ref.id === "main" || ref.id === "bac") && !!ref.parent && ref.parent.id === COLL_PLAN;
 }
 catch (e) {
     return false;
@@ -511,12 +521,12 @@ function fermerApp(motif, info) {
     }
     catch (e) { }
     try {
-        localStorage.setItem("cp6_ferme", JSON.stringify({ m: motif, lib: (info && info.lib) || "", t: (info && info.t) || 0, min: INACT.min, bac: !!BAC }));
+        localStorage.setItem((LS_PFX + "ferme"), JSON.stringify({ m: motif, lib: (info && info.lib) || "", t: (info && info.t) || 0, min: INACT.min, bac: !!BAC }));
     }
     catch (e) { }
     if (BAC) {
         try {
-            localStorage.removeItem("cp6_bac");
+            localStorage.removeItem((LS_PFX + "bac"));
         }
         catch (e) { }
     } /* v10.254 : la fermeture fait sortir du bac — au réveil, le vrai planning */
@@ -645,7 +655,8 @@ function cpteHash(s) {
     }
     return ("00000000" + h1.toString(16)).slice(-8) + ("00000000" + h2.toString(16)).slice(-8);
 }
-function cpteEmail(code) { return "c-" + cpteHash("cardioplanning|" + String(code)) + "@comptes.cardioplanning.app"; }
+function cpteEmail(code) { return "c-" + cpteHash("cardioplanning|" + String(code)) + (ESSAI ? "@essai.cardioplanning.app" : "@comptes.cardioplanning.app"); }
+function cpteEmailReel(code) { return "c-" + cpteHash("cardioplanning|" + String(code)) + "@comptes.cardioplanning.app"; } /* v10.266 : le vrai compte, sondé par l'essai */
 function cpteMdp(code) { code = String(code); return code.length >= 6 ? code : code + "-cp"; }
 function cpteErr(e) { return String((e && (e.code || e.message)) || e || ""); }
 function cpteReseau(e) { return /network-request-failed|auth\/timeout|unavailable|deadline/i.test(cpteErr(e)); }
@@ -691,6 +702,15 @@ function cpteSonder(code) {
     if (!cpteDispo())
         return Promise.resolve({ erreur: "sans" });
     return cpteDelai(window.cpAuth.sonder(cpteEmail(code), cpteMdp(code))).then(function (u) { return { existe: true, nom: (u && u.nom) || "", uid: u && u.uid }; }, function (e) { if (cpteInconnu(e))
+        return { existe: false }; cpteNote(e); return { erreur: cpteErr(e), reseau: cpteReseau(e) }; });
+}
+/* v10.266 : SONDER LE VRAI COMPTE depuis l'essai (liaison discrète, aussitôt refermée, aucune écriture). Si le code existe
+   pour de vrai, l'essai crée son propre compte @essai avec la même étiquette : on garde les mêmes codes sans jamais
+   les copier nulle part. {existe:true,nom} / {existe:false} / {erreur,reseau} */
+function cpteSonderReel(code) {
+    if (!cpteDispo())
+        return Promise.resolve({ erreur: "sans" });
+    return cpteDelai(window.cpAuth.sonder(cpteEmailReel(code), cpteMdp(code))).then(function (u) { return { existe: true, nom: (u && u.nom) || "" }; }, function (e) { if (cpteInconnu(e))
         return { existe: false }; cpteNote(e); return { erreur: cpteErr(e), reseau: cpteReseau(e) }; });
 }
 /* CRÉER pour un autre (liaison discrète) : {ok} / {existe:true} / {erreur} */
@@ -911,8 +931,8 @@ function codesDuDocument(data) {
     return Object.keys(lg).length ? lg : null;
 }
 /* le texte des règles Firestore : la nouvelle (à coller) et la précédente (marche arrière) — carte 🔐 Comptes */
-var REGLE_TXT = "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    // ── v10.246 : TAMPON HORAIRE (inchangé) ─────────────────────────────────────────────\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n\n    // ── v10.252 : COMPTES ET PROFILS ────────────────────────────────────────────────────\n    // Un compte Google connecté (adresse c-<empreinte>@comptes.cardioplanning.app) ; sa fiche\n    // profils/<empreinte>, écrite par l'éditeur seul, dit qui il est. Jamais le nom d'affichage.\n    function connecte() {\n      return request.auth != null && request.auth.token.email is string;\n    }\n    function cle() {\n      return request.auth.token.email.split('@')[0];\n    }\n    function ficheExiste() {\n      return exists(/databases/$(database)/documents/profils/$(cle()));\n    }\n    function fiche() {\n      return get(/databases/$(database)/documents/profils/$(cle())).data;\n    }\n    function aProfil() {\n      return connecte() && ficheExiste()\n        && fiche().p in ['editeur', 'medecin', 'attache', 'secretaires', 'cadres', 'internes']\n        && fiche().get('parti', false) != true;\n    }\n    function editeur() {\n      return aProfil()\n        && (fiche().p == 'editeur' || (fiche().p == 'medecin' && fiche().get('niv', '') == 'editeur'));\n    }\n    function moi(id) {\n      return aProfil() && fiche().p in ['medecin', 'attache'] && string(fiche().id) == id;\n    }\n\n    // Le cahier : lecture libre (Consulter), écriture par un profil, tampon frais sur main et bac.\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && id != 'main' && id != 'bac';\n    }\n    match /archives/{id} {\n      allow read: if true;\n      allow write: if editeur();\n    }\n    match /backups/{id} {\n      allow read: if editeur();\n      allow create: if aProfil();\n      allow update, delete: if editeur();\n    }\n    match /sessions/{id} {\n      allow read: if aProfil();\n      allow write: if moi(id);\n    }\n    match /push/{id} {\n      allow read: if editeur();\n      allow write: if aProfil();\n    }\n    match /signalements/{id} {\n      allow read: if editeur();\n      allow create: if request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur();\n    }\n    match /prive/{id} {\n      allow read, write: if editeur();\n    }\n    match /profils/{id} {\n      allow read: if editeur() || (connecte() && cle() == id);\n      allow write: if editeur();\n    }\n  }\n}\n";
-var REGLE_AVANT_TXT = "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if (id != 'main' && id != 'bac') || tamponFrais();\n      allow delete: if id != 'main' && id != 'bac';\n    }\n    match /{coll}/{doc=**} { allow read, write: if coll != 'planning'; }\n  }\n}\n";
+var REGLE_TXT = "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    // ── v10.246 : TAMPON HORAIRE (inchangé) ─────────────────────────────────────────────\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n\n    // ── v10.252 : COMPTES ET PROFILS ────────────────────────────────────────────────────\n    // Un compte Google connecté (adresse c-<empreinte>@comptes.cardioplanning.app) ; sa fiche\n    // profils/<empreinte>, écrite par l'éditeur seul, dit qui il est. Jamais le nom d'affichage.\n    function connecte() {\n      return request.auth != null && request.auth.token.email is string;\n    }\n    function cle() {\n      return request.auth.token.email.split('@')[0];\n    }\n    function ficheExiste() {\n      return exists(/databases/$(database)/documents/profils/$(cle()));\n    }\n    function fiche() {\n      return get(/databases/$(database)/documents/profils/$(cle())).data;\n    }\n    function aProfil() {\n      return connecte() && ficheExiste()\n        && fiche().p in ['editeur', 'medecin', 'attache', 'secretaires', 'cadres', 'internes']\n        && fiche().get('parti', false) != true;\n    }\n    function editeur() {\n      return aProfil()\n        && (fiche().p == 'editeur' || (fiche().p == 'medecin' && fiche().get('niv', '') == 'editeur'));\n    }\n    function moi(id) {\n      return aProfil() && fiche().p in ['medecin', 'attache'] && string(fiche().id) == id;\n    }\n\n    // ── v10.266 : VERSION D'ESSAI ─────────────────────────────────────────────────────\n    // L'application d'essai (…/essai/) entre avec des comptes c-<empreinte>@essai.cardioplanning.app\n    // (même empreinte, donc même fiche profils). Un compte essai n'écrit QUE dans les cahiers « -essai » ;\n    // un compte réel n'y écrit jamais. Lecture des vrais cahiers inchangée (c'est ce que fait la copie).\n    function essai() {\n      return connecte() && request.auth.token.email.split('@')[1] == 'essai.cardioplanning.app';\n    }\n\n    // Le cahier : lecture libre (Consulter), écriture par un profil réel, tampon frais sur main et bac.\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && !essai() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && !essai() && id != 'main' && id != 'bac';\n    }\n    match /planning-essai/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && essai() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && essai() && id != 'main' && id != 'bac';\n    }\n    match /archives/{id} {\n      allow read: if true;\n      allow write: if editeur() && !essai();\n    }\n    match /archives-essai/{id} {\n      allow read: if true;\n      allow write: if editeur() && essai();\n    }\n    match /backups/{id} {\n      allow read: if editeur() && !essai();\n      allow create: if aProfil() && !essai();\n      allow update, delete: if editeur() && !essai();\n    }\n    match /backups-essai/{id} {\n      allow read: if editeur() && essai();\n      allow create: if aProfil() && essai();\n      allow update, delete: if editeur() && essai();\n    }\n    match /sessions/{id} {\n      allow read: if aProfil() && !essai();\n      allow write: if moi(id) && !essai();\n    }\n    match /sessions-essai/{id} {\n      allow read: if aProfil() && essai();\n      allow write: if moi(id) && essai();\n    }\n    match /push/{id} {\n      allow read: if editeur() && !essai();\n      allow write: if aProfil() && !essai();\n    }\n    match /push-essai/{id} {\n      allow read: if editeur() && essai();\n      allow write: if aProfil() && essai();\n    }\n    match /signalements/{id} {\n      allow read: if editeur() && !essai();\n      allow create: if !essai()\n        && request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur() && !essai();\n    }\n    match /signalements-essai/{id} {\n      allow read: if editeur() && essai();\n      allow create: if essai()\n        && request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur() && essai();\n    }\n    // Communs aux deux : la copie des codes (lue par l'éditeur, réel ou essai) et les fiches profils — écrits par le vrai éditeur seul.\n    match /prive/{id} {\n      allow read: if editeur();\n      allow write: if editeur() && !essai();\n    }\n    match /profils/{id} {\n      allow read: if editeur() || (connecte() && cle() == id);\n      allow write: if editeur() && !essai();\n    }\n  }\n}\n";
+var REGLE_AVANT_TXT = "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    // ── v10.246 : TAMPON HORAIRE (inchangé) ─────────────────────────────────────────────\n    function tamponFrais() {\n      return request.resource.data.keys().hasAll(['_ecr'])\n        && request.resource.data._ecr.t is int\n        && request.resource.data._ecr.t > request.time.toMillis() - 600000\n        && request.resource.data._ecr.t < request.time.toMillis() + 600000\n        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasAny(['_ecr']));\n    }\n\n    // ── v10.252 : COMPTES ET PROFILS ────────────────────────────────────────────────────\n    // Un compte Google connecté (adresse c-<empreinte>@comptes.cardioplanning.app) ; sa fiche\n    // profils/<empreinte>, écrite par l'éditeur seul, dit qui il est. Jamais le nom d'affichage.\n    function connecte() {\n      return request.auth != null && request.auth.token.email is string;\n    }\n    function cle() {\n      return request.auth.token.email.split('@')[0];\n    }\n    function ficheExiste() {\n      return exists(/databases/$(database)/documents/profils/$(cle()));\n    }\n    function fiche() {\n      return get(/databases/$(database)/documents/profils/$(cle())).data;\n    }\n    function aProfil() {\n      return connecte() && ficheExiste()\n        && fiche().p in ['editeur', 'medecin', 'attache', 'secretaires', 'cadres', 'internes']\n        && fiche().get('parti', false) != true;\n    }\n    function editeur() {\n      return aProfil()\n        && (fiche().p == 'editeur' || (fiche().p == 'medecin' && fiche().get('niv', '') == 'editeur'));\n    }\n    function moi(id) {\n      return aProfil() && fiche().p in ['medecin', 'attache'] && string(fiche().id) == id;\n    }\n\n    // Le cahier : lecture libre (Consulter), écriture par un profil, tampon frais sur main et bac.\n    match /planning/{id} {\n      allow read: if true;\n      allow create, update: if aProfil() && ((id != 'main' && id != 'bac') || tamponFrais());\n      allow delete: if editeur() && id != 'main' && id != 'bac';\n    }\n    match /archives/{id} {\n      allow read: if true;\n      allow write: if editeur();\n    }\n    match /backups/{id} {\n      allow read: if editeur();\n      allow create: if aProfil();\n      allow update, delete: if editeur();\n    }\n    match /sessions/{id} {\n      allow read: if aProfil();\n      allow write: if moi(id);\n    }\n    match /push/{id} {\n      allow read: if editeur();\n      allow write: if aProfil();\n    }\n    match /signalements/{id} {\n      allow read: if editeur();\n      allow create: if request.resource.data.keys().hasOnly(['ts', 'auteur', 'texte', 'ctx', 'journal', 'prec', 'traite'])\n        && request.resource.data.texte is string && request.resource.data.texte.size() <= 2000\n        && request.resource.data.auteur is string && request.resource.data.auteur.size() <= 80\n        && request.resource.data.traite == false;\n      allow update, delete: if editeur();\n    }\n    match /prive/{id} {\n      allow read, write: if editeur();\n    }\n    match /profils/{id} {\n      allow read: if editeur() || (connecte() && cle() == id);\n      allow write: if editeur();\n    }\n  }\n}\n";
 /* v10.251 : LIAISON. Le feu gris suivait le navigateur, qui ne sait pas toujours que le réseau est tombé. Le vrai signal est
    celui de Firebase : (1) chaque écriture doit être ACCUSÉE par le serveur — sans accusé pendant plus de LIAISON.delai,
    la liaison est grise ; (2) un message « servi depuis le cache » qui dure plus de LIAISON.delai (Firebase a perdu le
@@ -1014,7 +1034,7 @@ function docSalleReg(d) { d = d || {}; return d.salleRegV2 && typeof d.salleRegV
    dans le fichier sans qu'on y pense (contrôle 42). Les 8 rubriques lisibles restent en tête (anciens lecteurs, contrôle 41) ;
    le planning n'est écrit qu'une fois (« plan », remis en planV2 à la restauration). */
 var EXP_CODES = ["medPins", "editPin", "adminPin", "cadrePin"]; /* + le code des internes, rangé dans intCfg.pin */
-var EXP_HORS = ["_ts", "_verArr", "_verPrec", "_ecr", "gel", "_bacDe", "_bacDep", "_lastBackupAt", "planV2", "plan"];
+var EXP_HORS = ["_ts", "_verArr", "_verPrec", "_ecr", "gel", "_bacDe", "_bacDep", "_essaiDep", "_lastBackupAt", "planV2", "plan"];
 var EXP_RUB = [[["astreinte", "astReport"], "l'astreinte"], [["tourWish", "tourAvoid", "gardeWish", "gardeAvoid"], "les souhaits de tour et de garde"],
     [["csRep", "csBlanches"], "les reports"], [["intCfg"], "les internes"], [["build"], "Construire"], [["ideCfg"], "les IDE"],
     [["vacs", "vacRule"], "les vacances"], [["salleFerm"], "les plages fermées"], [["annonces"], "les messages"], [["dblOk"], "les doubles en salle validés"]];
@@ -1080,7 +1100,7 @@ var JOURNAL = [];
 /* v10.148 : le journal survit au redémarrage — une page blanche emporte sa console, pas ce fichier. La session
    précédente est relue au chargement (JOURNAL_PREC) et jointe au prochain signalement, marquée comme telle. */
 var JOURNAL_PREC = (function () { try {
-    var v = JSON.parse(localStorage.getItem("cp6_journal") || "[]");
+    var v = JSON.parse(localStorage.getItem((LS_PFX + "journal")) || "[]");
     return Array.isArray(v) ? v.slice(-40) : [];
 }
 catch (e) {
@@ -1101,7 +1121,7 @@ function jlog(niv, args) { try {
     if (JOURNAL.length > 40)
         JOURNAL.shift();
     try {
-        localStorage.setItem("cp6_journal", JSON.stringify(JOURNAL));
+        localStorage.setItem((LS_PFX + "journal"), JSON.stringify(JOURNAL));
     }
     catch (e2) { }
 }
@@ -1142,7 +1162,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.265 — 01/11/2026";
+const APP_VERSION = "v10.266 — 04/11/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -1967,7 +1987,7 @@ function ZoomBtn() {
     const [, tick] = useState(0);
     const suiv = ZOOM_PAS[(ZOOM_PAS.indexOf(ZOOM.z) + 1) % ZOOM_PAS.length];
     return React.createElement("button", { onClick: () => { zoomApply(suiv); try {
-            localStorage.setItem("cp6_zoom", String(suiv));
+            localStorage.setItem((LS_PFX + "zoom"), String(suiv));
         }
         catch (e) { } window.dispatchEvent(new Event("resize")); tick(t => t + 1); }, title: "Zoom " + ZOOM.z + " % — cliquer pour " + suiv + " % (réglage de cet appareil)", style: Object.assign(Object.assign({}, S.arr), { fontSize: 10, width: 46, fontWeight: 800 }) }, "🔍" + ZOOM.z);
 }
@@ -7990,6 +8010,7 @@ const HELP_SECTIONS = [
     { id: "protection", icon: "🛡️", title: "Protection des données — tour, notes, vieilles pages", body: () => HE("div", null, HP({ children: ["Depuis la v10.246. Motif : fin septembre 2026, une ", HE("b", null, "vieille page restée ouverte"), ", sur un navigateur rarement utilisé d'un téléphone, s'est réveillée et a renvoyé ce qu'elle avait gardé en attente. Le tour, les notes et le registre des salles, alors enregistrés ", HE("b", null, "d'un seul bloc"), ", ont reculé de plusieurs jours ; les cases, enregistrées une par une, n'ont pas bougé."] }), HT({ children: "1. Tout est enregistré morceau par morceau" }), HP({ children: ["Le tour est enregistré ", HE("b", null, "semaine par semaine"), ", les notes ", HE("b", null, "case par case"), ", les salles ", HE("b", null, "salle par salle"), ". Une copie en retard n'envoie plus que ce qu'elle a elle-même modifié : elle ne peut plus effacer le travail des autres. L'ancien bloc est conservé comme filet dans la base, mais n'est plus lu."] }), HT({ children: "2. Le journal du tour et des notes" }), HP({ children: ["Chaque médecin ajouté ou retiré d'une semaine de tour, chaque note posée, modifiée ou effacée est inscrit : ", HE("b", null, "quand, qui, depuis quel appareil et quelle version"), ". À lire dans Paramètres, carte ", HE("b", null, "📜 Journal du tour et des notes"), ", période par période ; l'historique d'une case (clic droit) montre aussi sa note. Le journal part avec l'archivage de la période. L'archivage, le désarchivage et l'import d'un fichier n'y écrivent rien."] }), HT({ children: "3. L'heure d'envoi de chaque modification" }), HP({ children: ["Chaque modification part avec son ", HE("b", null, "heure d'envoi"), ", réglée sur l'heure du serveur (le fuseau horaire, un voyage ou un VPN n'y changent rien). Une règle de la base Firebase refuse une modification envoyée ", HE("b", null, "il y a plus de 10 minutes"), ". Elle est ", HE("b", null, "abandonnée"), ", jamais renvoyée ; l'écran reprend le planning à jour et un message l'annonce. Conséquence pour tous : une modification faite hors réseau puis envoyée plus de 10 minutes après est à refaire. La carte ", HE("b", null, "🛡️ Protection des écritures"), " des Paramètres indique l'appareil, l'heure utilisée, et teste si la règle est publiée."] }), HT({ children: "4. Les notes" }), HP({ children: ["Le champ de note garde votre texte pendant la frappe et n'enregistre qu'après ", HE("b", null, "une courte pause"), ", ou quand on quitte le champ ou la fenêtre. Les lettres ne s'effacent plus en tapant vite."] }), HT({ children: "5. Fermeture des pages oubliées (v10.247)" }), HP({ children: ["Pour tous ceux qui peuvent modifier (médecins, éditeur, secrétaires, cadres, internes), l'application se ferme et revient à l'écran du code après ", HE("b", null, "5 minutes sans action"), ", y compris si on est parti dans un autre onglet ou une autre application. Un bandeau orange prévient ", HE("b", null, "30 secondes avant"), ", touchez l'écran pour continuer. Le délai se règle dans Paramètres, carte ", HE("b", null, "🔒 Fermeture après inactivité"), ", pour toute l'équipe. « Consulter » n'est pas concerné."] }), HP({ children: ["Une page endormie (téléphone verrouillé, onglet laissé en arrière-plan) se ferme ", HE("b", null, "à son réveil"), ", sans rien envoyer de ce qu'elle gardait en attente. Une modification faite juste avant de changer d'application part normalement : l'application attend son envoi avant de s'endormir."] }), HP({ children: ["Un ", HE("b", null, "code personnel de médecin"), " ne reste ouvert que sur un seul appareil : l'entrer sur un autre appareil ferme le premier, qui l'annonce sur son écran du code. Deux onglets du même navigateur comptent comme un seul appareil. Les codes partagés (éditeur, secrétaires, cadres, internes) ne sont pas concernés : plusieurs postes peuvent travailler en même temps."] }), HT({ children: "6. Les comptes et la connexion perdue (v10.251)" }), HP({ children: ["Chaque code a, en coulisse, un ", HE("b", null, "compte Google"), " (Firebase Authentication), créé tout seul à la première connexion ou d'un coup depuis Paramètres → 🔐 Comptes. Pour l'équipe rien ne change : on tape son code, puis son prénom pour un code partagé. Depuis la v10.252, ce compte est ce que le serveur vérifie (voir le point 7)."] }), HP({ children: ["Sans réseau, on ne peut plus entrer en modification : l'écran du code dit « ", HE("b", null, "Pas de connexion internet : consultation seule"), " » et propose 👁 Consulter. En cours de travail, si Firebase ne répond plus pendant plus de quelques secondes, le bandeau « ", HE("b", null, "Connexion perdue — modifications suspendues"), " » apparaît et les modifications sont bloquées ; tout reprend tout seul dès que Firebase répond. Le feu de liaison suit désormais ce vrai signal, et non plus seulement celui du navigateur."] }), HT({ children: "7. Le serveur vérifie qui écrit (v10.252)" }), HP({ children: ["La base Firebase refuse désormais ", HE("b", null, "toute modification qui n'arrive pas d'un compte connu"), ". Chaque compte a une ", HE("b", null, "fiche profil"), ", écrite par l'éditeur seul (collection « profils »), qui dit s'il est éditeur, médecin, attaché, secrétaire, cadre ou interne ; c'est cette fiche que le serveur consulte, jamais le nom du compte (qu'un compte peut changer). Les codes eux-mêmes ont quitté le document partagé : ils vivent dans « prive/codes », lisible et modifiable par l'éditeur seul. Pour l'équipe rien ne change : on tape son code, puis son prénom pour un code partagé ; l'application ouvre le compte du code et lit sa fiche. Un code d'une personne partie n'ouvre plus rien, même si son compte existe encore."] }), HP({ children: ["Ce qui change en pratique : ", HE("b", null, "seul l'éditeur change les codes"), " (Équipe et Paramètres) ; un signalement 🐞 reste possible sans code, mais seul l'éditeur lit la liste ; les sauvegardes ne contiennent plus les codes et seul l'éditeur peut les lire, les comparer ou les restaurer ; la sauvegarde automatique du jour, le numéro de version et la photo de passage de version partent du premier appareil ", HE("b", null, "entré avec un code"), ", plus d'un simple appareil en consultation. Le bac à sable suit le même chemin (mêmes codes, mêmes comptes). Coût : une lecture Firebase par modification (la fiche), rien de plus."] }), HP({ children: ["Mise en ligne, dans l'ordre : (1) publier l'application ; (2) ouvrir Paramètres → 🔐 Comptes en éditeur : « fiches profils : N écrites ✅ » ; (3) copier la règle depuis cette carte et la publier dans la console Firebase (Firestore → Règles) ; (4) carte 🛡️ : les trois épreuves doivent être vertes ; (5) bouton ", HE("b", null, "Retirer les codes du document partagé"), ". Un téléphone resté sur une ancienne version continue de fonctionner jusqu'à l'étape 5 ; ensuite il ne reconnaît plus les codes (consultation seule) et affiche le bandeau « version périmée » : mettre à jour."] }), HP({ children: ["Marche arrière en une minute, depuis un téléphone : Console Firebase → Firestore → Règles → l'historique des versions (à gauche) → republier la version précédente — ou coller « Règle précédente » depuis la carte 🔐. L'application v10.252 fonctionne aussi bien sous l'ancienne règle. Si vous revenez aussi à une ancienne version de l'application : d'abord ", HE("b", null, "Remettre les codes"), " (carte 🔐). Si la carte 🔐 dit « copie privée illisible », c'est que la règle a été publiée avant que les fiches existent : republiez l'ancienne règle, ouvrez l'application en éditeur (les fiches s'écrivent), puis la nouvelle."] })) },
     { id: "fermees", icon: "🚫", title: "Plages fermées — fermer une salle sur une demi-journée", body: () => HE("div", null, HP({ children: ["Depuis la v10.229, une salle peut être ", HE("b", null, "fermée sur une demi-journée"), " : sa case est ", HE("b", null, "grisée et hachurée"), " (hachures depuis la v10.235, pour ne pas la confondre avec la couleur d'une salle vide) dans CHL, CHB, PT Cardio et PT Angio (le gris seul, sans sigle, depuis la v10.230 ; l'infobulle de la case dit « Plage fermée »), et la salle n'est ", HE("b", null, "proposée à personne"), " sur ce créneau — ni dans la fenêtre de la salle, ni dans la fenêtre d'une case du Planning, ni pour un interne, ni dans les Reports."] }), HT({ children: "Colorer les salles vides (v10.232)" }), HP({ children: ["Depuis la v10.233, tous les choix de couleur des Paramètres (salles vides, surspécialités, pointillé de votre colonne et sa transparence) se valident par ", HBtn({ kind: "ghost", children: "✓ OK" }), " : tant que vous cherchez la teinte, rien n'est enregistré ni envoyé aux autres appareils ; ✕ abandonne."] }), HP({ children: ["À ne pas confondre avec une plage fermée : dans Paramètres → 🏥 Salles, cliquez le nom d'une salle et cochez ", HE("b", null, "🎨 Colorer la case quand la salle est vide"), ". Dans CHL, CHB, PT Angio et PT Cardio, sa case prend alors la ", HE("b", null, "couleur des salles vides"), " tant que personne n'y est posé — pratique pour voir d'un coup d'œil ce qui reste à pourvoir. La couleur est ", HE("b", null, "unique"), ", réglée en tête de la carte 🏥 Salles ; les salles cochées y portent une petite pastille. Si la plage est fermée, ", HE("b", null, "le gris gagne"), "."] }), HT({ children: "Fermer ou rouvrir un jour précis" }), HP({ children: ["Cliquez la case de la salle : en tête de la fenêtre, la ligne ", HE("b", null, "🚫 Plage fermée"), " se coche pour fermer, se décoche pour rouvrir — ce jour-là seulement. Réservé aux ", HE("b", null, "éditeurs, cadres et médecins intermédiaires"), " ; pour les autres, une plage fermée ne s'ouvre pas, un message le dit."] }), HT({ children: "Fermer chaque semaine — la grille de la salle" }), HP({ children: ["Dans Paramètres → 🏥 Salles, cliquez le ", HE("b", null, "nom de la salle"), ", puis ", HBtn({ kind: "ghost", children: "🚫 Plages fermées" }), " : une grille ", HE("b", null, "sans date"), ", du lundi au vendredi, matin et après-midi. Cliquez à la suite toutes les demi-journées fermées : c'est enregistré aussitôt, et la pastille de la salle porte 🚫 avec leur nombre. Ces plages sont fermées toutes les semaines ; pour en rouvrir une un jour donné, passez par la case de ce jour (ligne 🚫 à décocher) — l'exception d'un jour gagne toujours sur la grille."] }), HT({ children: "Ce qui se passe autour" }), HP({ children: [HE("b", null, "Un médecin déjà posé"), " dans une plage qu'on ferme n'est pas retiré : il reste affiché sur la case grisée et entre dans le bandeau ⚠ des problèmes de planning (« en plage fermée »), à déplacer à la main. ", HE("b", null, "Le planning type"), " ne pose rien dans une plage fermée : la case est sautée et le message de fin le compte. Renommer une salle emporte ses fermetures ; la supprimer les efface."] })) },
     { id: "colplanning", icon: "👁", title: "Colonnes de salles et d'activités dans le Planning", body: () => HE("div", null, HP({ children: ["Accès : éditeur et intermédiaires. Pour construire le planning en voyant tout le monde, le bouton ", HBtn({ kind: "ghost", children: "👁" }), " de la barre du Planning ouvre la liste de ", HE("b", null, "toutes les colonnes des onglets salles"), " — CHL, CHB (avec le BIP), PT Cardio (avec la Stimulation) et PT Angio — et un champ de recherche (« bip », « stim », « CHB-2 »…). Chaque colonne cochée s'ajoute ", HE("b", null, "tout à droite, après les médecins"), ", derrière un trait vertical (v10.240)."] }), HP({ children: ["La colonne est ", HE("b", null, "exactement celle de son onglet"), ", dessinée par le même code : mêmes ronds, mêmes couleurs, salle vide colorée, plage fermée grisée, alertes et notes. Un clic ouvre la même fenêtre que dans l'onglet d'origine, avec les mêmes droits et les mêmes verrous. Poser un médecin depuis cette colonne revient à le poser dans sa propre colonne : tout se met à jour en même temps, rien n'est écrit deux fois."] }), HP({ last: true, children: ["Réglage ", HE("b", null, "propre à cet appareil"), ", vide par défaut : personne d'autre ne voit vos colonnes, et elles disparaissent dès qu'on les décoche (", HBtn({ kind: "ghost", children: "✕ Tout décocher" }), "). Le bouton 👁 prend un liseré tant qu'une colonne est cochée. Ces colonnes ne sont pas imprimées. Seul ce qui est déjà une colonne dans un onglet salle peut être affiché : pour une activité qui n'en a pas, cochez-lui une colonne de reprise ↩ dans Paramètres → Activités."] })) },
+    { id: "essai", icon: "🧪", title: "Version d'essai — tester une nouvelle version avant de la diffuser", body: () => HE("div", null, HP({ children: ["Depuis la v10.266, CardioPlanning existe en ", HE("b", null, "deux applications"), " : la vraie, et une ", HE("b", null, "version d'essai"), ", à l'adresse de la vraie suivie de ", HE("b", null, "/essai/"), ". L'essai se reconnaît à son ", HE("b", null, "bandeau orange « VERSION D'ESSAI »"), ", en haut de tous les écrans, et à son icône orange une fois installé sur un téléphone (nom « CardioPlanning ESSAI »). Il sert à essayer une nouvelle version de l'application — un nouvel affichage, un nouveau mécanisme — avec de vraies données, avant de la mettre entre les mains de l'équipe."] }), HP({ children: [HE("b", null, "Ses données sont à part"), ". L'essai travaille sur ses propres cahiers Firebase (planning, sauvegardes, archives, signalements), jamais sur les vrais : il a même son propre bac à sable. On y entre avec les mêmes codes que dans la vraie application — à la première entrée, le code est vérifié sur le vrai compte, puis l'essai se crée un compte à lui, en coulisse. Côté serveur, la règle Firestore v10.266 n'autorise un compte de l'essai qu'à écrire dans les cahiers de l'essai : même une erreur dans une version en test ne pourrait pas toucher le vrai planning."] }), HP({ children: [HE("b", null, "Copier le planning réel"), ". Dans les Paramètres de l'essai, la carte 🧪 Version d'essai (éditeur) porte ", HBtn({ kind: "ghost", children: "⬇ Copier le planning réel dans l'essai" }), ' : le vrai planning est lu (lecture seule) et remplace celui de l\'essai — cases, tour, gardes, notes, historique des cases. La case « copier aussi les archives » ajoute les anciennes périodes, pour tester ce qui ne se voit que sur elles. La carte rappelle la date de la dernière copie.'] }), HP({ children: [HE("b", null, "Ce qui est coupé"), ' : les notifications (un message posé pour voir partirait sinon sur les téléphones de toute l\'équipe) et l\'écriture des fiches profils et de la copie des codes, qui restent du ressort de la vraie application. Les signalements 🐞 faits dans l\'essai arrivent dans les Paramètres de l\'essai, pas dans ceux de la vraie application ; leur ligne de version porte « VERSION D\'ESSAI ».'] }), HP({ children: [HE("b", null, "Sur un même appareil"), ", la vraie application et l'essai ne se mélangent pas : thème, zoom, prénom, bac à sable, fermeture après inactivité — chacun garde les siens. Et « un code, un appareil » ne vaut qu'entre vraies applications : ouvrir l'essai sur le téléphone ne ferme pas la vraie application sur l'ordinateur."] }), HP({ children: [HE("b", null, "Pour fabriquer la version d'essai"), ' (administrateur) : « bash construire.sh --essai » produit le dossier essai/ (index.html, sw.js, manifest.json, icônes) à partir des mêmes fichiers sources que la vraie application ; on le dépose tel quel dans le dépôt GitHub, à côté des fichiers habituels. Une version peut ainsi vivre dans l\'essai avec un numéro plus récent que le vrai sans que le vrai passe en lecture seule : chaque application a son propre garde-fou de version.'] })) },
     { id: "bac", icon: "🧪", title: "Bac à sable — tester sans risque", body: () => HE("div", null, HP({ children: ["Un espace de test à part, ouvert à toute l'équipe depuis la v10.254. Sur l'écran d'accueil, le bouton ", HBtn({ kind: "ghost", children: "🧪 Essayer le bac à sable" }), " ouvre le bac ; on y tape ensuite son code habituel et on y a son vrai profil — un médecin y voit et y fait ce qu'un médecin voit et fait, une secrétaire ce qu'une secrétaire voit et fait. Le bac est un cahier Firebase distinct, copie du planning réel : tout ce qu'on y fait reste dans cette copie, et le vrai planning ne bouge pas d'une case."] }), HP({ children: [HE("b", null, "Plusieurs personnes à la fois"), ". Le bac est partagé : entrer ne copie rien, on le rejoint tel qu'il est, et chacun voit en direct ce que font les autres, comme dans le vrai planning. Seul l'éditeur remplace son contenu — par une copie fraîche du vrai planning (↺ Remettre à zéro) ou par une sauvegarde ; si d'autres appareils sont dans le bac à ce moment-là, il en est averti, car leurs essais sont remplacés. Le bandeau indique qui d'autre modifie le bac (👥) ; une personne entrée en simple consultation n'est pas comptée."] }), HP({ children: [HE("b", null, "On en sort tout seul"), ". Au bout du délai sans action (5 min, réglable dans Paramètres), l'application se ferme comme ailleurs ", HE("i", null, "et"), ", dans le bac, fait aussi sortir du bac : au réveil, on tape son code et on est dans le vrai planning. Le délai vaut aussi pour la consultation sans code, dans le bac seulement."] }), HP({ children: [HE("b", null, "Ce qui s'y comporte comme dans le vrai"), " : les verrous du passé et de l'avenir, les notifications aux secrétaires, Construire, le tour, les gardes, le planning type, l'historique des binômes. C'est le but : voir l'effet réel d'une modification, dans toutes les conditions."] }), HP({ children: [HE("b", null, "Ce qui est désactivé"), " : sauvegardes automatiques et manuelles, restauration, archivage et désarchivage, signalements 🐞. Les boutons restent visibles mais répondent par un simple message. Les archives ne sont pas recopiées : les périodes archivées restent consultables telles quelles."] }), HP({ children: [HE("b", null, "L'historique des cases dans le bac"), ", depuis la v10.238 : il montre le vrai historique jusqu'au moment où le bac a été copié — ou, si vous avez chargé une sauvegarde, jusqu'à l'heure de cette sauvegarde — puis vos essais du bac, à la suite. Vos essais ne se mêlent jamais au vrai historique, et la remise à zéro (ou le chargement d'une autre sauvegarde) les efface."] }), HP({ children: [HE("b", null, "Le bandeau orange"), ", en bas de l'écran, rappelle où vous êtes et porte ", HBtn({ kind: "ghost", children: "🚪 Sortir du bac" }), ", qui ramène au vrai planning. L'écran d'accueil (code) affiche le même rappel, avec son bouton Sortir. Pour l'éditeur seul, le bandeau porte en plus : ", HE("b", null, "Connecté comme"), ", pour passer d'un profil à l'autre sans code — éditeur, chaque médecin avec son niveau, secrétaire, cadre, interne, consultation ; ", HE("b", null, "la sauvegarde affichée"), ", une liste des sauvegardes avec les flèches ‹ (plus ancienne) et › (plus récente), pour feuilleter les sauvegardes sans passer par Paramètres — pratique pour retrouver le moment où un problème est apparu ; et ", HBtn({ kind: "ghost", children: "↺ Remettre à zéro" }), ", qui remplace le bac par une copie fraîche du planning réel."] })) },
     { id: "desactiver", icon: "⏸", title: "Indisponible : les hachures et la désactivation", body: () => HE("div", null, HP({ children: ["Une case ", HE("b", null, "hachurée"), " veut toujours dire la même chose, quel que soit l'onglet : ", HE("b", null, "cette personne n'est pas disponible ce jour-là"), ". Ce n'est pas un effet d'affichage mais un ", HE("b", null, "verrou"), " : la case ne s'ouvre pas au clic, le planning type ne s'y applique pas, et les répartitions automatiques passent la personne. Couverte sur ", HE("b", null, "toute"), " la période affichée, sa colonne disparaît même des grilles."] }), HP({ children: ["Deux situations produisent une hachure : une ", HE("b", null, "désactivation posée à la main"), " (ci-dessous), et un ", HE("b", null, "rôle de Dr Junior dont le nom du semestre n'a pas encore été saisi"), " (section suivante). Dans les deux cas, le contenu déjà posé n'est pas effacé : il reste sous les hachures."] }), HT({ children: "Désactiver quelqu'un" }), HP({ children: ["Pour un long congé, un départ, une période sans remplaçant : plutôt qu'une ligne remplie d'absences, on ", HE("b", null, "désactive"), " la personne sur des dates. Dans l'onglet ", HE("b", null, "Type"), ", cliquez sur ", HE("b", null, "la pastille ronde"), " d'un médecin (éditeur seulement) : la fenêtre propose « sur toute la période affichée » ou « de date à date », et liste les indisponibilités déjà posées avec un bouton ▶ Réactiver chacune."] }), HP({ children: ["Pendant ses dates, la personne sort du ", HE("b", null, "tour, des gardes, du bip"), " et des demandes de Construire. Sa pastille reste dans Type (grisée ⏸) pour la réactiver, et elle redevient disponible ", HE("b", null, "le jour de son retour"), ", sans autre manipulation. Ce sont des ", HE("b", null, "dates"), " qui sont enregistrées : changer la durée des périodes ne déplace rien."] }), HT({ children: "🚪 Quand quelqu'un quitte le service" }), HP({ children: ["Ne supprimez pas sa fiche : indiquez sa ", HE("b", null, "date de départ"), ", dans la fiche (Équipe › ✏️ › « Parti le »). C'est une désactivation sans fin : à partir de cette date la personne sort du tour, des gardes, des salles, du planning type, des demandes de Construire et des rappels ; les stats la comptent jusqu'au départ. Son ", HE("b", null, "PIN n'ouvre plus l'application"), ", et il peut être donné à un nouveau venu. Sa fiche passe dans le groupe replié « Anciens membres » en bas d'Équipe, d'où on peut la rouvrir — ou annuler le départ (v10.151)."] }), HP({ children: ["Tout son historique ", HE("b", null, "reste lisible"), ", dans les périodes vivantes comme dans les archives. La corbeille 🗑️ refuse désormais de supprimer une fiche qui a des cases dans le planning : elle ne sert plus qu'aux fiches créées par erreur. Et chaque archive emporte une copie des fiches de l'équipe : même une fiche disparue y garde son nom et sa couleur."] }), HP({ children: [HE("b", null, "Dans les onglets salles"), " (v10.241) : les fenêtres de CHL, CHB, PT Cardio et PT Angio — et les colonnes 👁 du Planning, qui les ouvrent — montrent la personne ", HE("b", null, "grisée, « ⏸ Indisponible — parti le … »"), " sur ses dates, et ne permettent plus de la poser. Avant, un départ ou une désactivation en cours de période la laissait proposée."] }), HT({ children: "⚠ Les limites à connaître" }), HP({ children: ["• ", HE("b", null, "Retirez ses activités avant de désactiver"), " : la désactivation n'efface ", HE("b", null, "rien"), '. La fenêtre compte ce qui est posé sur les dates choisies et propose « 🧹 Retirer ses activités sur ces dates » (gardes, tour et absences comprises).'] }), HP({ children: ["• L'", HE("b", null, "astreinte"), " n'est pas couverte : gérez-la à part dans son onglet."] }), HP({ last: true, children: ["• L'éditeur peut toujours poser ", HE("b", null, "à la main"), " un tour ou une garde sur quelqu'un de désactivé, depuis les tuiles 2 et 3 de Construire — le verrou porte sur les cases et les automatismes, pas sur un geste délibéré."] })) },
     { id: "internes", icon: "🎓", title: "Internes — l'onglet et les semestres", body: () => HE("div", null, HP({ children: ["L'onglet ", HE("b", null, "🎓 Internes"), " est facultatif : il s'affiche si la coche est mise dans ", HE("b", null, "Paramètres → tuile Internes"), ". Contrairement à tous les autres onglets, il travaille ", HE("b", null, "par semestre de 6 mois"), " et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant. Depuis la v10.259, ce planning se remplit sur ", HE("b", null, "tout le semestre"), " dès qu'il existe, par tous les profils qui y ont droit, ", HE("b", null, "sans attendre la diffusion"), " de la période de 4 mois ; et le HC/USIC d'un interne n'est jamais masqué, même sur une période non diffusée. Gel du planning, journée passée et plages fermées s'appliquent toujours. Depuis la v10.261, la ", HE("b", null, "croix d'une activité posée plusieurs jours de suite"), " (HC, USIC, absence, FMC…) propose d'elle-même quoi retirer — seulement ce créneau, jusqu'à la fin, ou toute la série — comme l'absence d'un médecin (la croix mène au même écran) ; et dans « Modifier sur une période », la date de fin est pré-remplie au dernier jour du mois cliqué."] }), HT({ children: "Les semestres et les fiches" }), HP({ children: ["Tout se règle dans l'onglet ", HE("b", null, "Équipe"), ", section Internes. Un semestre démarre le ", HE("b", null, "2 mai"), " ou le ", HE("b", null, "2 novembre"), ", reporté au ", HE("b", null, "lundi suivant"), " si la date tombe un vendredi, un samedi ou un dimanche ; les dates restent modifiables à la main. Chaque interne y reçoit un nom, des initiales et une ", HE("b", null, "couleur"), ", reprise partout."] }), HP({ children: ["« + Semestre suivant » se bloque à ", HE("b", null, "deux semestres ouverts"), " (l'actuel et le prochain) — on ne connaît les internes que quelques semaines à l'avance. Un semestre ", HE("b", null, "pas encore commencé"), " peut être supprimé (🗑) : la fin du précédent est recollée automatiquement."] }), HP({ children: ["La coche ☑ devant chaque interne dit s'il a ", HE("b", null, "accès aux salles"), ". Sans elle, il n'est pas proposé dans les fenêtres de CHL, CHB, PT Cardio et PT Angio — c'est ce qui réserve certaines activités (ETT, ETO…) à un ou deux internes. Elle ne gêne pas les activités à salle que les internes posent eux-mêmes (voir plus bas)."] }), HT({ children: "Ce qu'ils peuvent avoir, ce qu'ils peuvent poser" }), HP({ children: ["C'est l'onglet ", HE("b", null, "Activités"), " qui décide, avec la coche ", HChip({ txt: "🎓 Internes", bg: "#0e9f9f" }), " : une activité cochée peut leur être posée. Une ", HE("b", null, "seconde coche"), " dit s'ils peuvent la poser ", HE("b", null, "eux-mêmes"), " (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur ou un intermédiaire — une secrétaire ou un cadre ne pose et ne retire que les activités cochées pour son rôle (celles des plannings CHL, CHB, PT Cardio, PT Angio) : tour, absences, FMC et gardes d'internes leur restent fermés. Les activités ", HE("b", null, "à salle"), " suivent la même règle (v10.256) : cochées ", HE("b", null, "posable par eux"), ", tous les internes les posent eux-mêmes, dans la rubrique « Avec salle » de leur fenêtre — sans choix si l'activité n'a qu'une salle (Épreuve d'effort), avec choix sinon. Depuis la v10.257, ces activités sont aussi proposées pour ", HE("b", null, "tous les internes"), " à l'éditeur, aux intermédiaires, et à la cadre ou aux secrétaires si leur coche est mise dans la fiche de l'activité. Non cochées « posable par eux », elles ne sont posées que par un éditeur, un intermédiaire ou un cadre, depuis l'onglet Internes ou les onglets de salle, pour les internes qui ont l'accès aux salles."] }), HP({ children: [HE("b", null, "HC, USIC et activités sans salle"), " (v10.258) : du lundi au vendredi, quel que soit le jour cliqué, la fenêtre demande la ", HE("b", null, "durée"), " — ce créneau, cette journée, ou la semaine (lundi → vendredi de la semaine cliquée, matin et après-midi). Journée et semaine ne remplacent ", HE("b", null, "jamais"), " une demi-journée déjà occupée (EE, consultation, repos, absence, FMC…) et sautent les fériés et les jours hors semestre ; le message final compte les demi-journées posées et celles laissées. Le ", HE("b", null, "repos de garde"), " se pose toujours à la journée. Le ", HE("b", null, "samedi"), " n'a qu'une case, pour le HC du samedi matin."] }), HP({ children: [HE("b", null, "Absence et FMC"), " (v10.177) : après le clic, la fenêtre demande la ", HE("b", null, "durée"), ". Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du ", HE("b", null, "lundi au vendredi"), " de la semaine cliquée, sans week-end. FMC : ce créneau, 1, 2 ou 3 jours, à la suite du jour cliqué. Ce sont des journées entières : elles remplacent ce qui s'y trouve, repos de garde compris ; les jours hors semestre sont sautés."] }), HP({ children: [HE("b", null, "Activité avec salle"), " (v10.177) : la salle choisie, un écran ", HE("b", null, "✓ Valider"), " affiche l'interne, l'activité et la salle, avec une ", HE("b", null, "note facultative"), ". Depuis la v10.258, chaque salle proposée indique ", HE("b", null, "libre"), " ou ", HE("b", null, "occupée par…"), " sur le créneau (médecins et internes confondus ; pour une salle fixe comme EE-CHL, l'information figure sur l'écran ✓ Valider) — c'est un avertissement, jamais une interdiction : un médecin et un interne dans la même salle est courant. Et dans l'autre sens, les fenêtres de case des médecins voient désormais les internes déjà en salle. Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille rouge cerclée de blanc, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ", HE("b", null, "← Retour"), " revient en arrière sans rien poser."] }), HT({ children: "Les gardes" }), HP({ children: ["La colonne ", HE("b", null, "Garde"), " de l'onglet fonctionne comme celle des médecins, ", HE("b", null, "sans répartition automatique"), ". La garde se pose sur la nuit et le ", HBadg({ txt: "RG", color: "#ffe599" }), " repos est posé tout seul le lendemain — sauté, avec un avertissement, si l'interne est absent ou en FMC ce jour-là. ⇄ échange deux gardes directement, dans la liste de celles du semestre."] }), HP({ children: ["Un ", HE("b", null, "interne extérieur"), " au service se saisit au nom libre : il apparaît dans la colonne, sans repos chez nous. Un jour ", HE("b", null, "sans personne de garde"), " est signalé en rouge. Dans le Planning, la colonne « 🎓 Garde int. » s'affiche à la demande depuis la ligne Filtre, en ", HE("b", null, "lecture seule"), ", et se remasque à chaque ouverture."] }), HT({ children: "Jauge, statistiques, PIN" }), HP({ children: [HBtn({ kind: "ghost", children: "🚦" }), " affiche la ", HE("b", null, "jauge"), " H et U à gauche de chaque demi-journée, en rouge sous les seuils réglés dans Paramètres (un seuil à 0 = pas d'alerte). ", HBtn({ kind: "ghost", children: "📊" }), " ouvre les ", HE("b", null, "statistiques du semestre"), " : gardes par catégorie, HC, USIC et les activités retenues — les colonnes affichées se choisissent dans Paramètres, tuile Internes."] }), HP({ last: true, children: ["Un ", HE("b", null, "PIN interne partagé"), " se définit dans la même tuile. Avec lui, un interne saisit son prénom, arrive directement sur son onglet et ", HE("b", null, "ne peut modifier que celui-là"), " : Planning, CHL, CHB, PT Cardio, PT Angio et l'Aide lui restent visibles en lecture seule. Depuis la v10.258, il dispose aussi des flèches ", HE("b", null, "↶ ↷"), " en haut à gauche : ce retour arrière est propre à l'appareil et ne défait jamais le travail d'un autre. Enfin, quand une pose est refusée (planning gelé, journée passée, période non diffusée, plage fermée), la fenêtre n'affiche plus « Posé » : c'est le message du refus qui reste, et rien n'est écrit."] })) },
@@ -8014,8 +8035,11 @@ CpGarde.prototype.constructor = CpGarde;
 CpGarde.getDerivedStateFromError = function (e) { return { err: e }; };
 CpGarde.prototype.componentDidCatch = function (e, info) { jlog("PLANTAGE RENDU", [(e && e.message) || String(e), info && info.componentStack ? String(info.componentStack).trim().split("\n").slice(0, 3).join(" | ") : ""]); };
 CpGarde.prototype.render = function () {
-    if (!this.state.err)
-        return this.props.children;
+    if (!this.state.err) {
+        if (!ESSAI)
+            return this.props.children;
+        return React.createElement(React.Fragment, null, React.createElement("div", { "data-essai": "1", style: { position: "sticky", top: 0, zIndex: 450, background: "#ea580c", color: "#fff", textAlign: "center", fontSize: 12, fontWeight: 800, letterSpacing: ".04em", padding: "5px 8px", boxShadow: "0 2px 8px rgba(0,0,0,.25)" } }, "⚠ VERSION D'ESSAI — " + APP_VERSION.split(" — ")[0] + " · rien ici n'est le vrai planning"), this.props.children);
+    } /* v10.266 */
     var RE = React.createElement, e = this.state.err;
     var rapport = ["🐞 Plantage CardioPlanning — " + sigDate(Date.now()), "Version : " + APP_VERSION, "Trafic : " + trafLigne(), "Erreur : " + ((e && e.message) || String(e)), (e && e.stack ? String(e.stack).split("\n").slice(0, 4).join("\n") : ""), "—", "Journal :"].concat(JOURNAL).join("\n");
     return RE("div", { style: { padding: "24px 18px", maxWidth: 520, margin: "0 auto", fontFamily: "'Sora',sans-serif", color: "var(--txt,#e6edf3)" } }, RE("div", { style: { fontSize: 16, fontWeight: 800, marginBottom: 8 } }, "⚠️ L'application a rencontré une erreur"), RE("div", { style: { fontSize: 12, lineHeight: 1.6, marginBottom: 12 } }, "Rien n'est perdu : vos données sont dans Firebase. Rechargez la page ; si cela se reproduit, copiez le rapport et envoyez un 🐞 après le rechargement — il emportera ce plantage."), RE("pre", { style: { fontSize: 10, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", padding: 8, borderRadius: 8, border: "1px solid var(--border,#444)", background: "var(--bg2,#1b2230)", maxHeight: 220, overflow: "auto", marginBottom: 12 } }, rapport), RE("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, RE("button", { onClick: function () { window.location.reload(); }, style: { padding: "8px 14px", borderRadius: 8, border: "none", background: "#1d4ed8", color: "#fff", fontWeight: 700, cursor: "pointer" } }, "↻ Recharger"), RE("button", { onClick: function () { sigCopier(rapport, null); }, style: { padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border,#444)", background: "transparent", color: "inherit", fontWeight: 700, cursor: "pointer" } }, "📋 Copier le rapport")));
@@ -9516,9 +9540,9 @@ function AnnBanniere({ annonces, fam, medId = null, masques, setMasques }) {
         setMasques(o => (Object.assign(Object.assign({}, (o || {})), { [id]: 1 })));
         if (def) {
             try {
-                const h = JSON.parse(localStorage.getItem("cp6_annHide") || "{}") || {};
+                const h = JSON.parse(localStorage.getItem((LS_PFX + "annHide")) || "{}") || {};
                 h[id] = 1;
-                localStorage.setItem("cp6_annHide", JSON.stringify(h));
+                localStorage.setItem((LS_PFX + "annHide"), JSON.stringify(h));
             }
             catch (e) { }
         }
@@ -10039,7 +10063,7 @@ function ProtectionTuile({ netOff = false, bloque = false }) {
         catch (e) {
             app = fb.initializeApp(fb.app().options, "cp-sans");
         }
-        return app.firestore().collection("planning").doc(PLAN_ID);
+        return app.firestore().collection(COLL_PLAN).doc(PLAN_ID);
     }
     catch (e) {
         return null;
@@ -10455,7 +10479,7 @@ async function histLire(pids) {
     const out = {}, dep = BAC ? BAC_DEP.t : null;
     const lit = async (id, champ, garde) => {
         try {
-            const d = (await window.firebaseDB.collection("planning").doc(id).get()).data() || {};
+            const d = (await window.firebaseDB.collection(COLL_PLAN).doc(id).get()).data() || {};
             const e = d[champ] || {};
             Object.keys(e).forEach(k => { const x = histDec(e[k]); if (x && (!garde || garde(x)))
                 out[k] = x; });
@@ -12904,7 +12928,7 @@ function vSemAvertit(r, wk) { var q = String(wk).split("-").map(Number); var f =
    · iPhone : uniquement depuis l'application installée sur l'écran d'accueil (iOS ≥ 16.4) ;
      Android et ordinateur : Chrome/Edge sans installation.
    La clé publique (VAPID) est window.PUSH_VAPID dans index.html ; vide = pas configuré. */
-const PUSH_DEV_KEY = "cp6_pushDev", PUSH_ON_KEY = "cp6_pushOn", PUSH_CHOIX_KEY = "cp6_pushChoix";
+const PUSH_DEV_KEY = (LS_PFX + "pushDev"), PUSH_ON_KEY = (LS_PFX + "pushOn"), PUSH_CHOIX_KEY = (LS_PFX + "pushChoix");
 const pushDevId = () => { try {
     let d = localStorage.getItem(PUSH_DEV_KEY);
     if (!d) {
@@ -12929,6 +12953,8 @@ catch (e) {
 const pushEtatInitial = (medId) => {
     if (typeof window === "undefined")
         return "nonsupp";
+    if (ESSAI)
+        return "essai"; /* v10.266 : jamais de notification depuis l'essai (elles partiraient sur les vrais téléphones) */
     if (!window.PUSH_VAPID)
         return "noconf";
     if (pushLibAppareil() === "iPhone" && !pushInstalle())
@@ -13069,6 +13095,7 @@ function PushCarte({ medId, medecins = [], onChoix }) {
                 "Sur iPhone, les notifications ne fonctionnent que depuis l'application ",
                 React.createElement("b", null, "install\u00E9e sur l'\u00E9cran d'accueil"),
                 " : dans Safari, bouton Partager puis \u00AB Sur l'\u00E9cran d'accueil \u00BB. Ouvrez ensuite CardioPlanning depuis son ic\u00F4ne et revenez ici."),
+            etat === "essai" && React.createElement("p", { style: P }, "\uD83E\uDDEA Version d'essai : les notifications sont coup\u00E9es ici \u2014 un message pos\u00E9 pour voir partirait sinon sur les t\u00E9l\u00E9phones de toute l'\u00E9quipe."),
             etat === "nonsupp" && React.createElement("p", { style: P }, "Ce navigateur ne permet pas les notifications. Sur ordinateur, Chrome ou Edge conviennent ; sur t\u00E9l\u00E9phone, Chrome (Android) ou l'application install\u00E9e (iPhone)."),
             etat === "refuse" && React.createElement("p", { style: P },
                 "Les notifications ont \u00E9t\u00E9 ",
@@ -13162,27 +13189,27 @@ function CardioPlanning() {
     const [printWhat, setPrintWhat] = useState("plateau");
     const [printSel, setPrintSel] = useState(() => { const t = new Date(); return mondayOf(t.getFullYear(), t.getMonth(), t.getDate()); });
     const [ideOn, setIdeOn] = useState(() => { try {
-        return localStorage.getItem("cp6_ide_on") === "1";
+        return localStorage.getItem((LS_PFX + "ide_on")) === "1";
     }
     catch (_a) {
         return false;
     } });
     useEffect(() => { try {
-        localStorage.setItem("cp6_ide_on", ideOn ? "1" : "0");
+        localStorage.setItem((LS_PFX + "ide_on"), ideOn ? "1" : "0");
     }
     catch (_a) { } }, [ideOn]);
     const [adminEnabled, setAdminEnabled] = useState(true);
     const [adminCanReports, setAdminCanReports] = useState(true);
     const [adminCanNotes, setAdminCanNotes] = useState(false);
     const [adminName, setAdminName] = useState(() => { try {
-        return localStorage.getItem("cp6_adminName") || "";
+        return localStorage.getItem((LS_PFX + "adminName")) || "";
     }
     catch (e) {
         return "";
     } });
     const [adminAsk, setAdminAsk] = useState(false);
     const [adminNameInput, setAdminNameInput] = useState(() => { try {
-        return localStorage.getItem("cp6_adminName") || "";
+        return localStorage.getItem((LS_PFX + "adminName")) || "";
     }
     catch (e) {
         return "";
@@ -13192,13 +13219,13 @@ function CardioPlanning() {
        exactement comme pour les secretaires et les cadres. */
     const [interneAsk, setInterneAsk] = useState(false);
     const [interneName, setInterneName] = useState(() => { try {
-        return localStorage.getItem("cp6_interneName") || "";
+        return localStorage.getItem((LS_PFX + "interneName")) || "";
     }
     catch (e) {
         return "";
     } });
     const [interneNameInput, setInterneNameInput] = useState(() => { try {
-        return localStorage.getItem("cp6_interneName") || "";
+        return localStorage.getItem((LS_PFX + "interneName")) || "";
     }
     catch (e) {
         return "";
@@ -13228,8 +13255,8 @@ function CardioPlanning() {
     const [inactMin, setInactMin] = useState(5);
     const [inactReste, setInactReste] = useState(null);
     const [fermeMsg, setFermeMsg] = useState(() => { try {
-        const v = JSON.parse(localStorage.getItem("cp6_ferme") || "null");
-        localStorage.removeItem("cp6_ferme");
+        const v = JSON.parse(localStorage.getItem((LS_PFX + "ferme")) || "null");
+        localStorage.removeItem((LS_PFX + "ferme"));
         return v && v.m ? v : null;
     }
     catch (e) {
@@ -13257,7 +13284,7 @@ function CardioPlanning() {
             const k2 = sk(y2, m2, d2, sl2), pid2 = BAC ? "bac" : histPid(k2);
             if (!pid2)
                 return; /* v10.238 : le cahier de la période de la case */
-            const jdoc = window.firebaseDoc(window.firebaseDB, "planning", HIST_PFX + pid2);
+            const jdoc = window.firebaseDoc(window.firebaseDB, COLL_PLAN, HIST_PFX + pid2);
             const eid = "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
             const je = histEnc({ t: Date.now(), k: k2, md: medId2, x: action, act: acteId2 || null, a: authorRef.current });
             if (updatePaths)
@@ -13282,7 +13309,7 @@ function CardioPlanning() {
                     return; const eid = "e" + t0.toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5); (parPid[pid] = parPid[pid] || []).push([["e", eid], je]); });
             });
             Object.keys(parPid).forEach(pid => {
-                const jdoc = window.firebaseDoc(window.firebaseDB, "planning", HIST_PFX + pid), pr = parPid[pid];
+                const jdoc = window.firebaseDoc(window.firebaseDB, COLL_PLAN, HIST_PFX + pid), pr = parPid[pid];
                 for (let i = 0; i < pr.length; i += 200) {
                     const lot = pr.slice(i, i + 200);
                     const repli = () => { if (!setDoc)
@@ -13375,7 +13402,7 @@ function CardioPlanning() {
        « jours en lignes ». Le réglage d'orientation n'a donc plus lieu d'être. */
     const [darkMode, setDarkModeRaw] = useState(() => {
         try {
-            const v = localStorage.getItem("cp6_theme");
+            const v = localStorage.getItem((LS_PFX + "theme"));
             if (v === "dark")
                 return true;
             if (v === "light")
@@ -13391,7 +13418,7 @@ function CardioPlanning() {
     });
     /* v10.137 : themeSel = ce que l'utilisateur a choisi (auto / light / dark), pour l'afficher */
     const [themeSel, setThemeSel] = useState(() => { try {
-        const v = localStorage.getItem("cp6_theme");
+        const v = localStorage.getItem((LS_PFX + "theme"));
         return v === "dark" ? "dark" : v === "light" ? "light" : "auto";
     }
     catch (e) {
@@ -13410,9 +13437,9 @@ function CardioPlanning() {
     const themeApply = (sel, silencieux) => {
         try {
             if (sel === "auto")
-                localStorage.removeItem("cp6_theme");
+                localStorage.removeItem((LS_PFX + "theme"));
             else
-                localStorage.setItem("cp6_theme", sel);
+                localStorage.setItem((LS_PFX + "theme"), sel);
         }
         catch (e) { }
         const dark = sel === "auto" ? themeSys() : sel === "dark";
@@ -13429,7 +13456,7 @@ function CardioPlanning() {
        clair/sombre ; à la reprise on relit le réglage (seulement en auto). */
     useEffect(() => {
         const re = () => { try {
-            if (localStorage.getItem("cp6_theme"))
+            if (localStorage.getItem((LS_PFX + "theme")))
                 return;
         }
         catch (e) { } setDarkModeRaw(themeSys()); };
@@ -13443,7 +13470,7 @@ function CardioPlanning() {
             return;
         const mq = window.matchMedia("(prefers-color-scheme: dark)");
         const onChg = (e) => { try {
-            if (localStorage.getItem("cp6_theme"))
+            if (localStorage.getItem((LS_PFX + "theme")))
                 return;
         }
         catch (err) { } setDarkModeRaw(e.matches); };
@@ -13473,13 +13500,13 @@ function CardioPlanning() {
                 m.splice(i >= 0 ? i + 1 : m.length, 0, "notifications");
                 return m;
             };
-            const v5 = localStorage.getItem("cp6_taborder_v5");
+            const v5 = localStorage.getItem((LS_PFX + "taborder_v5"));
             if (v5)
                 return compl(JSON.parse(v5));
-            const v = localStorage.getItem("cp6_taborder_v4");
+            const v = localStorage.getItem((LS_PFX + "taborder_v4"));
             if (v)
                 return apresReports(compl(JSON.parse(v)));
-            const anc = localStorage.getItem("cp6_taborder_v3");
+            const anc = localStorage.getItem((LS_PFX + "taborder_v3"));
             if (anc) {
                 const m = compl(JSON.parse(anc)).filter(id => id !== "internes");
                 const i = m.indexOf("angio");
@@ -13494,7 +13521,7 @@ function CardioPlanning() {
     });
     const [dragTab, setDragTab] = useState(null);
     useEffect(() => { try {
-        localStorage.setItem("cp6_taborder_v5", JSON.stringify(tabOrder));
+        localStorage.setItem((LS_PFX + "taborder_v5"), JSON.stringify(tabOrder));
     }
     catch (_a) { } }, [tabOrder]);
     const [modal, setModal] = useState(null);
@@ -13505,13 +13532,13 @@ function CardioPlanning() {
     const [showFull, setShowFull] = useState(false);
     /* v10.170 : colonnes masquées par onglet ({CHL:[...],CHB:[...],ANGIO:[...],PT:[...]}), propres à
        cet appareil comme le thème — mémoire du navigateur, jamais Firebase. */
-    const [colHide, setColHide] = useState(() => { const v = ld("cp6_colHide", {}); return v && typeof v === "object" ? v : {}; });
-    useEffect(() => { sv("cp6_colHide", colHide); }, [colHide]);
+    const [colHide, setColHide] = useState(() => { const v = ld((LS_PFX + "colHide"), {}); return v && typeof v === "object" ? v : {}; });
+    useEffect(() => { sv((LS_PFX + "colHide"), colHide); }, [colHide]);
     const [hideModal, setHideModal] = useState(null);
     /* v10.240 : colonnes 👁 du Planning (éditeur, intermédiaires) — salles et activités des onglets salles affichées
        à droite des médecins. Réglage propre à CET appareil, vide par défaut : rien ne s'affiche tant qu'on ne coche pas. */
-    const [planCols, setPlanCols] = useState(() => { const v = ld("cp6_planCols", []); return Array.isArray(v) ? v : []; });
-    useEffect(() => { sv("cp6_planCols", planCols); }, [planCols]);
+    const [planCols, setPlanCols] = useState(() => { const v = ld((LS_PFX + "planCols"), []); return Array.isArray(v) ? v : []; });
+    useEffect(() => { sv((LS_PFX + "planCols"), planCols); }, [planCols]);
     const [planColQ, setPlanColQ] = useState("");
     const colHideToggle = (site, k) => setColHide(p => { const cur = (p && p[site]) || []; return Object.assign(Object.assign({}, p), { [site]: cur.includes(k) ? cur.filter(x => x !== k) : cur.concat([k]) }); });
     const viewPeriod = true;
@@ -13558,7 +13585,7 @@ function CardioPlanning() {
     const [secrCfg, setSecrCfg] = useState({ acts: [], dif: {}, atts: [] });
     const [annonces, setAnnonces] = useState([]); /* v10.203 : messages de l'éditeur (bannière + ligne dans la grille) */
     const [annMasq, setAnnMasq] = useState(() => { try {
-        return JSON.parse(localStorage.getItem("cp6_annHide") || "{}") || {};
+        return JSON.parse(localStorage.getItem((LS_PFX + "annHide")) || "{}") || {};
     }
     catch (e) {
         return {};
@@ -13581,13 +13608,13 @@ function CardioPlanning() {
     const [expBusy, setExpBusy] = useState(false);
     const [expSnooze, setExpSnooze] = useState(false);
     const [expSeuil, setExpSeuil] = useState(() => { try {
-        return parseInt(localStorage.getItem("cp6_expSeuil")) || EXP_SEUIL;
+        return parseInt(localStorage.getItem((LS_PFX + "expSeuil"))) || EXP_SEUIL;
     }
     catch (e) {
         return EXP_SEUIL;
     } });
     const [expLast, setExpLast] = useState(() => { try {
-        return parseInt(localStorage.getItem("cp6_expLast")) || 0;
+        return parseInt(localStorage.getItem((LS_PFX + "expLast"))) || 0;
     }
     catch (e) {
         return 0;
@@ -13603,24 +13630,24 @@ function CardioPlanning() {
         setExpN(0);
         setExpSnooze(false);
         try {
-            localStorage.setItem("cp6_expLast", String(expLastFB));
-            localStorage.setItem("cp6_expN", "0");
+            localStorage.setItem((LS_PFX + "expLast"), String(expLastFB));
+            localStorage.setItem((LS_PFX + "expN"), "0");
         }
         catch (e) { }
     }, [expLastFB, expLast]);
     const [expN, setExpN] = useState(() => { try {
-        return parseInt(localStorage.getItem("cp6_expN")) || 0;
+        return parseInt(localStorage.getItem((LS_PFX + "expN"))) || 0;
     }
     catch (e) {
         return 0;
     } });
     const expBump = useCallback((n) => { if (!n)
         return; setExpN(v => { const t = v + n; try {
-        localStorage.setItem("cp6_expN", String(t));
+        localStorage.setItem((LS_PFX + "expN"), String(t));
     }
     catch (e) { } return t; }); }, []);
     useEffect(() => { try {
-        localStorage.setItem("cp6_expSeuil", String(expSeuil));
+        localStorage.setItem((LS_PFX + "expSeuil"), String(expSeuil));
     }
     catch (e) { } }, [expSeuil]);
     const [salleReg, setSalleReg] = useState([]); // registre central des salles [{n:"Angio-1",s:"ANGIO"},...]
@@ -14370,6 +14397,8 @@ function CardioPlanning() {
                     } /* v10.247 */
                     setBacDe(BAC && data._bacDe && data._bacDe.ts ? data._bacDe : null); /* v10.237 */
                     BAC_DEP.t = BAC ? ((data._bacDe && data._bacDe.ts) || data._bacDep || null) : null; /* v10.238 : jusqu'où le vrai historique vaut dans le bac */
+                    if (ESSAI)
+                        setEssaiDep(data._essaiDep || null); /* v10.266 */
                     if (data.salleFerm) {
                         try {
                             const f = JSON.parse(data.salleFerm) || {};
@@ -14592,7 +14621,7 @@ function CardioPlanning() {
     const [bkOpen, setBkOpen] = useState(""); // sauvegarde ancienne dépliée
     const refreshBackupList = useCallback(async () => {
         try {
-            const snap = await window.firebaseDB.collection("backups").get();
+            const snap = await window.firebaseDB.collection(COLL_BK).get();
             const items = [];
             snap.forEach(d => { const x = d.data() || {}; items.push({ id: d.id, ts: x._ts || 0, ver: x._verArr || "", prec: x._verPrec || "" }); }); /* v10.248 : photos de passage de version */
             items.sort((a, b) => b.ts - a.ts);
@@ -14613,15 +14642,15 @@ function CardioPlanning() {
             return false;
         } /* v10.175 */
         try {
-            const cur = (await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data() || {};
+            const cur = (await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get()).data() || {};
             const ts = Date.now();
             const payload = sansCodes(Object.assign(Object.assign({}, cur), { _ts: ts })); /* v10.252 : jamais les codes dans une sauvegarde */
-            await window.firebaseDB.collection("backups").doc("b" + ts).set(payload);
-            await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon({ _lastBackupAt: ts }), { merge: true });
+            await window.firebaseDB.collection(COLL_BK).doc("b" + ts).set(payload);
+            await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).set(avecTampon({ _lastBackupAt: ts }), { merge: true });
             /* v10.248 : purge en deux comptes — 45 sauvegardes quotidiennes, et à part les 3 dernières photos de version */
             const items = await refreshBackupList();
             for (const it of items.filter(x => !x.ver).slice(BK_KEEP).concat(items.filter(x => x.ver).slice(BK_VER))) {
-                await window.firebaseDB.collection("backups").doc(it.id).delete();
+                await window.firebaseDB.collection(COLL_BK).doc(it.id).delete();
             }
             await refreshBackupList();
             setBkErr(null);
@@ -14647,7 +14676,7 @@ function CardioPlanning() {
         try {
             let autrePlan = planRef.current || {}, tB = Date.now(), libB = "le planning actuel";
             if (contre !== "actuel") {
-                const d = (await window.firebaseDB.collection("backups").doc(contre).get()).data() || {};
+                const d = (await window.firebaseDB.collection(COLL_BK).doc(contre).get()).data() || {};
                 autrePlan = d.planV2 ? d.planV2 : (d.plan ? JSON.parse(d.plan) : {});
                 tB = d._ts || 0;
                 libB = "la sauvegarde du " + new Date(tB).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -14692,7 +14721,7 @@ function CardioPlanning() {
     };
     const previewBackup = useCallback(async (id, ts, opt) => {
         try {
-            const snap = await window.firebaseDB.collection("backups").doc(id).get();
+            const snap = await window.firebaseDB.collection(COLL_BK).doc(id).get();
             const d = snap.data() || {};
             /* v10.101 : l'aperçu lisait les champs d'AVANT la v9.7 (plan, medecins), purgés depuis —
                il annonçait donc une sauvegarde vide et toutes les cases actuelles « perdues ».
@@ -14738,7 +14767,7 @@ function CardioPlanning() {
     /* v10.142 : signalements — lus à l'ouverture (badge sur l'onglet Paramètres) et à chaque visite de Paramètres */
     const [sigList, setSigList] = useState([]);
     const refreshSig = useCallback(async () => { try {
-        const snap = await window.firebaseDB.collection("signalements").get();
+        const snap = await window.firebaseDB.collection(COLL_SIG).get();
         const l = [];
         snap.forEach(d2 => { const x = d2.data() || {}; l.push({ id: d2.id, ts: x.ts || 0, auteur: x.auteur, texte: x.texte, ctx: x.ctx || {}, journal: x.journal || [], prec: x.prec || [], traite: !!x.traite }); });
         l.sort((a, b) => b.ts - a.ts);
@@ -14750,14 +14779,14 @@ function CardioPlanning() {
     useEffect(() => { if (tab === "partage")
         refreshSig(); }, [tab, refreshSig]);
     const sigTraite = async (id, v) => { try {
-        await window.firebaseDB.collection("signalements").doc(id).set({ traite: !!v }, { merge: true });
+        await window.firebaseDB.collection(COLL_SIG).doc(id).set({ traite: !!v }, { merge: true });
         toast(v ? "Signalement traité" : "Signalement rouvert");
     }
     catch (e) {
         toast("Échec de l'enregistrement", "warn");
     } refreshSig(); };
     const sigDel = async (id) => { try {
-        await window.firebaseDB.collection("signalements").doc(id).delete();
+        await window.firebaseDB.collection(COLL_SIG).doc(id).delete();
         toast("Signalement supprimé");
     }
     catch (e) {
@@ -14765,7 +14794,7 @@ function CardioPlanning() {
     } refreshSig(); };
     const refreshArchList = useCallback(async () => {
         try {
-            const snap = await window.firebaseDB.collection("archives").get();
+            const snap = await window.firebaseDB.collection(COLL_AR).get();
             const ids = [];
             let octets = 0;
             snap.forEach(d2 => { if (d2.id && d2.id.indexOf("per-") === 0) {
@@ -14794,7 +14823,7 @@ function CardioPlanning() {
         refreshArchList();
         (async () => {
             try {
-                const d = (await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data() || {};
+                const d = (await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get()).data() || {};
                 let bytes = 0;
                 const det = {};
                 Object.keys(d).forEach(k => {
@@ -14825,7 +14854,7 @@ function CardioPlanning() {
             return 0;
         } /* v10.175 */
         try {
-            const d = await window.firebaseDB.collection("backups").doc(id).get();
+            const d = await window.firebaseDB.collection(COLL_BK).doc(id).get();
             const data = d.data();
             if (!data) {
                 toast("Sauvegarde introuvable", "warn");
@@ -14903,7 +14932,7 @@ function CardioPlanning() {
        date de la sauvegarde chargée pour le bandeau ; la remise à zéro du bac (copie du vrai) l'efface. */
     const restoreBackup = useCallback(async (id) => {
         try {
-            const d = await window.firebaseDB.collection("backups").doc(id).get();
+            const d = await window.firebaseDB.collection(COLL_BK).doc(id).get();
             const data = d.data();
             if (!data) {
                 toast("Sauvegarde introuvable", "warn");
@@ -14921,10 +14950,10 @@ function CardioPlanning() {
                 planPending.current = {};
                 planSynced.current = null;
                 try {
-                    await window.firebaseDB.collection("planning").doc(HIST_PFX + "bac").set({ e: {} });
+                    await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX + "bac").set({ e: {} });
                 }
                 catch (e) { } /* v10.238 : l'historique repart de l'heure de la sauvegarde */
-                await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
+                await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).set(avecTampon(rest));
                 toast("📥 Sauvegarde du " + new Date(_ts || 0).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) + " chargée dans le bac — le vrai planning n'a pas bougé", "info");
                 return;
             }
@@ -14934,7 +14963,7 @@ function CardioPlanning() {
                 rest.appVer = APP_VERSION; /* v10.248 : restaurer une vieille sauvegarde ne fait pas croire aux autres appareils à un changement de version */
             planPending.current = {};
             planSynced.current = null;
-            await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest)); // remplacement complet : une restauration EST l'état intégral
+            await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).set(avecTampon(rest)); // remplacement complet : une restauration EST l'état intégral
             toast(GEL.on ? "Sauvegarde restaurée — le planning reste gelé : vérifiez-le, puis dégelez" : "Sauvegarde restaurée — rechargez la page si besoin", "info");
         }
         catch (e) {
@@ -14950,7 +14979,7 @@ function CardioPlanning() {
         try {
             let cur;
             try {
-                cur = (await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data();
+                cur = (await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get()).data();
             }
             catch (e) {
                 cur = null;
@@ -14981,13 +15010,13 @@ function CardioPlanning() {
             mapMigr.current = {};
             planPending.current = {};
             planSynced.current = null;
-            await window.firebaseDB.collection("planning").doc(PLAN_ID).set(avecTampon(rest));
+            await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).set(avecTampon(rest));
             let nA = 0;
             if (!BAC && data.archives && typeof data.archives === "object") {
                 for (const id of Object.keys(data.archives)) {
                     if (id.indexOf("per-") !== 0 || !data.archives[id])
                         continue;
-                    await window.firebaseDB.collection("archives").doc(id).set(data.archives[id]);
+                    await window.firebaseDB.collection(COLL_AR).doc(id).set(data.archives[id]);
                     nA++;
                 }
                 refreshArchList();
@@ -15032,7 +15061,7 @@ function CardioPlanning() {
             verInscrire(verRetard.current.data0, verRetard.current.prec); /* v10.252 : passage de version différé */
         const t = setTimeout(async () => {
             try {
-                const d = await window.firebaseDB.collection("planning").doc(PLAN_ID).get();
+                const d = await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get();
                 const last = (d.data() || {})._lastBackupAt || 0;
                 if (Date.now() - last > 24 * 3600 * 1000) {
                     const ok = await makeBackup(false); /* v10.0 : une par jour au lieu d'une tous les 3 jours */
@@ -15549,7 +15578,7 @@ function CardioPlanning() {
             return;
         let ref = null, off = null;
         try {
-            ref = window.firebaseDB.collection("sessions").doc(String(editMedId));
+            ref = window.firebaseDB.collection(COLL_SE).doc(String(editMedId));
             Promise.resolve(ref.set({ app: APPAREIL.id, lib: APPAREIL.lib, t: Date.now(), v: verCourt() })).catch(e => console.log("session:", e));
             off = ref.onSnapshot(sn => {
                 const d = sn && sn.exists && typeof sn.data === "function" ? sn.data() : null;
@@ -15576,7 +15605,7 @@ function CardioPlanning() {
         if (archFetched.current[pid])
             return;
         archFetched.current[pid] = true;
-        window.firebaseDB.collection("archives").doc("per-" + pid).get().then(snap => {
+        window.firebaseDB.collection(COLL_AR).doc("per-" + pid).get().then(snap => {
             const d = snap && snap.data && snap.data();
             if (d && d.plan) {
                 const frag = JSON.parse(d.plan);
@@ -15739,6 +15768,73 @@ function CardioPlanning() {
        il garde la main même après avoir changé de profil dans le bandeau (sinon il s'y enfermerait). bacAutres = les autres
        appareils présents (planning/presence-bac : {<appareil>:{t,qui}}, écrit toutes les 60 s, périmé après 150 s). */
     const [bacMaitre, setBacMaitre] = useState(false);
+    /* v10.266 : VERSION D'ESSAI — copie du planning réel (lecture seule du vrai cahier « planning », écriture dans « planning-essai »).
+       C'est le SEUL endroit du code qui nomme le vrai cahier en dur quand on est dans l'essai. Copie : main (tampon neuf, _essaiDep),
+       les cahiers d'historique hist-* et le journal ; jamais le bac ni la présence ; les archives seulement si la case est cochée. */
+    const [essaiDep, setEssaiDep] = useState(null);
+    const [essaiArch, setEssaiArch] = useState(false);
+    const [essaiBusy, setEssaiBusy] = useState(false);
+    const essaiCopier = async () => {
+        if (!ESSAI || !isEditVrai || essaiBusy || !window.firebaseDB)
+            return;
+        if (!window.confirm("Remplacer le planning de l'essai par une copie du planning réel ?\n\nTout ce qui a été essayé ici sera perdu" + (essaiArch ? ", et les archives de l'essai seront remplacées par les vraies" : "") + "."))
+            return;
+        setEssaiBusy(true);
+        try {
+            const db = window.firebaseDB;
+            const snap = await db.collection("planning").get();
+            let d = null;
+            const autres = [];
+            snap.forEach(x => { const id = x.id; if (id === "main")
+                d = x.data() || {};
+            else if (id.indexOf(HIST_PFX) === 0 && id !== HIST_PFX + "bac")
+                autres.push([id, x.data() || {}]);
+            else if (id === "journal")
+                autres.push([id, x.data() || {}]); });
+            if (!d) {
+                toast("Planning réel introuvable", "warn");
+                setEssaiBusy(false);
+                return;
+            }
+            mapPending.current = {};
+            mapMigr.current = {};
+            planPending.current = {};
+            planSynced.current = null;
+            const rest = Object.assign({}, sansCodes(d));
+            delete rest._bacDe;
+            delete rest._bacDep;
+            rest._essaiDep = Date.now();
+            if (verNum(rest.appVer) < verNum(APP_VERSION))
+                rest.appVer = APP_VERSION;
+            let n = 0;
+            for (const [id, x] of autres) {
+                await db.collection(COLL_PLAN).doc(id).set(x);
+                n++;
+            }
+            try {
+                await db.collection(COLL_PLAN).doc(HIST_PFX + "bac").set({ e: {} });
+            }
+            catch (e) { }
+            await db.collection(COLL_PLAN).doc("main").set(avecTampon(rest));
+            let nA = 0;
+            if (essaiArch) {
+                const sa = await db.collection("archives").get();
+                const l = [];
+                sa.forEach(x => l.push([x.id, x.data() || {}]));
+                for (const [id, x] of l) {
+                    await db.collection(COLL_AR).doc(id).set(x);
+                    nA++;
+                }
+            }
+            jlog("ESSAI", ["copie du planning réel", n + " cahier(s) d'historique", nA + " archive(s)"]);
+            toast("⬇ Planning réel copié dans l'essai" + (nA ? " (" + nA + " archive" + (nA > 1 ? "s" : "") + ")" : ""), "info");
+        }
+        catch (e) {
+            console.log("essai:", e);
+            toast("Échec de la copie : " + ((e && e.message) || e), "warn");
+        }
+        setEssaiBusy(false);
+    };
     useEffect(() => { if (BAC && isEditVrai)
         setBacMaitre(true); }, [isEditVrai]);
     useEffect(() => { if (BAC && bacMaitre)
@@ -15754,7 +15850,7 @@ function CardioPlanning() {
         }
         catch (e) { } };
         try {
-            ref = window.firebaseDB.collection("planning").doc("presence-bac");
+            ref = window.firebaseDB.collection(COLL_PLAN).doc("presence-bac");
             la();
             id = setInterval(la, 60000);
             off = ref.onSnapshot(sn => {
@@ -15853,7 +15949,7 @@ function CardioPlanning() {
         return () => { vivant = false; };
     }, [isEditVrai]);
     useEffect(() => {
-        if (BAC || !isEditVrai || !serverSeen.current || !window.firebaseDB || isFirstLoad.current || !priveLu.current)
+        if (ESSAI || BAC || !isEditVrai || !serverSeen.current || !window.firebaseDB || isFirstLoad.current || !priveLu.current)
             return;
         const { o, prof, profSig } = priveContenu(medPins, editPin, adminPin, cadrePin, intPin);
         const sig = JSON.stringify(o) + "|" + profSig;
@@ -16453,7 +16549,7 @@ function CardioPlanning() {
             return;
         (async () => {
             try {
-                const ref = window.firebaseDB.collection("planning").doc("journal");
+                const ref = window.firebaseDB.collection(COLL_PLAN).doc("journal");
                 const es = ((await ref.get()).data() || {}).entries || {};
                 const ks = Object.keys(es);
                 if (ks.length) {
@@ -16462,7 +16558,7 @@ function CardioPlanning() {
                         return; const pid = histPid(x.k); if (pid)
                         (par[pid] = par[pid] || {})[k2] = histEnc(x); });
                     for (const pid of Object.keys(par))
-                        await window.firebaseDB.collection("planning").doc(HIST_PFX + pid).set({ e: par[pid] }, { merge: true });
+                        await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX + pid).set({ e: par[pid] }, { merge: true });
                     await ref.delete();
                 }
             }
@@ -16476,8 +16572,8 @@ function CardioPlanning() {
                     p = perNext(p.sy, p.sm);
                 }
                 for (const pid of pids) {
-                    const jdoc = window.firebaseDoc(window.firebaseDB, "planning", HIST_PFX + pid);
-                    const e = ((await window.firebaseDB.collection("planning").doc(HIST_PFX + pid).get()).data() || {}).e || {};
+                    const jdoc = window.firebaseDoc(window.firebaseDB, COLL_PLAN, HIST_PFX + pid);
+                    const e = ((await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX + pid).get()).data() || {}).e || {};
                     const n = histOctets(e);
                     if (n <= HIST_ALERTE)
                         continue;
@@ -17764,7 +17860,7 @@ function CardioPlanning() {
         .sort((x, y) => String(x.a + x.s).localeCompare(String(y.a + y.s))));
     const diffMedPeriod = useCallback(async (id, medId, dateFrom, dateTo) => {
         try {
-            const d = await window.firebaseDB.collection("backups").doc(id).get();
+            const d = await window.firebaseDB.collection(COLL_BK).doc(id).get();
             const data = d.data();
             if (!data)
                 return null;
@@ -18240,10 +18336,10 @@ function CardioPlanning() {
                expComplet. Le tableau garde l'état affiché. Base muette : export partiel, annoncé comme tel. */
             let src = null, raw = null;
             if (expSrc !== "now")
-                raw = (await window.firebaseDB.collection("backups").doc(expSrc).get()).data() || {};
+                raw = (await window.firebaseDB.collection(COLL_BK).doc(expSrc).get()).data() || {};
             else if (kind === "donnees") {
                 try {
-                    raw = (await window.firebaseDB.collection("planning").doc(PLAN_ID).get()).data() || null;
+                    raw = (await window.firebaseDB.collection(COLL_PLAN).doc(PLAN_ID).get()).data() || null;
                 }
                 catch (e) {
                     raw = null;
@@ -18253,7 +18349,7 @@ function CardioPlanning() {
                 let arch = null;
                 if (kind === "donnees" && !BAC) {
                     try {
-                        const sn = await window.firebaseDB.collection("archives").get();
+                        const sn = await window.firebaseDB.collection(COLL_AR).get();
                         const a2 = {};
                         sn.forEach(d2 => { if (d2.id && d2.id.indexOf("per-") === 0)
                             a2[d2.id] = d2.data() || {}; });
@@ -18280,8 +18376,8 @@ function CardioPlanning() {
             setExpSnooze(false);
             setExpLastFB(t);
             try {
-                localStorage.setItem("cp6_expLast", String(t));
-                localStorage.setItem("cp6_expN", "0");
+                localStorage.setItem((LS_PFX + "expLast"), String(t));
+                localStorage.setItem((LS_PFX + "expN"), "0");
             }
             catch (e) { }
             saveToFirebase({ expLast: String(t) }); /* v10.169 : les autres appareils la reprennent */
@@ -18307,17 +18403,17 @@ function CardioPlanning() {
        l'application ne connaît que PLANNING_DOC / PLAN_ID. Le changement de profil refait ce que fait le PIN
        (mêmes setAccessMode / setEditMedId / setIsCadre), la vérification du code en moins. */
     const bacCopie = async () => {
-        const d = (await window.firebaseDB.collection("planning").doc("main").get()).data() || {};
+        const d = (await window.firebaseDB.collection(COLL_PLAN).doc("main").get()).data() || {};
         try {
-            await window.firebaseDB.collection("planning").doc(HIST_PFX + "bac").set({ e: {} });
+            await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX + "bac").set({ e: {} });
         }
         catch (e) { } /* v10.238 : les essais précédents s'effacent */
-        await window.firebaseDB.collection("planning").doc("bac").set(avecTampon(Object.assign(Object.assign({}, sansCodes(d)), { _bacDep: Date.now() })));
+        await window.firebaseDB.collection(COLL_PLAN).doc("bac").set(avecTampon(Object.assign(Object.assign({}, sansCodes(d)), { _bacDep: Date.now() })));
     }; /* v10.252 : jamais les codes dans le bac (ils y seraient lisibles par tous) */ /* v10.246 : tampon neuf (celui de la copie est ancien) */ /* v10.238 : l'heure de la copie borne le vrai historique */
     /* v10.254 : rejoindre le bac = poser le drapeau et recharger — AUCUNE copie (le bac est partagé : on le prend tel qu'il est) ;
        on tape ensuite son code habituel sur l'écran d'accueil du bac. */
     const bacRejoindre = () => { try {
-        localStorage.setItem("cp6_bac", "1");
+        localStorage.setItem((LS_PFX + "bac"), "1");
     }
     catch (e) { } window.location.reload(); };
     /* v10.254 : ce que le maître charge dans le bac le remplace POUR TOUT LE MONDE. Seul : sans question ; d'autres appareils
@@ -18373,7 +18469,7 @@ function CardioPlanning() {
             bacAller(backupList[bacPos - 1].id);
     };
     const bacSortir = () => { try {
-        localStorage.removeItem("cp6_bac");
+        localStorage.removeItem((LS_PFX + "bac"));
     }
     catch (e) { } window.location.reload(); };
     /* v10.251 : les codes en service et ceux des partis (compte à supprimer), pour la carte 🔐 Comptes */
@@ -18517,12 +18613,34 @@ function CardioPlanning() {
         setCodeAttente(true);
         let q = null;
         try {
-            const r = await cpteOuvrir(v);
+            let r = await cpteOuvrir(v);
             if (r && r.ok === false) {
                 setCodeAttente(false);
                 setHorsReseau(true);
                 setPinError(false);
                 return;
+            }
+            if (r && r.inconnu && ESSAI && !BAC) {
+                const sr = await cpteSonderReel(v); /* v10.266 : première entrée dans l'essai avec ce code */
+                if (sr && sr.reseau) {
+                    setCodeAttente(false);
+                    setHorsReseau(true);
+                    setPinError(false);
+                    return;
+                }
+                if (sr && sr.existe) {
+                    const r2 = await cpteEntrer(v, sr.nom || "");
+                    if (r2 && r2.ok === false) {
+                        setCodeAttente(false);
+                        setHorsReseau(true);
+                        setPinError(false);
+                        return;
+                    }
+                    if (r2 && r2.uid) {
+                        r = { ok: true, uid: r2.uid, nom: sr.nom || "" };
+                        cpteLog("essai : compte essai créé d'après le vrai compte", sr.nom || "");
+                    }
+                }
             }
             if (r && r.inconnu) {
                 q = codeProfil(v);
@@ -18616,7 +18734,7 @@ function CardioPlanning() {
                     React.createElement("input", { value: adminNameInput, onChange: e => setAdminNameInput(e.target.value), placeholder: "Pr\u00E9nom", style: Object.assign(Object.assign({}, S.fi), { width: "100%", textAlign: "center", marginBottom: 8 }) }),
                     React.createElement("button", { style: { width: "100%", padding: "9px", borderRadius: 9, border: "none", background: "#7c3aed", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800 }, onClick: () => { const n = (adminNameInput || "").trim(); if (!n)
                             return; setAdminName(n); try {
-                            localStorage.setItem("cp6_adminName", n);
+                            localStorage.setItem((LS_PFX + "adminName"), n);
                         }
                         catch (e) { } setAccessMode("adminEdit"); setAdminAsk(false); } }, "Entrer (" + (isCadre ? "cadre" : "secrétaire") + ")")),
                 interneAsk && React.createElement("div", { style: { marginTop: 10, padding: 10, borderRadius: 9, border: "1.5px solid #0e9f9f", background: "rgba(14,159,159,.08)" } },
@@ -18624,7 +18742,7 @@ function CardioPlanning() {
                     React.createElement("input", { value: interneNameInput, onChange: e => setInterneNameInput(e.target.value), placeholder: "Pr\u00E9nom", style: Object.assign(Object.assign({}, S.fi), { width: "100%", textAlign: "center", marginBottom: 8 }) }),
                     React.createElement("button", { style: { width: "100%", padding: "9px", borderRadius: 9, border: "none", background: "#0e9f9f", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800 }, onClick: () => { const n = (interneNameInput || "").trim(); if (!n)
                             return; setInterneName(n); try {
-                            localStorage.setItem("cp6_interneName", n);
+                            localStorage.setItem((LS_PFX + "interneName"), n);
                         }
                         catch (e) { } setAccessMode("interneEdit"); setInterneAsk(false); setTab("internes"); } }, "Entrer (interne)")),
                 !BAC && React.createElement("button", { "data-bacessai": "1", onClick: bacRejoindre, title: "Un espace de test partag\u00E9 par toute l'\u00E9quipe : rien de ce qui s'y fait ne touche au vrai planning", style: { width: "100%", marginTop: 12, padding: "7px", borderRadius: 8, border: "1px dashed #c2410c", background: "none", color: "#c2410c", cursor: "pointer", fontSize: 11, fontWeight: 700 } }, "\uD83E\uDDEA Essayer le bac \u00E0 sable"),
@@ -18659,7 +18777,7 @@ function CardioPlanning() {
         }
         catch (e) { }
         const lib = (orderedTabs.find(x => x[0] === tab) || [])[1] || tab;
-        return { version: APP_VERSION, onglet: lib, periode: perLibelle(ps.sy, ps.sm), jour: jr && jr.length === 3 ? (("0" + jr[2]).slice(-2) + "/" + ("0" + (+jr[1] + 1)).slice(-2) + "/" + jr[0]) : "—",
+        return { version: APP_VERSION + (ESSAI ? " (VERSION D'ESSAI)" : ""), onglet: lib, periode: perLibelle(ps.sy, ps.sm), jour: jr && jr.length === 3 ? (("0" + jr[2]).slice(-2) + "/" + ("0" + (+jr[1] + 1)).slice(-2) + "/" + jr[0]) : "—",
             mode: (accessMode === "edit" ? "éditeur" : accessMode === "medecinEdit" ? "médecin " + (authorRef.current || "?") : accessMode === "adminEdit" ? "administratif " + (authorRef.current || "?") : accessMode === "interneEdit" ? "interne " + (authorRef.current || "?") : "consultation") + (VER_STALE.on ? " — version périmée" : ""),
             appareil: (narrow ? "téléphone" : "ordinateur") + " " + window.innerWidth + "×" + window.innerHeight + (inst ? ", installée sur l'écran d'accueil" : ", dans le navigateur"),
             reseau: (netOff || navigator.onLine === false) ? "hors ligne" : "en ligne", theme: darkMode ? "nuit" : "jour", navigateur: String(navigator.userAgent || "?").slice(0, 200), trafic: trafLigne() };
@@ -18670,7 +18788,7 @@ function CardioPlanning() {
             return;
         }
         const ts = Date.now();
-        await window.firebaseDB.collection("signalements").doc("s" + ts).set({ ts, auteur: authorRef.current || "?", texte: String(texte || "").slice(0, 2000), ctx: sigCtx(), journal: JOURNAL.slice(), prec: JOURNAL_PREC.slice(), traite: false });
+        await window.firebaseDB.collection(COLL_SIG).doc("s" + ts).set({ ts, auteur: authorRef.current || "?", texte: String(texte || "").slice(0, 2000), ctx: sigCtx(), journal: JOURNAL.slice(), prec: JOURNAL_PREC.slice(), traite: false });
         toast("Signalement envoyé — merci");
         refreshSig();
         /* v10.219 : un signalement fait par quelqu'un d'autre que l'éditeur → notification seule aux médecins éditeurs
@@ -20048,6 +20166,21 @@ header::-webkit-scrollbar { display: none; }
                     })(),
                     React.createElement("button", { onClick: () => { setMData({ n: "", s: "CHL", _new: true }); setModal("salleCfg"); }, style: { marginTop: 8, width: "100%", padding: "9px", borderRadius: 8, border: "1.5px solid #16a34a", background: "rgba(22,163,74,.10)", color: "#16a34a", fontWeight: 800, cursor: "pointer", fontSize: 13 } }, "\u2795 Cr\u00E9er une salle"),
                     React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 4 } }, "Les salles cr\u00E9\u00E9es ici restent disponibles m\u00EAme si aucune activit\u00E9 ne les utilise. Renommer propage aux activit\u00E9s et au planning.")),
+                ESSAI && isEditVrai && !BAC && React.createElement("div", { "data-essaicarte": "1", style: Object.assign(Object.assign({}, S.card), { marginBottom: 10, border: "1.5px solid #ea580c" }) },
+                    React.createElement("div", { style: { fontWeight: 700, color: "#ea580c", fontSize: 13, marginBottom: 6 } }, "\uD83E\uDDEA Version d'essai"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt2)", marginBottom: 8 } },
+                        "Cette application est la ",
+                        React.createElement("b", null, "version d'essai"),
+                        " : elle travaille sur ses propres cahiers Firebase et ne peut rien \u00E9crire dans le vrai planning (la r\u00E8gle du serveur le lui interdit). ",
+                        essaiDep ? React.createElement("span", null,
+                            "Derni\u00E8re copie du planning r\u00E9el : ",
+                            React.createElement("b", null, new Date(essaiDep).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })),
+                            ".") : React.createElement("span", null, "Aucune copie du planning r\u00E9el n'a encore \u00E9t\u00E9 faite.")),
+                    React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--txt2)", marginBottom: 8 } },
+                        React.createElement("input", { type: "checkbox", "data-essaiarch": "1", checked: essaiArch, onChange: e => setEssaiArch(e.target.checked) }),
+                        " Copier aussi les archives (plus long ; utile pour tester ce qui ne se voit que sur les anciennes p\u00E9riodes)"),
+                    React.createElement("button", { "data-essaicopier": "1", disabled: essaiBusy || netOff, onClick: essaiCopier, style: { width: "100%", padding: "9px", borderRadius: 8, border: "none", background: essaiBusy || netOff ? "#9ca3af" : "#ea580c", color: "#fff", fontWeight: 800, cursor: essaiBusy || netOff ? "default" : "pointer", fontSize: 13 } }, essaiBusy ? "⏳ Copie en cours…" : "⬇ Copier le planning réel dans l'essai"),
+                    React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)", marginTop: 4 } }, "Lit le vrai planning (lecture seule) et remplace celui de l'essai : cases, tour, gardes, historique des cases. Le vrai n'est jamais modifi\u00E9.")),
                 isEdit && React.createElement("div", { style: Object.assign(Object.assign({}, S.card), { marginBottom: 10 }) },
                     React.createElement("div", { style: { fontWeight: 700, color: "#c2410c", fontSize: 13, marginBottom: 6 } }, "\uD83E\uDDEA Bac \u00E0 sable"),
                     BAC
@@ -20307,7 +20440,7 @@ header::-webkit-scrollbar { display: none; }
                             } });
                             try {
                                 for (const pid of list) {
-                                    const ref = window.firebaseDB.collection("archives").doc("per-" + pid);
+                                    const ref = window.firebaseDB.collection(COLL_AR).doc("per-" + pid);
                                     const prev = (await ref.get()).data() || {};
                                     const merged = Object.assign({}, prev.plan ? JSON.parse(prev.plan) : {}, byPer[pid] || {});
                                     /* les annexes de la période rejoignent le document d'archive, FUSIONNÉES
@@ -20407,7 +20540,7 @@ header::-webkit-scrollbar { display: none; }
                             const histArch = {};
                             for (const pid of list) {
                                 try {
-                                    const hd = ((await window.firebaseDB.collection("planning").doc(HIST_PFX + pid).get()).data() || {}).e || {};
+                                    const hd = ((await window.firebaseDB.collection(COLL_PLAN).doc(HIST_PFX + pid).get()).data() || {}).e || {};
                                     if (Object.keys(hd).length)
                                         histArch[pid] = hd;
                                 }
@@ -20455,7 +20588,7 @@ header::-webkit-scrollbar { display: none; }
                                             if (!window.confirm("Désarchiver la période " + perLib(pid) + " ? Elle sera remise dans les données actives, cases ET données datées (les valeurs actives existantes sont conservées en cas de doublon)."))
                                                 return;
                                             try {
-                                                const ref = window.firebaseDB.collection("archives").doc("per-" + pid);
+                                                const ref = window.firebaseDB.collection(COLL_AR).doc("per-" + pid);
                                                 const d2 = (await ref.get()).data();
                                                 if (!d2 || !d2.plan) {
                                                     toast("Archive introuvable", "warn");
