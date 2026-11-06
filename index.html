@@ -1,24 +1,24 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8"/><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="CP ESSAI">
-<meta name="theme-color" content="#ea580c">
+<meta name="apple-mobile-web-app-title" content="CardioPlanning">
+<meta name="theme-color" content="#3AC4A4">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>CardioPlanning ESSAI — version d'essai</title>
+<title>CardioPlanning — CHL &amp; CHB</title>
 <link rel="icon" href="icon-32.png"/>
 <link rel="apple-touch-icon" href="icon-180.png"/>
 <link rel="manifest" href="manifest.json"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="CP ESSAI"/>
-<meta name="theme-color" content="#ea580c"/>
-<style>body{margin:0;background:#f1f5f9}#loading{display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#ea580c;color:#fff;font-size:20px;letter-spacing:.01em}tr{max-height:28px}@media (min-width: 1100px){ body{ zoom: 1.12; } }
+<meta name="apple-mobile-web-app-title" content="CardioPlanning"/>
+<meta name="theme-color" content="#3AC4A4"/>
+<style>body{margin:0;background:#f1f5f9}#loading{display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#3AC4A4;color:#fff;font-size:20px;letter-spacing:.01em}tr{max-height:28px}@media (min-width: 1100px){ body{ zoom: 1.12; } }
 /* v10.143 : sur iPhone, Safari zoome la page dès qu'on touche un champ dont le texte fait moins de 16 px, et ne revient
    pas en arrière. Sur téléphone, tous les champs passent donc à 16 px (les styles en ligne sont à 13 px : !important les dépasse). */
 @media (max-width: 760px){ input, textarea, select { font-size: 16px !important; } }
 </style>
 </head><body>
-<div id="root"><div id="loading">&#9829; CardioPlanning — VERSION D'ESSAI</div></div>
+<div id="root"><div id="loading">&#9829; CardioPlanning</div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -28,8 +28,6 @@
 <script>
 /* v10.211 : clé PUBLIQUE d'envoi des notifications (Firebase → Paramètres du projet → Cloud Messaging → Web Push certificates).
    Vide = notifications non configurées : le bouton 🔔 le dit et ne fait rien. */
-/* v10.266 : VERSION D'ESSAI — drapeau lu par le script (cahiers -essai, comptes @essai, bandeau orange) */
-window.CP_ESSAI=true;
 window.PUSH_VAPID="BF-fxgtq9n1kwk1WJ3zrdpnKOkMQLPTEBnI3ucKM5ttk4hpn9RsKmT6MkhBuKojtzfrYTqMKc8xlSWvutO1vF4w";
 firebase.initializeApp({apiKey:"AIzaSyCTyQVUAvsZta9RISMBmqmRKOlqFHoa4wI",authDomain:"planning-cardio-chl-et-chb.firebaseapp.com",projectId:"planning-cardio-chl-et-chb",storageBucket:"planning-cardio-chl-et-chb.firebasestorage.app",messagingSenderId:"628915396436",appId:"1:628915396436:web:30f0e67a527d89b58a32c1"});
 const _db=firebase.firestore();window.firebaseDB=_db;
@@ -48,7 +46,7 @@ window.firebaseUpdatePaths=function(ref,pairs){
   return ref.update.apply(ref,args);
 };
 /* v10.211 : notifications sur l'appareil — jeton FCM via le service worker sw.js ; collection « push », un document par appareil */
-window.pushDB=function(){return _db.collection("push-essai");};
+window.pushDB=function(){return _db.collection("push");};
 window.pushGetToken=function(vapid){
   if(!firebase.messaging||!firebase.messaging.isSupported||!firebase.messaging.isSupported())return Promise.reject(new Error("navigateur non pris en charge"));
   return navigator.serviceWorker.ready.then(function(reg){return firebase.messaging().getToken({vapidKey:vapid,serviceWorkerRegistration:reg});});
