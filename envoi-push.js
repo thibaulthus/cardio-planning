@@ -1,4 +1,4 @@
-// CardioPlanning — envoi des notifications (v10.211, 11/09/2026).
+// CardioPlanning — envoi des notifications (v10.211, 11/09/2026 ; v10.272, 08/11/2026 : signalements aussi).
 // Lancé par GitHub Actions (.github/workflows/push.yml) toutes les 10 minutes, ou à la main.
 // Aucune bibliothèque à installer : Node ≥ 18 suffit (fetch et crypto sont intégrés).
 //
@@ -9,8 +9,12 @@
 //   3. pour chaque bannière RÉCENTE (créée il y a moins de 30 jours), COCHÉE « aussi par notification » (push:true), ACTIVE (d1 ≤ aujourd'hui ≤ d2)
 //      et pas encore poussée, trouve les personnes visées — nommées (meds), ou par famille (médecins,
 //      attachés) — et envoie à chacun de leurs appareils une notification NEUTRE :
-//      qui reprend le début du texte du message (v10.214) ;
-//   4. note la bannière comme poussée dans le document push/_etat, efface les jetons morts.
+//      « Un message vous attend dans CardioPlanning » ;
+//   4. note la bannière comme poussée dans le document push/_etat, efface les jetons morts ;
+//   5. (v10.272) lit la boîte « signalements » : les signalements NOUVEAUX (postérieurs au dernier passage, horodatage
+//      sigAt dans push/_etat) et NON déjà notifiés par l'application (ctx.notif absent : page sans compte, qui n'a pas
+//      le droit de prévenir elle-même) → une notification « Un signalement vous attend dans CardioPlanning » à chaque
+//      appareil d'un médecin ÉDITEUR, une seule par appareil et par passage. Au tout premier passage, rien de l'ancien stock.
 // Rien n'est jamais envoyé deux fois pour une même bannière. Un appareil enregistré APRÈS l'envoi
 // ne reçoit pas les bannières antérieures — il ouvre l'application, elles y sont.
 //
@@ -25,9 +29,7 @@ const APP_URL = process.env.APP_URL || "https://thibaulthus.github.io/cardio-pla
 const ESSAI = !!process.env.ESSAI;
 const PLAN_ID = process.env.PLAN_ID || "main";
 const FS = "https://firestore.googleapis.com/v1/projects/" + PID + "/databases/(default)/documents";
-const TITRE = "CardioPlanning", CORPS = "Un message vous attend dans CardioPlanning";
-// v10.214 : le corps de la notification reprend le début du message (sa demande du 12/09 : « un peu plus explicite »)
-const corpsDe = (a) => { const t = String((a && a.txt) || "").replace(/\s+/g, " ").trim(); return t ? (t.length > 120 ? t.slice(0, 117) + "…" : t) : CORPS; };
+const TITRE = "CardioPlanning", CORPS = "Un message vous attend dans CardioPlanning", CORPS_SIG = "Un signalement vous attend dans CardioPlanning";
 const JOURS_MAX = 30;
 
 const b64 = (s) => Buffer.from(s).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -72,14 +74,15 @@ async function fsList(tok, col) {
   return out;
 }
 async function fsDel(tok, nom) { if (ESSAI) return; await fetch("https://firestore.googleapis.com/v1/" + nom, { method: "DELETE", headers: { Authorization: "Bearer " + tok } }); }
-async function fsEtat(tok, done) {
+async function fsEtat(tok, done, sigAt) {
   if (ESSAI) return;
-  const r = await fetch(FS + "/push/_etat?updateMask.fieldPaths=done&updateMask.fieldPaths=at", { method: "PATCH", headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: { done: { stringValue: JSON.stringify(done) }, at: { integerValue: String(Date.now()) } } }) });
+  const r = await fetch(FS + "/push/_etat?updateMask.fieldPaths=done&updateMask.fieldPaths=at&updateMask.fieldPaths=sigAt", { method: "PATCH", headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: { done: { stringValue: JSON.stringify(done) }, at: { integerValue: String(Date.now()) }, sigAt: { integerValue: String(sigAt || 0) } } }) });
   if (!r.ok) throw new Error("écriture push/_etat : " + r.status + " " + (await r.text()).slice(0, 200));
 }
 // envoi d'une notification à un jeton — rend "ok", "mort" (jeton à effacer) ou "erreur" (à retenter au prochain passage)
-async function envoyer(tok, jetonAppareil, corps) {
+async function envoyer(tok, jetonAppareil, tag, corps) {
+  corps = corps || CORPS;
   if (ESSAI) return "ok";
   const r = await fetch("https://fcm.googleapis.com/v1/projects/" + PID + "/messages:send", { method: "POST", headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" },
     body: JSON.stringify({ message: { token: jetonAppareil,
@@ -104,11 +107,11 @@ const vise = (a, app) => { if (a.meds && a.meds.length) return a.meds.map(String
   const docs = await fsList(tok, "push");
   const etatDoc = docs.find(d => /\/push\/_etat$/.test(d.name));
   let done = {}; try { done = JSON.parse((champs(etatDoc).done) || "{}") || {}; } catch (e) { done = {}; }
+  let sigAt = Number((etatDoc && champs(etatDoc).sigAt) || 0) || 0;   /* v10.272 : horodatage du dernier signalement traité */
   const appareils = docs.filter(d => !/\/push\/_etat$/.test(d.name)).map(d => Object.assign({ nom: d.name }, champs(d))).filter(a => a.tok && a.med);
   const jour = auj(), lim = Date.now() - JOURS_MAX * 86400000;
   // v10.213 : seuls les messages cochés « 📱 Aussi par notification » (push:true) partent ; les autres restent de simples bannières
-// v10.214 : un message peut être une « notification seule » (ni bannière ni grille) — d'où plus de condition sur a.ban
-const aFaire = annonces.filter(a => a && a.push === true && a.at && a.at >= lim && (!a.d1 || a.d1 <= jour) && (!a.d2 || a.d2 >= jour) && !done[a.id]);
+const aFaire = annonces.filter(a => a && a.ban && a.push === true && a.at && a.at >= lim && (!a.d1 || a.d1 <= jour) && (!a.d2 || a.d2 >= jour) && !done[a.id]);
   console.log(annonces.length + " message(s) dans planning/" + PLAN_ID + ", " + appareils.length + " appareil(s) enregistré(s), " + aFaire.length + " bannière(s) à pousser" + (ESSAI ? " — ESSAI, rien ne part" : ""));
   const morts = new Set(); let nEnv = 0, nErr = 0;
   for (const a of aFaire) {
@@ -116,7 +119,7 @@ const aFaire = annonces.filter(a => a && a.push === true && a.at && a.at >= lim 
     console.log("· « " + String(a.txt || "").slice(0, 60).replace(/\n/g, " ") + " » → " + cibles.length + " appareil(s)" + (cibles.length ? " : " + cibles.map(c => (c.init || c.med) + "/" + (c.lib || "?")).join(", ") : ""));
     let transitoire = false;
     for (const c of cibles) {
-      const r = await envoyer(tok, c.tok, corpsDe(a));
+      const r = await envoyer(tok, c.tok, a.id);
       if (r === "ok") nEnv++; else if (r === "mort") { morts.add(c.nom); } else { transitoire = true; nErr++; }
     }
     if (!transitoire) done[a.id] = Date.now();
@@ -124,7 +127,29 @@ const aFaire = annonces.filter(a => a && a.push === true && a.at && a.at >= lim 
   // ménage : jetons morts effacés, état allégé des bannières disparues
   for (const nom of morts) { console.log("   jeton mort effacé : " + nom.split("/").pop()); await fsDel(tok, nom); }
   const ids = new Set(annonces.map(a => a.id)); Object.keys(done).forEach(k => { if (!ids.has(k)) delete done[k]; });
-  await fsEtat(tok, done);
-  console.log(nEnv + " notification(s) envoyée(s), " + morts.size + " jeton(s) effacé(s)" + (nErr ? ", " + nErr + " échec(s) à retenter" : ""));
+  /* ── v10.272 : signalements des pages sans compte → éditeurs ── */
+  let nSig = 0, nSigEnv = 0;
+  try {
+    let meds = {}; try { meds = typeof plan.medecinsV2 === "string" ? JSON.parse(plan.medecinsV2) : (plan.medecinsV2 || {}); } catch (e) { meds = {}; }
+    const editeur = (ap) => { const m = meds[String(ap.med)]; return !!m && m.niveau === "editeur" && (m.role || "medecin") === "medecin" && ap.role !== "attache"; };
+    const sigs = (await fsList(tok, "signalements")).map(d => champs(d)).filter(x => x && x.ts);
+    const maxTs = sigs.reduce((m, x) => Math.max(m, Number(x.ts) || 0), 0);
+    if (!sigAt) { sigAt = maxTs || Date.now(); console.log("signalements : premier passage, point de départ fixé (rien d'ancien n'est notifié)"); }
+    else {
+      const nouveaux = sigs.filter(x => Number(x.ts) > sigAt);
+      const aNotifier = nouveaux.filter(x => !((x.ctx || {}).notif));   /* l'application a déjà prévenu quand la page avait un compte */
+      nSig = aNotifier.length;
+      console.log(nouveaux.length + " signalement(s) nouveau(x), " + nSig + " à notifier (sans compte)" + (nSig ? " : " + aNotifier.map(x => String(x.auteur || "?") + " « " + String(x.texte || "").slice(0, 40).replace(/\n/g, " ") + " »").join(" ; ") : ""));
+      if (nSig) {
+        const cibles = appareils.filter(ap => editeur(ap) && !morts.has(ap.nom));
+        console.log("   → " + cibles.length + " appareil(s) d'éditeur" + (cibles.length ? " : " + cibles.map(c => (c.init || c.med) + "/" + (c.lib || "?")).join(", ") : ""));
+        let transitoire = false;
+        for (const c of cibles) { const r = await envoyer(tok, c.tok, "sig", CORPS_SIG); if (r === "ok") nSigEnv++; else if (r === "mort") { morts.add(c.nom); await fsDel(tok, c.nom); } else transitoire = true; }
+        if (!transitoire) sigAt = maxTs; else console.log("   échec transitoire : les signalements seront retentés au prochain passage");
+      } else if (maxTs > sigAt) sigAt = maxTs;
+    }
+  } catch (e) { console.log("signalements : lecture impossible (" + (e && e.message || e) + ") — ignoré pour ce passage"); }
+  await fsEtat(tok, done, sigAt);
+  console.log(nEnv + " notification(s) envoyée(s), " + nSigEnv + " pour des signalements, " + morts.size + " jeton(s) effacé(s)" + (nErr ? ", " + nErr + " échec(s) à retenter" : ""));
   process.exit(0);
 })().catch(e => { console.error("ÉCHEC : " + (e && e.message || e)); process.exit(1); });
