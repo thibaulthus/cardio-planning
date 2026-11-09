@@ -1,10 +1,10 @@
-/* CardioPlanning — service worker (v10.277)
+/* CardioPlanning — service worker (v10.278)
    Page : réseau d'abord, mais 3 s au plus (v10.274) — avec une barre de 5G la demande ne réussit ni n'échoue et
           l'écran restait figé ; passé ce délai, la copie gardée s'ouvre et la nouvelle version finit de se
           télécharger en arrière-plan pour la prochaine ouverture. Sans réseau du tout : la copie, aussitôt.
    Bibliothèques CDN : cache d'abord (URL versionnées, jamais périmées).
    Données Firestore : jamais mises en cache ici — c'est le cache interne du SDK qui s'en charge. */
-var CACHE = "cardioplanning-essai-v10-277";   /* v10.266 : cache de la VERSION D'ESSAI, distinct du vrai */
+var CACHE = "cardioplanning-essai-v10-278";   /* v10.266 : cache de la VERSION D'ESSAI, distinct du vrai */
 var PATIENCE = 3000;   /* v10.274 : attente maximale du réseau pour la page, en millisecondes */
 /* v10.135 : nouveau nom = les vieilles entrées (dont une v9.22) sont effacées ; v10.211 : notifications */
 
