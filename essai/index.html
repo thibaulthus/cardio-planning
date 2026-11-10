@@ -899,8 +899,12 @@ function cpteMemoire(garder) {
         return Promise.resolve(false);
     return cpteDelai(window.cpAuth.garder(!!garder)).then(function () { return true; }, function (e) { cpteLog("persistance non changée", cpteErr(e)); return false; });
 }
-/* le compte ouvert est-il celui que cet appareil retient ? */
-function gardeMienne() { var g = gardeLire(), u = cpteMoi(); return !!(g && u && u.uid === g.uid); }
+/* le compte ouvert est-il celui que cet appareil retient ? v10.284 : AUCUN compte ouvert compte aussi — au chargement, Google
+   met un instant à rendre la clé gardée ; la v10.283 refermait la session pendant cet instant (écran du code au premier
+   rendu), ce qui effaçait la clé : après fermeture de l'onglet ou de l'application, le code était redemandé (10/11/2026).
+   Seul un AUTRE compte ouvert (code tapé sans la case, en mémoire) est refermé. */
+function gardeMienne() { var g = gardeLire(); if (!g)
+    return false; var u = cpteMoi(); return !u || u.uid === g.uid; }
 function cpteDeconnecter() { if (!cpteDispo())
     return; if (gardeMienne())
     return; try {
@@ -1459,7 +1463,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.283 — 10/11/2026";
+const APP_VERSION = "v10.284 — 10/11/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
