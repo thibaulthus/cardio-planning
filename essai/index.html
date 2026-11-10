@@ -1382,7 +1382,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.280 — 09/11/2026";
+const APP_VERSION = "v10.281 — 10/11/2026";
 jlog("OUVERTURE", [APP_VERSION]); /* v10.148 : la première ligne du journal date le chargement */
 /* ════ PÉRIODE GLOBALE (configurable dans Paramètres) ════ */
 let PCFG = { len: 4, startM: 6 }; // défaut: 4 mois à partir de Juillet
@@ -2448,7 +2448,7 @@ function GridV({ tourSous = null, apChoix = null, onRemoveGarde = null, planIssu
         R.n = init.length;
         R.fini = false;
         R.ancre = null;
-        R.cache = null;
+        R.cache = null; /* R.k (étalonnage) gardé d'une période à l'autre */
     };
     (progOn && progR.current.cle !== progCle) && progDemarre();
     const gvLignes = (f) => {
@@ -2464,6 +2464,7 @@ function GridV({ tourSous = null, apChoix = null, onRemoveGarde = null, planIssu
                 const o = printDays[idx[0]];
                 let h = 0;
                 idx.forEach(i => { h += gvHJour(i); });
+                h = Math.round(h * (R.k || 1)); /* v10.281 : étalonnée */
                 return React.createElement("tr", { key: "att-" + w, "data-attente": w, "data-premier": o.y + "-" + o.m + "-" + o.d, className: "no-print" },
                     React.createElement("td", { colSpan: nCol, style: { height: h, padding: 0, background: "var(--bg2)", borderBottom: "1px solid var(--border)" } }));
             }
@@ -2477,8 +2478,10 @@ function GridV({ tourSous = null, apChoix = null, onRemoveGarde = null, planIssu
     };
     /* une étape par image, tant qu'il reste des semaines ; à la fin : défilement natif rendu, mesure « complet » */
     useEffect(() => {
-        if (!progOn)
+        if (!progOn) {
+            GV_PROG.on = false;
             return;
+        }
         const R = progR.current;
         const tok = ++R.tok;
         const sc = gvTab.current && gvTab.current.closest ? gvTab.current.closest("[data-defil]") : null;
@@ -2488,18 +2491,48 @@ function GridV({ tourSous = null, apChoix = null, onRemoveGarde = null, planIssu
                 if (sc)
                     sc.style.overflowAnchor = "";
                 trafOngFin();
+                GV_PROG.on = false;
+                setProgTic(x => x + 1);
             }
             return;
-        }
+        } /* v10.281 : un dernier rendu, pour la ligne MESURE du tableau complet */
+        GV_PROG.on = true;
         if (sc)
             sc.style.overflowAnchor = "none"; /* le recalage est fait ici : celui du navigateur s'y ajouterait */
-        const pas = () => { const R2 = progR.current; if (R2.tok !== tok)
-            return; R2.ancre = gvAncre(sc, gvTab.current); R2.n = Math.min(R2.ordre.length, R2.n + GV_PAS); setProgTic(x => x + 1); };
+        const pas = () => {
+            const R2 = progR.current;
+            if (R2.tok !== tok)
+                return;
+            /* v10.281 : ÉTALONNAGE des bandes d'attente — hauteur réelle des semaines déjà dessinées / hauteur estimée. Les bandes
+               étaient ≈ 6 % trop basses (son signalement du 10/11 : 5 893 → 6 287 px) : la barre de défilement rétrécissait à chaque
+               étape, ce qui faisait scintiller l'onglet. Le recalage garde la ligne regardée en place quand les bandes changent. */
+            try {
+                const tb = gvTab.current && gvTab.current.tBodies && gvTab.current.tBodies[0];
+                if (tb) {
+                    let vu = 0;
+                    for (let i = 0; i < tb.rows.length; i++) {
+                        const r = tb.rows[i];
+                        if (!r.hasAttribute("data-attente"))
+                            vu += r.offsetHeight || 0;
+                    }
+                    let est = 0;
+                    R2.ordre.slice(0, R2.n).forEach(w => { (gvSem[w] || []).forEach(i => { est += gvHJour(i); }); });
+                    const k = est > 0 ? vu / est : 0;
+                    if (k > 0.6 && k < 1.6)
+                        R2.k = k;
+                }
+            }
+            catch (e) { }
+            R2.ancre = gvAncre(sc, gvTab.current);
+            R2.n = Math.min(R2.ordre.length, R2.n + GV_PAS);
+            setProgTic(x => x + 1);
+        };
         if (typeof requestAnimationFrame === "function")
             requestAnimationFrame(() => setTimeout(pas, 0));
         else
             setTimeout(pas, 16);
     });
+    useEffect(() => () => { GV_PROG.on = false; }, []); /* tableau retiré en plein dessin (changement d'onglet) */
     /* recalage : la ligne regardée reste où elle était, avant que l'écran ne soit peint */
     React.useLayoutEffect(() => {
         const R = progR.current;
@@ -2979,6 +3012,9 @@ function FlecheHaut({ tab }) {
 const GV_PAS = 2;
 /* réglage de CET appareil, sans bouton : « cp6_dessinEntier » = 1 dans la mémoire du navigateur → le Planning se dessine d'un
    coup, comme avant la v10.280. Sert de référence au banc progressif.js (le tableau final doit être identique) et de secours. */
+/* v10.281 : dessin progressif en cours (le journal n'écrit la ligne MESURE qu'à la fin : 9 lignes par ouverture chassaient
+   les informations utiles des 40 gardées) */
+var GV_PROG = { on: false };
 var GV_ENTIER = (function () { try {
     return localStorage.getItem(LS_PFX + "dessinEntier") === "1";
 }
@@ -3088,10 +3124,10 @@ function TableScroll({ children, style, mh = 150, jours = false, memId = null, f
                 document.querySelectorAll('[data-botbar="1"]').forEach(b => { barV = Math.max(barV, b.getBoundingClientRect().height || 0); });
                 lg = Math.max(260, Math.round((window.innerHeight - barV) / k - mh)) + "px";
                 const l = "zoom " + ZOOM.z + " tel | fenetre " + window.innerWidth + "x" + window.innerHeight + " | k " + k.toFixed(3) + " | mh " + mh + " barV " + Math.round(barV) + " | pose " + lg;
-                if (l !== doFit._last) {
+                if (l !== doFit._last && !GV_PROG.on) {
                     doFit._last = l;
                     jlog("MESURE", [l]);
-                }
+                } /* v10.281 : pas pendant le dessin progressif */
             }
             if (el.style.maxHeight !== lg)
                 el.style.maxHeight = lg;
@@ -3131,10 +3167,10 @@ function TableScroll({ children, style, mh = 150, jours = false, memId = null, f
             if (el.style.maxHeight !== vz)
                 el.style.maxHeight = vz;
             const l = "zoom " + ZOOM.z + " | fenetre " + window.innerWidth + "x" + window.innerHeight + " | k " + k.toFixed(3) + " | rect.top " + Math.round(r0.top) + " bas1 " + Math.round(r1.bottom) + " lim " + Math.round(lim) + " | offsetH " + el.offsetHeight + " scrollH " + el.scrollHeight + " | barV " + Math.round(barV) + " | pose " + vz;
-            if (l !== doFit._last) {
+            if (l !== doFit._last && !GV_PROG.on) {
                 doFit._last = l;
                 jlog("MESURE", [l]);
-            }
+            } /* v10.281 : une ligne à la fin du dessin progressif, pas une par étape */
         }
     }, [fit, mh]);
     React.useLayoutEffect(() => { doFit(); });
@@ -17239,9 +17275,17 @@ function CardioPlanning() {
         }
         let vivant = true;
         try {
-            window.pushDB().get().then(snap => { const s = new Set(); snap.forEach(d => { const x = (d && d.data && d.data()) || {}; if (x.med)
-                s.add(String(x.med)); }); if (vivant)
-                setPushMeds(s); }).catch(() => { });
+            window.pushDB().get().then(snap => {
+                const s = new Set();
+                snap.forEach(d => { const x = (d && d.data && d.data()) || {}; if (x.med)
+                    s.add(String(x.med)); });
+                /* v10.281 : liste inchangée → on garde l'ancienne, sinon tout l'écran se redessinait (≈ 4 000 cases du Planning) à
+                   chaque changement d'onglet d'un éditeur, une seconde après l'affichage */
+                if (vivant)
+                    setPushMeds(prev => { if (!prev || prev.size !== s.size)
+                        return s; let pareil = true; s.forEach(x => { if (!prev.has(x))
+                        pareil = false; }); return pareil ? prev : s; });
+            }).catch(() => { });
         }
         catch (e) { }
         return () => { vivant = false; };
