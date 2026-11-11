@@ -1261,7 +1261,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.289 — 11/11/2026";
+const APP_VERSION = "v10.290 — 11/11/2026";
 jlog("OUVERTURE", [APP_VERSION]);
 let PCFG = { len: 4, startM: 6 };
 let VAC_LIST = [];
@@ -12690,6 +12690,7 @@ function CardioPlanning() {
     const pendF = useRef({});
     const refusesF = useRef({});
     const planSynced = useRef(null);
+    const planApplique = useRef(null);
     const planPending = useRef({});
     const planMigrated = useRef(false);
     const mapSynced = useRef({});
@@ -12747,6 +12748,7 @@ function CardioPlanning() {
             else
                 dm[c[1]] = inc; next = Object.assign(Object.assign({}, next), { [c[0]]: dm }); });
             planSynced.current = next;
+            planApplique.current = next;
             setPlan(next);
         }
         if (ok.length) {
@@ -12904,6 +12906,8 @@ function CardioPlanning() {
             return;
         if (GEL.on)
             return;
+        if (planApplique.current !== planSynced.current)
+            return;
         const prev = planSynced.current || {};
         const cles = [], chg = [];
         const ks = {};
@@ -12947,6 +12951,7 @@ function CardioPlanning() {
             catch (e) { }
             cles.forEach(c => { const id = c[0] + PP_SEP + c[1]; delete planPending.current[id]; delete planPendingT.current[id]; });
             planSynced.current = cur;
+            planApplique.current = cur;
             try {
                 sigAutoEnvoyer("disjoncteur", JOURNAL[JOURNAL.length - 1] || ("écriture massive bloquée : " + cles.length + " cases"));
             }
@@ -12957,6 +12962,7 @@ function CardioPlanning() {
         }
         secrEmit(prev, cur, chg);
         planSynced.current = cur;
+        planApplique.current = cur;
         if (cles.length === 0)
             return;
         expBump(chg.length);
@@ -13317,6 +13323,7 @@ function CardioPlanning() {
                     const avantNul = !planSynced.current, avant = planSynced.current || {};
                     planSynced.current = merged;
                     setPlan(cur => {
+                        planApplique.current = merged;
                         if (avantNul || !cur || cur === avant)
                             return merged;
                         const out = Object.assign({}, merged);
@@ -13337,6 +13344,7 @@ function CardioPlanning() {
                 else if (data.plan && !planMigrated.current) {
                     const legacy = JSON.parse(data.plan);
                     planSynced.current = legacy;
+                    planApplique.current = legacy;
                     setPlan(legacy);
                     planMigrated.current = true;
                     if (setDoc)

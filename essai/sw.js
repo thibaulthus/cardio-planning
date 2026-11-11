@@ -4,7 +4,7 @@
           télécharger en arrière-plan pour la prochaine ouverture. Sans réseau du tout : la copie, aussitôt.
    Bibliothèques CDN : cache d'abord (URL versionnées, jamais périmées).
    Données Firestore : jamais mises en cache ici — c'est le cache interne du SDK qui s'en charge. */
-var CACHE = "cardioplanning-essai-v10-289";   /* v10.266 : cache de la VERSION D'ESSAI, distinct du vrai */
+var CACHE = "cardioplanning-essai-v10-290";   /* v10.266 : cache de la VERSION D'ESSAI, distinct du vrai */
 var PATIENCE = 3000;   /* v10.274 : attente maximale du réseau pour la page, en millisecondes */
 /* v10.135 : nouveau nom = les vieilles entrées (dont une v9.22) sont effacées ; v10.211 : notifications */
 
