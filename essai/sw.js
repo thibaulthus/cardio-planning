@@ -1,11 +1,40 @@
-/* CardioPlanning — service worker (v10.289)
+/* CardioPlanning — service worker (v10.293)
    Page : réseau d'abord, mais 3 s au plus (v10.274) — avec une barre de 5G la demande ne réussit ni n'échoue et
           l'écran restait figé ; passé ce délai, la copie gardée s'ouvre et la nouvelle version finit de se
           télécharger en arrière-plan pour la prochaine ouverture. Sans réseau du tout : la copie, aussitôt.
    Bibliothèques CDN : cache d'abord (URL versionnées, jamais périmées).
    Données Firestore : jamais mises en cache ici — c'est le cache interne du SDK qui s'en charge. */
-var CACHE = "cardioplanning-essai-v10-292";   /* v10.266 : cache de la VERSION D'ESSAI, distinct du vrai */
+var CACHE = "cardioplanning-essai-v10-293";   /* v10.266 : cache de la VERSION D'ESSAI, distinct du vrai */
 var PATIENCE = 3000;   /* v10.274 : attente maximale du réseau pour la page, en millisecondes */
+/* v10.293 (12/11/2026) : NE JAMAIS RECULER DE VERSION. Vu le 11/11 sur l'essai : la v10.291 ouverte, puis la v10.290 à
+   l'ouverture suivante (bandeau « Version périmée »). Pendant une dizaine de minutes après un dépôt, GitHub Pages (serveurs
+   relais + max-age=600) peut répondre l'ANCIENNE page ; elle était rangée comme « dernière copie » sans regarder son numéro.
+   1. fraiche() : la page est demandée avec un paramètre unique et cache "no-store" (ni relais, ni copie HTTP du téléphone) ;
+   2. chaque copie rangée porte son numéro (X-CP-Ver, lu dans APP_VERSION) et l'heure de son arrivée (X-CP-Quand) : une page
+      plus ANCIENNE que la copie n'est ni rangée ni servie pendant NE_PAS_RECULER après l'arrivée de la plus récente
+      (passé ce délai elle est acceptée : un retour en arrière voulu, redéposé sur GitHub, reste possible) ;
+   3. SÛRETÉ : si le numéro d'une page est illisible (0), la règle ne s'applique pas et la page est acceptée comme avant —
+      jamais d'appareil bloqué sur une vieille copie parce que le format de APP_VERSION aurait changé ;
+   4. la copie de secours est d'abord celle de CE cache ; à l'activation on reprend la page la plus récente des vieux caches.
+   Banc : reculer.js (contrôle 58). */
+var NE_PAS_RECULER = 30 * 60 * 1000;
+var numVer = function (txt) { var m = /APP_VERSION\s*=\s*"v(\d+)\.(\d+)/.exec(String(txt || "")); return m ? (+m[1]) * 100000 + (+m[2]) : 0; };
+var verDe = function (rep) {   /* numéro et heure d'arrivée d'une copie → { v, q } */
+  if (!rep) return Promise.resolve({ v: 0, q: 0 });
+  var v = +rep.headers.get("X-CP-Ver") || 0, q = +rep.headers.get("X-CP-Quand") || 0;
+  if (v) return Promise.resolve({ v: v, q: q });
+  return rep.clone().text().then(function (t) { return { v: numVer(t), q: q }; }).catch(function () { return { v: 0, q: 0 }; });
+};
+var maCopie = function () {
+  return caches.open(CACHE).then(function (c) { return c.match("index.html"); })
+    .then(function (m) { return m || caches.match("index.html"); })
+    .catch(function () { return caches.match("index.html"); });
+};
+var fraiche = function (req) {
+  var u;
+  try { u = new URL(req.url); u.searchParams.set("cpv", Date.now().toString(36)); } catch (e) { return fetch(req); }
+  return fetch(u.toString(), { cache: "no-store", credentials: "same-origin" }).catch(function () { return fetch(req); });
+};
 /* v10.135 : nouveau nom = les vieilles entrées (dont une v9.22) sont effacées ; v10.211 : notifications */
 
 self.addEventListener("install", function (e) {
@@ -25,12 +54,15 @@ self.addEventListener("activate", function (e) {
       return caches.open(CACHE).then(function (c) {
         return c.match("index.html").then(function (deja) {
           if (deja) return null;
+          /* v10.293 : la page la plus RÉCENTE des vieux caches (pas la première trouvée) */
           return vieux.reduce(function (p, k) {
-            return p.then(function (trouve) {
-              if (trouve) return trouve;
-              return caches.open(k).then(function (vc) { return vc.match("index.html"); });
+            return p.then(function (best) {
+              return caches.open(k).then(function (vc) { return vc.match("index.html"); }).then(function (pg) {
+                if (!pg) return best;
+                return verDe(pg).then(function (x) { return (!best || x.v > best.v) ? { v: x.v, page: pg } : best; });
+              }).catch(function () { return best; });
             });
-          }, Promise.resolve(null)).then(function (page) { return page ? c.put("index.html", page) : null; });
+          }, Promise.resolve(null)).then(function (best) { return best ? c.put("index.html", best.page) : null; });
         });
       }).catch(function () {}).then(function () {
         return Promise.all(vieux.map(function (k) { return caches.delete(k); }));
@@ -53,20 +85,32 @@ self.addEventListener("fetch", function (e) {
     /* v10.274 : on attend la page ENTIÈRE (pas seulement son début : sur une barre de 5G, l'en-tête arrive et le reste
        se traîne). Reçue en entier → rangée sous UNE clé, toujours la dernière (v10.135), et servie. Une réponse en erreur
        (404, 500…) n'écrase jamais la bonne copie. */
-    var complet = fetch(req).then(function (res) {
+    var complet = fraiche(req).then(function (res) {
       if (!res || !res.ok) return { ko: res };
       return res.blob().then(function (b) {
-        var h = { "Content-Type": res.headers.get("Content-Type") || "text/html; charset=utf-8" };
-        var garde = new Response(b, { status: 200, headers: h });
-        return caches.open(CACHE).then(function (c) { return c.put("index.html", garde); })
-          .catch(function () {})
-          .then(function () { return { ok: new Response(b, { status: 200, headers: h }) }; });
+        var ct = res.headers.get("Content-Type") || "text/html; charset=utf-8";
+        var telle = function () { return { ok: new Response(b, { status: 200, headers: { "Content-Type": ct } }) }; };
+        return b.text().then(numVer).catch(function () { return 0; }).then(function (vN) {
+          return caches.open(CACHE).then(function (c) {
+            return c.match("index.html").then(function (anc) {
+              return verDe(anc).then(function (a) {
+                var now = Date.now();
+                /* v10.293 : plus ancienne que la copie → on ne recule pas (numéro illisible : acceptée, comme avant) */
+                if (anc && vN && a.v && vN < a.v && a.q && now - a.q < NE_PAS_RECULER) return { ok: anc };
+                var h = { "Content-Type": ct, "X-CP-Ver": String(vN), "X-CP-Quand": String((vN && vN === a.v && a.q) ? a.q : now) };
+                return c.put("index.html", new Response(b, { status: 200, headers: h }))
+                  .catch(function () {})
+                  .then(function () { return { ok: new Response(b, { status: 200, headers: h }) }; });
+              });
+            });
+          }).catch(telle);
+        });
       });
     });
     e.respondWith(new Promise(function (resolve) {
       var fini = false, t = null;
       var servir = function (r) { if (!fini && r) { fini = true; if (t) clearTimeout(t); resolve(r); } };
-      var copie = function () { return caches.match("index.html"); };
+      var copie = maCopie;
       /* PATIENCE écoulée sans la page entière : la copie gardée, si elle existe — sinon on continue d'attendre le réseau */
       t = setTimeout(function () { copie().then(servir); }, PATIENCE);
       complet.then(function (x) {
