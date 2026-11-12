@@ -1258,7 +1258,24 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.289 — 11/11/2026";
+const APP_VERSION = "v10.293 — 12/11/2026";
+const BATT = { set: null, pret: false };
+function Battement() { const s = useState(0); BATT.set = s[1]; return null; }
+function viderEffets() {
+    try {
+        const RD = typeof window !== "undefined" ? window.ReactDOM : null;
+        if (!RD || !RD.flushSync || !RD.createRoot || typeof document === "undefined")
+            return;
+        if (!BATT.pret) {
+            BATT.pret = true;
+            RD.createRoot(document.createElement("div")).render(React.createElement(Battement));
+            return;
+        }
+        if (BATT.set)
+            RD.flushSync(() => BATT.set(n => (n + 1) % 1000));
+    }
+    catch (e) { }
+}
 jlog("OUVERTURE", [APP_VERSION]);
 let PCFG = { len: 4, startM: 6 };
 let VAC_LIST = [];
@@ -5867,6 +5884,8 @@ function TourTab({ isVac = null, noNav = false, specColors = null, tourMins, tou
             Object.keys(dm2).forEach(mid => {
                 if (cellHasAny(dm2[mid], ["TOUR_USIC"])) {
                     const jr = medecins.find(m2 => String(m2.id) === String(mid));
+                    if (!jr)
+                        return;
                     const tp = derogMeds.length > 0 ? medecins.find(m2 => String(m2.id) === String(derogMeds[0])) : null;
                     infos.push({ jr, tp, y: dy, m: dm3, d: dd, txt: (jr ? jr.init : "?") + " remplace " + (tp ? tp.init : "?") + " (" + JOURS_TP[dt.getDay()] + " " + dd + " " + MOIS[dm3].slice(0, 4) + (MOIS[dm3].length > 4 ? "." : "") + ")" });
                 }
@@ -12680,6 +12699,32 @@ function CardioPlanning() {
     }, [vacs]);
     const isVac = (y, m, d) => vacDates.has(`${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
     const isFirstLoad = useRef(true);
+    const recuN = useRef(0);
+    const [recuVu, setRecuVu] = useState(0);
+    const [rejoue, setRejoue] = useState(0);
+    const rejoueDem = useRef(false);
+    const vusDep = useRef({}), rates = useRef({});
+    const pasPret = (k, deps) => {
+        const anc = vusDep.current[k], chg = !anc || anc.length !== deps.length || deps.some((d, i) => d !== anc[i]);
+        vusDep.current[k] = deps;
+        if (isFirstLoad.current)
+            return true;
+        if (recuVu !== recuN.current) {
+            if (chg)
+                rates.current[k] = 1;
+            if (rates.current[k] && !rejoueDem.current) {
+                rejoueDem.current = true;
+                setRejoue(n => (n + 1) % 1000000);
+            }
+            return true;
+        }
+        if (chg || rates.current[k]) {
+            delete rates.current[k];
+            return false;
+        }
+        return true;
+    };
+    useEffect(() => { rejoueDem.current = false; }, [rejoue]);
     const serverSeen = useRef(false);
     const localChange = useRef(false);
     const fieldSync = useRef({});
@@ -12687,6 +12732,7 @@ function CardioPlanning() {
     const pendF = useRef({});
     const refusesF = useRef({});
     const planSynced = useRef(null);
+    const planApplique = useRef(null);
     const planPending = useRef({});
     const planMigrated = useRef(false);
     const mapSynced = useRef({});
@@ -12744,6 +12790,7 @@ function CardioPlanning() {
             else
                 dm[c[1]] = inc; next = Object.assign(Object.assign({}, next), { [c[0]]: dm }); });
             planSynced.current = next;
+            planApplique.current = next;
             setPlan(next);
         }
         if (ok.length) {
@@ -12901,6 +12948,8 @@ function CardioPlanning() {
             return;
         if (GEL.on)
             return;
+        if (planApplique.current !== planSynced.current)
+            return;
         const prev = planSynced.current || {};
         const cles = [], chg = [];
         const ks = {};
@@ -12944,6 +12993,7 @@ function CardioPlanning() {
             catch (e) { }
             cles.forEach(c => { const id = c[0] + PP_SEP + c[1]; delete planPending.current[id]; delete planPendingT.current[id]; });
             planSynced.current = cur;
+            planApplique.current = cur;
             try {
                 sigAutoEnvoyer("disjoncteur", JOURNAL[JOURNAL.length - 1] || ("écriture massive bloquée : " + cles.length + " cases"));
             }
@@ -12954,6 +13004,7 @@ function CardioPlanning() {
         }
         secrEmit(prev, cur, chg);
         planSynced.current = cur;
+        planApplique.current = cur;
         if (cles.length === 0)
             return;
         expBump(chg.length);
@@ -13226,7 +13277,11 @@ function CardioPlanning() {
             return;
         }
         setFbStatus("connecting");
+        viderEffets();
         const recevoir = (snap) => {
+            viderEffets();
+            recuN.current++;
+            setRecuVu(recuN.current);
             fromServer.current = true;
             if (snap.metadata && snap.metadata.fromCache === false) {
                 serverSeen.current = true;
@@ -13314,6 +13369,7 @@ function CardioPlanning() {
                     const avantNul = !planSynced.current, avant = planSynced.current || {};
                     planSynced.current = merged;
                     setPlan(cur => {
+                        planApplique.current = merged;
                         if (avantNul || !cur || cur === avant)
                             return merged;
                         const out = Object.assign({}, merged);
@@ -13334,6 +13390,7 @@ function CardioPlanning() {
                 else if (data.plan && !planMigrated.current) {
                     const legacy = JSON.parse(data.plan);
                     planSynced.current = legacy;
+                    planApplique.current = legacy;
                     setPlan(legacy);
                     planMigrated.current = true;
                     if (setDoc)
@@ -14416,8 +14473,8 @@ function CardioPlanning() {
             ks.forEach(k => { delete fieldSync.current[k]; });
         }
     }, []);
-    useEffect(() => { if (!isFirstLoad.current)
-        flushPlan(plan); }, [plan]);
+    useEffect(() => { if (!pasPret(1, [plan]))
+        flushPlan(plan); }, [plan, rejoue]);
     const tourJournal = (prev, cur) => {
         const evts = [];
         const wks = {};
@@ -14447,7 +14504,7 @@ function CardioPlanning() {
             j[e.k] = { s: e.s, at: Date.now() }; cur2.tourJrn = j; n[e.pk] = cur2; }); return n; });
     };
     useEffect(() => {
-        if (isFirstLoad.current)
+        if (pasPret(2, [tourMed]))
             return;
         const s = JSON.stringify(tourMed), prevS = tourPrevRef.current;
         tourPrevRef.current = s;
@@ -14458,57 +14515,57 @@ function CardioPlanning() {
             catch (e) { }
         }
         flushMap("tourMedV2", tourMed, null, jrnTour);
-    }, [tourMed]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourMins: JSON.stringify(tourMins) }); }, [tourMins]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourMinsHard: JSON.stringify(tourMinsHard) }); }, [tourMinsHard]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourCfg: JSON.stringify(tourCfg) }); }, [tourCfg]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ build: JSON.stringify(build) }); }, [build]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourAvoid: JSON.stringify(tourAvoid) }); }, [tourAvoid]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourWish: JSON.stringify(tourWish) }); }, [tourWish]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ gardeAvoid: JSON.stringify(gardeAvoid) }); }, [gardeAvoid]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ gardeWish: JSON.stringify(gardeWish) }); }, [gardeWish]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ secrNotif: JSON.stringify(secrNotif) }); }, [secrNotif]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ secrCfg: JSON.stringify(secrCfg) }); }, [secrCfg]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ annonces: JSON.stringify(annonces) }); }, [annonces]);
+    }, [tourMed, rejoue]);
+    useEffect(() => { if (!pasPret(3, [tourMins]))
+        saveToFirebase({ tourMins: JSON.stringify(tourMins) }); }, [tourMins, rejoue]);
+    useEffect(() => { if (!pasPret(4, [tourMinsHard]))
+        saveToFirebase({ tourMinsHard: JSON.stringify(tourMinsHard) }); }, [tourMinsHard, rejoue]);
+    useEffect(() => { if (!pasPret(5, [tourCfg]))
+        saveToFirebase({ tourCfg: JSON.stringify(tourCfg) }); }, [tourCfg, rejoue]);
+    useEffect(() => { if (!pasPret(6, [build]))
+        saveToFirebase({ build: JSON.stringify(build) }); }, [build, rejoue]);
+    useEffect(() => { if (!pasPret(7, [tourAvoid]))
+        saveToFirebase({ tourAvoid: JSON.stringify(tourAvoid) }); }, [tourAvoid, rejoue]);
+    useEffect(() => { if (!pasPret(8, [tourWish]))
+        saveToFirebase({ tourWish: JSON.stringify(tourWish) }); }, [tourWish, rejoue]);
+    useEffect(() => { if (!pasPret(9, [gardeAvoid]))
+        saveToFirebase({ gardeAvoid: JSON.stringify(gardeAvoid) }); }, [gardeAvoid, rejoue]);
+    useEffect(() => { if (!pasPret(10, [gardeWish]))
+        saveToFirebase({ gardeWish: JSON.stringify(gardeWish) }); }, [gardeWish, rejoue]);
+    useEffect(() => { if (!pasPret(11, [secrNotif]))
+        saveToFirebase({ secrNotif: JSON.stringify(secrNotif) }); }, [secrNotif, rejoue]);
+    useEffect(() => { if (!pasPret(12, [secrCfg]))
+        saveToFirebase({ secrCfg: JSON.stringify(secrCfg) }); }, [secrCfg, rejoue]);
+    useEffect(() => { if (!pasPret(13, [annonces]))
+        saveToFirebase({ annonces: JSON.stringify(annonces) }); }, [annonces, rejoue]);
     useEffect(() => { secrRef.current = { cfg: secrCfg, meds: medecins }; }, [secrCfg, medecins]);
     useEffect(() => { if (!peutEcrire())
         return; const p = secrPurgePasse(secrNotif); if (p)
         setSecrNotif(p); }, [secrNotif]);
     useEffect(() => { const t = setInterval(() => { if (peutEcrire())
         setSecrNotif(o => secrPurgePasse(o) || o); }, 1800000); return () => clearInterval(t); }, []);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ csBlanches: JSON.stringify(csBlanches) }); }, [csBlanches]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ csRep: JSON.stringify(csRep) }); }, [csRep]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ csActsSel: JSON.stringify(csActsSel) }); }, [csActsSel]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ csActsGlobal: JSON.stringify(csActsGlobal) }); }, [csActsGlobal]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourDerog: JSON.stringify(tourDerog) }); }, [tourDerog]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourPtOte: JSON.stringify(tourPtOte) }); }, [tourPtOte]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourHist: JSON.stringify(tourHist) }); }, [tourHist]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourHistDeb: tourHistDeb || TH_DEB_DEF }); }, [tourHistDeb]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ tourReport: tourReport || "" }); }, [tourReport]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ astReport: astReport || "" }); }, [astReport]);
+    useEffect(() => { if (!pasPret(14, [csBlanches]))
+        saveToFirebase({ csBlanches: JSON.stringify(csBlanches) }); }, [csBlanches, rejoue]);
+    useEffect(() => { if (!pasPret(15, [csRep]))
+        saveToFirebase({ csRep: JSON.stringify(csRep) }); }, [csRep, rejoue]);
+    useEffect(() => { if (!pasPret(16, [csActsSel]))
+        saveToFirebase({ csActsSel: JSON.stringify(csActsSel) }); }, [csActsSel, rejoue]);
+    useEffect(() => { if (!pasPret(17, [csActsGlobal]))
+        saveToFirebase({ csActsGlobal: JSON.stringify(csActsGlobal) }); }, [csActsGlobal, rejoue]);
+    useEffect(() => { if (!pasPret(18, [tourDerog]))
+        saveToFirebase({ tourDerog: JSON.stringify(tourDerog) }); }, [tourDerog, rejoue]);
+    useEffect(() => { if (!pasPret(19, [tourPtOte]))
+        saveToFirebase({ tourPtOte: JSON.stringify(tourPtOte) }); }, [tourPtOte, rejoue]);
+    useEffect(() => { if (!pasPret(20, [tourHist]))
+        saveToFirebase({ tourHist: JSON.stringify(tourHist) }); }, [tourHist, rejoue]);
+    useEffect(() => { if (!pasPret(21, [tourHistDeb]))
+        saveToFirebase({ tourHistDeb: tourHistDeb || TH_DEB_DEF }); }, [tourHistDeb, rejoue]);
+    useEffect(() => { if (!pasPret(22, [tourReport]))
+        saveToFirebase({ tourReport: tourReport || "" }); }, [tourReport, rejoue]);
+    useEffect(() => { if (!pasPret(23, [astReport]))
+        saveToFirebase({ astReport: astReport || "" }); }, [astReport, rejoue]);
     useEffect(() => {
-        if (isFirstLoad.current)
+        if (pasPret(24, [salleReg]))
             return;
         const mp = {}, ord = [];
         (salleReg || []).forEach(x => { if (x && x.n && !(x.n in mp)) {
@@ -14516,17 +14573,17 @@ function CardioPlanning() {
             ord.push(x.n);
         } });
         flushMap("salleRegV2", mp, ord);
-    }, [salleReg]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ salleFerm: JSON.stringify(salleFerm) }); }, [salleFerm]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ dblOk: JSON.stringify(dblOk) }); }, [dblOk]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ issOk: JSON.stringify(issOk) }); }, [issOk]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ salleVideCol }); }, [salleVideCol]);
-    useEffect(() => { INACT.min = inactMin; if (!isFirstLoad.current)
-        saveToFirebase({ inactMin }); }, [inactMin]);
+    }, [salleReg, rejoue]);
+    useEffect(() => { if (!pasPret(25, [salleFerm]))
+        saveToFirebase({ salleFerm: JSON.stringify(salleFerm) }); }, [salleFerm, rejoue]);
+    useEffect(() => { if (!pasPret(26, [dblOk]))
+        saveToFirebase({ dblOk: JSON.stringify(dblOk) }); }, [dblOk, rejoue]);
+    useEffect(() => { if (!pasPret(27, [issOk]))
+        saveToFirebase({ issOk: JSON.stringify(issOk) }); }, [issOk, rejoue]);
+    useEffect(() => { if (!pasPret(28, [salleVideCol]))
+        saveToFirebase({ salleVideCol }); }, [salleVideCol, rejoue]);
+    useEffect(() => { INACT.min = inactMin; if (!pasPret(29, [inactMin]))
+        saveToFirebase({ inactMin }); }, [inactMin, rejoue]);
     useEffect(() => {
         if (accessMode !== "ask") {
             setFermeMsg(null);
@@ -14619,17 +14676,17 @@ function CardioPlanning() {
             }
         }).catch(() => { });
     }, [year, month]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg]);
-    useEffect(() => { if (!isFirstLoad.current)
-        flushPT(planningType); }, [planningType]);
-    useEffect(() => { if (!isFirstLoad.current)
-        flushMap("notesV2", notes, null, jrnNotes); }, [notes]);
+    useEffect(() => { if (!pasPret(30, [periodCfg]))
+        saveToFirebase({ periodCfg: JSON.stringify(periodCfg) }); }, [periodCfg, rejoue]);
+    useEffect(() => { if (!pasPret(31, [planningType]))
+        flushPT(planningType); }, [planningType, rejoue]);
+    useEffect(() => { if (!pasPret(32, [notes]))
+        flushMap("notesV2", notes, null, jrnNotes); }, [notes, rejoue]);
     useEffect(() => { const f = () => setModal("signal"); window.addEventListener("cp-signal", f); return () => window.removeEventListener("cp-signal", f); }, []);
-    useEffect(() => { if (!isFirstLoad.current)
-        flushList("medecinsV2", medecins); }, [medecins]);
-    useEffect(() => { if (!isFirstLoad.current)
-        flushList("actesV2", actes); }, [actes]);
+    useEffect(() => { if (!pasPret(33, [medecins]))
+        flushList("medecinsV2", medecins); }, [medecins, rejoue]);
+    useEffect(() => { if (!pasPret(34, [actes]))
+        flushList("actesV2", actes); }, [actes, rejoue]);
     useEffect(() => {
         const gInits = medecins.filter(m => m.garde === true).map(m => m.init);
         const tpInits = medecins.filter(m => m.partTime === true).map(m => m.init);
@@ -14650,23 +14707,23 @@ function CardioPlanning() {
             return changed ? next : prev;
         });
     }, [medecins]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ adminEnabled, adminCanReports, adminCanNotes }); }, [adminEnabled, adminCanReports, adminCanNotes]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ ideCfg: JSON.stringify(ideCfg) }); }, [ideCfg]);
-    useEffect(() => { if (isFirstLoad.current)
+    useEffect(() => { if (!pasPret(35, [adminEnabled, adminCanReports, adminCanNotes]))
+        saveToFirebase({ adminEnabled, adminCanReports, adminCanNotes }); }, [adminEnabled, adminCanReports, adminCanNotes, rejoue]);
+    useEffect(() => { if (!pasPret(36, [ideCfg]))
+        saveToFirebase({ ideCfg: JSON.stringify(ideCfg) }); }, [ideCfg, rejoue]);
+    useEffect(() => { if (pasPret(37, [intCfg]))
         return; const lg = codesMain.current; const c = Object.assign({}, intCfg); delete c.pin; if (lg && lg.intPin !== undefined)
-        c.pin = lg.intPin; saveToFirebase({ intCfg: JSON.stringify(c) }); }, [intCfg]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ ptOrder: JSON.stringify(ptOrder) }); }, [ptOrder]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ specColors: JSON.stringify(specColors) }); }, [specColors]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ vacs: JSON.stringify(vacs), vacRule: vacRule ? 1 : 0 }); }, [vacs, vacRule]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ colOrder: JSON.stringify(colOrder) }); }, [colOrder]);
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ colSelf: JSON.stringify(colSelf) }); }, [colSelf]);
+        c.pin = lg.intPin; saveToFirebase({ intCfg: JSON.stringify(c) }); }, [intCfg, rejoue]);
+    useEffect(() => { if (!pasPret(38, [ptOrder]))
+        saveToFirebase({ ptOrder: JSON.stringify(ptOrder) }); }, [ptOrder, rejoue]);
+    useEffect(() => { if (!pasPret(39, [specColors]))
+        saveToFirebase({ specColors: JSON.stringify(specColors) }); }, [specColors, rejoue]);
+    useEffect(() => { if (!pasPret(40, [vacs, vacRule]))
+        saveToFirebase({ vacs: JSON.stringify(vacs), vacRule: vacRule ? 1 : 0 }); }, [vacs, vacRule, rejoue]);
+    useEffect(() => { if (!pasPret(41, [colOrder]))
+        saveToFirebase({ colOrder: JSON.stringify(colOrder) }); }, [colOrder, rejoue]);
+    useEffect(() => { if (!pasPret(42, [colSelf]))
+        saveToFirebase({ colSelf: JSON.stringify(colSelf) }); }, [colSelf, rejoue]);
     const moveCol = (siteKey, key, dir) => {
         const cur = (colOrder[siteKey] && colOrder[siteKey].length) ? colOrder[siteKey].slice() : ((colModal && colModal.cols) ? colModal.cols.slice() : []);
         const i = cur.indexOf(key), j = i + dir;
@@ -14718,8 +14775,8 @@ function CardioPlanning() {
         nx[j] = cur[i];
         setPtOrder(nx);
     };
-    useEffect(() => { if (!isFirstLoad.current)
-        saveToFirebase({ astreinte: JSON.stringify(astreinte) }); }, [astreinte]);
+    useEffect(() => { if (!pasPret(43, [astreinte]))
+        saveToFirebase({ astreinte: JSON.stringify(astreinte) }); }, [astreinte, rejoue]);
     useEffect(() => { applyTheme(darkMode); }, [darkMode]);
     useEffect(() => {
         const f = () => { if (!document.hidden)
