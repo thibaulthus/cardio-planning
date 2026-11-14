@@ -405,7 +405,40 @@ function horlEcho(e, duServeur) {
     }
     catch (x) { }
 }
-function estRefus(e) { var c = String((e && (e.code || e.message)) || ""); return /permission[-_ ]?denied|insufficient permissions/i.test(c); }
+function estRefus(e) { var c = String((e && (e.code || e.message)) || ""); var r = /permission[-_ ]?denied|insufficient permissions/i.test(c); if (r)
+    refusDiag(e); return r; }
+var REFUS_DIAG = { t: 0 };
+function refusDiag(e) {
+    try {
+        var now = Date.now();
+        if (now - REFUS_DIAG.t < 10000)
+            return;
+        REFUS_DIAG.t = now;
+        var motif = String((e && e.code) || "?") + (e && e.message ? " — " + String(e.message).slice(0, 140) : "");
+        var cpt = "bibliothèque des comptes absente";
+        if (cpteDispo()) {
+            var u = null;
+            try {
+                u = window.firebase.auth().currentUser;
+            }
+            catch (x) { }
+            if (!u)
+                cpt = "AUCUN compte connecté";
+            else {
+                var d = NaN;
+                try {
+                    d = Math.round((now - Date.parse(u.metadata && u.metadata.lastSignInTime)) / 1000);
+                }
+                catch (x) { }
+                cpt = "compte connecté" + (isNaN(d) ? "" : ", clé Google reçue il y a " + (d < 120 ? d + " s" : d < 7200 ? Math.round(d / 60) + " min" : Math.round(d / 3600) + " h")) + " (" + (String(u.email || "").split("@")[1] || "?") + ")";
+            }
+        }
+        var hor = "horloge corrigée de " + Math.round(HORL.dec / 1000) + " s (" + (HORL.sure ? "sûre : écho d'une écriture" : HORL.tete ? "d'après l'en-tête de la page" : "NON vérifiée") + ")";
+        var age = Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : 0) / 1000);
+        jlog("REFUS", ["diagnostic — motif : " + motif + " | " + cpt + " | " + hor + " | page ouverte depuis " + age + " s | " + (typeof navigator !== "undefined" && navigator.onLine === false ? "hors ligne" : "en ligne") + " | " + HORL.n + " écriture(s) tentée(s)"]);
+    }
+    catch (x) { }
+}
 var REFUS = { n: 0, t: 0 };
 var SIG_AUTO = { der: {}, hook: null };
 function sigAutoQuota() { try {
@@ -1261,7 +1294,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.293 — 12/11/2026";
+const APP_VERSION = "v10.294 — 13/11/2026";
 const BATT = { set: null, pret: false };
 function Battement() { const s = useState(0); BATT.set = s[1]; return null; }
 function viderEffets() {

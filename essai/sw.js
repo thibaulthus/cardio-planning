@@ -1,10 +1,10 @@
-/* CardioPlanning — service worker (v10.293)
+/* CardioPlanning — service worker (v10.294)
    Page : réseau d'abord, mais 3 s au plus (v10.274) — avec une barre de 5G la demande ne réussit ni n'échoue et
           l'écran restait figé ; passé ce délai, la copie gardée s'ouvre et la nouvelle version finit de se
           télécharger en arrière-plan pour la prochaine ouverture. Sans réseau du tout : la copie, aussitôt.
    Bibliothèques CDN : cache d'abord (URL versionnées, jamais périmées).
    Données Firestore : jamais mises en cache ici — c'est le cache interne du SDK qui s'en charge. */
-var CACHE = "cardioplanning-essai-v10-293";   /* v10.266 : cache de la VERSION D'ESSAI, distinct du vrai */
+var CACHE = "cardioplanning-essai-v10-294";   /* v10.266 : cache de la VERSION D'ESSAI, distinct du vrai */
 var PATIENCE = 3000;   /* v10.274 : attente maximale du réseau pour la page, en millisecondes */
 /* v10.293 (12/11/2026) : NE JAMAIS RECULER DE VERSION. Vu le 11/11 sur l'essai : la v10.291 ouverte, puis la v10.290 à
    l'ouverture suivante (bandeau « Version périmée »). Pendant une dizaine de minutes après un dépôt, GitHub Pages (serveurs
