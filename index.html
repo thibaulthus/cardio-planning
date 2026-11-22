@@ -1268,6 +1268,69 @@ catch (e) { } }
     window.addEventListener("error", function (e) { jlog("PLANTAGE", [(e && e.message) || "?", (e && e.filename ? String(e.filename).split("/").pop() + ":" + e.lineno : "")]); });
     window.addEventListener("unhandledrejection", function (e) { jlog("PROMESSE", [e && e.reason && e.reason.message || (e && e.reason) || "?"]); });
 })();
+var VIE = { cle: LS_PFX + "vie", hist: LS_PFX + "arrets", d0: 0 };
+function vieEcrire(etat) { try {
+    localStorage.setItem(VIE.cle, JSON.stringify({ t: Date.now(), e: etat, d: VIE.d0 }));
+}
+catch (e) { } }
+function vieHeure(ms, court) { var t = new Date(ms), p = function (n) { return ("0" + n).slice(-2); }; return p(t.getHours()) + ":" + p(t.getMinutes()) + (court ? "" : ":" + p(t.getSeconds())); }
+(function () {
+    if (typeof window === "undefined" || typeof document === "undefined" || window.__vieOn)
+        return;
+    window.__vieOn = true;
+    var prec = null;
+    try {
+        prec = JSON.parse(localStorage.getItem(VIE.cle) || "null");
+    }
+    catch (e) {
+        prec = null;
+    }
+    var now = Date.now();
+    VIE.d0 = now;
+    if (prec && typeof prec.t === "number") {
+        if (prec.e === "visible") {
+            var h = [];
+            try {
+                h = JSON.parse(localStorage.getItem(VIE.hist) || "[]");
+            }
+            catch (e) {
+                h = [];
+            }
+            h = (Array.isArray(h) ? h : []).filter(function (x) { return typeof x === "number" && now - x < 86400000; });
+            h.push(prec.t);
+            h = h.slice(-30);
+            try {
+                localStorage.setItem(VIE.hist, JSON.stringify(h));
+            }
+            catch (e) { }
+            var dur = (typeof prec.d === "number" && prec.t >= prec.d) ? Math.round((prec.t - prec.d) / 1000) : null;
+            jlog("ARRET BRUTAL", ["la page précédente s'est arrêtée vers " + vieHeure(prec.t) + " alors qu'elle était affichée, sans être fermée" + (dur === null ? "" : " (ouverte depuis " + (dur < 120 ? dur + " s" : Math.round(dur / 60) + " min") + ")") + " — " + h.length + " en 24 h : " + h.map(function (x) { return vieHeure(x, true); }).join(", ")]);
+        }
+        else
+            jlog("REPRISE", ["page précédente " + (prec.e === "fermee" ? "fermée" : "mise en arrière-plan") + " à " + vieHeure(prec.t)]);
+    }
+    var visible = function () { return document.visibilityState !== "hidden"; };
+    vieEcrire(visible() ? "visible" : "cachee");
+    setInterval(function () { if (visible())
+        vieEcrire("visible"); }, 5000);
+    document.addEventListener("visibilitychange", function () { var v = visible(); vieEcrire(v ? "visible" : "cachee"); jlog(v ? "REVENUE" : "CACHEE", [v ? "page de nouveau affichée" : "page mise en arrière-plan"]); });
+    window.addEventListener("pagehide", function (e) { vieEcrire("fermee"); jlog("FIN", ["page fermée" + (e && e.persisted ? " (gardée en mémoire)" : "")]); });
+    window.addEventListener("pageshow", function (e) { if (e && e.persisted) {
+        vieEcrire("visible");
+        jlog("REVENUE", ["page reprise de la mémoire"]);
+    } });
+    var dS = 0;
+    document.addEventListener("focusin", function (e) {
+        var el = e && e.target, tg = el && el.tagName;
+        if (tg !== "INPUT" && tg !== "TEXTAREA" && tg !== "SELECT")
+            return;
+        var n = Date.now();
+        if (n - dS < 3000)
+            return;
+        dS = n;
+        jlog("SAISIE", ["champ touché : " + String(tg).toLowerCase() + (el.type ? " " + el.type : "")]);
+    }, true);
+})();
 function getFeries(y) {
     const f = new Set(), add = (m, d) => f.add(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
     add(1, 1);
@@ -1292,7 +1355,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.297 — 19/11/2026";
+const APP_VERSION = "v10.298 — 23/11/2026";
 const BATT = { set: null, pret: false };
 function Battement() { const s = useState(0); BATT.set = s[1]; return null; }
 function viderEffets() {
