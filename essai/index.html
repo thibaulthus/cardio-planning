@@ -1358,7 +1358,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.301 — 23/11/2026";
+const APP_VERSION = "v10.302 — 24/11/2026";
 const BATT = { set: null, pret: false };
 function Battement() { const s = useState(0); BATT.set = s[1]; return null; }
 function viderEffets() {
@@ -12311,7 +12311,7 @@ function acteAG(a, salle, y, m, d, sl) {
 function agFond(salle, vide, y, m, d, sl, night) {
     if (!vide || !salleAG(salle, y, m, d, sl))
         return null;
-    return { background: night ? AGS.col + "73" : AGS.col, boxShadow: "inset 0 0 0 2px var(--bg2)" };
+    return { background: night ? AGS.col + "73" : AGS.col, boxShadow: "inset 0 0 0 2px var(--bg2)", verticalAlign: "middle", textAlign: "center" };
 }
 function agMot(salle, vide, y, m, d, sl) {
     if (!vide || !salleAG(salle, y, m, d, sl))
