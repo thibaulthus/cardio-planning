@@ -1183,7 +1183,7 @@ var EXP_CODES = ["medPins", "editPin", "adminPin", "cadrePin"];
 var EXP_HORS = ["_ts", "_verArr", "_verPrec", "_ecr", "gel", "_bacDe", "_bacDep", "_essaiDep", "_lastBackupAt", "planV2", "plan"];
 var EXP_RUB = [[["astreinte", "astReport"], "l'astreinte"], [["tourWish", "tourAvoid", "gardeWish", "gardeAvoid"], "les souhaits de tour et de garde"],
     [["csRep", "csBlanches"], "les reports"], [["intCfg"], "les internes"], [["build"], "Construire"], [["ideCfg"], "les IDE"],
-    [["vacs", "vacRule"], "les vacances"], [["salleFerm"], "les plages fermées"], [["salleAG", "salleAGCol"], "les plages sous AG"], [["annonces"], "les messages"], [["dblOk"], "les doubles en salle validés"], [["issOk"], "les alertes du Planning validées"]];
+    [["vacs", "vacRule"], "les vacances"], [["salleFerm"], "les plages fermées"], [["salleAG", "salleAGCol"], "les plages sous AG"], [["annonces"], "les messages"], [["dblOk"], "les doubles en salle validés"], [["issOk"], "les alertes du Planning validées"], [["posteAnn"], "les postes à pourvoir annulés"]];
 function docListeV2(mp, ordRaw, leg) {
     if (!mp || typeof mp !== "object")
         return lireJson(leg, []);
@@ -1358,7 +1358,7 @@ const JOURSC = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const JOURSL = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const SLOTL = { M: "Matin", AM: "Après-midi", N: "Nuit", JOUR: "Journée" };
 const SLOTS = { M: "M", AM: "AM", N: "N", JOUR: "J" };
-const APP_VERSION = "v10.302 — 24/11/2026";
+const APP_VERSION = "v10.303 — 24/11/2026";
 const BATT = { set: null, pret: false };
 function Battement() { const s = useState(0); BATT.set = s[1]; return null; }
 function viderEffets() {
@@ -3096,9 +3096,10 @@ function siteCellTd(c, salle, d, sl, ry, rm) {
                     }),
                     (g.imeds || []).map((m, mi) => (React.createElement("div", Object.assign({ key: "i" + mi }, histProps(onCellHistory, m.id, ry, rm, d, sl), { title: m.nom + (notes[nk(m.id, ry, rm, d, sl)] ? " — 📝 " + notes[nk(m.id, ry, rm, d, sl)] : ""), style: { width: 24, height: 24, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 800, flexShrink: 0, border: "1.5px dashed rgba(255,255,255,.95)" } }), m.init)))),
                 React.createElement(ActPill, { a: acteAG(g.acte, salle, ry, rm, d, sl), night: darkMode, hasNote: g.meds.concat(g.imeds || []).some(m => !!notes[nk(m.id, ry, rm, d, sl)]) })))),
-            posteR && React.createElement("div", { "data-poste": posteR.acte.id, title: "Poste à pourvoir — aucun interne inscrit (" + (posteR.acte.label || posteR.acte.short) + ")", style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, padding: "2px 0", borderTop: grps.length ? "1px dashed var(--border)" : "none" } },
-                React.createElement("span", { style: postePillSt(darkMode) }, "Interne ?"),
-                React.createElement(ActPill, { a: posteR.acte, night: darkMode, hasNote: false })),
+            posteR && React.createElement("div", { "data-poste": posteR.acte.id, "data-postequi": posteR.qui, title: "Poste à pourvoir — " + (posteR.qui === "med" ? "aucun médecin" : "aucun interne inscrit") + " (" + (posteR.acte.label || posteR.acte.short) + ")", style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, padding: "2px 0", borderTop: grps.length ? "1px dashed var(--border)" : "none" } }, posteR.qui === "med" ? React.createElement("span", { style: postePillSt(darkMode) }, (posteR.acte.short || posteR.acte.label) + " ?")
+                : React.createElement(React.Fragment, null,
+                    React.createElement("span", { style: postePillSt(darkMode) }, "Interne ?"),
+                    React.createElement(ActPill, { a: posteR.acte, night: darkMode, hasNote: false }))),
             !fz && agMot(salle, grps.length === 0 && !posteR, ry, rm, d, sl))));
 }
 function SiteView({ moiC = null, moi = null, dbl = null, salleVide = null, isVac = null, salleFerm = null, onCellHistory = null, issMap = {}, printWk = null, onPrint = null, site, year, month, prevM, nextM, actes, medecins, getEntries, salleOcc, allDays, isEdit, onPickSite, notes = {}, salleReg = [], darkMode, setDarkMode, showFull, setShowFull, viewPeriod, allDays4, setViewPeriod, colOrder = null, onOrder = null, intCfg = null, colHide = null, onHide = null, narrow = false, moreOpen = false, setMoreOpen = null }) {
@@ -3301,8 +3302,8 @@ function actCellTd(c, row, d, sl, ry, rm) {
                             ideOnly ? (ideN + " IDE") : ideN,
                             g.dif && React.createElement("span", { style: { marginLeft: 4, fontSize: 9 } }, "\uD83D\uDD59")))));
         })),
-        posteR && React.createElement("div", { "data-poste": posteR.acte.id, title: "Poste à pourvoir — aucun interne inscrit (" + (posteR.acte.label || posteR.acte.short) + ")", style: { display: "flex", alignItems: "center", gap: 4, marginTop: _grpsA.length ? 3 : 0 } },
-            React.createElement("span", { style: postePillSt(darkMode) }, "Interne ?"),
+        posteR && React.createElement("div", { "data-poste": posteR.acte.id, "data-postequi": posteR.qui, title: "Poste à pourvoir — " + (posteR.qui === "med" ? "aucun médecin" : "aucun interne inscrit") + " (" + (posteR.acte.label || posteR.acte.short) + ")", style: { display: "flex", alignItems: "center", gap: 4, marginTop: _grpsA.length ? 3 : 0 } },
+            React.createElement("span", { style: postePillSt(darkMode) }, posteR.qui === "med" ? "Médecin ?" : "Interne ?"),
             React.createElement("span", { style: Object.assign(Object.assign({}, pillCols(posteR.acte.color || "#888888", darkMode)), { display: "inline-flex", alignItems: "stretch", height: 22, borderRadius: 4, overflow: "hidden", fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 800, whiteSpace: "nowrap" }) },
                 React.createElement("span", { style: { display: "flex", alignItems: "center", padding: "0 6px" } }, posteR.acte.short || posteR.acte.label),
                 ideActive && (posteR.acte.ideN || 0) > 0 && React.createElement("span", { "data-posteide": "1", style: { display: "flex", alignItems: "center", padding: "0 5px", background: "#e0f4e3", color: "#2f9440", borderLeft: "1px solid #95d99f" } }, posteR.acte.ideN))),
@@ -3392,7 +3393,7 @@ function ActTabView({ moiC = null, moi = null, dbl = null, salleVide = null, isV
             });
         });
         return M;
-    }, [ideActive, wdays, rows, medecins, actes, getEntries, intCfg, salleFerm]);
+    }, [ideActive, wdays, rows, medecins, actes, getEntries, intCfg, salleFerm, POSTE_ANN.d]);
     const setIdeDefV = (dw3, sl, v) => { if (setIdeCfg)
         setIdeCfg(p => { const q = Object.assign({}, (p || {})); q.def = Object.assign({}, (q.def || {})); q.def[dw3 + "|" + sl] = v; return q; }); };
     const setIdeOvV = (y3, m3, d3, sl, v) => { if (setIdeCfg)
@@ -7896,7 +7897,7 @@ const HELP_SECTIONS = [
     { id: "essai", icon: "🧪", title: "Version d'essai — tester une nouvelle version avant de la diffuser", body: () => HE("div", null, HP({ children: ["Depuis la v10.266, CardioPlanning existe en ", HE("b", null, "deux applications"), " : la vraie, et une ", HE("b", null, "version d'essai"), ", à l'adresse de la vraie suivie de ", HE("b", null, "/essai/"), ". L'essai se reconnaît à son ", HE("b", null, "bandeau orange « VERSION D'ESSAI »"), ", en haut de tous les écrans, et à son icône orange une fois installé sur un téléphone (nom « CardioPlanning ESSAI »). Il sert à essayer une nouvelle version de l'application — un nouvel affichage, un nouveau mécanisme — avec de vraies données, avant de la mettre entre les mains de l'équipe."] }), HP({ children: [HE("b", null, "Ses données sont à part"), ". L'essai travaille sur ses propres cahiers Firebase (planning, sauvegardes, archives, signalements), jamais sur les vrais : il a même sa propre visionneuse des sauvegardes. On y entre avec les mêmes codes que dans la vraie application — à la première entrée, le code est vérifié sur le vrai compte, puis l'essai se crée un compte à lui, en coulisse. Côté serveur, la règle Firestore v10.266 n'autorise un compte de l'essai qu'à écrire dans les cahiers de l'essai : même une erreur dans une version en test ne pourrait pas toucher le vrai planning."] }), HP({ children: [HE("b", null, "Copier le planning réel"), ". Dans les Paramètres de l'essai, la carte 🧪 Version d'essai (éditeur) porte ", HBtn({ kind: "ghost", children: "⬇ Copier le planning réel dans l'essai" }), ' : le vrai planning est lu (lecture seule) et remplace celui de l\'essai — cases, tour, gardes, notes, historique des cases. La case « copier aussi les archives » ajoute les anciennes périodes, pour tester ce qui ne se voit que sur elles. La carte rappelle la date de la dernière copie.'] }), HP({ children: [HE("b", null, "Ce qui est coupé"), ' : les notifications (un message posé pour voir partirait sinon sur les téléphones de toute l\'équipe) et l\'écriture des fiches profils et de la copie des codes, qui restent du ressort de la vraie application. Les signalements 🐞 faits dans l\'essai arrivent dans les Paramètres de l\'essai, pas dans ceux de la vraie application ; leur ligne de version porte « VERSION D\'ESSAI ».'] }), HP({ children: [HE("b", null, "Sur un même appareil"), ", la vraie application et l'essai ne se mélangent pas : thème, zoom, prénom, visionneuse des sauvegardes, fermeture après inactivité — chacun garde les siens. Et « un code, un appareil » ne vaut qu'entre vraies applications : ouvrir l'essai sur le téléphone ne ferme pas la vraie application sur l'ordinateur."] }), HP({ children: [HE("b", null, "Pour fabriquer la version d'essai"), ' (administrateur) : « bash construire.sh --essai » produit le dossier essai/ (index.html, sw.js, manifest.json, icônes) à partir des mêmes fichiers sources que la vraie application ; on le dépose tel quel dans le dépôt GitHub, à côté des fichiers habituels. Une version peut ainsi vivre dans l\'essai avec un numéro plus récent que le vrai sans que le vrai passe en lecture seule : chaque application a son propre garde-fou de version.'] })) },
     { id: "visio", icon: "🔍", title: "Visionneuse des sauvegardes — remonter le temps", body: () => HE("div", null, HP({ children: ["Réservée à l'éditeur. Elle affiche une sauvegarde ", HE("b", null, "en entier"), ", dans tous les onglets, comme si c'était le planning — pour retrouver à l'œil le moment où un problème est apparu, ce que l'aperçu et la comparaison case par case ne montrent pas aussi bien. Elle remplace le bac à sable depuis la v10.288 : pour tester l'application, c'est désormais la version d'essai qui sert (voir « Version d'essai »)."] }), HP({ children: [HE("b", null, "Y entrer"), ". Dans Paramètres → 💾 Sauvegarde & archivage, chaque sauvegarde porte un bouton ", HBtn({ kind: "ghost", children: "🔍 Voir" }), ". La page se recharge dans la visionneuse : si vous avez coché « Rester connecté sur cet appareil », elle s'ouvre toute seule ; sinon, votre code est redemandé, et seul un code d'éditeur y est accepté. Il n'y a plus de bouton sur l'écran d'accueil, et personne d'autre que l'éditeur ne peut y entrer."] }), HP({ children: [HE("b", null, "Lecture seule complète"), ". Dans la visionneuse, rien ne se modifie : les cases ne s'ouvrent pas, et l'application refuse toute écriture, comme pendant un gel. La sauvegarde est recopiée dans un cahier Firebase à part, celui de la visionneuse : le vrai planning ne bouge pas d'une case, et ce cahier n'entre ni dans les sauvegardes, ni dans les archives, ni dans les exports. Sauvegarde, restauration, archivage et signalements 🐞 y sont désactivés."] }), HP({ children: [HE("b", null, "Le bandeau orange"), ", en bas de l'écran, rappelle où vous êtes et quelle sauvegarde est affichée. Il porte la liste des sauvegardes et les flèches ‹ (plus ancienne) et › (plus récente), pour passer de l'une à l'autre sans quitter l'onglet que vous regardez, et le bouton ", HBtn({ kind: "ghost", children: "🚪 Sortir de la visionneuse" }), ", qui ramène au vrai planning. Dans la visionneuse, l'onglet Paramètres ne montre que la liste des sauvegardes et ce même bouton."] }), HP({ children: [HE("b", null, "On en sort tout seul"), ". Au bout du délai sans action (celui de la fermeture après inactivité, réglable dans Paramètres), l'application se ferme comme ailleurs ", HE("i", null, "et"), ", ici, fait aussi sortir de la visionneuse : au réveil, on est dans le vrai planning. Un appareil qui était resté dans l'ancien bac à sable retombe de lui-même sur le vrai planning."] })) },
     { id: "desactiver", icon: "⏸", title: "Indisponible : les hachures et la désactivation", body: () => HE("div", null, HP({ children: ["Une case ", HE("b", null, "hachurée"), " veut toujours dire la même chose, quel que soit l'onglet : ", HE("b", null, "cette personne n'est pas disponible ce jour-là"), ". Ce n'est pas un effet d'affichage mais un ", HE("b", null, "verrou"), " : la case ne s'ouvre pas au clic, le planning type ne s'y applique pas, et les répartitions automatiques passent la personne. Couverte sur ", HE("b", null, "toute"), " la période affichée, sa colonne disparaît même des grilles."] }), HP({ children: ["Deux situations produisent une hachure : une ", HE("b", null, "désactivation posée à la main"), " (ci-dessous), et un ", HE("b", null, "rôle de Dr Junior dont le nom du semestre n'a pas encore été saisi"), " (section suivante). Dans les deux cas, le contenu déjà posé n'est pas effacé : il reste sous les hachures."] }), HT({ children: "Désactiver quelqu'un" }), HP({ children: ["Pour un long congé, un départ, une période sans remplaçant : plutôt qu'une ligne remplie d'absences, on ", HE("b", null, "désactive"), " la personne sur des dates. Dans l'onglet ", HE("b", null, "Type"), ", cliquez sur ", HE("b", null, "la pastille ronde"), " d'un médecin (éditeur seulement) : la fenêtre propose « sur toute la période affichée » ou « de date à date », et liste les indisponibilités déjà posées avec un bouton ▶ Réactiver chacune."] }), HP({ children: ["Pendant ses dates, la personne sort du ", HE("b", null, "tour, des gardes, du bip"), " et des demandes de Construire. Sa pastille reste dans Type (grisée ⏸) pour la réactiver, et elle redevient disponible ", HE("b", null, "le jour de son retour"), ", sans autre manipulation. Ce sont des ", HE("b", null, "dates"), " qui sont enregistrées : changer la durée des périodes ne déplace rien."] }), HT({ children: "🚪 Quand quelqu'un quitte le service" }), HP({ children: ["Ne supprimez pas sa fiche : indiquez sa ", HE("b", null, "date de départ"), ", dans la fiche (Équipe › ✏️ › « Parti le »). C'est une désactivation sans fin : à partir de cette date la personne sort du tour, des gardes, des salles, du planning type, des demandes de Construire et des rappels ; les stats la comptent jusqu'au départ. Son ", HE("b", null, "PIN n'ouvre plus l'application"), ", et il peut être donné à un nouveau venu. Sa fiche passe dans le groupe replié « Anciens membres » en bas d'Équipe, d'où on peut la rouvrir — ou annuler le départ (v10.151)."] }), HP({ children: ["Tout son historique ", HE("b", null, "reste lisible"), ", dans les périodes vivantes comme dans les archives. La corbeille 🗑️ refuse désormais de supprimer une fiche qui a des cases dans le planning : elle ne sert plus qu'aux fiches créées par erreur. Et chaque archive emporte une copie des fiches de l'équipe : même une fiche disparue y garde son nom et sa couleur."] }), HP({ children: [HE("b", null, "Dans les onglets salles"), " (v10.241) : les fenêtres de CHL, CHB, PT Cardio et PT Angio — et les colonnes 👁 du Planning, qui les ouvrent — montrent la personne ", HE("b", null, "grisée, « ⏸ Indisponible — parti le … »"), " sur ses dates, et ne permettent plus de la poser. Avant, un départ ou une désactivation en cours de période la laissait proposée."] }), HT({ children: "⚠ Les limites à connaître" }), HP({ children: ["• ", HE("b", null, "Retirez ses activités avant de désactiver"), " : la désactivation n'efface ", HE("b", null, "rien"), '. La fenêtre compte ce qui est posé sur les dates choisies et propose « 🧹 Retirer ses activités sur ces dates » (gardes, tour et absences comprises).'] }), HP({ children: ["• L'", HE("b", null, "astreinte"), " n'est pas couverte : gérez-la à part dans son onglet."] }), HP({ last: true, children: ["• L'éditeur peut toujours poser ", HE("b", null, "à la main"), " un tour ou une garde sur quelqu'un de désactivé, depuis les tuiles 2 et 3 de Construire — le verrou porte sur les cases et les automatismes, pas sur un geste délibéré."] })) },
-    { id: "internes", icon: "🎓", title: "Internes — l'onglet et les semestres", body: () => HE("div", null, HP({ children: ["L'onglet ", HE("b", null, "🎓 Internes"), " est facultatif : il s'affiche si la coche est mise dans ", HE("b", null, "Paramètres → tuile Internes"), ". Contrairement à tous les autres onglets, il travaille ", HE("b", null, "par semestre de 6 mois"), " et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant. Depuis la v10.259, ce planning se remplit sur ", HE("b", null, "tout le semestre"), " dès qu'il existe, par tous les profils qui y ont droit, ", HE("b", null, "sans attendre la diffusion"), " de la période de 4 mois ; et le HC/USIC d'un interne n'est jamais masqué, même sur une période non diffusée. Gel du planning, journée passée et plages fermées s'appliquent toujours. Depuis la v10.261, la ", HE("b", null, "croix d'une activité posée plusieurs jours de suite"), " (HC, USIC, absence, FMC…) propose d'elle-même quoi retirer — seulement ce créneau, jusqu'à la fin, ou toute la série — comme l'absence d'un médecin (la croix mène au même écran) ; et dans « Modifier sur une période », la date de fin est pré-remplie au dernier jour du mois cliqué."] }), HT({ children: "Les semestres et les fiches" }), HP({ children: ["Tout se règle dans l'onglet ", HE("b", null, "Équipe"), ", section Internes. Un semestre démarre le ", HE("b", null, "2 mai"), " ou le ", HE("b", null, "2 novembre"), ", reporté au ", HE("b", null, "lundi suivant"), " si la date tombe un vendredi, un samedi ou un dimanche ; les dates restent modifiables à la main. Chaque interne y reçoit un nom, des initiales et une ", HE("b", null, "couleur"), ", reprise partout."] }), HP({ children: ["« + Semestre suivant » se bloque à ", HE("b", null, "deux semestres ouverts"), " (l'actuel et le prochain) — on ne connaît les internes que quelques semaines à l'avance. Un semestre ", HE("b", null, "pas encore commencé"), " peut être supprimé (🗑) : la fin du précédent est recollée automatiquement."] }), HP({ children: ["La coche ☑ devant chaque interne dit s'il a ", HE("b", null, "accès aux salles"), ". Sans elle, il n'est pas proposé dans les fenêtres de CHL, CHB, PT Cardio et PT Angio — c'est ce qui réserve certaines activités (ETT, ETO…) à un ou deux internes. Elle ne gêne pas les activités à salle que les internes posent eux-mêmes (voir plus bas)."] }), HT({ children: "Ce qu'ils peuvent avoir, ce qu'ils peuvent poser" }), HP({ children: ["C'est l'onglet ", HE("b", null, "Activités"), " qui décide, avec la coche ", HChip({ txt: "🎓 Internes", bg: "#0e9f9f" }), " : une activité cochée peut leur être posée. Une ", HE("b", null, "seconde coche"), " dit s'ils peuvent la poser ", HE("b", null, "eux-mêmes"), " (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur ou un intermédiaire — une secrétaire ou un cadre ne pose et ne retire que les activités cochées pour son rôle (celles des plannings CHL, CHB, PT Cardio, PT Angio) : tour, absences, FMC et gardes d'internes leur restent fermés. Les activités ", HE("b", null, "à salle"), " suivent la même règle (v10.256) : cochées ", HE("b", null, "posable par eux"), ", tous les internes les posent eux-mêmes, dans la rubrique « Avec salle » de leur fenêtre — sans choix si l'activité n'a qu'une salle (Épreuve d'effort), avec choix sinon. Depuis la v10.257, ces activités sont aussi proposées pour ", HE("b", null, "tous les internes"), " à l'éditeur, aux intermédiaires, et à la cadre ou aux secrétaires si leur coche est mise dans la fiche de l'activité. Non cochées « posable par eux », elles ne sont posées que par un éditeur, un intermédiaire ou un cadre, depuis l'onglet Internes ou les onglets de salle, pour les internes qui ont l'accès aux salles."] }), HP({ children: [HE("b", null, "Poste à pourvoir"), " (v10.297) : quand on sait qu'un interne tiendra une salle chaque semaine sans savoir lequel (l'épreuve d'effort du mardi après-midi), l'éditeur coche ", HE("b", null, "📌 Poste à pourvoir par un interne"), " dans la fiche de l'activité (Paramètres → Activités ; l'activité doit être accessible aux internes et n'avoir qu'une salle) et choisit le jour, la demi-journée, la date de départ et le délai d'alerte. Rien n'est écrit dans le planning : tant que personne ne tient l'activité dans la salle ce créneau-là, la case de la salle affiche ", HE("b", null, "« Interne ? »"), " dans CHL et PT Cardio, et ses infirmières sont comptées. En tête de l'onglet Internes, ", HE("b", null, "📌 Dates à compléter"), " liste les dates sans personne : un appui sur une date, on choisit son nom, puis ✓ Valider — le nom remplace alors « Interne ? » partout. Les fériés et les plages fermées de la salle sont sautés. À l'approche de la date (14 jours par défaut), la date passe en ", HE("b", null, "rouge"), " pour les internes et la cadre voit une alerte en tête de CHL et de PT Cardio. Depuis la case de la salle, l'éditeur, un intermédiaire, la cadre — et les secrétaires si leur coche est mise dans la fiche — peuvent poser n'importe quel interne, le retirer, ou poser un médecin à la place : le poste est pourvu dès que quelqu'un tient la salle. S'il n'y a pas d'épreuve d'effort ce jour-là, on ferme la plage (éditeur, intermédiaire, cadre)."] }), HP({ children: [HE("b", null, "HC, USIC et activités sans salle"), " (v10.258) : du lundi au vendredi, quel que soit le jour cliqué, la fenêtre demande la ", HE("b", null, "durée"), " — ce créneau, cette journée, ou la semaine (lundi → vendredi de la semaine cliquée, matin et après-midi). Journée et semaine ne remplacent ", HE("b", null, "jamais"), " une demi-journée déjà occupée (EE, consultation, repos, absence, FMC…) et sautent les fériés et les jours hors semestre ; le message final compte les demi-journées posées et celles laissées. Le ", HE("b", null, "repos de garde"), " se pose toujours à la journée. Le ", HE("b", null, "samedi"), " n'a qu'une case, pour le HC du samedi matin."] }), HP({ children: [HE("b", null, "Absence et FMC"), " (v10.177) : après le clic, la fenêtre demande la ", HE("b", null, "durée"), ". Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du ", HE("b", null, "lundi au vendredi"), " de la semaine cliquée, sans week-end. FMC : ce créneau, 1, 2 ou 3 jours, à la suite du jour cliqué. Ce sont des journées entières : elles remplacent ce qui s'y trouve, repos de garde compris ; les jours hors semestre sont sautés."] }), HP({ children: [HE("b", null, "Activité avec salle"), " (v10.177) : la salle choisie, un écran ", HE("b", null, "✓ Valider"), " affiche l'interne, l'activité et la salle, avec une ", HE("b", null, "note facultative"), ". Depuis la v10.258, chaque salle proposée indique ", HE("b", null, "libre"), " ou ", HE("b", null, "occupée par…"), " sur le créneau (médecins et internes confondus ; pour une salle fixe comme EE-CHL, l'information figure sur l'écran ✓ Valider) — c'est un avertissement, jamais une interdiction : un médecin et un interne dans la même salle est courant. Et dans l'autre sens, les fenêtres de case des médecins voient désormais les internes déjà en salle. Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille rouge cerclée de blanc, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ", HE("b", null, "← Retour"), " revient en arrière sans rien poser."] }), HT({ children: "Les gardes" }), HP({ children: ["La colonne ", HE("b", null, "Garde"), " de l'onglet fonctionne comme celle des médecins, ", HE("b", null, "sans répartition automatique"), ". La garde se pose sur la nuit et le ", HBadg({ txt: "RG", color: "#ffe599" }), " repos est posé tout seul le lendemain — sauté, avec un avertissement, si l'interne est absent ou en FMC ce jour-là. ⇄ échange deux gardes directement, dans la liste de celles du semestre."] }), HP({ children: [HE("b", null, "Samedi : HC et repos ensemble"), " (v10.276) : le samedi seulement, un interne au repos de garde (garde du vendredi) peut quand même être posé en ", HBadg({ txt: "HC", color: "#388bfd", dark: true }), " le matin ; la case montre le repos en grand avec une petite marque ", HBadg({ txt: "+HC", color: "#388bfd", dark: true }), " (v10.279). Retirer le HC → le repos reste. Retirer la garde du vendredi → le repos part, le HC reste. Poser la garde du vendredi (ou un repos à la main) alors que le HC est déjà posé → le HC est conservé et le repos s'ajoute. Dans la jauge, l'interne compte comme présent (H) ce samedi matin. Une absence ou une FMC remplacent tout, comme avant ; les autres jours, le repos reste exclusif."] }), HP({ children: [HE("b", null, "Export des gardes"), ' (v10.277) : le bouton 🖨️ de la barre de l\'onglet ouvre un petit menu — « Semestre entier » ou l\'un des mois du semestre affiché. Il télécharge un tableur (Date ; Jour ; Interne de garde), le même que celui des gardes des médecins, qui s\'ouvre dans Excel. Accessible à tous ceux qui voient l\'onglet, internes compris.'] }), HP({ children: ["Un ", HE("b", null, "interne extérieur"), " au service se saisit au nom libre : il apparaît dans la colonne, sans repos chez nous. Un jour ", HE("b", null, "sans personne de garde"), " est signalé en rouge. Dans le Planning, la colonne « 🎓 Garde int. » s'affiche à la demande depuis la ligne Filtre, en ", HE("b", null, "lecture seule"), ", et se remasque à chaque ouverture."] }), HT({ children: "Jauge, statistiques, PIN" }), HP({ children: [HBtn({ kind: "ghost", children: "🚦" }), " affiche la ", HE("b", null, "jauge"), " H et U à gauche de chaque demi-journée, en rouge sous les seuils réglés dans Paramètres (un seuil à 0 = pas d'alerte). ", HBtn({ kind: "ghost", children: "📊" }), " ouvre les ", HE("b", null, "statistiques du semestre"), " : gardes par catégorie, HC, USIC et les activités retenues — les colonnes affichées se choisissent dans Paramètres, tuile Internes."] }), HP({ last: true, children: ["Un ", HE("b", null, "PIN interne partagé"), " se définit dans la même tuile. Avec lui, un interne saisit son prénom, arrive directement sur son onglet et ", HE("b", null, "ne peut modifier que celui-là"), " : Planning, CHL, CHB, PT Cardio, PT Angio et l'Aide lui restent visibles en lecture seule. Depuis la v10.258, il dispose aussi des flèches ", HE("b", null, "↶ ↷"), " en haut à gauche : ce retour arrière est propre à l'appareil et ne défait jamais le travail d'un autre. Enfin, quand une pose est refusée (planning gelé, journée passée, période non diffusée, plage fermée), la fenêtre n'affiche plus « Posé » : c'est le message du refus qui reste, et rien n'est écrit."] })) },
+    { id: "internes", icon: "🎓", title: "Internes — l'onglet et les semestres", body: () => HE("div", null, HP({ children: ["L'onglet ", HE("b", null, "🎓 Internes"), " est facultatif : il s'affiche si la coche est mise dans ", HE("b", null, "Paramètres → tuile Internes"), ". Contrairement à tous les autres onglets, il travaille ", HE("b", null, "par semestre de 6 mois"), " et non par période de 4 mois — les flèches ‹ › passent d'un semestre au suivant. Depuis la v10.259, ce planning se remplit sur ", HE("b", null, "tout le semestre"), " dès qu'il existe, par tous les profils qui y ont droit, ", HE("b", null, "sans attendre la diffusion"), " de la période de 4 mois ; et le HC/USIC d'un interne n'est jamais masqué, même sur une période non diffusée. Gel du planning, journée passée et plages fermées s'appliquent toujours. Depuis la v10.261, la ", HE("b", null, "croix d'une activité posée plusieurs jours de suite"), " (HC, USIC, absence, FMC…) propose d'elle-même quoi retirer — seulement ce créneau, jusqu'à la fin, ou toute la série — comme l'absence d'un médecin (la croix mène au même écran) ; et dans « Modifier sur une période », la date de fin est pré-remplie au dernier jour du mois cliqué."] }), HT({ children: "Les semestres et les fiches" }), HP({ children: ["Tout se règle dans l'onglet ", HE("b", null, "Équipe"), ", section Internes. Un semestre démarre le ", HE("b", null, "2 mai"), " ou le ", HE("b", null, "2 novembre"), ", reporté au ", HE("b", null, "lundi suivant"), " si la date tombe un vendredi, un samedi ou un dimanche ; les dates restent modifiables à la main. Chaque interne y reçoit un nom, des initiales et une ", HE("b", null, "couleur"), ", reprise partout."] }), HP({ children: ["« + Semestre suivant » se bloque à ", HE("b", null, "deux semestres ouverts"), " (l'actuel et le prochain) — on ne connaît les internes que quelques semaines à l'avance. Un semestre ", HE("b", null, "pas encore commencé"), " peut être supprimé (🗑) : la fin du précédent est recollée automatiquement."] }), HP({ children: ["La coche ☑ devant chaque interne dit s'il a ", HE("b", null, "accès aux salles"), ". Sans elle, il n'est pas proposé dans les fenêtres de CHL, CHB, PT Cardio et PT Angio — c'est ce qui réserve certaines activités (ETT, ETO…) à un ou deux internes. Elle ne gêne pas les activités à salle que les internes posent eux-mêmes (voir plus bas)."] }), HT({ children: "Ce qu'ils peuvent avoir, ce qu'ils peuvent poser" }), HP({ children: ["C'est l'onglet ", HE("b", null, "Activités"), " qui décide, avec la coche ", HChip({ txt: "🎓 Internes", bg: "#0e9f9f" }), " : une activité cochée peut leur être posée. Une ", HE("b", null, "seconde coche"), " dit s'ils peuvent la poser ", HE("b", null, "eux-mêmes"), " (absences, FMC, gardes, HC/USIC en général) ; le reste est posé par un éditeur ou un intermédiaire — une secrétaire ou un cadre ne pose et ne retire que les activités cochées pour son rôle (celles des plannings CHL, CHB, PT Cardio, PT Angio) : tour, absences, FMC et gardes d'internes leur restent fermés. Les activités ", HE("b", null, "à salle"), " suivent la même règle (v10.256) : cochées ", HE("b", null, "posable par eux"), ", tous les internes les posent eux-mêmes, dans la rubrique « Avec salle » de leur fenêtre — sans choix si l'activité n'a qu'une salle (Épreuve d'effort), avec choix sinon. Depuis la v10.257, ces activités sont aussi proposées pour ", HE("b", null, "tous les internes"), " à l'éditeur, aux intermédiaires, et à la cadre ou aux secrétaires si leur coche est mise dans la fiche de l'activité. Non cochées « posable par eux », elles ne sont posées que par un éditeur, un intermédiaire ou un cadre, depuis l'onglet Internes ou les onglets de salle, pour les internes qui ont l'accès aux salles."] }), HP({ children: [HE("b", null, "Poste à pourvoir"), " (v10.297) : quand on sait qu'un interne tiendra une salle chaque semaine sans savoir lequel (l'épreuve d'effort du mardi après-midi), l'éditeur coche ", HE("b", null, "📌 Poste à pourvoir"), " dans la fiche de l'activité (Paramètres → Activités), choisit ", HE("b", null, "« par un interne »"), " (l'activité doit être accessible aux internes), puis le jour, la demi-journée ou la journée, la salle si l'activité en a plusieurs, la date de départ et le délai d'alerte. Rien n'est écrit dans le planning : tant que personne ne tient l'activité dans la salle ce créneau-là, la case de la salle affiche ", HE("b", null, "« Interne ? »"), " dans CHL et PT Cardio, et ses infirmières sont comptées. En tête de l'onglet Internes, ", HE("b", null, "📌 Dates à compléter"), " liste les dates sans personne : un appui sur une date, on choisit son nom, puis ✓ Valider — le nom remplace alors « Interne ? » partout. Les fériés et les plages fermées de la salle sont sautés. À l'approche de la date (14 jours par défaut), la date passe en ", HE("b", null, "rouge"), " pour les internes et la cadre voit une alerte en tête de CHL et de PT Cardio. Depuis la case de la salle, l'éditeur, un intermédiaire, la cadre — et les secrétaires si leur coche est mise dans la fiche — peuvent poser n'importe quel interne, le retirer, ou poser un médecin à la place : le poste est pourvu dès que quelqu'un tient la salle. S'il n'y a pas d'épreuve d'effort ce jour-là, on ferme la plage (éditeur, intermédiaire, cadre)."] }), HP({ children: [HE("b", null, "Poste à pourvoir par un médecin"), " (v10.303) : pour une activité à jour fixe et salle fixe dont le médecin change (Reveal, Cs DAI), l'éditeur coche la même case ", HE("b", null, "📌 Poste à pourvoir"), " et choisit ", HE("b", null, "« par un médecin autorisé »"), ", le jour, la demi-journée ou la journée, la ", HE("b", null, "salle"), " et la date de départ. Tant que personne ne tient l'activité dans cette salle, la case affiche une pastille en pointillés ", HE("b", null, "« Reveal ? »"), " dans l'onglet de la salle (rien dans Planning), et ses infirmières sont comptées. Pendant la construction, la ", HE("b", null, "tuile 6 de Construire"), " (Plannings par surspécialité) liste les dates de la période : un appui sur une date, on choisit le médecin parmi ceux autorisés sur l'activité (absents grisés) puis ✓ Valider — ou ", HE("b", null, "✕ Pas de … ce jour"), " quand l'activité saute faute de médecin (la salle reste libre pour autre chose ; une date annulée se rétablit d'un appui). La tuile ne passe au vert que lorsque les coches de surspécialité sont mises et que chaque date a son médecin ou a été annulée. Après la diffusion, si le poste redevient vide, la ", HE("b", null, "cadre"), " le voit en tête de l'onglet de la salle (« plus de médecin »). Et quand un médecin qui tenait un poste reçoit une absence, une garde ou un repos sur ce créneau, la fenêtre demande ce que devient le poste : ", HE("b", null, "le laisser à pourvoir"), ", ", HE("b", null, "l'annuler ce jour"), ", ou — éditeur, intermédiaire, cadre — ", HE("b", null, "le confier"), " à un autre médecin autorisé. Pour qu'une règle nouvelle ne réclame rien sur la période en cours, donnez-lui comme date de départ le premier jour de la période suivante."] }), HP({ children: [HE("b", null, "HC, USIC et activités sans salle"), " (v10.258) : du lundi au vendredi, quel que soit le jour cliqué, la fenêtre demande la ", HE("b", null, "durée"), " — ce créneau, cette journée, ou la semaine (lundi → vendredi de la semaine cliquée, matin et après-midi). Journée et semaine ne remplacent ", HE("b", null, "jamais"), " une demi-journée déjà occupée (EE, consultation, repos, absence, FMC…) et sautent les fériés et les jours hors semestre ; le message final compte les demi-journées posées et celles laissées. Le ", HE("b", null, "repos de garde"), " se pose toujours à la journée. Le ", HE("b", null, "samedi"), " n'a qu'une case, pour le HC du samedi matin."] }), HP({ children: [HE("b", null, "Absence et FMC"), " (v10.177) : après le clic, la fenêtre demande la ", HE("b", null, "durée"), ". Absence : ce créneau, 1 jour, la semaine, 2 ou 3 semaines — du ", HE("b", null, "lundi au vendredi"), " de la semaine cliquée, sans week-end. FMC : ce créneau, 1, 2 ou 3 jours, à la suite du jour cliqué. Ce sont des journées entières : elles remplacent ce qui s'y trouve, repos de garde compris ; les jours hors semestre sont sautés."] }), HP({ children: [HE("b", null, "Activité avec salle"), " (v10.177) : la salle choisie, un écran ", HE("b", null, "✓ Valider"), " affiche l'interne, l'activité et la salle, avec une ", HE("b", null, "note facultative"), ". Depuis la v10.258, chaque salle proposée indique ", HE("b", null, "libre"), " ou ", HE("b", null, "occupée par…"), " sur le créneau (médecins et internes confondus ; pour une salle fixe comme EE-CHL, l'information figure sur l'écran ✓ Valider) — c'est un avertissement, jamais une interdiction : un médecin et un interne dans la même salle est courant. Et dans l'autre sens, les fenêtres de case des médecins voient désormais les internes déjà en salle. Rien n'est écrit avant ✓ ; la note se relit et se modifie ensuite dans la fenêtre de la case (Internes comme CHL, CHB ou PT), et se signale par la pastille rouge cerclée de blanc, visible au survol dans tous ces onglets. À chaque étape — durée, semaine, salle, validation — ", HE("b", null, "← Retour"), " revient en arrière sans rien poser."] }), HT({ children: "Les gardes" }), HP({ children: ["La colonne ", HE("b", null, "Garde"), " de l'onglet fonctionne comme celle des médecins, ", HE("b", null, "sans répartition automatique"), ". La garde se pose sur la nuit et le ", HBadg({ txt: "RG", color: "#ffe599" }), " repos est posé tout seul le lendemain — sauté, avec un avertissement, si l'interne est absent ou en FMC ce jour-là. ⇄ échange deux gardes directement, dans la liste de celles du semestre."] }), HP({ children: [HE("b", null, "Samedi : HC et repos ensemble"), " (v10.276) : le samedi seulement, un interne au repos de garde (garde du vendredi) peut quand même être posé en ", HBadg({ txt: "HC", color: "#388bfd", dark: true }), " le matin ; la case montre le repos en grand avec une petite marque ", HBadg({ txt: "+HC", color: "#388bfd", dark: true }), " (v10.279). Retirer le HC → le repos reste. Retirer la garde du vendredi → le repos part, le HC reste. Poser la garde du vendredi (ou un repos à la main) alors que le HC est déjà posé → le HC est conservé et le repos s'ajoute. Dans la jauge, l'interne compte comme présent (H) ce samedi matin. Une absence ou une FMC remplacent tout, comme avant ; les autres jours, le repos reste exclusif."] }), HP({ children: [HE("b", null, "Export des gardes"), ' (v10.277) : le bouton 🖨️ de la barre de l\'onglet ouvre un petit menu — « Semestre entier » ou l\'un des mois du semestre affiché. Il télécharge un tableur (Date ; Jour ; Interne de garde), le même que celui des gardes des médecins, qui s\'ouvre dans Excel. Accessible à tous ceux qui voient l\'onglet, internes compris.'] }), HP({ children: ["Un ", HE("b", null, "interne extérieur"), " au service se saisit au nom libre : il apparaît dans la colonne, sans repos chez nous. Un jour ", HE("b", null, "sans personne de garde"), " est signalé en rouge. Dans le Planning, la colonne « 🎓 Garde int. » s'affiche à la demande depuis la ligne Filtre, en ", HE("b", null, "lecture seule"), ", et se remasque à chaque ouverture."] }), HT({ children: "Jauge, statistiques, PIN" }), HP({ children: [HBtn({ kind: "ghost", children: "🚦" }), " affiche la ", HE("b", null, "jauge"), " H et U à gauche de chaque demi-journée, en rouge sous les seuils réglés dans Paramètres (un seuil à 0 = pas d'alerte). ", HBtn({ kind: "ghost", children: "📊" }), " ouvre les ", HE("b", null, "statistiques du semestre"), " : gardes par catégorie, HC, USIC et les activités retenues — les colonnes affichées se choisissent dans Paramètres, tuile Internes."] }), HP({ last: true, children: ["Un ", HE("b", null, "PIN interne partagé"), " se définit dans la même tuile. Avec lui, un interne saisit son prénom, arrive directement sur son onglet et ", HE("b", null, "ne peut modifier que celui-là"), " : Planning, CHL, CHB, PT Cardio, PT Angio et l'Aide lui restent visibles en lecture seule. Depuis la v10.258, il dispose aussi des flèches ", HE("b", null, "↶ ↷"), " en haut à gauche : ce retour arrière est propre à l'appareil et ne défait jamais le travail d'un autre. Enfin, quand une pose est refusée (planning gelé, journée passée, période non diffusée, plage fermée), la fenêtre n'affiche plus « Posé » : c'est le message du refus qui reste, et rien n'est écrit."] })) },
     { id: "juniors", icon: "🩺", title: "Dr Juniors — un rôle, un nom par semestre", body: () => HE("div", null, HP({ children: ["Une fiche de ", HE("b", null, "Dr Junior"), " ne décrit pas une personne, mais un ", HE("b", null, "rôle"), " : son nom, sa couleur, sa surspécialité, son planning type, ses coches tour et gardes. Tout cela ", HE("b", null, "ne change pas"), " quand le titulaire change — c'est l'intérêt du mécanisme : le planning type se fait une fois pour toutes, et il n'y a jamais de fiche à recréer."] }), HP({ children: ["Ce qui change, c'est le ", HE("b", null, "nom du titulaire"), ", saisi ", HE("b", null, "semestre par semestre"), " dans la fiche (onglet Équipe), aux ", HE("b", null, "mêmes dates que les internes"), ". Dès qu'il est saisi, ce sont ses initiales et son nom qui apparaissent partout — cases, fenêtres, infobulles, impression, export — et ", HE("b", null, "à la date près"), " : une case du 4 mai affiche le nouveau titulaire même si vous la regardez depuis le mois d'avril."] }), HT({ children: "Un rôle sans titulaire" }), HP({ children: ["Tant qu'aucun nom n'est saisi pour un semestre, le rôle est ", HE("b", null, "hachuré et verrouillé"), " sur ces dates (voir la section précédente), et sa colonne disparaît si toute la période est concernée. La personne n'existe pas encore : rien ne peut lui être posé, pas même un congé. ", HE("b", null, "Saisir le nom déverrouille"), " aussitôt, sans autre manipulation."] }), HP({ children: ["⚠ Conséquence pratique : ", HE("b", null, "saisissez les noms avant de construire la période"), ". Sinon le planning type saute ces mois, et il faudra le réappliquer une fois les noms entrés."] }), HP({ children: ["Effacer un nom déjà saisi ", HE("b", null, "n'efface aucune activité"), " : les cases se reverrouillent, le contenu reste dessous. La fiche le ", HE("b", null, "compte"), " et propose de retirer ces activités si c'est ce que vous voulez."] }), HP({ children: ["Un rôle ", HE("b", null, "sans titulaire sur toute la période"), " ne compte pas pour une personne : il sort des listes et des totaux des tuiles Tour et Gardes (et des Stats), et la répartition automatique l'ignore. Ses cases restent visibles, hachurées, dans le planning — et l'éditeur peut toujours lui poser une garde à la main depuis la grille."] }), HT({ children: "Le rappel des congés et des préférences" }), HP({ children: ["Le rappel affiché dans le Planning (« Poser vos congés… », « Dire vos préférences… ») ne s'adresse à un rôle junior que si ", HE("b", null, "le semestre en cours aujourd'hui"), ", celui de la personne connectée, recouvre la période demandée, au moins en partie (v10.149). Deux fois par an, le junior ne reçoit donc rien : la période suivante appartient à son successeur. Une fois par an — la période à cheval sur la bascule — il le reçoit."] }), HP({ children: ["Dans la tuile 1 de Construire, le rôle reste dans la liste et dans le compte : ses congés sont ", HE("b", null, "saisis par l'éditeur"), ", et une mention « junior suivant » le rappelle sous son nom. Rien à régler : tout découle des semestres de Paramètres › Internes."] }), HT({ children: "Quand le changement tombe au milieu d'une période" }), HP({ last: true, children: ["Le changement du 2 novembre tombe sur une frontière de période : rien à gérer. Seule la période ", HE("b", null, "mars-juin"), " contient une bascule. Dans ce cas, l'en-tête de colonne montre ", HE("b", null, "un seul jeu d'initiales"), ", celui du titulaire du moment, et bascule tout seul le jour dit. Dans Construire, le tour et les gardes, le rôle reste ", HE("b", null, "une seule ligne"), " portant les deux noms (« X puis Y ») : il compte ainsi sur la période entière, comme tout le monde."] })) },
     { id: "legende", icon: "🎨", title: "Légende", body: () => HE("div", null, HP({ children: [HAvat({ txt: "TH", color: "#ec4899" }), " pastille d'initiales : chaque médecin a sa couleur · ", HBadg({ txt: "CORO", color: "#76a5af" }), " badge d'activité, dans la couleur de l'activité."] }), HP({ children: ["Fiches Équipe : ", HChip({ txt: "Garde", bg: "#16a34a" }), " / ", HChip({ txt: "Sans garde", bg: "#dc2626" }), " · ", HChip({ txt: "TM", bg: "#1d4ed8" }), " / ", HChip({ txt: "Sans TM", bg: "#d97706" }), "."] }), HP({ children: ["Sur-spécialités : ", HE("span", { style: { color: "#76a5af", fontWeight: 800 } }, "Coro"), " · ", HE("span", { style: { color: "#e3b341", fontWeight: 800 } }, "Pace"), " · ", HE("span", { style: { color: "#8b5cf6", fontWeight: 800 } }, "EEP"), " · ", HE("span", { style: { color: "#ec4899", fontWeight: 800 } }, "ETT"), "."] }), HP({ children: ["⭐ souhaite (garde ou tour) · 🚫 préfère éviter · ⇄ échange · ✂ temps partiel · 📝 note sur la case."] }), HP({ children: ["👁 en haut de l'écran : mode consultation (lecture seule) · pastille ", HE("span", { style: { display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: "#3fb950", margin: "0 2px" } }), " verte en haut : synchronisation Firebase active (grise = hors ligne)."] }), HP({ last: true, children: ["Fonds : jaune pâle = week-end · bleuté = aujourd'hui · vert clair + contour vert = astreinte de la semaine · contour violet = exception d'astreinte posée sur un jour précis."] })) }
 ];
@@ -8841,6 +8842,116 @@ function BuildPersonList({ gens, etat, onSet, peut, vide }) {
             m._note && React.createElement("span", { style: { fontSize: 9.5, color: "var(--txt3)", fontStyle: "italic", marginLeft: "auto", whiteSpace: "nowrap" } }, m._note)));
     })));
 }
+function posteCandidats(a, medecins, sauf) {
+    return (medecins || []).filter(med => (med.role || "medecin") !== "ide" && (sauf == null || med.id !== sauf)
+        && (!(a.medecinsAutorise && a.medecinsAutorise.length) || a.medecinsAutorise.indexOf(authI(med)) >= 0));
+}
+function PosteChoixMed({ o, actes, medecins, getEntries, isMedAvailable, qui, setQui, sauf = null }) {
+    const cands = posteCandidats(o.r.acte, medecins, sauf);
+    if (!cands.length)
+        return React.createElement("div", { "data-postepersonne": "1", style: { fontSize: 12, color: "var(--txt3)" } }, "Aucun m\u00E9decin n'est autoris\u00E9 sur cette activit\u00E9 (Param\u00E8tres \u2192 Activit\u00E9s).");
+    return React.createElement("div", { "data-posteliste": "med", style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: "calc(46vh / var(--zf,1))", overflowY: "auto" } }, cands.map(med => {
+        const offR = offJour(med, o.y, o.m, o.d), av = offR ? "blocked" : (isMedAvailable ? isMedAvailable(med, o.y, o.m, o.d, o.sl) : "free");
+        const labs = uniqArr([o.sl, "JOUR"].flatMap(s2 => getEntries(med.id, o.y, o.m, o.d, s2) || []).filter(e => e && e.acteId && !e._blocked)
+            .map(e => { if (e.acteId === "TOUR_HC")
+            return "HC"; if (e.acteId === "TOUR_USIC")
+            return "USIC"; const ax = actes.find(x => x.id === e.acteId); return (ax && (ax.short || ax.label)) || e.acteId; }));
+        const rg = labs.indexOf("RG") >= 0, bloc = av === "blocked" || rg, on = !!qui && qui.id === med.id;
+        const txt = offR ? ("⏸ Indisponible — " + offLib(offR)) : bloc ? "Absent / repos" : av === "cond" ? "◇ Choix ouvert, non tranché" : labs.length ? ("⚠ Déjà : " + labs.join(", ")) : "Disponible";
+        return React.createElement("button", { key: med.id, "data-postemed": med.id, disabled: bloc, onClick: () => setQui(med), style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 7, border: "1px solid " + (on ? "#1d4ed8" : "var(--border)"), cursor: bloc ? "default" : "pointer", background: on ? "rgba(29,78,216,.12)" : "var(--bg2)", opacity: bloc ? .4 : 1 } },
+            React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: med.color || "#888", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, med.init),
+            React.createElement("div", { style: { textAlign: "left", flex: 1 } },
+                React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--txt)" } }, ((med.prenom || "") + " " + (med.nom || "")).trim() || med.init),
+                React.createElement("div", { style: { fontSize: 9, color: bloc ? "#ef4444" : labs.length ? "#f59e0b" : "var(--txt3)" } }, txt)));
+    }));
+}
+function PostesConstruire({ liste, actes, medecins, getEntries, addEntry, isMedAvailable, peut, setPosteAnn, darkMode }) {
+    const [sel, setSel] = useState(null);
+    const [qui, setQui] = useState(null);
+    if (!liste.length)
+        return null;
+    const grp = [];
+    liste.forEach(o => { let g = grp.find(x => x.r === o.r); if (!g) {
+        g = { r: o.r, l: [] };
+        grp.push(g);
+    } g.l.push(o); });
+    const cur = sel ? liste.find(o => o.iso === sel.iso && o.sl === sel.sl && o.r.acte.id === sel.id) : null;
+    const fermer = () => { setSel(null); setQui(null); };
+    const nom = cur ? (cur.r.acte.short || cur.r.acte.label) : "";
+    const poser = () => {
+        if (!cur || !qui || !addEntry)
+            return;
+        addEntry(qui.id, cur.y, cur.m, cur.d, cur.sl, { acteId: cur.r.acte.id, salle: cur.r.salle });
+        toast("📌 " + nom + " " + posteTxt(cur, false) + " : " + qui.init);
+        fermer();
+    };
+    const annuler = (on) => { if (!cur || !setPosteAnn)
+        return; const k = posteAnnCle(cur.r, cur.y, cur.m, cur.d, cur.sl); setPosteAnn(p => posteAnnMaj(p, k, on)); fermer(); };
+    const pill = (o) => o.etat === "ouvert" ? Object.assign(Object.assign({}, postePillSt(darkMode)), { fontSize: 11, padding: "3px 8px" }) : o.etat === "pourvu" ? { fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 10, border: "1px solid #3fb950", background: "rgba(63,185,80,.13)", color: darkMode ? "#7ee787" : "#166534", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono',monospace" }
+        : { fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt3)", textDecoration: "line-through", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono',monospace" };
+    return (React.createElement("div", { "data-postesbuild": "1", style: { border: "1px solid #d9770688", borderRadius: 8, padding: "7px 9px", marginBottom: 8, background: "var(--bg3)" } },
+        React.createElement("div", { style: { fontSize: 12, fontWeight: 800, color: "var(--txt)", marginBottom: 4 } }, "\uD83D\uDCCC Postes \u00E0 pourvoir de la p\u00E9riode"),
+        grp.map(g => React.createElement("div", { key: g.r.acte.id + "|" + g.r.sl, "data-postesbuildacte": g.r.acte.id, style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, margin: "3px 0" } },
+            React.createElement("span", { style: { fontSize: 11.5, fontWeight: 800, color: "var(--txt)" } }, g.r.acte.label || g.r.acte.short),
+            React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "(" + posteQuand(g.r) + ", " + g.r.salle + ")"),
+            g.l.map(o => React.createElement("button", { key: o.iso, "data-postebdate": o.iso, "data-etat": o.etat, disabled: !peut, onClick: () => { setQui(null); setSel({ iso: o.iso, sl: o.sl, id: o.r.acte.id }); }, title: o.etat === "ouvert" ? "À pourvoir — appuyez pour choisir le médecin" : o.etat === "pourvu" ? ("Tenu par " + (o.par.map(m => m.init).join(", ") || "un interne")) : "Annulé ce jour — appuyez pour rétablir", style: Object.assign(Object.assign({}, pill(o)), { cursor: peut ? "pointer" : "default" }) }, posteTxt(o, true) + (o.etat === "ouvert" ? " ?" : o.etat === "pourvu" ? (" · " + (o.par.map(m => m.init).join("+") || "✓")) : " ✕"))))),
+        cur && React.createElement(Ov, { onClose: fermer },
+            React.createElement("h2", { style: S.mTit }, "📌 " + (cur.r.acte.label || cur.r.acte.short)),
+            React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 10 } }, posteTxt(cur, false) + " · " + cur.r.salle),
+            cur.etat === "ouvert" && React.createElement(React.Fragment, null,
+                React.createElement("div", { style: { fontSize: 12, color: "var(--txt2)", marginBottom: 6 } }, "Qui tient le poste ?"),
+                React.createElement(PosteChoixMed, { o: cur, actes: actes, medecins: medecins, getEntries: getEntries, isMedAvailable: isMedAvailable, qui: qui, setQui: setQui }),
+                React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap", marginTop: 12 } },
+                    React.createElement("button", { "data-postebannuler": "1", onClick: () => annuler(true), title: "Faute de m\u00E9decin : la date est r\u00E9gl\u00E9e, la salle reste libre pour autre chose", style: { padding: "9px 12px", borderRadius: 8, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, fontSize: 12, cursor: "pointer" } }, "✕ Pas de " + nom + " ce jour"),
+                    React.createElement("span", { style: { display: "flex", gap: 8 } },
+                        React.createElement("button", { onClick: fermer, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Fermer"),
+                        React.createElement("button", { "data-postebvalider": "1", disabled: !qui, onClick: poser, style: Object.assign(Object.assign({}, S.btnP), { opacity: qui ? 1 : .4 }) }, "\u2713 Valider")))),
+            cur.etat === "pourvu" && React.createElement(React.Fragment, null,
+                React.createElement("div", { "data-postebtenu": "1", style: { fontSize: 13, color: "var(--txt)", marginBottom: 6 } }, "✓ Tenu par " + (cur.par.map(m => ((m.prenom || "") + " " + (m.nom || "")).trim() || m.init).join(", ") || "un interne") + "."),
+                React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Pour changer de m\u00E9decin, cliquez la case de la salle dans son onglet : retirez-le, puis posez son rempla\u00E7ant."),
+                React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 12 } },
+                    React.createElement("button", { onClick: fermer, style: Object.assign({}, S.btnP) }, "OK"))),
+            cur.etat === "annule" && React.createElement(React.Fragment, null,
+                React.createElement("div", { "data-postebannule": "1", style: { fontSize: 13, color: "var(--txt)", marginBottom: 6 } }, "✕ Pas de " + nom + " ce jour-là (annulé faute de médecin)."),
+                React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 } },
+                    React.createElement("button", { onClick: fermer, style: { padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Fermer"),
+                    React.createElement("button", { "data-postebretablir": "1", onClick: () => annuler(false), style: Object.assign({}, S.btnP) }, "\u21BA R\u00E9tablir le poste"))))));
+}
+function PosteLache({ items, actes, medecins, getEntries, isMedAvailable, addEntry, canInt, setPosteAnn, onClose }) {
+    const [ch, setCh] = useState({});
+    const cle = o => o.r.acte.id + "|" + o.iso + "|" + o.sl;
+    const set = (o, q) => setCh(c => (Object.assign(Object.assign({}, c), { [cle(o)]: Object.assign(Object.assign({}, (c[cle(o)] || { c: "laisser" })), q) })));
+    const valider = () => {
+        items.forEach(o => {
+            const x = ch[cle(o)] || { c: "laisser" };
+            if (x.c === "annuler" && setPosteAnn)
+                setPosteAnn(p => posteAnnMaj(p, posteAnnCle(o.r, o.y, o.m, o.d, o.sl), true));
+            else if (x.c === "confier" && x.med && canInt && addEntry)
+                addEntry(x.med.id, o.y, o.m, o.d, o.sl, { acteId: o.r.acte.id, salle: o.r.salle });
+        });
+        onClose();
+    };
+    const bt = on => ({ padding: "5px 10px", borderRadius: 6, border: "1px solid " + (on ? "#1d4ed8" : "var(--border)"), cursor: "pointer", fontWeight: 700, fontSize: 11.5, background: on ? "#1d4ed8" : "var(--bg2)", color: on ? "#fff" : "var(--txt2)" });
+    const attente = items.some(o => { const x = ch[cle(o)]; return !!x && x.c === "confier" && !x.med; });
+    return (React.createElement(Ov, { onClose: onClose },
+        React.createElement("h2", { style: S.mTit }, "\uD83D\uDCCC Poste \u00E0 pourvoir"),
+        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, items.map(o => {
+            const x = ch[cle(o)] || { c: "laisser" }, nom = o.r.acte.short || o.r.acte.label;
+            return React.createElement("div", { key: cle(o), "data-postelache": o.iso, style: { border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px" } },
+                React.createElement("div", { style: { fontSize: 12.5, color: "var(--txt)", marginBottom: 6 } },
+                    React.createElement("b", null, o.med.init),
+                    " tenait " + (o.r.acte.label || nom) + " du " + posteTxt(o, false) + " (" + o.r.salle + ") : que devient-il ?"),
+                React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap" } },
+                    React.createElement("button", { "data-postelc": "laisser", "data-on": x.c === "laisser" ? "1" : "0", onClick: () => set(o, { c: "laisser" }), style: bt(x.c === "laisser") }, "Le laisser \u00E0 pourvoir"),
+                    React.createElement("button", { "data-postelc": "annuler", "data-on": x.c === "annuler" ? "1" : "0", onClick: () => set(o, { c: "annuler" }), style: bt(x.c === "annuler") }, "✕ Annuler " + nom + " ce jour"),
+                    canInt && React.createElement("button", { "data-postelc": "confier", "data-on": x.c === "confier" ? "1" : "0", onClick: () => set(o, { c: "confier" }), style: bt(x.c === "confier") }, "Le confier \u00E0\u2026")),
+                !canInt && React.createElement("div", { "data-postelcadre": "1", style: { fontSize: 11, color: "var(--txt3)", marginTop: 6 } }, "Pour le confier \u00E0 un confr\u00E8re, demandez \u00E0 la cadre : elle voit le poste \u00E0 pourvoir en t\u00EAte de l'onglet de la salle."),
+                canInt && x.c === "confier" && React.createElement("div", { style: { marginTop: 8 } },
+                    React.createElement(PosteChoixMed, { o: o, actes: actes, medecins: medecins, getEntries: getEntries, isMedAvailable: isMedAvailable, qui: x.med || null, setQui: m => set(o, { med: m }), sauf: o.med.id })));
+        })),
+        React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 } },
+            React.createElement("button", { "data-postelvalider": "1", disabled: attente, onClick: valider, style: Object.assign(Object.assign({}, S.btnP), { opacity: attente ? .4 : 1 }) }, "\u2713 Valider"))));
+}
 function BuildLien({ txt, onClick }) {
     return React.createElement("button", { onClick: onClick, style: { fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg3)", color: "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, txt);
 }
@@ -8873,7 +8984,7 @@ function BuildAsk({ build, medecins, editMedId, onRepondre, onGoPer }) {
         React.createElement("button", { onClick: () => onGoPer(a.k), style: { fontSize: 11, padding: "4px 11px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--txt2)", fontWeight: 700, cursor: "pointer" } }, "\u2192 Voir cette p\u00E9riode"),
         React.createElement("button", { onClick: () => onRepondre(a.k, a.champ), style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1.5px solid #3fb950", background: "rgba(63,185,80,.13)", color: "#3fb950", fontWeight: 800, cursor: "pointer" } }, "\u2713 C'est fait"))))));
 }
-function BuildTab({ build, setBuild, medecins, getEntries, tourMed, isEdit, edReel, darkMode, setDarkMode, author, goTab, onOpenBip, onApplyPT, onRemovePT, tourProps, gardeProps, secrDif, onDiffuser, onAnnulerDif, onPushDemande = null }) {
+function BuildTab({ build, setBuild, medecins, getEntries, tourMed, isEdit, edReel, darkMode, setDarkMode, author, goTab, onOpenBip, onApplyPT, onRemovePT, tourProps, gardeProps, secrDif, onDiffuser, onAnnulerDif, onPushDemande = null, actes = null, intCfg = null, addEntry = null, isMedAvailable = null, posteAnn = null, setPosteAnn = null, salleFerm = null }) {
     const [bPer, setBPer] = React.useState(() => { if (BUILD_MEM.per)
         return BUILD_MEM.per; const t = new Date(); const p0 = perStart(t.getFullYear(), t.getMonth()); return perNext(p0.sy, p0.sm); });
     const allerA = (p) => { BUILD_MEM.per = { sy: p.sy, sm: p.sm }; setBPer({ sy: p.sy, sm: p.sm }); };
@@ -8965,13 +9076,31 @@ function BuildTab({ build, setBuild, medecins, getEntries, tourMed, isEdit, edRe
         return { tot: ks.length, ok: ks.filter(k => par[k] >= BIP_MIN_SEM).length };
     }, [bDays, medecins, getEntries]);
     const nSpec = BUILD_SPECS.filter(s => (B.specs || {})[s]).length;
+    const postesB = useMemo(() => {
+        if (!actes || !bDays.length)
+            return [];
+        const a = bDays[0], z = bDays[bDays.length - 1];
+        return postesEtat(actes, getEntries, medecins, intCfg, salleFerm, intISO2(a.y, a.m, a.d), intISO2(z.y, z.m, z.d));
+    }, [actes, getEntries, medecins, intCfg, salleFerm, bDays, posteAnn]);
+    const nPosteO = postesB.filter(o => o.etat === "ouvert").length;
+    const posteAlerte = (() => {
+        if (!nPosteO)
+            return null;
+        const c = {}, ord = [];
+        postesB.forEach(o => { if (o.etat !== "ouvert")
+            return; const k = o.r.acte.short || o.r.acte.label; if (!c[k]) {
+            c[k] = 0;
+            ord.push(k);
+        } c[k]++; });
+        return nPosteO + " poste" + (nPosteO > 1 ? "s" : "") + " à pourvoir (" + ord.map(k => c[k] + " " + k).join(", ") + ")";
+    })();
     const valide = (n) => (B.etapes || {})[n] || null;
     const autoOk = { 1: meds.length > 0 && nMeds === meds.length,
         2: tour.tot > 0 && tour.ok === tour.tot && (!bFut || !!B.tourOk),
         3: gardes.tot > 0 && gardes.ok === gardes.tot && (!bFut || !!B.gardeOk),
         4: autres.length > 0 && nAutres === autres.length,
         5: false,
-        6: nSpec === BUILD_SPECS.length,
+        6: nSpec === BUILD_SPECS.length && nPosteO === 0,
         7: bips.tot > 0 && bips.ok === bips.tot,
         8: !!(secrDif || {})[bPid] };
     const estFait = (n) => !!(valide(n) || autoOk[n]);
@@ -9098,9 +9227,10 @@ function BuildTab({ build, setBuild, medecins, getEntries, tourMed, isEdit, edRe
                     peutTout && React.createElement("button", { onClick: () => onRemovePT(bPer), style: { fontSize: 11, padding: "4px 13px", borderRadius: 6, border: "1px solid #dc2626", background: "var(--bg2)", color: "#dc2626", fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDDD1 Retirer"),
                     React.createElement(BuildLien, { txt: "\u2192 Modifier le planning type", onClick: () => goTab("plantype") }))) },
         { n: 6, icon: "🔬", titre: "Plannings par surspécialité",
-            sous: nSpec + " sur " + BUILD_SPECS.length + " terminée" + (nSpec > 1 ? "s" : ""),
-            alerte: mSpec ? (mSpec + " surspécialité" + (mSpec > 1 ? "s" : "") + " non terminée" + (mSpec > 1 ? "s" : "")) : null,
+            sous: nSpec + " sur " + BUILD_SPECS.length + " terminée" + (nSpec > 1 ? "s" : "") + (postesB.length ? (" · " + (nPosteO ? (nPosteO + " poste" + (nPosteO > 1 ? "s" : "") + " à pourvoir") : "postes pourvus")) : ""),
+            alerte: [mSpec ? (mSpec + " surspécialité" + (mSpec > 1 ? "s" : "") + " non terminée" + (mSpec > 1 ? "s" : "")) : null, posteAlerte].filter(Boolean).join(" · ") || null,
             body: React.createElement("div", null,
+                React.createElement(PostesConstruire, { liste: postesB, actes: actes || [], medecins: medecins, getEntries: getEntries, addEntry: addEntry, isMedAvailable: isMedAvailable, peut: peutTout, setPosteAnn: setPosteAnn, darkMode: darkMode }),
                 React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 } }, BUILD_SPECS.map(s => {
                     const f = (B.specs || {})[s];
                     return (React.createElement("button", { key: s, disabled: !peutTout, onClick: () => setSpec(s), style: { fontSize: 11, padding: "3px 11px", borderRadius: 6, fontWeight: 700, cursor: peutTout ? "pointer" : "default", border: "1px solid " + (f ? "#3fb950" : "var(--border)"), background: f ? "rgba(63,185,80,.13)" : "var(--bg3)", color: f ? "#3fb950" : "var(--txt2)" } }, (f ? "✓ " : "") + s));
@@ -11297,34 +11427,51 @@ function intMedsDuJour(intCfg, y, m, d) {
     return (s && (s.meds || []).length) ? { lbl: intSemLabel(s.deb), meds: s.meds } : null;
 }
 const POSTE_MEM = { a: null, r: [] };
+var POSTE_ANN = { d: {} };
 const POSTE_JOURS = [[1, "Lun"], [2, "Mar"], [3, "Mer"], [4, "Jeu"], [5, "Ven"]];
 function posteSalle(a) { return a ? (a.fixedSalle || ((a.salles || []).length === 1 ? a.salles[0] : null)) : null; }
-function posteQuand(p) { const j = (Array.isArray(p && p.j) ? p.j : []).slice().sort(); return j.map(x => JOURSL[x].toLowerCase()).join(", ") + " " + ((p && p.sl) === "M" ? "matin" : "après-midi"); }
+function posteSalleDe(a, p) { if (a && p && p.sa && ((a.salles || []).indexOf(p.sa) >= 0 || a.fixedSalle === p.sa))
+    return p.sa; return posteSalle(a); }
+function posteQui(a, p) { if (p && p.qui === "med")
+    return "med"; if (p && p.qui === "interne")
+    return "interne"; return (a && a.interneOk === true) ? "interne" : "med"; }
+function posteQuand(p) { const j = (Array.isArray(p && p.j) ? p.j : []).slice().sort(); return j.map(x => JOURSL[x].toLowerCase()).join(", ") + " " + ((p && p.sl) === "M" ? "matin" : (p && p.sl) === "J" ? "journée" : "après-midi"); }
+function posteRegleDe(a) {
+    const p = a && a.poste;
+    if (!p || p.on !== true)
+        return [];
+    const qui = posteQui(a, p);
+    if (qui === "interne" && a.interneOk !== true)
+        return [];
+    const sa = posteSalleDe(a, p), j = (Array.isArray(p.j) ? p.j : []).filter(x => x >= 1 && x <= 5);
+    if (!sa || !j.length)
+        return [];
+    return (p.sl === "J" ? ["M", "AM"] : [p.sl === "M" ? "M" : "AM"]).map(sl => ({ acte: a, salle: sa, j: j, sl: sl, du: (typeof p.du === "string" ? p.du : ""), al: (typeof p.al === "number" && p.al >= 0) ? p.al : 14, qui: qui }));
+}
 function posteRegles(actes) {
     if (POSTE_MEM.a === actes)
         return POSTE_MEM.r;
-    const out = [];
-    (actes || []).forEach(a => {
-        const p = a && a.poste;
-        if (!p || p.on !== true || a.interneOk !== true)
-            return;
-        const sa = posteSalle(a), j = (Array.isArray(p.j) ? p.j : []).filter(x => x >= 1 && x <= 5);
-        if (!sa || !j.length)
-            return;
-        out.push({ acte: a, salle: sa, j: j, sl: p.sl === "M" ? "M" : "AM", du: (typeof p.du === "string" ? p.du : ""), al: (typeof p.al === "number" && p.al >= 0) ? p.al : 14, qui: "interne" });
-    });
+    let out = [];
+    (actes || []).forEach(a => { const l = posteRegleDe(a); if (l.length)
+        out = out.concat(l); });
     POSTE_MEM.a = actes;
     POSTE_MEM.r = out;
     return out;
 }
-function posteDu(r, intCfg, y, m, d, sl, F) {
+function posteAnnCle(r, y, m, d, sl) { return r.acte.id + "|" + intISO2(y, m, d) + "|" + sl; }
+function posteAnnule(r, y, m, d, sl) { return POSTE_ANN.d[posteAnnCle(r, y, m, d, sl)] === 1; }
+function posteDuBrut(r, intCfg, y, m, d, sl, F) {
     if (sl !== r.sl || r.j.indexOf(new Date(y, m, d).getDay()) < 0)
         return false;
     if (r.du && intISO2(y, m, d) < r.du)
         return false;
     if (isFerie(y, m, d) || salleFermee(r.salle, y, m, d, sl, F || undefined))
         return false;
-    return !!intMedsDuJour(intCfg, y, m, d);
+    return r.qui === "med" ? true : !!intMedsDuJour(intCfg, y, m, d);
+}
+function posteDu(r, intCfg, y, m, d, sl, F) { return posteDuBrut(r, intCfg, y, m, d, sl, F) && !posteAnnule(r, y, m, d, sl); }
+function posteTenants(r, getEntries, medecins, y, m, d, sl) {
+    return (medecins || []).filter(med => (getEntries(med.id, y, m, d, sl) || []).some(e => !!(e && e.acteId === r.acte.id && !e.cond && e.salle === r.salle)));
 }
 function postePourvu(r, getEntries, medecins, intCfg, y, m, d, sl) {
     const ok = e => !!(e && e.acteId === r.acte.id && !e.cond && e.salle === r.salle);
@@ -11348,8 +11495,8 @@ function posteCase(actes, salle, ids, getEntries, medecins, intCfg, y, m, d, sl,
     }
     return null;
 }
-function postesListe(actes, getEntries, medecins, intCfg, F, isoDeb, isoFin) {
-    const rs = posteRegles(actes), out = [];
+function postesListe(actes, getEntries, medecins, intCfg, F, isoDeb, isoFin, qui) {
+    const rs = posteRegles(actes).filter(r => !qui || r.qui === qui), out = [];
     if (!rs.length)
         return out;
     const tod = intISO(new Date());
@@ -11366,6 +11513,65 @@ function postesListe(actes, getEntries, medecins, intCfg, F, isoDeb, isoFin) {
     }
     return out;
 }
+function postesEtat(actes, getEntries, medecins, intCfg, F, isoDeb, isoFin) {
+    const rs = posteRegles(actes).filter(r => r.qui === "med"), out = [];
+    if (!rs.length)
+        return out;
+    const tod = intISO(new Date());
+    let iso = isoDeb < tod ? tod : isoDeb, n = 0;
+    const t0 = tod.split("-").map(Number), j0 = new Date(t0[0], t0[1] - 1, t0[2]).getTime();
+    while (iso <= isoFin && n < 400) {
+        const p = iso.split("-").map(Number), y = p[0], m = p[1] - 1, d = p[2];
+        rs.forEach(r => {
+            if (!posteDuBrut(r, intCfg, y, m, d, r.sl, F))
+                return;
+            const ann = posteAnnule(r, y, m, d, r.sl), par = ann ? [] : posteTenants(r, getEntries, medecins, y, m, d, r.sl);
+            const pv = !ann && (par.length > 0 || postePourvu(r, getEntries, medecins, intCfg, y, m, d, r.sl));
+            out.push({ r: r, y: y, m: m, d: d, sl: r.sl, iso: iso, dans: Math.round((new Date(y, m, d).getTime() - j0) / 86400000), etat: ann ? "annule" : pv ? "pourvu" : "ouvert", par: par });
+        });
+        iso = intDecal(iso, 1);
+        n++;
+    }
+    return out;
+}
+function postesLaches(actes, medecins, avant, apres, F) {
+    const rs = posteRegles(actes).filter(r => r.qui === "med"), out = [];
+    if (!rs.length || !avant || !apres || avant === apres)
+        return out;
+    const tient = (pl, r, med, y, m, d) => expEntries(pl, {}, {}, med.id, y, m, d, r.sl).some(e => !!(e && e.acteId === r.acte.id && !e.cond && e.salle === r.salle));
+    let iso = intISO(new Date()), n = 0;
+    while (n < 220) {
+        const p = iso.split("-").map(Number), y = p[0], m = p[1] - 1, d = p[2];
+        rs.forEach(r => {
+            const kS = sk(y, m, d, r.sl), kJ = sk(y, m, d, "JOUR");
+            if (avant[kS] === apres[kS] && avant[kJ] === apres[kJ])
+                return;
+            if (!posteDu(r, null, y, m, d, r.sl, F))
+                return;
+            const av = (medecins || []).filter(med => tient(avant, r, med, y, m, d));
+            if (!av.length)
+                return;
+            if ((medecins || []).some(med => tient(apres, r, med, y, m, d)))
+                return;
+            const parti = av.find(med => expEntries(apres, {}, {}, med.id, y, m, d, r.sl).some(e => !!(e && (e._blocked || EXCL_IDS.indexOf(e.acteId) >= 0))));
+            if (parti)
+                out.push({ r: r, y: y, m: m, d: d, sl: r.sl, iso: iso, med: parti });
+        });
+        iso = intDecal(iso, 1);
+        n++;
+    }
+    return out;
+}
+function posteAnnMaj(cur, cle, on) {
+    const lim = intDecal(intISO(new Date()), -60), n = {};
+    Object.keys(cur || {}).forEach(k => { const dt = String(k).split("|")[1] || ""; if (dt >= lim && cur[k] === 1)
+        n[k] = 1; });
+    if (on)
+        n[cle] = 1;
+    else
+        delete n[cle];
+    return n;
+}
 function posteTxt(o, court) { const dw = new Date(o.y, o.m, o.d).getDay(); return (court ? JOURSC[dw].toLowerCase() : JOURSL[dw].toLowerCase()) + " " + o.d + "/" + (o.m + 1) + (court ? "" : (o.sl === "M" ? " matin" : " après-midi")); }
 function postePillSt(dark) { return { fontSize: 9.5, fontWeight: 800, padding: "2px 6px", borderRadius: 10, border: "1.5px dashed " + (dark ? "#fbbf24" : "#d97706"), background: dark ? "#3a2a08" : "#fef3c7", color: dark ? "#fbbf24" : "#92400e", whiteSpace: "nowrap", fontFamily: "'JetBrains Mono',monospace" }; }
 function intPosable(a, im, canInt, adminOnly, okKey) {
@@ -11380,10 +11586,10 @@ function PostesInternes({ actes, getEntries, setEntry, medecins, intCfg, salleFe
     const [tout, setTout] = useState({});
     const [sel, setSel] = useState(null);
     const [qui, setQui] = useState(null);
-    const rs = posteRegles(actes);
+    const rs = posteRegles(actes).filter(r => r.qui === "interne");
     if (!sem || !rs.length || !cols.length)
         return null;
-    const liste = postesListe(actes, getEntries, medecins, intCfg, salleFerm, sem.deb, sem.fin);
+    const liste = postesListe(actes, getEntries, medecins, intCfg, salleFerm, sem.deb, sem.fin, "interne");
     if (!liste.length)
         return null;
     const peut = r => !!canEdit && (!adminKey || r.acte[adminKey] === true) && (!intSelf || r.acte.interneSelf === true);
@@ -11411,7 +11617,7 @@ function PostesInternes({ actes, getEntries, setEntry, medecins, intCfg, salleFe
             if (!l.length)
                 return null;
             const vus = tout[r.acte.id] ? l : l.slice(0, 6);
-            return React.createElement("div", { key: r.acte.id, "data-postesacte": r.acte.id, style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, margin: "2px 0" } },
+            return React.createElement("div", { key: r.acte.id + "|" + r.sl, "data-postesacte": r.acte.id, style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, margin: "2px 0" } },
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "var(--txt)" } }, "📌 Dates d'" + (r.acte.short || r.acte.label) + " à compléter"),
                 React.createElement("span", { style: { fontSize: 10, color: "var(--txt3)" } }, "(" + posteQuand(r) + ", " + r.salle + ")"),
                 vus.map(o => {
@@ -12706,6 +12912,7 @@ function CardioPlanning() {
     const [issOk, setIssOk] = useState({});
     const [salleVideCol, setSalleVideCol] = useState(VIDE_COL_DEF);
     const [agPl, setAgPl] = useState({ jours: {} });
+    const [posteAnn, setPosteAnn] = useState({});
     const [agCol, setAgCol] = useState(AG_COL_DEF);
     const [inactMin, setInactMin] = useState(60);
     const [inactReste, setInactReste] = useState(null);
@@ -13152,6 +13359,7 @@ function CardioPlanning() {
     const refusesF = useRef({});
     const planSynced = useRef(null);
     const planApplique = useRef(null);
+    const posteLacheRef = useRef(null);
     const planPending = useRef({});
     const planMigrated = useRef(false);
     const mapSynced = useRef({});
@@ -13422,6 +13630,12 @@ function CardioPlanning() {
             return;
         }
         secrEmit(prev, cur, chg);
+        if (chg.length && chg.length <= 400 && posteLacheRef.current) {
+            try {
+                posteLacheRef.current(prev, cur);
+            }
+            catch (e) { }
+        }
         planSynced.current = cur;
         planApplique.current = cur;
         if (cles.length === 0)
@@ -13928,6 +14142,15 @@ function CardioPlanning() {
                         try {
                             const o = JSON.parse(data.dblOk);
                             setDblOk(o && typeof o === "object" ? o : {});
+                        }
+                        catch (e) { }
+                    }
+                    if (data.posteAnn !== undefined) {
+                        try {
+                            const o = JSON.parse(data.posteAnn);
+                            const no = o && typeof o === "object" ? o : {};
+                            POSTE_ANN.d = no;
+                            setPosteAnn(no);
                         }
                         catch (e) { }
                     }
@@ -15016,6 +15239,8 @@ function CardioPlanning() {
         saveToFirebase({ salleAG: JSON.stringify(agPl) }); }, [agPl, rejoue]);
     useEffect(() => { if (!pasPret(45, [agCol]))
         saveToFirebase({ salleAGCol: agCol }); }, [agCol, rejoue]);
+    useEffect(() => { if (!pasPret(46, [posteAnn]))
+        saveToFirebase({ posteAnn: JSON.stringify(posteAnn) }); }, [posteAnn, rejoue]);
     useEffect(() => { INACT.min = inactMin; if (!pasPret(29, [inactMin]))
         saveToFirebase({ inactMin }); }, [inactMin, rejoue]);
     useEffect(() => {
@@ -15089,6 +15314,7 @@ function CardioPlanning() {
     AGS.d = agPl;
     AGS.col = videColOk(agCol) ? agCol : AG_COL_DEF;
     AGS.noms = agNoms;
+    POSTE_ANN.d = posteAnn;
     useEffect(() => {
         const p = perStart(year, month);
         const pid = p.sy + "-" + p.sm;
@@ -18035,6 +18261,24 @@ function CardioPlanning() {
         const t = setTimeout(f, 300);
         return () => { window.removeEventListener("resize", f); clearTimeout(t); };
     }, []);
+    const [posteQ, setPosteQ] = useState([]);
+    const posteDroit = isEdit || isInterEdit || (isAdminEdit && isCadre);
+    posteLacheRef.current = (av, ap) => {
+        if (BAC || isFirstLoad.current)
+            return;
+        if (!posteDroit && !(accessMode === "medecinEdit" && editMedId != null))
+            return;
+        let l = postesLaches(actes, medsAff, av, ap, salleFerm);
+        if (!posteDroit)
+            l = l.filter(o => o.med.id === editMedId);
+        if (!l.length || l.length > 12)
+            return;
+        setPosteQ(q => q.concat(l.filter(o => !q.some(x => x.iso === o.iso && x.sl === o.sl && x.r.acte.id === o.r.acte.id))).slice(0, 12));
+    };
+    const posteQv = posteQ.length ? posteQ.filter(o => {
+        const r = posteRegles(actes).find(x => x.acte.id === o.r.acte.id && x.sl === o.sl && x.salle === o.r.salle);
+        return !!r && posteDu(r, intCfgAff, o.y, o.m, o.d, o.sl, salleFerm) && !postePourvu(r, getEntries, medsAff, intCfgAff, o.y, o.m, o.d, o.sl);
+    }) : posteQ;
     const entreePrec = useRef(accessMode);
     useEffect(() => {
         const av = entreePrec.current;
@@ -18563,15 +18807,17 @@ header::-webkit-scrollbar { display: none; }
                         medPlan.map(m => { const on = planFilter.includes(m.id); return React.createElement("button", { key: m.id, onClick: () => setPlanFilter(p => on ? p.filter(x => x !== m.id) : [...p, m.id]), style: { padding: "2px 7px", borderRadius: 10, border: `1px solid ${on ? m.color : "var(--border)"}`, background: on ? m.color : "var(--bg2)", color: on ? "#fff" : "var(--txt2)", fontSize: 11, cursor: "pointer", fontWeight: on ? 700 : 400 } }, m.init); }))),
                 React.createElement(GridV, { salleOcc: salleOcc, tourSous: tourSous, apChoix: issOk, annJour: annJourDe("planning"), onRemoveGarde: removeGardeDay, planIssues: planIssues.map, intGarde: intGardeOn ? ((y2, m2, d2) => intGardeDuJour(getEntries, intCfgAff, y2, m2, d2)) : null, printWk: printWk, allDays4: allDays4, allDays: allDays, year: year, month: month, meds: filteredMeds, getEntries: getEntries, acteById: acteById, onCell: openCell, isEdit: isAnyEdit, gardeSelf: gardeSelfId, gardeOuvert: gardeOuvert, onPrevenir: annPrevenir, pushMeds: pushMeds, notes: notesAff, isVac: isVac, applyGarde: applyGarde, allMeds: medsAff, viewPeriod: viewPeriod, allDays4: allDays4, showFull: showFull, gardeLocked: isAdminEdit || isAttEdit, onCellHistory: histOk ? openCellHistory : null, prefFor: prefOn ? prefFor : null, gardePref: gardePrefFor, getAstreinteForDay: prefOn ? null : astSelf, extraCols: planColsVues, progressif: true, memX: "planning", selfId: selfLis, centreId: selfMedId, lis: lisCur, suiviId: suiviCur, onSuivi: suiviTap }))),
             tab === "tourmedical" && React.createElement(TourTab, Object.assign({}, tourProps)),
-            tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medsAff, getEntries: getEntries, tourMed: tourMed, isEdit: (isEdit || isInterEdit) && !isAttEdit, edReel: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: (per) => openPtModal(null, "apply", per), onRemovePT: (per) => openPtModal(null, "remove", per), secrDif: secrCfg.dif || {}, onPushDemande: (l) => annPrevenir(l, true, true), onDiffuser: (pid) => setSecrCfg(c => (Object.assign(Object.assign({}, c), { dif: Object.assign(Object.assign({}, (c.dif || {})), { [pid]: new Date().toLocaleDateString("fr-FR") }) }))), onAnnulerDif: (pid) => setSecrCfg(c => { const d2 = Object.assign({}, (c.dif || {})); delete d2[pid]; return Object.assign(Object.assign({}, c), { dif: d2 }); }), tourProps: tourProps, gardeProps: gardeProps }),
+            tab === "construire" && React.createElement(BuildTab, { build: build, setBuild: setBuild, medecins: medsAff, getEntries: getEntries, tourMed: tourMed, isEdit: (isEdit || isInterEdit) && !isAttEdit, edReel: isEdit, darkMode: darkMode, setDarkMode: setDarkMode, author: authorRef.current, goTab: goTab, onOpenBip: bipOpen, onApplyPT: (per) => openPtModal(null, "apply", per), onRemovePT: (per) => openPtModal(null, "remove", per), secrDif: secrCfg.dif || {}, onPushDemande: (l) => annPrevenir(l, true, true), onDiffuser: (pid) => setSecrCfg(c => (Object.assign(Object.assign({}, c), { dif: Object.assign(Object.assign({}, (c.dif || {})), { [pid]: new Date().toLocaleDateString("fr-FR") }) }))), onAnnulerDif: (pid) => setSecrCfg(c => { const d2 = Object.assign({}, (c.dif || {})); delete d2[pid]; return Object.assign(Object.assign({}, c), { dif: d2 }); }), tourProps: tourProps, gardeProps: gardeProps, actes: actes, intCfg: intCfgAff, addEntry: addEntryM, isMedAvailable: isMedAvailable, posteAnn: posteAnn, setPosteAnn: setPosteAnn, salleFerm: salleFerm }),
             isAdminEdit && isCadre && (tab === "chl" || tab === "chb" || tab === "angio" || tab === "plateau") && (() => {
                 const tod = intISO(new Date());
                 const montre = r => tab === "plateau" ? (ptRows || []).some(row => row.salle === r.salle && (row.ids || []).indexOf(r.acte.id) >= 0)
                     : siteActesDe(tab === "chl" ? "CHL" : tab === "chb" ? "CHB" : "ANGIO", actes).some(a => a.id === r.acte.id);
-                const l = postesListe(actes, getEntries, medsAff, intCfgAff, salleFerm, tod, intDecal(tod, 60)).filter(o => o.dans <= o.r.al && montre(o.r));
+                const c0 = perStart(new Date().getFullYear(), new Date().getMonth());
+                const dif = o => { const p = perOfDay(o.y, o.m, o.d); return !!(secrCfg.dif || {})[perIdOf(p.sy, p.sm)] || perIdx(p.sy, p.sm) <= perIdx(c0.sy, c0.sm); };
+                const l = postesListe(actes, getEntries, medsAff, intCfgAff, salleFerm, tod, intDecal(tod, 150)).filter(o => montre(o.r) && (o.r.qui === "med" ? dif(o) : o.dans <= o.r.al));
                 if (!l.length)
                     return null;
-                return React.createElement("div", { "data-postealerte": "1", style: Object.assign(Object.assign({}, S.card), { marginBottom: 8, padding: "7px 10px", border: "1px solid #dc2626", background: darkMode ? "#3b1212" : "#fee2e2", color: darkMode ? "#fca5a5" : "#991b1b", fontSize: 12 }) }, l.map(o => React.createElement("div", { key: o.r.acte.id + "|" + o.iso, "data-postealerteligne": o.iso }, "🔔 " + (o.r.acte.short || o.r.acte.label) + " du " + posteTxt(o, false) + " (" + o.r.salle + ") : aucun interne inscrit" + (o.dans === 0 ? " — aujourd'hui" : (" — dans " + o.dans + " jour" + (o.dans > 1 ? "s" : ""))))));
+                return React.createElement("div", { "data-postealerte": "1", style: Object.assign(Object.assign({}, S.card), { marginBottom: 8, padding: "7px 10px", border: "1px solid #dc2626", background: darkMode ? "#3b1212" : "#fee2e2", color: darkMode ? "#fca5a5" : "#991b1b", fontSize: 12 }) }, l.map(o => React.createElement("div", { key: o.r.acte.id + "|" + o.iso + "|" + o.sl, "data-postealerteligne": o.iso, "data-postealertequi": o.r.qui }, "🔔 " + (o.r.acte.short || o.r.acte.label) + " du " + posteTxt(o, false) + " (" + o.r.salle + ") : " + (o.r.qui === "med" ? "plus de médecin" : "aucun interne inscrit") + (o.dans === 0 ? " — aujourd'hui" : (" — dans " + o.dans + " jour" + (o.dans > 1 ? "s" : ""))))));
             })(),
             tab === "chl" && React.createElement(SiteView, { moiC: moiC, moi: moiJaune, dbl: dblCtl, salleVide: salleVide, isVac: isVac, onCellHistory: histOk ? openCellHistory : null, issMap: issAllMap, printWk: printWk, onPrint: () => setModal("print"), narrow: narrow, moreOpen: moreOpen, setMoreOpen: setMoreOpen, colHide: colHide["CHL"] || null, onHide: (cols) => { setHideModal({ site: "CHL", cols }); setModal("colHide"); }, colOrder: colOrder["CHL"] || null, onOrder: (cols) => { setColModal({ site: "CHL", cols }); setModal("colOrder"); }, site: "CHL", salleFerm: salleFerm, intCfg: intCfgAff, salleReg: salleReg, year: year, month: month, prevM: prevM, nextM: nextM, actes: actes, medecins: medsAff, getEntries: getEntries, salleOcc: salleOcc, allDays: allDays, isEdit: peutSalles, notes: notesAff, onPickSite: pickSiteDe("CHL"), darkMode: darkMode, setDarkMode: setDarkMode, showFull: showFull, setShowFull: setShowFull, viewPeriod: viewPeriod, allDays4: allDays4, setViewPeriod: setViewPeriod }),
             tab === "chb" && React.createElement("div", null,
@@ -18647,7 +18893,7 @@ header::-webkit-scrollbar { display: none; }
                             a.adminOk && React.createElement("div", { style: { fontSize: 9, color: "#7c3aed", fontWeight: 700 } }, "\u270F\uFE0F Secr\u00E9taires"),
                             a.cadreOk && React.createElement("div", { style: { fontSize: 9, color: "#7c3aed", fontWeight: 700 } }, "\u270F\uFE0F Cadres"),
                             a.interneOk && React.createElement("div", { style: { fontSize: 9, color: "#0e9f9f", fontWeight: 700 } }, "🎓 Internes" + (a.interneSelf ? " (posable par eux)" : "")),
-                            a.interneOk && a.poste && a.poste.on === true && !!posteSalle(a) && React.createElement("div", { "data-postecarte": "1", style: { fontSize: 9, color: "#b45309", fontWeight: 700 } }, "📌 Poste à pourvoir : " + posteQuand(a.poste))),
+                            a.poste && a.poste.on === true && posteRegleDe(a).length > 0 && React.createElement("div", { "data-postecarte": "1", style: { fontSize: 9, color: "#b45309", fontWeight: 700 } }, "📌 Poste à pourvoir (" + (posteQui(a, a.poste) === "med" ? "médecin" : "interne") + ") : " + posteQuand(a.poste) + " · " + posteSalleDe(a, a.poste))),
                         isEdit && React.createElement("div", { style: { display: "flex", gap: 4 } },
                             React.createElement("button", { style: Object.assign({}, S.icnBtn), onClick: () => { setMData(Object.assign(Object.assign({}, a), { _new: false, sallesStr: (a.salles || []).join(","), medStr: (a.medecinsAutorise || []).join(",") })); setModal("editActe"); } }, "\u270F\uFE0F"),
                             !a.isSystem && React.createElement("button", { style: Object.assign(Object.assign({}, S.icnBtn), { background: "#fff1f2", border: "1px solid #fecdd3", color: "#dc2626" }), onClick: () => { if (confirm(`Supprimer "${a.label}" ?`))
@@ -19644,7 +19890,7 @@ header::-webkit-scrollbar { display: none; }
                                 React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 4 } })),
                             docDet && (() => {
                                 const EQ = "Équipe & internes", AC = "Activités & salles", TO = "Tour médical", SO = "Souhaits ⭐🚫", AS = "Astreinte", RE = "Reports";
-                                const FAMN = { planV2: "Cases du planning", plan: "Cases (ancien format)", planningTypeV2: "Planning type", planningType: "Planning type", medecinsV2: EQ, medecinsV2Order: EQ, medecins: EQ, intCfg: EQ, medPins: EQ, actesV2: AC, actesV2Order: AC, actes: AC, salleReg: AC, salleRegV2: AC, salleRegV2Order: AC, salleFerm: AC, salleAG: AC, salleAGCol: AC, tourMed: TO, tourMedV2: TO, notesV2: "Notes", _ecr: "Réglages divers", tourDerog: TO, tourPtOte: TO, tourHist: TO, tourHistDeb: TO, tourMins: TO, tourMinsHard: TO, tourCfg: TO, tourReport: TO, tourWish: SO, tourAvoid: SO, gardeWish: SO, gardeAvoid: SO, astreinte: AS, astReport: AS, notes: "Notes", build: "Construire", csRep: RE, csBlanches: RE, csActsSel: RE, csActsGlobal: RE, journal: "Journal" };
+                                const FAMN = { planV2: "Cases du planning", plan: "Cases (ancien format)", planningTypeV2: "Planning type", planningType: "Planning type", medecinsV2: EQ, medecinsV2Order: EQ, medecins: EQ, intCfg: EQ, medPins: EQ, actesV2: AC, actesV2Order: AC, actes: AC, salleReg: AC, salleRegV2: AC, salleRegV2Order: AC, salleFerm: AC, salleAG: AC, posteAnn: AC, salleAGCol: AC, tourMed: TO, tourMedV2: TO, notesV2: "Notes", _ecr: "Réglages divers", tourDerog: TO, tourPtOte: TO, tourHist: TO, tourHistDeb: TO, tourMins: TO, tourMinsHard: TO, tourCfg: TO, tourReport: TO, tourWish: SO, tourAvoid: SO, gardeWish: SO, gardeAvoid: SO, astreinte: AS, astReport: AS, notes: "Notes", build: "Construire", csRep: RE, csBlanches: RE, csActsSel: RE, csActsGlobal: RE, journal: "Journal" };
                                 const g = {};
                                 Object.keys(docDet).forEach(k => { const f = FAMN[k] || "Réglages divers"; g[f] = (g[f] || 0) + docDet[k]; });
                                 const rows = Object.keys(g).map(f => ({ f, b: g[f] })).sort((a, b) => b.b - a.b);
@@ -21217,6 +21463,7 @@ header::-webkit-scrollbar { display: none; }
                     React.createElement("button", { disabled: i === ptRows.length - 1, title: "Descendre", style: Object.assign(Object.assign({}, S.icnBtn), { fontSize: 11, fontWeight: 800, opacity: i === ptRows.length - 1 ? .3 : 1 }), onClick: () => movePtRow(r.key, 1) }, "\u25BC"))))),
                 React.createElement("button", { style: Object.assign(Object.assign({}, S.icnBtn), { width: "100%", marginTop: 10 }), onClick: () => setPtOrder([]) }, "\u21A9 Ordre par d\u00E9faut"),
                 React.createElement("div", { style: { fontSize: 9, color: "var(--txt3)", marginTop: 8, lineHeight: 1.45 } }, "Les colonnes se d\u00E9duisent des activit\u00E9s : la salle indiqu\u00E9e sur chaque fiche d'activit\u00E9 d\u00E9cide de la colonne o\u00F9 elle appara\u00EEt. Modifier une salle dans l'onglet Activit\u00E9s d\u00E9place donc la colonne ici."))),
+        !modal && posteQv.length > 0 && React.createElement(PosteLache, { items: posteQv, actes: actes, medecins: medsAff, getEntries: getEntries, isMedAvailable: isMedAvailable, addEntry: addEntryM, canInt: posteDroit, setPosteAnn: setPosteAnn, onClose: () => setPosteQ([]) }),
         modal === "signal" && React.createElement(SignalModal, { auteur: authorRef.current, ctx: sigCtx(), journal: JOURNAL, prec: JOURNAL_PREC, netOff: netOffSig || navigator.onLine === false, onClose: () => setModal(null), toast: toast, onSend: async (t) => { try {
                 await sigEnvoyer(t);
                 setModal(null);
@@ -21301,29 +21548,45 @@ header::-webkit-scrollbar { display: none; }
                 !(mData.id === "GARDE" || mData.id === "REPOS_GARDE" || mData.id === "TP") && !!mData.interneOk && React.createElement("div", { style: { gridColumn: "1/-1", display: "flex", gap: 8, alignItems: "center", marginLeft: 22 } },
                     React.createElement("input", { type: "checkbox", checked: !!mData.interneSelf, onChange: e => setMData(p => (Object.assign(Object.assign({}, p), { interneSelf: e.target.checked }))), style: { width: 14, height: 14 } }),
                     React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "Posable par les internes eux-m\u00EAmes (sinon : secr\u00E9taire, cadre, interm\u00E9diaire ou \u00E9diteur)")),
-                !(mData.id === "GARDE" || mData.id === "REPOS_GARDE" || mData.id === "TP") && !!mData.interneOk && (() => {
-                    const ps = posteSalle(mData), po = mData.poste || {};
-                    const setP = q => setMData(p => (Object.assign(Object.assign({}, p), { poste: Object.assign(Object.assign({ on: false, j: [2], sl: "AM", du: "", al: 14 }, (p.poste || {})), q) })));
-                    if (!ps)
-                        return mData.hasSalle ? React.createElement("div", { "data-postenon": "1", style: { gridColumn: "1/-1", marginLeft: 22, fontSize: 11, color: "var(--txt3)" } }, "\uD83D\uDCCC Poste \u00E0 pourvoir par un interne : possible quand l'activit\u00E9 n'a qu'une seule salle coch\u00E9e.") : null;
-                    const pj = Array.isArray(po.j) ? po.j : [2], psl = po.sl === "M" ? "M" : "AM";
+                !(mData.id === "GARDE" || mData.id === "REPOS_GARDE" || mData.id === "TP") && (() => {
+                    const po = mData.poste || {};
+                    const sls = uniqArr((mData.fixedSalle ? [mData.fixedSalle] : []).concat(mData.salles || []));
+                    if (!sls.length)
+                        return null;
+                    const pqui = posteQui(mData, po);
+                    const setP = q => setMData(p => (Object.assign(Object.assign({}, p), { poste: Object.assign(Object.assign({ on: false, j: [2], sl: "AM", du: "", al: 14, qui: posteQui(p, p.poste || {}) }, (p.poste || {})), q) })));
+                    const ps = posteSalleDe(mData, po);
+                    const pj = Array.isArray(po.j) ? po.j : [2], psl = po.sl === "M" ? "M" : po.sl === "J" ? "J" : "AM";
                     const bt = on => ({ padding: "4px 9px", borderRadius: 6, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, background: on ? "#1d4ed8" : "var(--bg2)", color: on ? "#fff" : "var(--txt2)" });
                     return React.createElement("div", { "data-postebloc": "1", style: { gridColumn: "1/-1", display: "flex", flexDirection: "column", gap: 6 } },
                         React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "flex-start" } },
                             React.createElement("input", { "data-postecoche": "1", type: "checkbox", checked: po.on === true, onChange: e => setP({ on: e.target.checked }), style: { width: 14, height: 14, marginTop: 2 } }),
-                            React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "📌 Poste à pourvoir par un interne — salle " + ps + " : chaque semaine, la salle affiche « Interne ? » tant que personne n'y est posé, les infirmières sont comptées, et l'onglet Internes liste les dates à compléter")),
+                            React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12 } }, "📌 Poste à pourvoir — un jour fixe, une salle fixe, mais on ne sait pas encore qui : la salle affiche un rappel en pointillés tant que personne n'y est posé")),
                         po.on === true && React.createElement("div", { style: { marginLeft: 22, display: "flex", flexDirection: "column", gap: 6 } },
+                            React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: "var(--txt2)" } },
+                                React.createElement("span", null, "Par"),
+                                React.createElement("button", { "data-postequi": "interne", "data-on": pqui === "interne" ? "1" : "0", disabled: !mData.interneOk, title: mData.interneOk ? "" : "Cochez d'abord « 🎓 Accessible aux internes »", onClick: () => setP({ qui: "interne" }), style: Object.assign(Object.assign({}, bt(pqui === "interne")), { opacity: mData.interneOk ? 1 : .45, cursor: mData.interneOk ? "pointer" : "default" }) }, "\uD83C\uDF93 un interne"),
+                                React.createElement("button", { "data-postequi": "med", "data-on": pqui === "med" ? "1" : "0", onClick: () => setP({ qui: "med" }), style: bt(pqui === "med") }, "\uD83E\uDE7A un m\u00E9decin autoris\u00E9")),
                             React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" } },
                                 POSTE_JOURS.map(j => React.createElement("button", { key: j[0], "data-postejour": j[0], "data-on": pj.indexOf(j[0]) >= 0 ? "1" : "0", onClick: () => setP({ j: pj.indexOf(j[0]) >= 0 ? pj.filter(x => x !== j[0]) : pj.concat([j[0]]).sort() }), style: bt(pj.indexOf(j[0]) >= 0) }, j[1])),
                                 React.createElement("span", { style: { width: 8 } }),
-                                [["M", "Matin"], ["AM", "Après-midi"]].map(q => React.createElement("button", { key: q[0], "data-postesl": q[0], "data-on": psl === q[0] ? "1" : "0", onClick: () => setP({ sl: q[0] }), style: bt(psl === q[0]) }, q[1]))),
+                                [["M", "Matin"], ["AM", "Après-midi"], ["J", "Journée"]].map(q => React.createElement("button", { key: q[0], "data-postesl": q[0], "data-on": psl === q[0] ? "1" : "0", onClick: () => setP({ sl: q[0] }), style: bt(psl === q[0]) }, q[1]))),
+                            sls.length > 1 && React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: "var(--txt2)" } },
+                                React.createElement("span", null, "Salle"),
+                                sls.map(sa => React.createElement("button", { key: sa, "data-postesa": sa, "data-on": ps === sa ? "1" : "0", onClick: () => setP({ sa: sa }), style: bt(ps === sa) }, sa))),
+                            sls.length === 1 && React.createElement("div", { style: { fontSize: 11, color: "var(--txt3)" } }, "Salle : " + sls[0]),
                             React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: "var(--txt2)" } },
                                 React.createElement("span", null, "\u00C0 partir du"),
                                 React.createElement("input", { "data-postedu": "1", type: "date", value: po.du || "", onChange: e => setP({ du: e.target.value || "" }), style: Object.assign(Object.assign({}, S.fi), { width: 150, padding: "4px 6px" }) }),
-                                React.createElement("span", null, "Alerte"),
-                                React.createElement("input", { "data-posteal": "1", type: "number", min: 0, max: 90, value: typeof po.al === "number" ? po.al : 14, onChange: e => setP({ al: Math.max(0, Math.min(90, parseInt(e.target.value || "0", 10) || 0)) }), style: Object.assign(Object.assign({}, S.fi), { width: 60, textAlign: "center", padding: "4px 2px" }) }),
-                                React.createElement("span", null, "jours avant, si personne n'est inscrit")),
-                            pj.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "#dc2626" } }, "Choisissez au moins un jour.")));
+                                pqui === "interne" && React.createElement(React.Fragment, null,
+                                    React.createElement("span", null, "Alerte"),
+                                    React.createElement("input", { "data-posteal": "1", type: "number", min: 0, max: 90, value: typeof po.al === "number" ? po.al : 14, onChange: e => setP({ al: Math.max(0, Math.min(90, parseInt(e.target.value || "0", 10) || 0)) }), style: Object.assign(Object.assign({}, S.fi), { width: 60, textAlign: "center", padding: "4px 2px" }) }),
+                                    React.createElement("span", null, "jours avant, si personne n'est inscrit"))),
+                            React.createElement("div", { "data-posteexpl": pqui, style: { fontSize: 11, color: "var(--txt3)" } }, pqui === "interne" ? "Les internes s'inscrivent dans leur onglet (📌 Dates à compléter) ; la cadre est alertée à l'approche de la date."
+                                : "Se remplit pendant la construction : Construire → tuile 6, qui ne passe au vert que lorsque chaque date a son médecin ou a été annulée. Après diffusion, la cadre est alertée si le poste redevient vide."),
+                            pj.length === 0 && React.createElement("div", { style: { fontSize: 11, color: "#dc2626" } }, "Choisissez au moins un jour."),
+                            !ps && React.createElement("div", { "data-postesansalle": "1", style: { fontSize: 11, color: "#dc2626" } }, "Choisissez la salle du poste."),
+                            pqui === "interne" && !mData.interneOk && React.createElement("div", { style: { fontSize: 11, color: "#dc2626" } }, "Pour un interne, cochez \u00AB \uD83C\uDF93 Accessible aux internes \u00BB plus haut.")));
                 })(),
                 React.createElement("div", { style: { gridColumn: "1/-1" } },
                     React.createElement("label", { style: { color: "var(--txt2)", fontSize: 12, display: "block", marginBottom: 3 } }, "\u21A9 Colonne/ligne de reprise dans :"),
